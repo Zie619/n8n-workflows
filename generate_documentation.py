@@ -113,6 +113,14 @@ class WorkflowAnalyzer:
         # Generate description
         workflow['description'] = self._generate_description(workflow, trigger_type, integrations)
         
+        # Extract or generate step-by-step process
+        steps = self._extract_or_generate_steps(workflow['nodes'], workflow['connections'])
+        workflow['steps'] = steps
+        
+        # Debug logging
+        if steps:
+            print(f"Found/Generated {len(steps)} steps in workflow: {workflow['name']}")
+        
         # Extract raw JSON for viewer
         workflow['rawJson'] = json.dumps(data, indent=2)
         
@@ -197,6 +205,204 @@ class WorkflowAnalyzer:
         desc += "."
         
         return desc
+    
+    def _extract_or_generate_steps(self, nodes: List[Dict], connections: Dict) -> List[Dict]:
+        """Extract notes from nodes or generate steps from workflow structure."""
+        steps = []
+        
+        # First, try to extract existing notes
+        nodes_with_notes = []
+        for node in nodes:
+            note = node.get('notes')
+            if note:
+                nodes_with_notes.append({
+                    'name': node.get('name', ''),
+                    'type': node.get('type', ''),
+                    'note': note,
+                    'id': node.get('id', '')
+                })
+        
+        # If we have notes, use them
+        if nodes_with_notes:
+            return nodes_with_notes
+        
+        # Otherwise, generate steps from workflow structure
+        return self._generate_steps_from_structure(nodes, connections)
+    
+    def _generate_steps_from_structure(self, nodes: List[Dict], connections: Dict) -> List[Dict]:
+        """Generate step descriptions from workflow node structure and connections."""
+        if not nodes:
+            return []
+        
+        # Create a map of nodes by ID for easy lookup
+        node_map = {node.get('id', ''): node for node in nodes}
+        
+        # Find the starting node (trigger or first node)
+        start_node = self._find_start_node(nodes, connections)
+        if not start_node:
+            # Fallback: just describe all nodes in order
+            return self._generate_basic_steps(nodes)
+        
+        # Follow the workflow path
+        steps = []
+        visited = set()
+        self._traverse_workflow(start_node, node_map, connections, steps, visited)
+        
+        return steps
+    
+    def _find_start_node(self, nodes: List[Dict], connections: Dict) -> Optional[Dict]:
+        """Find the starting node of the workflow (trigger or node with no inputs)."""
+        # Look for trigger nodes first
+        for node in nodes:
+            node_type = node.get('type', '').lower()
+            if any(trigger in node_type for trigger in ['trigger', 'webhook', 'cron', 'schedule', 'manual']):
+                return node
+        
+        # Find nodes that are not targets of any connections
+        target_nodes = set()
+        for source_connections in connections.values():
+            if isinstance(source_connections, dict) and 'main' in source_connections:
+                for main_connections in source_connections['main']:
+                    if isinstance(main_connections, list):
+                        for connection in main_connections:
+                            if isinstance(connection, dict) and 'node' in connection:
+                                target_nodes.add(connection['node'])
+        
+        # Return first node that's not a target
+        for node in nodes:
+            if node.get('name', '') not in target_nodes:
+                return node
+        
+        # Fallback: return first node
+        return nodes[0] if nodes else None
+    
+    def _traverse_workflow(self, current_node: Dict, node_map: Dict, connections: Dict, steps: List[Dict], visited: set):
+        """Traverse the workflow following connections and generate step descriptions."""
+        node_name = current_node.get('name', '')
+        node_id = current_node.get('id', '')
+        
+        if node_id in visited:
+            return
+        
+        visited.add(node_id)
+        
+        # Generate step description for current node
+        step_description = self._generate_step_description(current_node)
+        if step_description:
+            steps.append({
+                'name': node_name,
+                'type': current_node.get('type', ''),
+                'note': step_description,
+                'id': node_id
+            })
+        
+        # Find next nodes
+        if node_name in connections:
+            node_connections = connections[node_name]
+            if isinstance(node_connections, dict) and 'main' in node_connections:
+                for main_connections in node_connections['main']:
+                    if isinstance(main_connections, list):
+                        for connection in main_connections:
+                            if isinstance(connection, dict) and 'node' in connection:
+                                next_node_name = connection['node']
+                                next_node = None
+                                for node in node_map.values():
+                                    if node.get('name') == next_node_name:
+                                        next_node = node
+                                        break
+                                if next_node:
+                                    self._traverse_workflow(next_node, node_map, connections, steps, visited)
+    
+    def _generate_step_description(self, node: Dict) -> str:
+        """Generate a meaningful description for a workflow node based on its type and parameters."""
+        node_type = node.get('type', '')
+        node_name = node.get('name', '')
+        parameters = node.get('parameters', {})
+        
+        # Clean up node type
+        clean_type = node_type.replace('n8n-nodes-base.', '').replace('Trigger', '').replace('trigger', '')
+        
+        # Generate description based on node type
+        if 'webhook' in node_type.lower():
+            return f"Receives incoming webhook requests to trigger the workflow"
+        elif 'cron' in node_type.lower() or 'schedule' in node_type.lower():
+            return f"Runs on a scheduled basis to trigger the workflow automatically"
+        elif 'manual' in node_type.lower():
+            return f"Manual trigger to start the workflow execution"
+        elif 'http' in node_type.lower() or 'httpRequest' in node_type:
+            url = parameters.get('url', '')
+            method = parameters.get('method', 'GET')
+            return f"Makes {method} HTTP request" + (f" to {url}" if url else "")
+        elif 'set' in node_type.lower():
+            return f"Sets and transforms data values for use in subsequent steps"
+        elif 'if' in node_type.lower():
+            return f"Evaluates conditions to determine workflow path"
+        elif 'switch' in node_type.lower():
+            return f"Routes workflow execution based on multiple conditions"
+        elif 'function' in node_type.lower() or 'code' in node_type.lower():
+            return f"Executes custom JavaScript code for data processing"
+        elif 'merge' in node_type.lower():
+            return f"Combines data from multiple workflow branches"
+        elif 'split' in node_type.lower():
+            return f"Splits data into multiple items for parallel processing"
+        elif 'filter' in node_type.lower():
+            return f"Filters data based on specified conditions"
+        elif 'gmail' in node_type.lower():
+            operation = parameters.get('operation', 'send')
+            return f"Performs Gmail {operation} operation"
+        elif 'slack' in node_type.lower():
+            return f"Sends message or performs action in Slack"
+        elif 'discord' in node_type.lower():
+            return f"Sends message or performs action in Discord"
+        elif 'telegram' in node_type.lower():
+            return f"Sends message or performs action in Telegram"
+        elif 'airtable' in node_type.lower():
+            operation = parameters.get('operation', 'create')
+            return f"Performs Airtable {operation} operation on records"
+        elif 'google' in node_type.lower():
+            if 'sheets' in node_type.lower():
+                return f"Reads from or writes to Google Sheets"
+            elif 'drive' in node_type.lower():
+                return f"Manages files in Google Drive"
+            elif 'calendar' in node_type.lower():
+                return f"Manages Google Calendar events"
+            else:
+                return f"Integrates with Google {clean_type} service"
+        elif 'microsoft' in node_type.lower():
+            if 'outlook' in node_type.lower():
+                return f"Manages Microsoft Outlook emails"
+            elif 'excel' in node_type.lower():
+                return f"Works with Microsoft Excel files"
+            else:
+                return f"Integrates with Microsoft {clean_type} service"
+        elif 'openai' in node_type.lower():
+            return f"Processes data using OpenAI AI models"
+        elif 'anthropic' in node_type.lower():
+            return f"Processes data using Anthropic Claude AI"
+        elif 'database' in node_type.lower() or 'mysql' in node_type.lower() or 'postgres' in node_type.lower():
+            return f"Executes database operations"
+        elif 'wait' in node_type.lower():
+            return f"Pauses workflow execution for specified duration"
+        elif 'error' in node_type.lower():
+            return f"Handles errors and stops workflow execution"
+        else:
+            # Generic description based on service name
+            service_name = clean_type.title()
+            return f"Integrates with {service_name} to process data"
+    
+    def _generate_basic_steps(self, nodes: List[Dict]) -> List[Dict]:
+        """Generate basic steps when workflow structure is unclear."""
+        steps = []
+        for i, node in enumerate(nodes, 1):
+            description = self._generate_step_description(node)
+            if description:
+                steps.append({
+                    'name': node.get('name', f'Step {i}'),
+                    'type': node.get('type', ''),
+                    'note': description,
+                    'id': node.get('id', '')
+                })
+        return steps
     
     def _calculate_stats(self):
         """Calculate statistics from analyzed workflows."""
@@ -638,13 +844,40 @@ def generate_html_documentation(data: Dict[str, Any]) -> str:
 
         .workflow-description {
             color: var(--text-secondary);
-            font-size: 0.95rem;
-            line-height: 1.5;
-            margin-bottom: 15px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            margin-bottom: 0;
         }
 
-        .dark-mode .workflow-description {
-            color: var(--text-muted);
+        .workflow-integrations {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .dark-mode .workflow-integrations {
+            border-top-color: var(--border-color-dark);
+        }
+
+        .integrations-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 0 0 8px 0;
+        }
+
+        .integrations-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .integration-tag {
+            background: var(--secondary-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
         }
 
         .workflow-footer {
@@ -652,7 +885,7 @@ def generate_html_documentation(data: Dict[str, Any]) -> str:
             background: var(--surface-hover);
             border-radius: 0 0 12px 12px;
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             align-items: center;
             flex-wrap: wrap;
             gap: 10px;
@@ -745,18 +978,72 @@ def generate_html_documentation(data: Dict[str, Any]) -> str:
             color: var(--text-light);
         }
 
-        .integrations-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
+        .workflow-steps {
+            list-style: none;
+            counter-reset: step-counter;
+            padding-left: 0;
         }
 
-        .integration-tag {
-            background: var(--secondary-color);
+        .workflow-step {
+            counter-increment: step-counter;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: var(--surface-hover);
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-color);
+            position: relative;
+        }
+
+        .dark-mode .workflow-step {
+            background: var(--surface-hover-dark);
+        }
+
+        .workflow-step::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: -15px;
+            top: 12px;
+            background: var(--accent-color);
             color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .step-header {
+            margin-bottom: 6px;
+        }
+
+        .step-type {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: normal;
+            margin-left: 8px;
+        }
+
+        .step-note {
+            color: var(--text-secondary);
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+
+        .dark-mode .step-note {
+            color: var(--text-muted);
+        }
+
+        .workflow-howitworks {
+            color: var(--text-secondary);
+            line-height: 1.5;
+            padding: 10px 0;
+        }
+
+        .dark-mode .workflow-howitworks {
+            color: var(--text-muted);
         }
 
         @keyframes pulse-green {
@@ -1215,6 +1502,35 @@ def generate_html_documentation(data: Dict[str, Any]) -> str:
                     `<span class="integration-tag">${integration}</span>`
                 ).join('');
 
+                // Step-by-step process section
+                let stepsSection = '';
+                if (workflow.steps && workflow.steps.length > 0) {
+                  stepsSection = `
+                    <div class="details-section">
+                      <h4 class="details-title">Step-by-step process (${workflow.steps.length} steps)</h4>
+                      <ol class="workflow-steps">
+                        ${workflow.steps.map(step => `
+                          <li class="workflow-step">
+                            <div class="step-header">
+                              <strong>${step.name ? step.name : '(Unnamed node)'}</strong>
+                              <span class="step-type">[${step.type.replace('n8n-nodes-base.', '')}]</span>
+                            </div>
+                            <div class="step-note">${step.note}</div>
+                          </li>
+                        `).join('')}
+                      </ol>
+                    </div>
+                  `;
+                } else {
+                  // Debug: Show when no steps are found
+                  stepsSection = `
+                    <div class="details-section">
+                      <h4 class="details-title">Step-by-step process</h4>
+                      <p style="color: var(--text-muted); font-style: italic;">No step-by-step notes available for this workflow.</p>
+                    </div>
+                  `;
+                }
+
                 return `
                     <div class="workflow-card" data-trigger="${workflow.triggerType}" data-name="${workflow.name.toLowerCase()}" data-description="${workflow.description.toLowerCase()}" data-integrations="${workflow.integrations.join(' ').toLowerCase()}">
                         <div class="workflow-header">
@@ -1233,16 +1549,19 @@ def generate_html_documentation(data: Dict[str, Any]) -> str:
                             </div>
                             <h3 class="workflow-title">${workflow.name}</h3>
                             <p class="workflow-description">${workflow.description}</p>
-                        </div>
-                        
-                        <div class="workflow-details">
-                            <div class="details-section">
-                                <h4 class="details-title">Integrations (${workflow.integrations.length})</h4>
+                            
+                            <!-- Integrations moved to main card -->
+                            <div class="workflow-integrations">
+                                <h4 class="integrations-title">Integrations (${workflow.integrations.length})</h4>
                                 <div class="integrations-list">
                                     ${integrations}
                                     ${workflow.integrations.length > 5 ? `<span class="integration-tag">+${workflow.integrations.length - 5} more</span>` : ''}
                                 </div>
                             </div>
+                        </div>
+                        
+                        <div class="workflow-details">
+                            ${stepsSection}
                             ${workflow.tags.length > 0 ? `
                                 <div class="details-section">
                                     <h4 class="details-title">Tags</h4>
@@ -1262,7 +1581,6 @@ def generate_html_documentation(data: Dict[str, Any]) -> str:
                         </div>
 
                         <div class="workflow-footer">
-                            <div class="workflow-tags">${tags}</div>
                             <div class="action-buttons">
                                 <button class="btn toggle-details">View Details</button>
                                 <button class="btn view-json" data-workflow-name="${workflow.name}" data-filename="${workflow.filename}">View File</button>
