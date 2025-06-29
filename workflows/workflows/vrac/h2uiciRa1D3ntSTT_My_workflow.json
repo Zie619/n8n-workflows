@@ -1,0 +1,1005 @@
+{
+  "id": "h2uiciRa1D3ntSTT",
+  "meta": {
+    "instanceId": "ddfdf733df99a65c801a91865dba5b7c087c95cc22a459ff3647e6deddf2aee6"
+  },
+  "name": "My workflow",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "4b885b7d-0976-4dd3-bc1c-091ab0dff437",
+      "name": "Split Topics into Items",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        420,
+        420
+      ],
+      "parameters": {
+        "jsCode": "// Input data (from $json.Topics)\nconst topicsString = $json.Topics;\n\n// Split the string by newlines and trim whitespace\nconst topicsArray = topicsString.split('\\n').map(topic => topic.trim());\n\n// Create an array of items for each topic\nconst items = topicsArray.map(topic => {\n  return { json: { Topic: topic } };\n});\n\n// Output the new array of items\nreturn items;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "935d0266-feda-48cb-b441-b4da19d8b163",
+      "name": "Search Posts",
+      "type": "n8n-nodes-base.reddit",
+      "position": [
+        620,
+        420
+      ],
+      "parameters": {
+        "keyword": "meta",
+        "location": "allReddit",
+        "operation": "search",
+        "returnAll": true,
+        "additionalFields": {
+          "sort": "hot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cea577c8-c025-4132-926a-74d6946d81b8",
+      "name": "Upvotes Requirement Filtering",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        800,
+        420
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f767f7a8-a2e8-4566-be80-bd735249e069",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.ups }}",
+              "rightValue": 100
+            },
+            {
+              "id": "3af82bef-5a78-4e6e-91ef-a5bd0141c87f",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.post_hint }}",
+              "rightValue": "link"
+            },
+            {
+              "id": "980a84ed-d640-47a7-b49a-bf638e811f20",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              },
+              "leftValue": "={{ $json.url }}",
+              "rightValue": "bsky.app"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "eec2d833-9a63-4cf6-a6bd-56b300ede5e0",
+      "name": "Set Reddit Posts",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1040,
+        420
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8d5ae4fa-2f54-48d7-8f61-766f4ecf9d96",
+              "name": "Title",
+              "type": "string",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "id": "8eb33a06-d8e7-4eea-bcd3-f956e20e06e6",
+              "name": "Subreddit",
+              "type": "string",
+              "value": "={{ $json.subreddit }}"
+            },
+            {
+              "id": "5ff8c76e-a8d5-4f76-a7d0-faa69b7960e4",
+              "name": "Upvotes",
+              "type": "string",
+              "value": "={{ $json.ups }}"
+            },
+            {
+              "id": "05a2b453-0e29-4a81-8f10-5934ae721f64",
+              "name": "Comments",
+              "type": "string",
+              "value": "={{ $json.num_comments }}"
+            },
+            {
+              "id": "78f73e89-19a7-4dd5-9db0-ead55dfd5606",
+              "name": "Reddit URL",
+              "type": "string",
+              "value": "=https://www.reddit.com{{ $json.permalink }}"
+            },
+            {
+              "id": "6f92bce7-2dc5-4dfd-b216-efc12c5411bb",
+              "name": "URL",
+              "type": "string",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "id": "0b20d78c-1d6b-4c84-99ef-978ee39fd35e",
+              "name": "Is_URL",
+              "type": "string",
+              "value": "={{ $json.post_hint }}"
+            },
+            {
+              "id": "489807f6-25ef-47d5-bd47-711ca75dedea",
+              "name": "Date",
+              "type": "string",
+              "value": "={{ new Date($json.created * 1000).toISOString().split('T')[0] }}"
+            },
+            {
+              "id": "0a9fb817-bfb7-4ea7-9182-1eddc404035f",
+              "name": "Post ID",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9b45abb0-866a-47f4-b2b3-03e4cf41c988",
+      "name": "Remove Duplicates",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1220,
+        420
+      ],
+      "parameters": {
+        "jsCode": "// Get all input items\nconst inputItems = $input.all();\n\n// Create a Map to store the most upvoted item for each URL\nconst uniqueItemsMap = new Map();\n\nfor (const item of inputItems) {\n  const url = item.json.URL;\n  \n  // Skip items where URL contains \"redd.it\"\n  if (url && url.includes(\"redd.it\")) {\n    continue;\n  }\n  \n  const upvotes = parseInt(item.json.Upvotes, 10) || 0; // Ensure upvotes is a number\n\n  if (!uniqueItemsMap.has(url)) {\n    // Add the first occurrence of the URL\n    uniqueItemsMap.set(url, item);\n  } else {\n    // Compare upvotes and keep the item with the most upvotes\n    const existingItem = uniqueItemsMap.get(url);\n    const existingUpvotes = parseInt(existingItem.json.Upvotes, 10) || 0;\n    if (upvotes > existingUpvotes) {\n      uniqueItemsMap.set(url, item);\n    }\n  }\n}\n\n// Extract all unique items\nconst uniqueItems = Array.from(uniqueItemsMap.values());\n\n// Return each unique item as a separate output\nreturn uniqueItems;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "39672fd4-3f8c-4cdb-acd5-bb862ae5eddd",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        40,
+        660
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ad70aec7-a610-42f8-b87c-0d3dbee00e7b",
+      "name": "Get Comments",
+      "type": "n8n-nodes-base.reddit",
+      "position": [
+        480,
+        640
+      ],
+      "parameters": {
+        "postId": "={{ $json[\"Post ID\"] }}",
+        "resource": "postComment",
+        "operation": "getAll",
+        "subreddit": "={{ $json.Subreddit }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "af7f0b35-4250-49e5-afa7-608155df0fd5",
+      "name": "Extract Top Comments",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        660,
+        640
+      ],
+      "parameters": {
+        "jsCode": "/**\n * n8n Code Node for filtering top 30 Reddit-style comments by score/ups\n * and ensuring replies are included in the comment tree.\n * Excludes deleted comments.\n */\n\n// Get all input items\nconst inputItems = $input.all();\nconst commentsArray = inputItems.flatMap(item => item.json);\n\n/**\n * Checks if a comment is deleted.\n * @param {Object} commentObj - The comment to check.\n * @returns {boolean} - True if the comment is deleted, false otherwise.\n */\nfunction isDeletedComment(commentObj) {\n  return commentObj.author === \"[deleted]\" && commentObj.body === \"[removed]\";\n}\n\n// Function to recursively flatten a comment and its replies\nfunction flattenCommentTree(commentObj) {\n  // Skip deleted comments\n  if (isDeletedComment(commentObj)) {\n    return null;\n  }\n\n  const { body, ups, score, replies, author } = commentObj;\n\n  // Calculate score\n  const finalScore = typeof ups === 'number' ? ups : (score || 0);\n\n  // Process comment\n  const flatComment = {\n    body: body || '',\n    score: finalScore,\n    author: author || 'Unknown',\n    replies: [],\n  };\n\n  // Process replies\n  if (\n    replies &&\n    replies.data &&\n    Array.isArray(replies.data.children)\n  ) {\n    flatComment.replies = replies.data.children\n      .filter(child => child.kind === 't1' && child.data)\n      .map(child => flattenCommentTree(child.data)) // Recursively flatten replies\n      .filter(reply => reply !== null); // Filter out null replies (deleted comments)\n  }\n\n  return flatComment;\n}\n\n// Flatten all comments, preserving hierarchy\nconst allComments = commentsArray\n  .map(flattenCommentTree)\n  .filter(comment => comment !== null); // Filter out null comments (deleted comments)\n\n// Flatten the hierarchy to a list for scoring and filtering\nfunction flattenForScoring(tree) {\n  const result = [];\n  tree.forEach(comment => {\n    result.push(comment); // Add current comment\n    if (comment.replies && comment.replies.length > 0) {\n      result.push(...flattenForScoring(comment.replies)); // Add replies recursively\n    }\n  });\n  return result;\n}\n\n// Flatten the hierarchy and sort by score\nconst flatList = flattenForScoring(allComments);\nflatList.sort((a, b) => b.score - a.score);\n\n// Select the top 30 comments\nconst top30 = flatList.slice(0, 30);\n\n// Rebuild the hierarchy from the top 30\nfunction filterHierarchy(tree, allowedBodies) {\n  return tree\n    .filter(comment => allowedBodies.has(comment.body))\n    .map(comment => ({\n      ...comment,\n      replies: filterHierarchy(comment.replies || [], allowedBodies), // Recurse for replies\n    }));\n}\n\nconst allowedBodies = new Set(top30.map(comment => comment.body));\nconst filteredHierarchy = filterHierarchy(allComments, allowedBodies);\n\n// Return in n8n format\nreturn [\n  {\n    json: {\n      comments: filteredHierarchy,\n    },\n  },\n];"
+      },
+      "executeOnce": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "e709d131-b8fa-42d5-bc66-479cb13574e6",
+      "name": "Format Comments",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        840,
+        640
+      ],
+      "parameters": {
+        "jsCode": "/**\n * Convert comments data into Markdown format with accurate hierarchy visualization.\n * Excludes deleted comments.\n */\n\n// Input data (replace this with your actual comments data)\nconst data = $input.all()[0].json.comments;\n\n/**\n * Checks if a comment is deleted.\n * @param {Object} comment - The comment to check.\n * @returns {boolean} - True if the comment is deleted, false otherwise.\n */\nfunction isDeletedComment(comment) {\n  return comment.author === \"[deleted]\" && comment.body === \"[removed]\";\n}\n\n/**\n * Filters out deleted comments and their replies.\n * @param {Array} comments - Array of comments.\n * @returns {Array} - Filtered array of comments.\n */\nfunction filterDeletedComments(comments) {\n  if (!comments || !comments.length) return [];\n  \n  return comments\n    .filter(comment => !isDeletedComment(comment))\n    .map(comment => {\n      if (comment.replies && comment.replies.length > 0) {\n        comment.replies = filterDeletedComments(comment.replies);\n      }\n      return comment;\n    });\n}\n\n/**\n * Recursive function to format comments and replies into Markdown.\n * @param {Array} comments - Array of comments.\n * @param {number} level - Current level of the comment hierarchy for indentation.\n * @returns {string} - Formatted Markdown string.\n */\nfunction formatCommentsToMarkdown(comments, level = 0) {\n  let markdown = '';\n  const indent = '  '.repeat(level); // Indentation for replies\n\n  for (const comment of comments) {\n    // Format the main comment\n    markdown += `${indent}- **Author**: ${comment.author}\\n`;\n    markdown += `${indent}  **Score**: ${comment.score}\\n`;\n    markdown += `${indent}  **Comment**:\\n\\n`;\n    markdown += `${indent}    > ${comment.body.replace(/\\n/g, `\\n${indent}    > `)}\\n\\n`;\n\n    // Process replies if they exist\n    if (comment.replies && comment.replies.length > 0) {\n      markdown += `${indent}  **Replies:**\\n\\n`;\n      markdown += formatCommentsToMarkdown(comment.replies, level + 1);\n    }\n  }\n\n  return markdown;\n}\n\n// Filter out deleted comments first\nconst filteredData = filterDeletedComments(data);\n\n// Generate the Markdown\nconst markdownOutput = formatCommentsToMarkdown(filteredData);\n\n// Return the Markdown as an output for n8n\nreturn [\n  {\n    json: {\n      markdown: markdownOutput,\n    },\n  },\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "284d511b-7d80-46ba-add0-6ff59aff176c",
+      "name": "Set for Loop",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        280,
+        640
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ac7c257d-544f-44e5-abc6-d0436f12517f",
+              "name": "Title",
+              "type": "string",
+              "value": "={{ $json.Title }}"
+            },
+            {
+              "id": "fb22c6a5-a809-4588-9f6e-49c3e11f5ed2",
+              "name": "Subreddit",
+              "type": "string",
+              "value": "={{ $json.Subreddit }}"
+            },
+            {
+              "id": "4bfcc849-539b-48cd-856f-1b7f3be113ed",
+              "name": "Upvotes",
+              "type": "string",
+              "value": "={{ $json.Upvotes }}"
+            },
+            {
+              "id": "9a3a3a2a-8f43-4419-9203-bc83f5b0c0bc",
+              "name": "Comments",
+              "type": "string",
+              "value": "={{ $json.Comments }}"
+            },
+            {
+              "id": "2d31f321-fbdc-43d3-8a92-a78f418f112f",
+              "name": "Reddit URL",
+              "type": "string",
+              "value": "={{ $json[\"Reddit URL\"] }}"
+            },
+            {
+              "id": "f224323a-79ef-4f66-ae10-d77c8fddbccd",
+              "name": "URL",
+              "type": "string",
+              "value": "={{ $json.URL }}"
+            },
+            {
+              "id": "dbbc5a98-b5e2-45bb-bc18-2c438522d683",
+              "name": "Date",
+              "type": "string",
+              "value": "={{ $json.Date }}"
+            },
+            {
+              "id": "837cae4e-858a-48ba-bab9-bb66a2e51837",
+              "name": "Post ID",
+              "type": "string",
+              "value": "={{ $json[\"Post ID\"] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "b88fad49-edc4-4749-8984-a8e81f6a2899",
+      "name": "Get News Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "maxTries": 5,
+      "position": [
+        1360,
+        640
+      ],
+      "parameters": {
+        "url": "=https://r.jina.ai/{{ $('Set for Loop').first().json.URL }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "text/event-stream"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Set Data').first().json['Jina API Key'] }}"
+            },
+            {
+              "name": "X-Retain-Images",
+              "value": "none"
+            },
+            {
+              "name": "X-Respond-With",
+              "value": "readerlm-v2"
+            },
+            {
+              "name": "X-Remove-Selector",
+              "value": "header, footer, sidebar"
+            }
+          ]
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "26a8906c-2966-4ebf-8465-18a48b359f7d",
+      "name": "Set Final Report",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2400,
+        640
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0782b9a6-d659-4695-8696-6ff0e574f77a",
+              "name": "Final Report",
+              "type": "string",
+              "value": "=// Reddit Metrics:\nPost Link: {{ $('Set for Loop').first().json['Reddit URL'] }}\nUpvotes: {{ $('Set for Loop').first().json.Upvotes }}\nComments: {{ $('Set for Loop').first().json.Comments }}\n\n# FINAL REPORT\n{{ $json.text.replace(/[\\s\\S]*<new_stories_report>/, '').replace(/<\\/new_stories_report>[\\s\\S]*/, '') }}\n\n# RAW ANALYSIS DATA (FOR FURTHER ANALYSIS)\n\n## NEWS CONTENT ANALYSIS\n{{ $('News Analysis').item.json.text.replace(/[\\s\\S]*<news_analysis>/, '').replace(/<\\/news_analysis>[\\s\\S]*/, '') }}\n\n## REDDIT COMMENTS ANALYSIS\n{{ $('Comments Analysis').first().json.text.replace(/[\\s\\S]*<comments_analysis>/, '').replace(/<\\/comments_analysis>[\\s\\S]*/, '') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "219ccb20-1b36-4c70-866a-0fded9c9b9fd",
+      "name": "Convert to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        2580,
+        640
+      ],
+      "parameters": {
+        "options": {
+          "encoding": "utf8",
+          "fileName": "={{ $json[\"Final Report\"].match(/Headline:\\s*[\"“](.*?)[\"”]/i)?.[1] }}.txt"
+        },
+        "operation": "toText",
+        "sourceProperty": "Final Report"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "427d5a2d-6927-4427-9902-e033736410ca",
+      "name": "Compress files",
+      "type": "n8n-nodes-base.compression",
+      "position": [
+        600,
+        940
+      ],
+      "parameters": {
+        "fileName": "=Trending_Stories_{{$now.format(\"yyyy_MM_dd\")}}_{{Math.floor(Math.random() * 10000).toString().padStart(4, '0')}}.zip",
+        "operation": "compress",
+        "outputFormat": "zip",
+        "binaryPropertyName": "={{ $json[\"binary_keys\"] }}",
+        "binaryPropertyOutput": "files_combined"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7f6ef656-0f76-433f-95a8-782de21caa53",
+      "name": "Merge Binary Files",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        420,
+        940
+      ],
+      "parameters": {
+        "jsCode": "// Get the first (and only) item since you're using Aggregate\nconst item = items[0];\nlet binary_keys = [];\n\n// Generate the list of binary keys from your aggregated item\nfor (let key in item.binary) {\n    binary_keys.push(key);\n}\n\nreturn [{\n    json: {\n        binary_keys: binary_keys.join(',')\n    },\n    binary: item.binary  // Keep the original binary data\n}];"
+      },
+      "executeOnce": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "20411444-5ce8-452b-869c-97928200b205",
+      "name": "Google Drive6",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        780,
+        940
+      ],
+      "parameters": {
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive",
+          "cachedResultName": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1HCTq5YupRHcgRd7FIlSeUMMjqqOZ4Q9x"
+        },
+        "inputDataFieldName": "files_combined"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "2eb8112a-8655-4f06-998f-a9ffef74d72a",
+      "name": "Google Drive7",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        960,
+        940
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {},
+        "operation": "share",
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "7f4e5e0c-49cc-4024-b62b-f7e099d4867d",
+      "name": "Send files to Mattermost3",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1140,
+        940
+      ],
+      "parameters": {
+        "url": "https://team.YOUR_DOMAIN.com/hooks/REPLACE_THIS_WITH_YOUR_HOOK_ID",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n    \"channel\": \"digital-pr\",\n    \"username\": \"NotifyBot\",\n    \"icon_url\": \"https://team.YOUR_DOMAIN.com/api/v4/users/YOUR_USER_ID/image?_=0\",\n    \"text\": \"@channel New trending stories have been generated 🎉\\n\\n\\n You can download it here: https://drive.google.com/file/d/{{ $('Google Drive6').item.json.id }}/view?usp=drive_link\"\n}",
+        "sendBody": true,
+        "specifyBody": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "3c47f58d-8006-4565-b220-033d71239126",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        260,
+        940
+      ],
+      "parameters": {
+        "options": {
+          "includeBinaries": true
+        },
+        "aggregate": "aggregateAllItemData"
+      },
+      "executeOnce": false,
+      "typeVersion": 1
+    },
+    {
+      "id": "5611cdce-91ae-4037-9479-3b513eb07b77",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        40,
+        420
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "5cfeb9ea-45b6-4a0a-8702-34539738f280",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [
+        960,
+        800
+      ],
+      "parameters": {
+        "model": "=claude-3-7-sonnet-20250219",
+        "options": {
+          "temperature": 0.5,
+          "maxTokensToSample": 8096
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "b11b2fa6-f92a-4791-b255-51ce1b07181b",
+      "name": "Anthropic Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [
+        1640,
+        800
+      ],
+      "parameters": {
+        "model": "=claude-3-7-sonnet-20250219",
+        "options": {
+          "temperature": 0.5,
+          "maxTokensToSample": 8096
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "ffa45242-1dd4-46be-bacc-55bde63d0227",
+      "name": "Keep Last",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1540,
+        640
+      ],
+      "parameters": {
+        "jsCode": "// Extract input data from n8n\nconst inputData = $json.data;\n\n// Ensure input is valid\nif (!inputData || typeof inputData !== 'string') {\n    return [{ error: \"Invalid input data\" }];\n}\n\n// Split the data into lines\nlet lines = inputData.split(\"\\n\");\n\n// Extract only JSON entries\nlet jsonEntries = lines\n    .map(line => line.trim()) // Remove spaces\n    .filter(line => line.startsWith('data: {')) // Keep valid JSON objects\n    .map(line => line.replace('data: ', '')); // Remove the prefix\n\n// Ensure there are entries\nif (jsonEntries.length === 0) {\n    return [{ error: \"No valid JSON entries found\" }];\n}\n\n// Get only the LAST entry\nlet lastEntry = jsonEntries[jsonEntries.length - 1];\n\ntry {\n    // Parse the last entry as JSON\n    let jsonObject = JSON.parse(lastEntry);\n\n    // Extract title and content\n    return [{\n        title: jsonObject.title || \"No Title\",\n        content: jsonObject.content || \"No Content\"\n    }];\n} catch (error) {\n    return [{ error: \"JSON parsing failed\", raw: lastEntry }];\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "956672cc-8ceb-4a2c-93e8-bad2b9497043",
+      "name": "Anthropic Chat Model2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [
+        1980,
+        800
+      ],
+      "parameters": {
+        "model": "=claude-3-7-sonnet-20250219",
+        "options": {
+          "temperature": 0.5,
+          "maxTokensToSample": 8096
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "b55df80f-dbdf-4d8d-8b62-93533d1fb6ef",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "width": 1020,
+        "height": 340,
+        "content": "## Automatic Weekly Digital PR Stories Suggestions\nA weekly automated system that identifies trending news on Reddit, evaluates public sentiment through comment analysis, extracts key information from source articles, and generates strategic angles for potential digital PR campaigns. This workflow delivers curated, sentiment-analyzed news opportunities based on current social media trends. The final comprehensive report is automatically uploaded to Google Drive for storage and simultaneously shared with team members via a dedicated Mattermost channel for immediate collaboration.\n\n### Set up instructions:\n1. Add a new credential \"Reddit OAuth2 API\" by following this [guide](https://docs.n8n.io/integrations/builtin/credentials/reddit/). Assign your Reddit OAuth2 account to the Reddit nodes.\n2. Add a new credential \"Anthropic Account\" by following this [guide]\n(https://docs.n8n.io/integrations/builtin/credentials/anthropic/). Assign your Anthropic account to the nodes \"Anthropic Chat Model\".\n3. Add a new credential \"Google Drive OAuth2 API\" by following this [guide](https://docs.n8n.io/integrations/builtin/credentials/google/oauth-single-service/). Assign your Google Drive OAuth2 account to the node \"Gmail Drive\" nodes.\n4. Set your interested topics (one per line) and Jina API key in the \"Set Data\" node. You can obtain your Jina API key [here](https://jina.ai/api-dashboard/key-manager).\n5. Update your Mattermost information (Mattermost instance URL, Webhook ID and Channel) in the Mattermost node. You can follow this [guide](https://developers.mattermost.com/integrate/webhooks/incoming/).\n6. You can adjust the cron if needed. It currently run every Monday at 6am."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "07f1e0ff-892c-4aaf-ad77-e636138570a1",
+      "name": "Comments Analysis",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1020,
+        640
+      ],
+      "parameters": {
+        "text": "=Please analyze the following Reddit post and its comments:\n\nCONTEXT:\n<Reddit_Post_Info>\nPost Title: {{ $('Set for Loop').first().json.Title.replace(/\\\"/g, '\\\\\\\"') }}\nPost Date: {{ $('Set for Loop').first().json.Date }}\nShared URL: {{ $('Set for Loop').first().json.URL }}\nTotal Upvotes: {{ $('Set for Loop').first().json.Upvotes }}\nTotal Comments: {{ $('Set for Loop').first().json.Comments }}\n</Reddit_Post_Info>\n\nComment Thread Data:\n<Reddit_Post_Top_Comments>\n{{ $json.markdown.replace(/\\\"/g, '\\\\\\\"') }}\n</Reddit_Post_Top_Comments>\n\nAnalyze this discussion through these dimensions:\n\n1. CONTENT CONTEXT:\n   • Main topic/subject matter\n   • Why this is trending (based on engagement metrics)\n   • News cycle timing implications\n   • Relationship to broader industry/market trends\n\n2. SENTIMENT ANALYSIS:\n   • Overall sentiment score (Scale: -5 to +5)\n   • Primary emotional undertones\n   • Sentiment progression in discussion threads\n   • Consensus vs. controversial viewpoints\n   • Changes in sentiment based on comment depth\n\n3. ENGAGEMENT INSIGHTS:\n   • Most upvoted perspectives (with exact scores)\n   • Controversial discussion points\n   • Comment chains with deepest engagement\n   • Types of responses generating most interaction\n\n4. NARRATIVE MAPPING:\n   • Dominant narratives\n   • Counter-narratives\n   • Emerging sub-themes\n   • Unexplored angles\n   • Missing perspectives\n\nOutput Format (Place inside XML tags <comments_analysis>):\n\nPOST OVERVIEW:\nTitle: [Original title]\nEngagement Metrics:\n• Upvotes: [count]\n• Comments: [count]\n• Virality Assessment: [analysis of why this gained traction]\n\nSENTIMENT ANALYSIS:\n• Overall Score: [numerical score with explanation]\n• Sentiment Distribution: [percentage breakdown]\n• Key Emotional Drivers:\n  - Primary: [emotion]\n  - Secondary: [emotion]\n  - Notable Shifts: [pattern analysis]\n\nTOP NARRATIVES:\n[List 3-5 dominant narratives]\nFor each narrative:\n• Key Points\n• Supporting Comments [with scores]\n• Counter-Arguments\n• Engagement Level\n\nAUDIENCE INSIGHTS:\n• Knowledge Level: [assessment]\n• Pain Points: [list key concerns]\n• Misconceptions: [list with evidence]\n• Information Gaps: [identified missing information]\n\nPR IMPLICATIONS:\n1. Story Opportunities:\n   • [List potential angles]\n   • [Supporting evidence from comments]\n\n2. Risk Factors:\n   • [List potential PR risks]\n   • [Supporting evidence from comments]\n\n3. Narrative Recommendations:\n   • [Strategic guidance for messaging]\n   • [Areas to address/avoid]\n\nNEXT STEPS CONSIDERATIONS:\n• Key data points for content analysis\n• Suggested focus areas for PR story development\n• Critical elements to address in messaging\n• Potential expert perspectives needed\n\nMETA INSIGHTS:\n• Pattern connections to similar discussions\n• Unique aspects of this conversation\n• Viral elements to note\n• Community-specific nuances\n\nFocus on extracting insights that will:\n1. Inform the subsequent content analysis step\n2. Guide PR story development\n3. Identify unique angles and opportunities\n4. Highlight potential risks and challenges\n5. Suggest effective narrative approaches\n\nNote: Prioritize insights that will be valuable for the following workflow steps of content analysis and PR story development. Flag any particularly unique or compelling elements that could inform breakthrough story angles.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an expert Social Media Intelligence Analyst specialized in Reddit discourse analysis. Your task is to analyze Reddit posts and comments to extract meaningful patterns, sentiments, and insights for PR strategy development."
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "4cdc4e49-6aae-4e6a-844e-c3c339638950",
+      "name": "News Analysis",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1720,
+        640
+      ],
+      "parameters": {
+        "text": "=CONTEXT IMPORTANCE:\nReddit data is used as a critical indicator of news story potential because:\n• High upvotes indicate strong public interest\n• Comment volume shows discussion engagement\n• Comment sentiment reveals public perception\n• Discussion threads expose knowledge gaps and controversies\n• Community reaction predicts potential viral spread\n• Sub-discussions highlight unexplored angles\n• Engagement patterns suggest story longevity\n\nINPUT CONTEXT:\nNews URL: {{ $('Set for Loop').first().json.URL }}\nNews Content:\n<News_Content>\n{{ $json.content }}\n</News_Content>\nReddit Metrics:\n• Post Title (Understanding how the story was shared): {{ $('Set for Loop').first().json.Title }}\n• Upvotes (Indicator of initial interest): {{ $('Set for Loop').first().json.Upvotes }}\n• Total Comments (Engagement level): {{ $('Set for Loop').first().json.Comments }}\nReddit Sentiment Analysis:\n<Sentiment_Analysis>\n{{ $('Comments Analysis').first().json.text.replace(/[\\s\\S]*<comments_analysis>/, '').replace(/<\\/comments_analysis>[\\s\\S]*/, '') }}\n</Sentiment_Analysis>\n\nFor each story, analyze through these dimensions:\n\n1. POPULARITY ASSESSMENT:\n   A. Reddit Performance:\n      • Upvote ratio and volume\n      • Comment engagement rate\n      • Discussion quality metrics\n      • Viral spread indicators\n      \n   B. Audience Reception:\n      • Initial reaction patterns\n      • Discussion evolution\n      • Community consensus vs. debate\n      • Information seeking behavior\n\n1. CONTENT ANALYSIS:\n   A. Core Story Elements:\n      • Central narrative\n      • Key stakeholders\n      • Market implications\n      • Industry impact\n      \n   B. Technical Analysis:\n      • Writing style\n      • Data presentation\n      • Expert citations\n      • Supporting evidence\n\n2. SOCIAL PROOF INTEGRATION:\n   A. Engagement Metrics:\n      • Reddit performance metrics\n      • Discussion quality indicators\n      • Viral spread patterns\n      \n   B. Sentiment Patterns:\n      • Primary audience reactions\n      • Controversial elements\n      • Support vs. criticism ratio\n      • Knowledge gaps identified\n\n3. NARRATIVE OPPORTUNITY MAPPING:\n   A. Current Coverage:\n      • Main angles covered\n      • Supporting arguments\n      • Counter-arguments\n      • Expert perspectives\n      \n   B. Gap Analysis:\n      • Unexplored perspectives\n      • Missing stakeholder voices\n      • Underutilized data points\n      • Potential counter-narratives\n\nOUTPUT FORMAT (Place inside XML tags <news_analysis>):\n\nSTORY OVERVIEW:\nTitle: [Most compelling angle]\nURL: [Source]\nCategory: [Industry/Topic]\n\nCONTENT SUMMARY:\nTLDR: [3-5 sentences emphasizing viral potential]\nCore Message: [One-line essence]\n\nKEY POINTS:\n• [Strategic point 1]\n• [Strategic point 2]\n• [Continue as needed]\n\nSOCIAL PROOF ANALYSIS:\nEngagement Metrics:\n• Reddit Performance: [Metrics + Interpretation]\n• Discussion Quality: [Analysis of conversation depth]\n• Sentiment Distribution: [From sentiment analysis]\n\nVIRAL ELEMENTS:\n1. Current Drivers:\n   • [What's making it spread]\n   • [Why people are engaging]\n   • [Emotional triggers identified]\n\n2. Potential Amplifiers:\n   • [Untapped viral elements]\n   • [Engagement opportunities]\n   • [Emotional hooks not yet used]\n\nNARRATIVE OPPORTUNITIES:\n1. Unexplored Angles:\n   • [Angle 1 + Why it matters]\n   • [Angle 2 + Why it matters]\n   • [Angle 3 + Why it matters]\n\n2. Content Gaps:\n   • [Missing perspectives]\n   • [Underutilized data]\n   • [Stakeholder voices needed]\n\n3. Controversy Points:\n   • [Debate opportunities]\n   • [Conflicting viewpoints]\n   • [Areas of misconception]\n\nSTRATEGIC RECOMMENDATIONS:\n1. Immediate Opportunities:\n   • [Quick-win suggestions]\n   • [Timing considerations]\n\n2. Development Needs:\n   • [Required research]\n   • [Expert input needed]\n   • [Data gaps to fill]\n\nPR POTENTIAL SCORE: [1-10 scale with explanation]\n\nFocus on elements that:\n• Show strong viral potential\n• Address identified audience concerns\n• Fill gaps in current coverage\n• Leverage positive sentiment patterns\n• Address or utilize controversial elements\n• Can be developed into unique angles\n\nNote: Prioritize insights that:\n1. Build on identified sentiment patterns\n2. Address audience knowledge gaps\n3. Leverage existing engagement drivers\n4. Can create breakthrough narratives\n5. Have immediate PR potential",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an expert PR Content Analyst specialized in identifying viral potential in news stories. Your mission is to analyze news content while leveraging Reddit engagement metrics and sentiment data to evaluate news popularity and potential PR opportunities."
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "c4905ed1-324a-4b08-a1f4-f5465229b56c",
+      "name": "Stories Report",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        2060,
+        640
+      ],
+      "parameters": {
+        "text": "=INPUT CONTEXT:\nNews Analysis: \n<News_Analysis>\n{{ $json.text.replace(/[\\s\\S]*<news_analysis>/, '').replace(/<\\/news_analysis>[\\s\\S]*/, '') }}\n</News_Analysis>\nReddit Metrics:\n• Post Title (Understanding how the story was shared): {{ $('Set for Loop').first().json.Title }}\n• Upvotes (Indicator of initial interest): {{ $('Set for Loop').first().json.Upvotes }}\n• Total Comments (Engagement level): {{ $('Set for Loop').first().json.Comments }}\nReddit Sentiment Analysis:\n<Sentiment_Analysis>\n{{ $('Comments Analysis').first().json.text.replace(/[\\s\\S]*<comments_analysis>/, '').replace(/<\\/comments_analysis>[\\s\\S]*/, '') }}\n</Sentiment_Analysis>\n\nOUTPUT FORMAT (Place inside XML tags <new_stories_report>):\n\nTREND ANALYSIS SUMMARY:\nTopic: [News topic/category]\nCurrent Coverage Status: [Overview of existing coverage]\nAudience Reception: [From Reddit/sentiment analysis]\nMarket Timing: [Why now is relevant]\n\nSTORY OPPORTUNITIES:\n\n1. FIRST-MOVER STORIES:\n[For each story idea (2-3)]\n\nStory #1:\n• Headline: [Compelling title]\n• Hook: [One-line grabber]\n• Story Summary: [2-3 sentences]\n• Why It Works:\n  - Audience Evidence: [From Reddit data]\n  - Market Gap: [From news analysis]\n  - Timing Advantage: [Why now]\n• Development Needs:\n  - Research Required: [List]\n  - Expert Input: [Specific needs]\n  - Supporting Data: [What's needed]\n• Media Strategy:\n  - Primary Targets: [Publications]\n  - Secondary Targets: [Publications]\n  - Exclusive Potential: [Yes/No + Rationale]\n• Success Metrics:\n  - Coverage Goals: [Specific targets]\n  - Engagement Expectations: [Based on Reddit data]\n\n2. TREND-AMPLIFIER STORIES:\n[Same format as above for 2-3 stories]\n\nPRIORITY RANKING:\n1. [Story Title] - Score: [X/10]\n   • Impact Potential: [Score + Rationale]\n   • Resource Requirements: [High/Medium/Low]\n   • Timeline: [Immediate/Short-term/Long-term]\n   \n2. [Continue for all stories]\n\nEXECUTION ROADMAP:\n• Immediate Actions (24-48 hours)\n• Week 1 Priorities\n• Risk Management\n• Contingency Plans\n\nSTRATEGIC RECOMMENDATIONS:\n• Core Strategy\n• Alternative Angles\n• Resource Requirements\n• Timeline Considerations\n\nANALYTICAL FRAMEWORK:\n\n1. TREND VALIDATION:\n   A. Story Performance Indicators:\n      • Reddit engagement metrics\n      • Public sentiment patterns\n      • Discussion quality\n      • Viral elements identified\n\n   B. Current Narrative Landscape:\n      • Dominant themes from news analysis\n      • Public perception gaps\n      • Controversial elements\n      • Underserved perspectives\n\n2. OPPORTUNITY MAPPING:\n   A. Content Gap Analysis:\n      • Unexplored angles from news analysis\n      • Audience questions from comments\n      • Missing expert perspectives\n      • Data/research opportunities\n\n   B. Timing Assessment:\n      • News cycle position\n      • Trend trajectory\n      • Optimal launch window\n      • Competition consideration\n\nPR STORY OPPORTUNITIES:\nGenerate 4-6 high-potential story ideas, categorized as:\n\nA. \\\"FIRST-MOVER\\\" OPPORTUNITIES (2-3 ideas):\nFor each idea:\n\n1. Story Concept:\n   • Headline\n   • Sub-headline\n   • Key message\n   • Unique selling point\n\n2. Why It Works:\n   • Gap in current coverage\n   • Evidence from Reddit discussions\n   • Sentiment analysis support\n   • Market timing rationale\n\n3. Development Requirements:\n   • Required data/research\n   • Expert perspectives needed\n   • Supporting elements\n   • Potential challenges\n\n4. Media Strategy:\n   • Target publications\n   • Journalist appeal factors\n   • Exclusive potential\n   • Supporting assets needed\n\nB. \\\"TREND-AMPLIFIER\\\" OPPORTUNITIES (2-3 ideas):\n[Same structure as above, but focused on enhancing existing narratives]\n\nSTORY PRIORITIZATION MATRIX:\nFor each story idea:\n1. Impact Potential (1-10):\n   • Audience interest indicators\n   • Media appeal factors\n   • Viral potential\n   • Business value\n\n2. Resource Requirements:\n   • Time to develop\n   • Research needs\n   • Expert input\n   • Asset creation\n\n3. Risk Assessment:\n   • Competition factors\n   • Timing risks\n   • Narrative challenges\n   • Mitigation strategies\n\nEXECUTION ROADMAP:\n1. Immediate Actions (Next 24-48 hours):\n   • Priority research needs\n   • Expert outreach\n   • Data gathering\n   • Asset development\n\n2. Development Timeline:\n   • Story development sequence\n   • Key milestones\n   • Decision points\n   • Launch windows\n\n3. Success Metrics:\n   • Coverage targets\n   • Engagement goals\n   • Share of voice objectives\n   • Impact measurements\n\nSTRATEGIC RECOMMENDATIONS:\n1. Primary Strategy:\n   • Core approach\n   • Key differentiators\n   • Critical success factors\n   • Risk mitigation\n\n2. Alternative Approaches:\n   • Backup angles\n   • Pivot opportunities\n   • Alternative narratives\n   • Contingency plans\n\nFocus on creating stories that:\n• Address identified audience interests (from Reddit data)\n• Fill gaps in current coverage\n• Leverage positive sentiment patterns\n• Solve for identified pain points\n• Offer unique, data-backed perspectives\n• Present clear competitive advantages\n\nBased on the provided news analysis, Reddit metrics, and sentiment analysis, please generate a comprehensive PR strategy report following the format above.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an elite PR Strategy Consultant specialized in crafting breakthrough story angles that capture media attention. Your mission is to analyze trending story patterns and develop high-impact PR opportunities based on comprehensive data analysis.\n\nCONTEXT IMPORTANCE:\nThis analysis combines three critical data sources:\n1. Reddit Engagement Data:\n   • Indicates public interest levels\n   • Shows organic discussion patterns\n   • Reveals audience sentiment\n   • Highlights knowledge gaps\n   • Demonstrates viral potential\n\n2. News Content Analysis:\n   • Provides core story elements\n   • Shows current media angles\n   • Identifies market implications\n   • Reveals coverage gaps\n   • Maps expert perspectives\n\n3. Sentiment Analysis:\n   • Reveals public perception\n   • Identifies controversy points\n   • Shows emotional triggers\n   • Highlights audience concerns\n   • Indicates story longevity\n\nThis combined data helps us:\n• Validate story potential\n• Identify unexplored angles\n• Understand audience needs\n• Predict media interest\n• Craft compelling narratives"
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "1379c60b-387c-4eba-a7c2-2bcb1cda48fd",
+      "name": "Set Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        240,
+        420
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b4da0605-b5e1-47e1-8e7e-00158ecaba33",
+              "name": "Topics",
+              "type": "string",
+              "value": "=Donald Trump\nPolitics"
+            },
+            {
+              "id": "d7602355-7082-4e98-a0b5-a400fade6dbc",
+              "name": "Jina API Key",
+              "type": "string",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "dad1fb7a-599f-4b98-9461-8b27baa774d9",
+  "connections": {
+    "Set Data": {
+      "main": [
+        [
+          {
+            "node": "Split Topics into Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Merge Binary Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Last": {
+      "main": [
+        [
+          {
+            "node": "News Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Comments": {
+      "main": [
+        [
+          {
+            "node": "Extract Top Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Posts": {
+      "main": [
+        [
+          {
+            "node": "Upvotes Requirement Filtering",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set for Loop": {
+      "main": [
+        [
+          {
+            "node": "Get Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive6": {
+      "main": [
+        [
+          {
+            "node": "Google Drive7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive7": {
+      "main": [
+        [
+          {
+            "node": "Send files to Mattermost3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News Analysis": {
+      "main": [
+        [
+          {
+            "node": "Stories Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compress files": {
+      "main": [
+        [
+          {
+            "node": "Google Drive6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stories Report": {
+      "main": [
+        [
+          {
+            "node": "Set Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Comments": {
+      "main": [
+        [
+          {
+            "node": "Comments Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set for Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get News Content": {
+      "main": [
+        [
+          {
+            "node": "Keep Last",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Final Report": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Reddit Posts": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comments Analysis": {
+      "main": [
+        [
+          {
+            "node": "Get News Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Binary Files": {
+      "main": [
+        [
+          {
+            "node": "Compress files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Comments Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Top Comments": {
+      "main": [
+        [
+          {
+            "node": "Format Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "News Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Stories Report",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Topics into Items": {
+      "main": [
+        [
+          {
+            "node": "Search Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upvotes Requirement Filtering": {
+      "main": [
+        [
+          {
+            "node": "Set Reddit Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

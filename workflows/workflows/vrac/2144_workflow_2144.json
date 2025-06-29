@@ -1,0 +1,280 @@
+{
+  "nodes": [
+    {
+      "id": "48a0524d-db39-4046-bad1-18684064cbac",
+      "name": "Every 1 hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        40,
+        600
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "bf9e2480-e879-4ebc-829f-b61f29251d29",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        680,
+        600
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "f8e8a9a4-6104-4d4c-a400-5160e37f6c55",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        920,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "980351bb-685b-4392-bb28-a10bec1608fe",
+      "name": "RSS Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "onError": "continueRegularOutput",
+      "position": [
+        920,
+        620
+      ],
+      "parameters": {
+        "url": "={{ $json.urls }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "typeVersion": 1,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "7281072f-f773-468f-8599-4efa5832f8e2",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        260,
+        760
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 162,
+        "height": 84,
+        "content": "👆 Add your RSS feeds urls here."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c1aece31-d2d5-4cf2-864e-1911e34056f3",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        466
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 447,
+        "height": 104.61602497398542,
+        "content": "### 👨‍🎤 Setup\n1. Add your email and email creds\n2. Add the RSS feed URLs you want to follow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8a932df6-4550-4f01-86a0-45a2857645c0",
+      "name": "If published in the last hour",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1120,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "97b4e257-2413-4c78-8b33-1f7523bfe0cd",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              },
+              "leftValue": "={{ DateTime.fromISO($json.isoDate) }}",
+              "rightValue": "={{ DateTime.now().minus({hour: 1}) }}"
+            },
+            {
+              "id": "b37ee746-6b2c-45ad-80db-fa2750ce9a58",
+              "operator": {
+                "type": "dateTime",
+                "operation": "beforeOrEquals"
+              },
+              "leftValue": "={{ DateTime.fromISO($json.isoDate) }}",
+              "rightValue": "={{ DateTime.now() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "8bf89e60-5ea1-47b9-9249-bf2e258f9a2d",
+      "name": "Send email with each post",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1360,
+        600
+      ],
+      "parameters": {
+        "sendTo": "SET YOUR EMAIL HERE",
+        "message": "=Check out this new post from {{ $json.link.extractDomain() }} at {{ $json.link }}\n\n----\n\n {{ $json.contentSnippet }}",
+        "options": {
+          "appendAttribution": true
+        },
+        "subject": "=New post from {{ $json.link.extractDomain() }}: {{ $json.title }} "
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "7",
+          "name": "Personal Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "8a344c1e-4f57-46b8-8736-d4d651188e57",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        480,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "urls"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6b523a05-ba2e-4118-9061-7ef7fd152802",
+      "name": "List of RSS feeds",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        260,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "257d7e0a-1c6e-42ca-825c-347fec574914",
+              "name": "urls",
+              "type": "array",
+              "value": "[\"https://www.anildash.com/feed.xml\", \"https://sive.rs/en.atom\"]"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If published in the last hour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 1 hour": {
+      "main": [
+        [
+          {
+            "node": "List of RSS feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List of RSS feeds": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If published in the last hour": {
+      "main": [
+        [
+          {
+            "node": "Send email with each post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,303 @@
+{
+  "meta": {
+    "instanceId": "408f9fb9940c3cb18ffdef0e0150fe342d6e655c3a9fac21f0f644e8bedabcd9",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "eaa31cde-3017-400d-aac8-999def8cc227",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -340,
+        -780
+      ],
+      "parameters": {
+        "width": 617,
+        "height": 490,
+        "content": "## Check if incoming email is about appointment\nWe use LLM to check subject and body of the email and determine if it's an appointment request. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b03d3f72-d1d8-49a7-bcc1-a476fd5c4ad7",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        400,
+        -780
+      ],
+      "parameters": {
+        "width": 796,
+        "height": 482,
+        "content": "## Get calendar availability and compose a response\nMake sure to update the Workflow ID if you are running this as 2 workflows"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "29ce0093-c4c8-41cc-be69-334de3a1d1a2",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -60,
+        -460
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "5176f475-704b-446e-b368-ffa395bb089e",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        480,
+        -460
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "0e8a75dd-ce68-46c3-972c-32b15e04b254",
+      "name": "Send reply",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        940,
+        -660
+      ],
+      "webhookId": "0f18d414-1b14-4d2e-9fc2-d2d302372dc6",
+      "parameters": {
+        "message": "={{ $json.output }}",
+        "options": {},
+        "messageId": "={{ $('Gmail Trigger').first().json.id }}",
+        "operation": "reply"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sf5Gfl9NiFTNXFWb",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "bf154384-274a-4cdd-977d-890220948a9d",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        -280,
+        -640
+      ],
+      "parameters": {
+        "filters": {
+          "readStatus": "unread",
+          "includeSpamTrash": false
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sf5Gfl9NiFTNXFWb",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "5a268b34-38ea-4e55-87ab-8a616e2aa1fa",
+      "name": "Classify appointment",
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "position": [
+        -60,
+        -640
+      ],
+      "parameters": {
+        "options": {
+          "fallback": "discard"
+        },
+        "inputText": "=Please evaluate the following email to determine if it suggests scheduling a meeting or a call:\nSubject: {{ $json.Subject }}\nSnippet: {{ $json.snippet }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "is_appointment",
+              "description": "email Is requesting an appointment"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7b5a8468-09e5-4575-97cb-9175ee02b19d",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        500,
+        -660
+      ],
+      "parameters": {
+        "text": "=Sender: {{ $('Gmail Trigger').first().json.From }}\nSubject: {{ $('Gmail Trigger').first().json.Subject }}\nEmail Text: {{ $('Gmail Trigger').first().json.snippet }}",
+        "options": {
+          "systemMessage": "=You are an email scheduling assistant. Based on the received email, check my availability and propose an appropriate response. \nAim to get a specific time, rather than just a day. When checking my availability, make sure that there's enough time in between meetings.\nIf I'm not available, ALWAYS propose a new time based on my availability. When proposing a new time, always leave 15 minutes buffer from previous meeting.\nToday date and time is: {{ $now.toISO() }}."
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "b61e8061-5719-4c30-97da-e306e7b79b76",
+      "name": "Google Calendar",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        680,
+        -460
+      ],
+      "parameters": {
+        "options": {},
+        "timeMax": "={{ $now.plus(1, 'month').toISO() }}",
+        "timeMin": "={{ $now.minus(1, 'day').toISO() }}",
+        "calendar": {
+          "__rl": true,
+          "mode": "id",
+          "value": "your_email@gmail.com"
+        },
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "kWMxmDbMDDJoYFVK",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "47e07b6c-d432-4111-b33e-56d6c305c40c",
+      "name": "Mark as read",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        940,
+        -480
+      ],
+      "webhookId": "7e2d851b-c9f3-471c-875d-0da7c2c3b561",
+      "parameters": {
+        "messageId": "={{ $('Gmail Trigger').first().json.id }}",
+        "operation": "markAsRead"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sf5Gfl9NiFTNXFWb",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Agent": {
+      "main": [
+        [
+          {
+            "node": "Send reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Classify appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify appointment",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify appointment": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  }
+}

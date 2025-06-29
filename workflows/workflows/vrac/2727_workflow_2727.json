@@ -1,0 +1,349 @@
+{
+  "meta": {
+    "instanceId": "03e9d14e9196363fe7191ce21dc0bb17387a6e755dcc9acc4f5904752919dca8"
+  },
+  "nodes": [
+    {
+      "id": "eece2f27-2a2f-4207-a756-c3b8062c0028",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "f6ec2074-6c23-410e-ad31-ac1eaf7381ad",
+      "parameters": {
+        "path": "f6ec2074-6c23-410e-ad31-ac1eaf7381ad",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3a710d14-a56b-4a9a-a30a-f298de68d92b",
+      "name": "Extract Incident ID from Response",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        200,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "38125eed-d2ab-4a69-b48f-97cb8d1905b1",
+              "name": "incident_id",
+              "type": "string",
+              "value": "={{ $json.body.text }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "cf285efd-f722-4c26-9b64-0b91206c739c",
+      "name": "Search For Incident in ServiceNow",
+      "type": "n8n-nodes-base.serviceNow",
+      "onError": "continueRegularOutput",
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "sysparm_query": "=GOTOnumber={{ $json.incident_id }}",
+          "sysparm_display_value": "true"
+        },
+        "resource": "incident",
+        "operation": "getAll",
+        "authentication": "basicAuth"
+      },
+      "credentials": {
+        "serviceNowBasicApi": {
+          "id": "wjkWiUNQxo5PzTIb",
+          "name": "ServiceNow Basic Auth account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "84fbfbe2-e922-439e-aa33-7c70ebc2215d",
+      "name": "Send Incident Details to Slack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        960,
+        180
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={\n    \"response_type\": \"in_channel\",\n    \"blocks\": [\n        {\n            \"type\": \"header\",\n            \"text\": {\n                \"type\": \"plain_text\",\n                \"text\": \"ServiceNow Incident Notification\",\n                \"emoji\": true\n            }\n        },\n        {\n            \"type\": \"section\",\n            \"fields\": [\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*Incident ID:*\\n{{ $('Search For Incident in ServiceNow').item.json.number }}\"\n                },\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*Description:*\\n{{ $('Search For Incident in ServiceNow').item.json.short_description }}\"\n                },\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*Severity:*\\n{{ $('Search For Incident in ServiceNow').item.json.severity }}\"\n                },\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*Caller:*\\n{{ $('Search For Incident in ServiceNow').item.json.caller_id.display_value }}\"\n                },\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*Priority:*\\n{{ $('Search For Incident in ServiceNow').item.json.priority }}\"\n                },\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*State:*\\n{{ $('Search For Incident in ServiceNow').item.json.incident_state }}\"\n                },\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*Category:*\\n{{ $('Search For Incident in ServiceNow').item.json.category }}\"\n                },\n                {\n                    \"type\": \"mrkdwn\",\n                    \"text\": \"*Date Opened:*\\n{{ $('Search For Incident in ServiceNow').item.json.opened_at }}\"\n                }\n            ]\n        },\n        {\n            \"type\": \"actions\",\n            \"elements\": [\n                {\n                    \"type\": \"button\",\n                    \"text\": {\n                        \"type\": \"plain_text\",\n                        \"text\": \"View Incident\",\n                        \"emoji\": true\n                    },\n                    \"url\": \"https://dev206761.service-now.com/nav_to.do?uri=incident.do?sys_id={{ $('Search For Incident in ServiceNow').item.json.sys_id }}\",\n                    \"action_id\": \"view_incident\"\n                }\n            ]\n        }\n    ]\n}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2bfefc69-8b4e-4bc2-8fea-1216aa95e58b",
+      "name": "Notify User no Incident was Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={\n\t\"blocks\": [\n\t\t{\n\t\t\t\"type\": \"section\",\n\t\t\t\"text\": {\n\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\"text\": \":warning: No incident was found with that ID. Please double check and try again. :warning:\"\n\t\t\t}\n\t\t}\n\t]\n}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "47e3fdb0-9824-4b95-b794-972adadcfe5c",
+      "name": "Notify User of Error with ServiceNow",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        960,
+        -180
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={\n\t\"blocks\": [\n\t\t{\n\t\t\t\"type\": \"section\",\n\t\t\t\"text\": {\n\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\"text\": \":rotating_light: Issue connecting to ServiceNow. Please investigate in n8n. :rotating_light:\"\n\t\t\t}\n\t\t}\n\t]\n}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "a64be48f-c318-41f0-950f-d5c545b56001",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -60,
+        -400
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 431.79628558910616,
+        "height": 756.5967348425984,
+        "content": "![Slack](https://uploads.n8n.io/templates/slack.png)\n## Receive Slack Webhook Slash Command\n\nThis section begins with the `Webhook` node, which listens for incoming Slack Slash Command requests. When triggered, it extracts the incident ID from the request payload using the `Extract Incident ID from Response` node. The incident ID is then passed forward for further processing. This setup allows users to initiate ServiceNow incident lookups directly from Slack.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1434eb2a-5a9c-47f4-9e69-abaca2047c65",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        378.80172279482787,
+        -402.30436380125093
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 390.19827720517213,
+        "height": 753.3043638012509,
+        "content": "![ServiceNow](https://uploads.n8n.io/templates/servicenow.png)\n## Search ServiceNow for Incident\n\nIn this section, the `Search For Incident in ServiceNow` node queries the ServiceNow platform using the extracted incident ID. If the query returns a valid incident, the details are prepared for the Slack response. If no incident is found, the workflow routes this outcome for a corresponding Slack notification. The `Parse ServiceNow Response` node evaluates the outcome of the ServiceNow query. This ensures accurate and responsive communication with ServiceNow.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b5a063f6-3676-4ff0-b1ca-944e8285db0d",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        777,
+        -646.1743824166542
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 448,
+        "height": 998.1743824166542,
+        "content": "![Slack](https://uploads.n8n.io/templates/webhook.png)\n## Respond to Slack Webhook\n\nBased on the ServiceNow result:\n- The `Send Incident Details to Slack` node formats and sends detailed incident information to Slack.\n- The `Notify User no Incident was Found` node sends a user-friendly notification indicating the incident ID was invalid.\n- The `Notify User of Error with ServiceNow` node alerts the user if the ServiceNow connection fails.\nThis ensures users receive the right response for every scenario, enabling seamless incident management directly from Slack.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "907e9461-2cf8-4c2a-8d25-38a319861937",
+      "name": "Parse ServiceNow Response",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        640,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "ServiceNow Error",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.error }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Incident Not Found",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "6d9ff397-8bb6-41df-979c-4eb7ef16bfc1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notExists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.number }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Incident Found",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "aed034ac-8a45-44d5-9734-813a36aeadaa",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.number }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Incident ID from Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse ServiceNow Response": {
+      "main": [
+        [
+          {
+            "node": "Notify User of Error with ServiceNow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify User no Incident was Found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Incident Details to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Incident ID from Response": {
+      "main": [
+        [
+          {
+            "node": "Search For Incident in ServiceNow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search For Incident in ServiceNow": {
+      "main": [
+        [
+          {
+            "node": "Parse ServiceNow Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

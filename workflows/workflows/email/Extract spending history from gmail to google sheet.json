@@ -1,0 +1,1134 @@
+{
+  "id": "nkMjcOC4hpte1a0t",
+  "meta": {
+    "instanceId": "3986dc65ca3ddc4ee46e71fc194b0a9d4ef46d960a5e71624f9f7eaa198213cb",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Extract spend details (template)",
+  "tags": [
+    {
+      "id": "9mCuuNEpnYNvVzb8",
+      "name": "Finance",
+      "createdAt": "2024-09-15T07:22:30.749Z",
+      "updatedAt": "2024-09-15T07:22:30.749Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "8e1e0861-9f06-4fe2-a9c1-423bab246959",
+      "name": "Get invoice",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        600,
+        380
+      ],
+      "parameters": {
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "Label_7885838942566773656"
+          ]
+        },
+        "options": {
+          "downloadAttachments": true
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "fegneFqi8XJX3NJH",
+          "name": "Gmail account (hana@hanamizuki.tw)"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "364fe355-672a-4074-800a-a7496c4fb1b2",
+      "name": "Get payment",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        600,
+        580
+      ],
+      "parameters": {
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "Label_371722915607774622"
+          ]
+        },
+        "options": {
+          "downloadAttachments": true
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "fegneFqi8XJX3NJH",
+          "name": "Gmail account (hana@hanamizuki.tw)"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "e3218faf-2486-46e0-bf43-3bc52927e2bd",
+      "name": "Extract invoice",
+      "type": "n8n-nodes-base.extractFromFile",
+      "notes": "No attachements",
+      "onError": "continueRegularOutput",
+      "position": [
+        820,
+        380
+      ],
+      "parameters": {
+        "options": {
+          "password": "E223706995"
+        },
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3772b3dc-7601-4005-9b61-263b2c1abd5f",
+      "name": "Extract payment",
+      "type": "n8n-nodes-base.extractFromFile",
+      "notes": "No attachements",
+      "onError": "continueRegularOutput",
+      "position": [
+        820,
+        580
+      ],
+      "parameters": {
+        "options": {
+          "password": "E223706995"
+        },
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "10d57038-940e-47aa-84ea-3850f61ac757",
+      "name": "HTML",
+      "type": "n8n-nodes-base.html",
+      "notes": "\".spend-table\" here is an example when the email use \"spend\" html tags to display each spends.\ne.g.\n<div class=spend-table>Spend 1</div>\n<div class=spend-table>Spend 2</div>",
+      "position": [
+        1440,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "=html",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "spend",
+              "cssSelector": ".spend-table",
+              "returnArray": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "dae6d22e-587d-4102-b006-20a341ede5ee",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1660,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "spend"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0d75443d-0d23-4120-95e5-b3128a760fb4",
+      "name": "Structured Output Parser1",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        2500,
+        640
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n \"title\": \"Expense Record Schema\",\n \"description\": \"Schema used to parse expense record emails, including date, service name, transaction details, amount, category, currency, and card.\",\n \"type\": \"object\",\n \"properties\": {\n \"date\": {\n \"type\": \"string\",\n \"description\": \"Transaction date, can refer to the email date or the consumption date within the content. If there are multiple dates, use the earliest one. The format is 'YYYY-MM-DD hh:mm', e.g., '2024-09-02 10:12'.\",\n \"examples\": [\"2024-09-02 10:12\"]\n },\n \"service\": {\n \"type\": [\"string\", \"null\"],\n \"description\": \"Name of the service or store, such as 'GOOGLE', 'Uber', etc.\",\n \"examples\": [\"GOOGLE\", \"Uber Eats\", \"Uber\", \"CLAUDE.AI\"]\n },\n \"details\": {\n \"type\": [\"string\", \"null\"],\n \"description\": \"Detailed transaction information, such as overseas card usage, online transactions, restaurant names, or consumption details. If none, can be left blank or null.\",\n \"examples\": [\"Uber: from Fuxing North Road to Minquan East Road\", \"Restaurant name\", null]\n },\n \"amount\": {\n \"type\": \"number\",\n \"description\": \"Transaction amount. If in USD, keep two decimal places (e.g., 50.12); if in TWD, use integers (e.g., 550).\",\n \"examples\": [50.12, 550]\n },\n \"category\": {\n \"type\": \"string\",\n \"description\": \"Transaction category\",\n \"enum\": [\"Food & Beverage\", \"Transportation\", \"Daily Necessities\", \"Housing\", \"Electronics\", \"Beauty & Hair\", \"Apparel & Accessories\", \"Medical & Healthcare\", \"Pets\", \"Education\", \"Entertainment\", \"Cloud Services\", \"Automobile\", \"Gifts\", \"Family Care\", \"Counseling\", \"Insurance\", \"Taxes\", \"Transfer Fees\", \"Music\", \"Fitness\", \"Travel\", \"Lending\", \"Donations\", \"Advertising\", \"Finance\"],\n \"examples\": [\"Food & Beverage\", \"Transportation\"]\n },\n \"currency\": {\n \"type\": \"string\",\n \"description\": \"Currency code used in the transaction. If the amount starts with NT$, then currency is TWD.\",\n \"enum\": [\"TWD\", \"USD\", \"JPY\", \"EUR\", \"SGD\"],\n \"examples\": [\"USD\", \"TWD\"]\n },\n \"card\": {\n \"type\": [\"string\", \"null\"],\n \"description\": \"Credit card used for the transaction.\",\n \"enum\": [\"HSBC 3088\", \"HSBC 3854\", \"Fubon Card\", \"Crypto.com Card\", \"Cathay Card\", null],\n \"examples\": [\"HSBC 3088\", \"HSBC 3854\"]\n }\n },\n \"required\": [\"date\", \"amount\", \"category\", \"currency\"]\n}\n"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "7ade499c-015b-4903-8129-6c135264bf75",
+      "name": "Google Gemini Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        2320,
+        640
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "QR3KfTwhKpbgAGWU",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "10fe4a38-139b-4284-9e86-dd36e472f59e",
+      "name": "Send",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2740,
+        480
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "date": "={{ $json.output.date }}",
+            "amount": "={{ $json.output.amount }}",
+            "source": "n8n",
+            "details": "={{ $json.output.details }}",
+            "payment": "={{ $json.output.card }}",
+            "service": "={{ $json.output.service }}",
+            "category": "={{ $json.output.category }}",
+            "currency": "={{ $json.output.currency }}"
+          },
+          "schema": [
+            {
+              "id": "date",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "service",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "details",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "amount",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "amount",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "category",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currency",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "currency",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payment",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "payment",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "source",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": []
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 2071031170,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ccwhQeUSUkINccAucC6_clRyNF5Mw4IjIxAtcH4ftIs/edit#gid=2071031170",
+          "cachedResultName": "raw data 2"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1ccwhQeUSUkINccAucC6_clRyNF5Mw4IjIxAtcH4ftIs/edit?gid=370005862#gid=370005862"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "flAcWUeyvdjh7MiW",
+          "name": "Google Sheets account: hana@hanamizuki.tw (GCP: n8n)"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.5
+    },
+    {
+      "id": "87ab4932-aae5-4c5a-a175-c782bebdf781",
+      "name": "Set data 0",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1860,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "75b16672-71cf-4157-bcb6-683099ff1620",
+              "name": "email_date",
+              "type": "string",
+              "value": "={{ $('Switch').item.json.date }}"
+            },
+            {
+              "id": "3298f680-5d17-42fd-8b41-a6ca621af37d",
+              "name": "email_subject",
+              "type": "string",
+              "value": "={{ $('Switch').item.json.subject }}"
+            },
+            {
+              "id": "cf7181b7-fef9-437a-8bbe-cd4a4eda85b8",
+              "name": "email_content",
+              "type": "string",
+              "value": "={{ $ifEmpty($json.spend, $ifEmpty( $json.text, $json.html)) }}"
+            },
+            {
+              "id": "1a524cb4-6975-4d45-ac0e-f1ac1f9b0417",
+              "name": "email_type",
+              "type": "number",
+              "value": "=0"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "c2829f41-1e3f-40bc-8d4b-9fd1bac41381",
+      "name": "Set data 1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1660,
+        440
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "75b16672-71cf-4157-bcb6-683099ff1620",
+              "name": "email_date",
+              "type": "string",
+              "value": "={{ $json.date }}"
+            },
+            {
+              "id": "3298f680-5d17-42fd-8b41-a6ca621af37d",
+              "name": "email_subject",
+              "type": "string",
+              "value": "={{ $json.subject }}"
+            },
+            {
+              "id": "cf7181b7-fef9-437a-8bbe-cd4a4eda85b8",
+              "name": "email_content",
+              "type": "string",
+              "value": "={{ $ifEmpty( $json.text, $json.html) }}"
+            },
+            {
+              "id": "1a524cb4-6975-4d45-ac0e-f1ac1f9b0417",
+              "name": "email_type",
+              "type": "number",
+              "value": "=1"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "ecf9ea3c-3f34-43ef-b101-ca4a420e4c24",
+      "name": "Set data 2",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1640,
+        740
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "75b16672-71cf-4157-bcb6-683099ff1620",
+              "name": "email_date",
+              "type": "string",
+              "value": "={{ $json.date }}"
+            },
+            {
+              "id": "3298f680-5d17-42fd-8b41-a6ca621af37d",
+              "name": "email_subject",
+              "type": "string",
+              "value": "={{ $json.subject }}"
+            },
+            {
+              "id": "cf7181b7-fef9-437a-8bbe-cd4a4eda85b8",
+              "name": "email_content",
+              "type": "string",
+              "value": "={{ $ifEmpty( $json.text, $json.html) }}"
+            },
+            {
+              "id": "1a524cb4-6975-4d45-ac0e-f1ac1f9b0417",
+              "name": "email_type",
+              "type": "number",
+              "value": "=2"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "0d9f8bde-af54-480c-bdc9-15cd5b0e6f28",
+      "name": "Invoice data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1040,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ac7c18ba-1944-4019-aa85-03d7751a7e1c",
+              "name": "html",
+              "type": "string",
+              "value": "={{ $('Get invoice').item.json.html }}"
+            },
+            {
+              "id": "5eb54501-9c55-437d-9918-e5eff92e2229",
+              "name": "subject",
+              "type": "string",
+              "value": "={{ $('Get invoice').item.json.subject }}"
+            },
+            {
+              "id": "87eebc48-0b95-46ae-b41b-b6540b1afaa9",
+              "name": "date",
+              "type": "string",
+              "value": "={{ $('Get invoice').item.json.date }}"
+            },
+            {
+              "id": "c6b75367-239e-4e88-9e17-90ee75a064e2",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $('Get invoice').item.json.text }} \\n {{ $json.text }}"
+            },
+            {
+              "id": "7d5b4b42-6b90-4ffe-ab8f-4288771d1302",
+              "name": "label",
+              "type": "string",
+              "value": "={{ $('Get invoice').item.json.labelIds }}"
+            },
+            {
+              "id": "551ea1c3-01ca-4615-9d52-a880e24252ed",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $('Get invoice').item.json.from.text }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "c1c4c490-d7a9-4b16-a81b-a338103764b6",
+      "name": "Payment data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1040,
+        580
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ac7c18ba-1944-4019-aa85-03d7751a7e1c",
+              "name": "html",
+              "type": "string",
+              "value": "={{ $('Get payment').item.json.html }}"
+            },
+            {
+              "id": "5eb54501-9c55-437d-9918-e5eff92e2229",
+              "name": "subject",
+              "type": "string",
+              "value": "={{ $('Get payment').item.json.subject }}"
+            },
+            {
+              "id": "87eebc48-0b95-46ae-b41b-b6540b1afaa9",
+              "name": "date",
+              "type": "string",
+              "value": "={{ $('Get payment').item.json.date }}"
+            },
+            {
+              "id": "c6b75367-239e-4e88-9e17-90ee75a064e2",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $('Get payment').item.json.text }} \\n {{ $json.text }}"
+            },
+            {
+              "id": "7d5b4b42-6b90-4ffe-ab8f-4288771d1302",
+              "name": "label",
+              "type": "string",
+              "value": "={{ $('Get payment').item.json.labelIds }}"
+            },
+            {
+              "id": "2c976be1-48b8-42fa-b1c9-2fd315da89ae",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $('Get payment').item.json.from.text }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "01c5a934-9412-4ef9-81a8-c4aef19c8868",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1300,
+        480
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Multiple payment info in one mail",
+              "conditions": {
+                "options": {
+                  "version": 1,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "leftValue": "={{ $json.from }}",
+                    "rightValue": "service@pxbillrc01.cathaybk.com.tw"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "One payment info in one mail",
+              "conditions": {
+                "options": {
+                  "version": 1,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "47e3b84f-903c-4594-9297-785cfbea0316",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "leftValue": "={{ $json.from }}",
+                    "rightValue": "\\b(?:noreply@messaging\\.hsbc\\.com\\.tw|hello@crypto\\.com|taipeifubon\\.com\\.tw)\\b"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Invoices",
+              "conditions": {
+                "options": {
+                  "version": 1,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "db9d40f1-8fa4-4908-9010-985072b3f319",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notRegex"
+                    },
+                    "leftValue": "={{ $json.from }}",
+                    "rightValue": "\\b(?:noreply@messaging\\.hsbc\\.com\\.tw|hello@crypto\\.com|taipeifubon\\.com\\.tw)\\b"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": false,
+      "typeVersion": 3.1,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "250bbd9a-3d22-4a04-910c-7cec437b3c33",
+      "name": "Groq Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "position": [
+        2320,
+        1120
+      ],
+      "parameters": {
+        "model": "llama-3.2-11b-text-preview",
+        "options": {}
+      },
+      "credentials": {
+        "groqApi": {
+          "id": "vaG2nZFaKeQarQHw",
+          "name": "Groq account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b8d2b2fc-748c-43c5-a82b-d5e7357bbef8",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        2520,
+        1120
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n \"title\": \"Transaction Record Schema\",\n \"description\": \"Schema for parsing transaction record emails, including date, service name, transaction details, amount, category, currency, and card.\",\n \"type\": \"object\",\n \"properties\": {\n \"date\": {\n \"type\": \"string\",\n \"description\": \"Transaction date, can refer to email date or transaction date in content. If multiple dates exist, use the earliest date. Format is 'YYYY-MM-DD hh:mm', e.g., '2024-09-02 10:12'.\",\n \"examples\": [\"2024-09-02 10:12\"]\n },\n \"service\": {\n \"type\": [\"string\", \"null\"],\n \"description\": \"Name of service or store, e.g., 'GOOGLE', 'Uber', etc.\",\n \"examples\": [\"GOOGLE\", \"Uber Eats\", \"Uber\", \"CLAUDE.AI\"]\n },\n \"details\": {\n \"type\": [\"string\", \"null\"],\n \"description\": \"Detailed transaction information, such as overseas purchase, online purchase, restaurant name, or consumption details. Can be empty or null if not available.\",\n \"examples\": [\"Uber: From Fuxing North Road to Minquan East Road\", \"Restaurant name\", null]\n },\n \"amount\": {\n \"type\": \"number\",\n \"description\": \"Transaction amount. For USD, keep two decimal places (e.g., 50.12); for TWD, use integers (e.g., 550).\",\n \"examples\": [50.12, 550]\n },\n \"category\": {\n \"type\": \"string\",\n \"description\": \"Transaction category\",\n \"enum\": [\"Food & Beverage\", \"Transportation\", \"Daily Necessities\", \"Housing\", \"Electronics\", \"Beauty & Hair\", \"Clothing & Accessories\", \"Healthcare\", \"Pets\", \"Education\", \"Entertainment\", \"Cloud Services\", \"Automotive\", \"Gifts\", \"Family Support\", \"Counseling\", \"Insurance\", \"Taxes\", \"Transfer Fee\", \"Music\", \"Fitness\", \"Travel\", \"Lending\", \"Donations\", \"Advertising\", \"Finance\"],\n \"examples\": [\"Food & Beverage\", \"Transportation\"]\n },\n \"currency\": {\n \"type\": \"string\",\n \"description\": \"Currency code used for the transaction, if amount starts with NT$, currency is TWD.\",\n \"enum\": [\"TWD\", \"USD\", \"JPY\", \"EUR\", \"SGD\"],\n \"examples\": [\"USD\", \"TWD\"]\n }\n },\n \"required\": [\"date\", \"amount\", \"category\", \"currency\"]\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "39b10715-54fe-4c07-9ca1-afbe43ae519e",
+      "name": "Send1",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2740,
+        900
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "date": "={{ $json.output.date }}",
+            "amount": "={{ $json.output.amount }}",
+            "source": "n8n",
+            "details": "={{ $json.output.details }}",
+            "payment": "=",
+            "service": "={{ $json.output.service }}",
+            "category": "={{ $json.output.category }}",
+            "currency": "={{ $json.output.currency }}"
+          },
+          "schema": [
+            {
+              "id": "date",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "service",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "service",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "details",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "amount",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "amount",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "category",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "currency",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "currency",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "payment",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "payment",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "source",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": []
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 2071031170,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ccwhQeUSUkINccAucC6_clRyNF5Mw4IjIxAtcH4ftIs/edit#gid=2071031170",
+          "cachedResultName": "raw data 2"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1ccwhQeUSUkINccAucC6_clRyNF5Mw4IjIxAtcH4ftIs/edit?gid=370005862#gid=370005862"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "flAcWUeyvdjh7MiW",
+          "name": "Google Sheets account: hana@hanamizuki.tw (GCP: n8n)"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.5
+    },
+    {
+      "id": "112f5198-871e-42f9-9376-5fa074497413",
+      "name": "Extract details1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        2320,
+        900
+      ],
+      "parameters": {
+        "text": "=Email Date: {{ $json.email_date }}\nEmail Subject: {{ $json.email_subject }}\nEmail Content:\n{{ $json.email_content }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Please analyze the following email to extract transaction details for bookkeeping purposes.\n\nPlease extract relevant transaction details such as transaction date, amount, merchant name, and any other pertinent information, and provide them in a structured format suitable for accounting records."
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "retryOnFail": true,
+      "typeVersion": 1.4
+    },
+    {
+      "id": "b9c3cb29-e68e-4ae0-8930-185c17bc6cab",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2060,
+        440
+      ],
+      "parameters": {},
+      "typeVersion": 3
+    },
+    {
+      "id": "b50d632c-b762-4f61-b34a-91f941100668",
+      "name": "Extract details",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        2320,
+        480
+      ],
+      "parameters": {
+        "text": "=Email Date: {{ $json.email_date }}\nEmail Subject: {{ $json.email_subject }}\nEmail Content:\n{{ $json.email_content }}\nEmail Source: {{ $json.email_type }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Please analyze the following email to extract transaction details for bookkeeping purposes. The \"Email Source\" field indicates the origin of the email, where 0 represents Cathay Bank card statements and 1 represents other credit card statements.\n\nPlease extract relevant transaction details such as transaction date, amount, merchant name, and any other pertinent information, and provide them in a structured format suitable for accounting records."
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "retryOnFail": true,
+      "typeVersion": 1.4
+    },
+    {
+      "id": "7a7e2e36-a8b6-48dc-ad57-2f5eea691285",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        220
+      ],
+      "parameters": {
+        "width": 720,
+        "height": 560,
+        "content": "# A. Get data\n- Set up labels in Gmail\n- Suggested using Gmail filters to move emails to labels automatically"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "108becad-1a7b-4409-9cb3-36a1c7b64786",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        -20
+      ],
+      "parameters": {
+        "width": 920,
+        "height": 960,
+        "content": "# B. Deal with the data\n1. Multiple payment info in one mail: input the \"sender\" of the emails that contain more than one payment info. e.g. credit card daily spend notification\n2. One payment info in one mail: input the \"sender\" of the emails that contain only one payment info. e.g. instant credit card spend notification\n3. Invoices: input the mails that contain one invoice in one mail"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7123f576-87f9-4df1-ae24-f3e5289c7234",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2240,
+        320
+      ],
+      "parameters": {
+        "width": 840,
+        "height": 980,
+        "content": "# C. Get spend details and send to google sheet\n- Edit the output schema to fit your google sheet format\n- Edit the prompt to fit your needs"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  },
+  "versionId": "211d9ccc-7a66-41c8-bda1-eacde400eeff",
+  "connections": {
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Extract details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set data 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set data 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Set data 0",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set data 0": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set data 1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Set data 2": {
+      "main": [
+        [
+          {
+            "node": "Extract details1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get invoice": {
+      "main": [
+        [
+          {
+            "node": "Extract invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get payment": {
+      "main": [
+        [
+          {
+            "node": "Extract payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoice data": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment data": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract details": {
+      "main": [
+        [
+          {
+            "node": "Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract invoice": {
+      "main": [
+        [
+          {
+            "node": "Invoice data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract payment": {
+      "main": [
+        [
+          {
+            "node": "Payment data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract details1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract details1": {
+      "main": [
+        [
+          {
+            "node": "Send1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extract details1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract details",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extract details",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

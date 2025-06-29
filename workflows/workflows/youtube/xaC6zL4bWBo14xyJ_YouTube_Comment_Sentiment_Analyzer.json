@@ -1,0 +1,755 @@
+{
+  "id": "xaC6zL4bWBo14xyJ",
+  "meta": {
+    "instanceId": "10f6e8a86649316fe7041c503c24e6d77b68a961a9f4f1f76d0100c435446092",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "YouTube Comment Sentiment Analyzer",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "0bacd739-7ea3-42f5-8986-2f7d47628ee9",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        820,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "body.items"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "236aaaab-6a9a-42d7-8645-980bf8c3254d",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1080,
+        180
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "4d73v7kxEDNu3n25",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "c1eda3a6-9fbe-4150-8086-c3ffebaeb2e1",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        380,
+        140
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "d28f3fbf-6013-47af-ba84-3bdd9800fd3b",
+      "name": "Get Video Urls from Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -200,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 760258523,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4/edit#gid=760258523",
+          "cachedResultName": "Sheet2"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4/edit?usp=drivesdk",
+          "cachedResultName": "Youtube Videos Comments"
+        },
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "jPoTdPxgVL0vr9SQ",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "0ac06530-cfe7-4f1c-8c0a-8def2126df0f",
+      "name": "check next fetch time is available or not",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -20,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "92084960-e023-4cd6-a5c0-ddd43275cc33",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.next_fetch_time }}",
+              "rightValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "ba42f450-3b0c-41a3-8e72-d2a38b97cfc7",
+      "name": "check next fetch time is before the current time",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        160,
+        80
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "40c8d081-b298-46b1-850c-2322ed89d18d",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              },
+              "leftValue": "={{ $json.next_fetch_time }}",
+              "rightValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "aad11f42-b976-41d7-b771-151da60391d6",
+      "name": "Get Comments for video urls",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        360,
+        -60
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/commentThreads",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken }}"
+                  }
+                ]
+              },
+              "completeExpression": "={{ !$response.body.nextPageToken}}",
+              "paginationCompleteWhen": "other"
+            }
+          }
+        },
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "videoId",
+              "value": "={{ $json[\"video_urls\"].match(/(?:v=|\\/)([0-9A-Za-z_-]{11})/)[1] || ''}}"
+            },
+            {
+              "name": "maxResults",
+              "value": "100"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "LmsYEaslJmA6CMdL",
+          "name": "Query Auth account 4"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "4cf1ebd0-e260-4e53-bc26-be1db2f6e7f2",
+      "name": "Analyze sentiment of every comment",
+      "type": "@n8n/n8n-nodes-langchain.sentimentAnalysis",
+      "position": [
+        1060,
+        -40
+      ],
+      "parameters": {
+        "options": {
+          "categories": "Positive, Neutral, Negative",
+          "systemPromptTemplate": "You are highly intelligent and accurate sentiment analyzer. Analyze the sentiment of the provided text. Categorize it into one of the following: {categories}. Use the provided formatting instructions. Only output the JSON."
+        },
+        "inputText": "={{ $json.snippet.topLevelComment.snippet.textOriginal }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f306c5cd-6b6b-46fa-b7ef-f3ccef960931",
+      "name": "Format fields as required to save in google sheet",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1500,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "25fb96a0-de38-4495-8473-0385a3fd5df9",
+              "name": "commentId",
+              "type": "string",
+              "value": "={{ $json.snippet.topLevelComment.id }}"
+            },
+            {
+              "id": "d824ecd0-89c0-4c07-992f-6a5d3421690e",
+              "name": "video_url",
+              "type": "string",
+              "value": "=https://www.youtube.com/watch?v={{ $json.snippet.videoId }}"
+            },
+            {
+              "id": "cdcbc3d9-ab3e-4d7d-80a7-bfe168b0ed27",
+              "name": "comment",
+              "type": "string",
+              "value": "={{ $json.snippet.topLevelComment.snippet.textOriginal }}"
+            },
+            {
+              "id": "20bcfe96-3904-44d2-b72a-9eb49d603c8d",
+              "name": "authorName",
+              "type": "string",
+              "value": "={{ $json.snippet.topLevelComment.snippet.authorDisplayName }}"
+            },
+            {
+              "id": "c92f56bf-8b37-4c4e-9ce7-b7a49d63deee",
+              "name": "likes",
+              "type": "string",
+              "value": "={{ $json.snippet.topLevelComment.snippet.likeCount }}"
+            },
+            {
+              "id": "7cc4fdb3-7c41-418a-bf4f-71081fe9df74",
+              "name": "reply",
+              "type": "string",
+              "value": "={{ $json.snippet.totalReplyCount }}"
+            },
+            {
+              "id": "9988ea66-7f31-4b2c-90ab-3cad8efabf95",
+              "name": "sentiment",
+              "type": "string",
+              "value": "={{ $json.sentimentAnalysis.category }}"
+            },
+            {
+              "id": "6552df27-6e04-4048-b3c2-1e1755ccac28",
+              "name": "published_at",
+              "type": "string",
+              "value": "={{ $json.snippet.topLevelComment.snippet.publishedAt }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "6cd20a6e-8bcc-44c7-a62d-e3c3c75e6d9a",
+      "name": "Insert and update comment in google sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1720,
+        -40
+      ],
+      "parameters": {
+        "columns": {
+          "value": {},
+          "schema": [
+            {
+              "id": "commentId",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "commentId",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "video_url",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "video_url",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "comment",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "comment",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "authorName",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "authorName",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "likes",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "likes",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reply",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "reply",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sentiment",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "sentiment",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "published_at",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "published_at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": [
+            "commentId"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4/edit?usp=drivesdk",
+          "cachedResultName": "Youtube Videos Comments"
+        },
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "jPoTdPxgVL0vr9SQ",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "ea240f38-1462-402b-8db2-36b3e8664c2f",
+      "name": "Update last fetched time and next_fetch_time",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1940,
+        -40
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "video_urls": "={{ $('Get Video Urls from Google Sheet').item.json.video_urls }}",
+            "next_fetch_time": "={{ $now.plus(5, 'min').toISO() }}",
+            "last_fetched_time": "={{ $now.toISO() }}"
+          },
+          "schema": [
+            {
+              "id": "video_urls",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "video_urls",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_fetched_time",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "last_fetched_time",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_fetch_time",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "next_fetch_time",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "video_urls"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 760258523,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4/edit#gid=760258523",
+          "cachedResultName": "Sheet2"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xoCVr_mlwn4jFcnJENtrU-_K5nkIytZ8qBXzxMq55n4/edit?usp=drivesdk",
+          "cachedResultName": "Youtube Videos Comments"
+        },
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "jPoTdPxgVL0vr9SQ",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "610fa83c-a626-42c0-aa8b-1ebb1a6bcf44",
+      "name": "No Operation, do nothing1",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        820,
+        140
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "30570a68-78b8-434e-bb20-ea85a0689a63",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -380,
+        -40
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "4fe79a97-fc39-41c0-9d2f-f07865deef5e",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -440,
+        -160
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 2620,
+        "height": 480,
+        "content": "\n# 🚀 YouTube Comment Sentiment Analyzer with Google Sheets & OpenAI"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0ccb85d8-d29e-44a7-b644-49b3dcc6ce9b",
+      "name": "Check Success Response",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        560,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "bce76f94-5904-4fdb-b172-adc1134855f9",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "880f570f-6300-4659-9dcf-d47880140131",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1100,
+        -500
+      ],
+      "parameters": {
+        "width": 640,
+        "height": 820,
+        "content": "### **How to Use This Workflow:**\n📝 **YouTube Comment Sentiment Analyzer**\n\n1. 🔘 **Trigger:** Click \"Execute Workflow\" to run it manually.\n\n2. 📄 Your Google Sheet should have **2 sheets**:\n   - **Sheet1 (Results with Sentiment):**\n     - Column A: `commentId` (YouTube comment id)\n     - Column B: `video_url` (url of video)\n     - Column C: `comment` (YouTube comment)\n     - Column D: `authorName` (Name of author as per Youtube)\n     - Column E: `likes` (Number of likes on that particular comment)\n     - Column f: `reply` (Number of replies on that particular comment)\n     - Column g: `sentiment` (Analyzed sentiment of the comment)\n     - Column h: `published_at` (timestamp of comment published)\n   \n   - **Sheet2 (Video URLs):**\n     - Column A: `video_urls` (list of YouTube video URLs)\n     - Column B: `last_fetched_time` (timestamp of the last fetch)\n     - Column C: `next_fetch_time` (time for the next fetch)\n\n3. 🔐 **Make sure these credentials are set up**:\n   - Google Sheets (Service Account)\n   - YouTube Data API v3\n   - OpenAI API Key (for sentiment analysis)\n\n4. ✅ **What this workflow does**:\n   - Reads **video URLs** from **Sheet2**.\n   - Checks **last fetched time** (if applicable).\n   - Fetches new comments from YouTube.\n   - Analyzes sentiment using OpenAI.\n   - Appends **comment**, **sentiment**, **video ID**, and **timestamp** to **Sheet1**.\n   - Updates **last_fetched** timestamp in **Sheet2**.\n\n5. 💡 **Tip:**\n   - You can replace the **Manual Trigger** with a **Cron node** for automatic execution at specified intervals.\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "70007187-7437-4053-b909-5057bf816906",
+  "connections": {
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Analyze sentiment of every comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze sentiment of every comment",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success Response": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Comments for video urls": {
+      "main": [
+        [
+          {
+            "node": "Check Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Urls from Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "check next fetch time is available or not",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Video Urls from Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze sentiment of every comment": {
+      "main": [
+        [
+          {
+            "node": "Format fields as required to save in google sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format fields as required to save in google sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format fields as required to save in google sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert and update comment in google sheet": {
+      "main": [
+        [
+          {
+            "node": "Update last fetched time and next_fetch_time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check next fetch time is available or not": {
+      "main": [
+        [
+          {
+            "node": "Get Comments for video urls",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "check next fetch time is before the current time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update last fetched time and next_fetch_time": {
+      "main": [
+        []
+      ]
+    },
+    "check next fetch time is before the current time": {
+      "main": [
+        [
+          {
+            "node": "Get Comments for video urls",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format fields as required to save in google sheet": {
+      "main": [
+        [
+          {
+            "node": "Insert and update comment in google sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

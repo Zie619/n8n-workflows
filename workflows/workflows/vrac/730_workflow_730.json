@@ -1,0 +1,286 @@
+{
+  "nodes": [
+    {
+      "name": "Attendee Registrations",
+      "type": "n8n-nodes-base.typeformTrigger",
+      "position": [
+        400,
+        300
+      ],
+      "webhookId": "6314f4db-12ca-4c5e-a6c5-062bb0437734",
+      "parameters": {
+        "formId": "RknoIFsl"
+      },
+      "credentials": {
+        "typeformApi": "Typeform Burner Account"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Add to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        600,
+        300
+      ],
+      "parameters": {
+        "range": "Attendees!A:F",
+        "options": {},
+        "sheetId": "1nlnsTQKGgQZN-Rtd07K9bn0ROm0aFBC2O4kzM2YaTBI",
+        "operation": "append",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": "google-sheets"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Create Account",
+      "type": "n8n-nodes-base.mattermost",
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "email": "={{$json[\"And what's your email address?\"]}}",
+        "password": "=P!_{{$json[\"And what's your email address?\"].split(\" \").join(\"\")}}-{{new Date().getHours()}}{{new Date().getDate()}}",
+        "resource": "user",
+        "username": "={{$json[\"Great, can we get your full name?\"].split(\" \").join(\"\")}}-{{new Date().getHours()}}",
+        "operation": "create",
+        "authService": "email",
+        "additionalFields": {
+          "first_name": "={{$json[\"Great, can we get your full name?\"]}}"
+        }
+      },
+      "credentials": {
+        "mattermostApi": "Mattermost Credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Add to team",
+      "type": "n8n-nodes-base.mattermost",
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "emails": "={{$node[\"Attendee Registrations\"].json[\"And what's your email address?\"]}}",
+        "teamId": "ee3ddsn98i8d3xizkcttras5nw",
+        "resource": "user",
+        "operation": "invite"
+      },
+      "credentials": {
+        "mattermostApi": "Mattermost Credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Array to Rows",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const newItems = [];\nfor (let i=0;i<$node[\"Attendee Registrations\"].json[\"Which sessions would you like to attend?\"].length;i++) {\n\tnewItems.push({\n    \tjson: {\n        \tSession: $node[\"Attendee Registrations\"].json[\"Which sessions would you like to attend?\"][i]\n        }\n     });\n}\n\nreturn newItems;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get Session Details",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1200,
+        500
+      ],
+      "parameters": {
+        "range": "Sessions!A:F",
+        "options": {},
+        "sheetId": "1nlnsTQKGgQZN-Rtd07K9bn0ROm0aFBC2O4kzM2YaTBI",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": "google-sheets"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge Data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1376,
+        422
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "Session",
+        "propertyName2": "Session"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Add to channels",
+      "type": "n8n-nodes-base.mattermost",
+      "position": [
+        1576,
+        422
+      ],
+      "parameters": {
+        "userId": "={{$node[\"Create Account\"].json[\"id\"]}}",
+        "resource": "channel",
+        "channelId": "={{$json[\"Mattermost Channel ID\"]}}",
+        "operation": "addUser"
+      },
+      "credentials": {
+        "mattermostApi": "Mattermost Credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Add to Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        1776,
+        422
+      ],
+      "parameters": {
+        "eventId": "={{$node[\"Merge Data\"].json[\"Google Calendar Event ID\"]}}",
+        "calendar": "3ne32v2nlrrd2l3624v5qpg6qk@group.calendar.google.com",
+        "operation": "update",
+        "updateFields": {
+          "attendees": [
+            "={{$node[\"Attendee Registrations\"].json[\"And what's your email address?\"]}}"
+          ]
+        }
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": "Google Calendar Credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Welcome Email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1976,
+        422
+      ],
+      "parameters": {
+        "toList": [
+          "={{$node[\"Attendee Registrations\"].json[\"And what's your email address?\"]}}"
+        ],
+        "message": "=Dear {{$node[\"Attendee Registrations\"].json[\"Great, can we get your full name?\"]}},\n\nWelcome to n8nConf, the world's largest no-code automation conference!\n\nThis email is to confirm your registration to the following sessions:\n- {{$node[\"Attendee Registrations\"].json[\"Which sessions would you like to attend?\"].join('\\n- ')}}\n\nYou should receive Google Calendar invites to these events on your email. Please consult those for the Google Meet joining information.\n\nYou can also interact with the rest of the community via our Mattermost chat. We created an account just for you!\nLook for the channel corresponding to your session to join the discussion!\n\nLogin URL: https://mm.failedmachine.com/\nUsername: {{$node[\"Create Account\"].json[\"username\"]}}\nPassword: {{$node[\"Create Account\"].parameter[\"password\"]}}\n\nRemember to change your password immediately after your first login!\n\nIf you have any troubles with joining the event, or using the chat rooms; please feel free to let us know on support@n8nconf.com\n\nWe look forward to your participation!\n\nBest,\nTeam n8n",
+        "subject": "Welcome to n8nConf",
+        "resource": "message",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "gmailOAuth2": "gmail"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Merge Data": {
+      "main": [
+        [
+          {
+            "node": "Add to channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to team": {
+      "main": [
+        [
+          {
+            "node": "Array to Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Event": {
+      "main": [
+        [
+          {
+            "node": "Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Create Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Array to Rows": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Account": {
+      "main": [
+        [
+          {
+            "node": "Add to team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to channels": {
+      "main": [
+        [
+          {
+            "node": "Add to Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session Details": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Attendee Registrations": {
+      "main": [
+        [
+          {
+            "node": "Add to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

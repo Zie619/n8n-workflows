@@ -1,0 +1,716 @@
+{
+  "id": "2ddwHvuidKc6lZia",
+  "meta": {
+    "instanceId": "5b12f258e7b8845a7e4d948aaf2096c942ee796fa3f6edf443a06fe951a6e6e2",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "AI Agent - Cv Resume - Automated Screening , Sorting , Rating and Tracker System",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "92b75a8f-da03-4545-91ef-da29b88f1cef",
+      "name": "GDocs - Get Job Desc",
+      "type": "n8n-nodes-base.googleDocs",
+      "position": [
+        220,
+        120
+      ],
+      "parameters": {
+        "operation": "get",
+        "documentURL": "https://docs.google.com/document/d/12dv1AXaotpJ3ST1nUI-QgCoi5SJjM52zeHmjhwZUtvs/edit?usp=sharing"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "k7j5KUAvAzARmxTu",
+          "name": "Google Docs account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "213712d5-f7ef-4c49-bfa6-da02be76a213",
+      "name": "Google Drive - Resume CV File Created",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "position": [
+        -540,
+        120
+      ],
+      "parameters": {
+        "event": "fileCreated",
+        "options": {},
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "list",
+          "value": "17g2HGxLieONy6EWfsPADvA9IXDp5nJ8p",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/17g2HGxLieONy6EWfsPADvA9IXDp5nJ8p",
+          "cachedResultName": "Unfiltered"
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0k4QgJ8YgVPNgF7",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "31075389-e8c5-431a-b5e1-807422dbcd5f",
+      "name": "Download Resume File From Gdrive",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        -220,
+        120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "fileName": "={{ $json.name }}"
+        },
+        "operation": "download"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0k4QgJ8YgVPNgF7",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "367d4e61-a73c-4e47-bd73-690b2a63e0ae",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        720,
+        -400
+      ],
+      "parameters": {
+        "text": "=You are expert backend principal engineer specialize in python. You will compare job description and candidate profile.\n\nThen you will response with decision [REJECTED/KIV/SHORTLISTED].\n, provide a reason and give a score rating\n{ decision, reason , score}\n\nAfter you identify a decision, used the tool in sequence.\n1. Use the relevant tool to move the candidate resume file accordingly to the right folder GoogleDrive:MoveFileToReject or GoogleDrive:MoveFileToShortlisted or GoogleDrive:MoveFileToKIV\n2. Use the Gsheet:UpdateTracker tool to update the tracker status.\n3. Use the Gmail:NotificationTool to infor the candidate name, role, decision and reason\n\n==[JOB-DESC]===\n{{ $json.content }}\n==[/JOB-DESC]===\n\n==[CANDIDATE-DESC]===\n{{ $('Extract from File').item.json.text }}\n \n==[/CANDIDATE-DESC]===\n\n",
+        "options": {
+          "systemMessage": "You are expert backend principal engineer specialize in python. You will compare job description and candidate profile.\n\nThen you will response with decision [REJECTED/KIV/SHORTLISTED].\nand provide a reason.\n{ decision, reason}\n\nAfter you identify a decision, used the tool \n1. Use the relevant tool to move the candidate resume file accordingly to the right folder GoogleDrive:MoveFileToReject or GoogleDrive:MoveFileToShortlisted or GoogleDrive:MoveFileToKIV\n2. Use the Gsheet-UpdateTracker tool to update the tracker status.\n"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.9
+    },
+    {
+      "id": "f2a16cf3-0404-4791-b7d4-64f1909e02c2",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        -40,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "pdf"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "98af749e-d4ee-4f9b-bacc-f78a47525077",
+      "name": "Gmail:Notification",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [
+        1760,
+        120
+      ],
+      "webhookId": "ed0f09b9-4b16-4bf1-af47-208f1e8e3761",
+      "parameters": {
+        "sendTo": "aiix.space.noreply@gmail.com",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {},
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "descriptionType": "manual",
+        "toolDescription": "Gmail:NotificationTool - This tool will notify the candidate name, job role, and status of [shortlisted/kiv/rejected]"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1cn2wligOf77izLL",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "343f7f0f-d505-448f-a95d-0fc7d3c14730",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        -60
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 660,
+        "height": 400,
+        "content": "## 1. Move candidate cv to folder\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9941231e-7cfb-442e-9593-aed21fe86cf8",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        -60
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 320,
+        "height": 400,
+        "content": "## 2. Update tracker\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bfd181ec-cf79-4320-9acd-f3e35fb499c5",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1640,
+        -60
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 320,
+        "height": 400,
+        "content": "## 3. Send email notification\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "60fd65e7-6e8a-4092-9fce-2dd97e35b236",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -280,
+        -60
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 380,
+        "height": 400,
+        "content": "## Download and read candidate CV Resume\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d5d3cf16-d84d-4e7d-af75-f5341af20f59",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        100,
+        -60
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 380,
+        "height": 400,
+        "content": "## Read Job Description\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0ee07985-b24b-492b-a394-2f7097254911",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2040,
+        -80
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 620,
+        "height": 1040,
+        "content": "# AI-Agent : Automated CV Resume Screening Evaluate Rating System\n\n## What is this for?\n### Let AI agent intelligently analyze and rate your Candidate's cv resumes based on your job description. This will help ensure a fast and accurate screening process.\n\n### The Screening AI automatically organizes resumes into appropriate folders, updates statuses and scores in your tracking system, and sends timely notifications—saving you valuable time and effort. \n\n\n### Let AI Agent and automation handle the heavy lifting while you focus on making the best hiring decisions!\n\n\n```\n```\n\n## Prerequisite\n\n### Please follow official n8n integration document on how setup your gdrive,gmail,gdoc,gsheet credentials. \n\n \n```\n```\n\n## How it works?\n\n### Each time you place a new pdf resume in the 'Unfiltered' folder , you will automatically get screening results in the tracker for the candidate. \n\nThe AI agent will help notify email and do CV sorting into appropriate folder.\n\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "aa43af12-fae1-4a98-9cad-7859051baf48",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -620,
+        -60
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 260,
+        "height": 400,
+        "content": "## Add candidate CV Resume into folder\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7ad2b8a9-3720-4713-a8dd-af8f6745f95d",
+      "name": "Gdrive:Move-To-Reject-Folder",
+      "type": "n8n-nodes-base.googleDriveTool",
+      "position": [
+        580,
+        120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Google Drive - Resume CV File Created').item.json.id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "16BR7dhzd4-6i_kHYRStJd5UdqNWhpXKA",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/16BR7dhzd4-6i_kHYRStJd5UdqNWhpXKA",
+          "cachedResultName": "REJECTED"
+        },
+        "operation": "move",
+        "descriptionType": "manual",
+        "toolDescription": "GoogleDrive:MoveFileToReject\nUse this tool to move rejected candidate profile to reject folder\n "
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0k4QgJ8YgVPNgF7",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "921a0561-9733-47fe-a6ee-191abf30ac37",
+      "name": "Gdrive:Move-To-KIV-Folder",
+      "type": "n8n-nodes-base.googleDriveTool",
+      "position": [
+        800,
+        120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Google Drive - Resume CV File Created').item.json.id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1KLfykacUhwtO0-wgYs6WsrcxbCHHKJ7o",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1KLfykacUhwtO0-wgYs6WsrcxbCHHKJ7o",
+          "cachedResultName": "KIV"
+        },
+        "operation": "move",
+        "descriptionType": "manual",
+        "toolDescription": "GoogleDrive:MoveFileToKIV\nUse this tool to move KIV candidate profile to KIV folder"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0k4QgJ8YgVPNgF7",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "0b32131c-3811-406f-a50d-875750781906",
+      "name": "Gdrive:Move-To-Shortlisted-Folder",
+      "type": "n8n-nodes-base.googleDriveTool",
+      "position": [
+        1000,
+        120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Google Drive - Resume CV File Created').item.json.id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive",
+          "cachedResultName": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1m8vrejmyPWpGsjJc6amnWfSXBRESlpfO",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1m8vrejmyPWpGsjJc6amnWfSXBRESlpfO",
+          "cachedResultName": "SHORTLISTED"
+        },
+        "operation": "move",
+        "descriptionType": "manual",
+        "toolDescription": "GoogleDrive:MoveFileToShortlisted\nUse this tool to move  Shortlisted candidate profile to Shortlisted folder"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0k4QgJ8YgVPNgF7",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "98a656c7-bb17-4808-abf8-ef4e23716b60",
+      "name": "Gsheet: Update Candidate Tracker",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "position": [
+        1340,
+        120
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "AI Score": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('AI_Score', ``, 'string') }}",
+            "AI Reason": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('AI_Reason', ``, 'string') }}",
+            "AI Verdict": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('AI_Verdict', ``, 'string') }}",
+            "Candidate Name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Candidate_Name__using_to_match_', ``, 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "Candidate Name",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Candidate Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Current Role",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Current Role",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Role Scope",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Role Scope",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Score",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "AI Score",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Verdict",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "AI Verdict",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI Reason",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "AI Reason",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Referral",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Referral",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Due date",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Due date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Notes",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Human verdict",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Human verdict",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Candidate Name"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 843593464,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SwnbH_dnqPMho7SqX1LKAjFMc0YvLBGok4I1AdgrJjE/edit#gid=843593464",
+          "cachedResultName": "main"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1SwnbH_dnqPMho7SqX1LKAjFMc0YvLBGok4I1AdgrJjE",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SwnbH_dnqPMho7SqX1LKAjFMc0YvLBGok4I1AdgrJjE/edit?usp=drivesdk",
+          "cachedResultName": "ResumeScreening- Candidate Tracker"
+        },
+        "descriptionType": "manual",
+        "toolDescription": "Gsheet:UpdateTracker\nThis tool help update relevant candidate status"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fqYZ5O9pQ89v3SAp",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "c9eb92a0-f3bc-4226-835e-602a2f808e4c",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1340,
+        -80
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 600,
+        "height": 1300,
+        "content": "\n## Folder & File Setup\n### 1. Create a google-drive folder like this\n \n[View directory example](https://drive.google.com/drive/folders/1Uh7VdJORE03YBJkCmvr1TXg_esbiNnTV?dmr=1&ec=wgc-drive-hero-goto)\n\n![Directory EXAMPLE](https://github.com/dragonjump/n8n-ai-agent-screening/blob/main/screenshot1.png?raw=true)\n\n### 2. Create a job description like this\n \n[View file example](https://docs.google.com/document/d/12dv1AXaotpJ3ST1nUI-QgCoi5SJjM52zeHmjhwZUtvs/edit?usp=drive_link)\n\n![Directory EXAMPLE](https://github.com/dragonjump/n8n-ai-agent-screening/blob/main/screenshot2.png?raw=true)\n\n\n### 3. Configure a tracker like this\n \n[View file example](https://docs.google.com/spreadsheets/d/1SwnbH_dnqPMho7SqX1LKAjFMc0YvLBGok4I1AdgrJjE/edit?gid=843593464#gid=843593464)\n\n![Directory EXAMPLE](https://github.com/dragonjump/n8n-ai-agent-screening/blob/main/screenshot3.png?raw=true)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e0d419d7-dcc1-40c5-afb1-5bda110e681c",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -560,
+        20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 150,
+        "height": 80,
+        "content": "UNFILTERED FOLDER"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d9034b09-41f9-4f27-8d9d-e40f8603e1ea",
+      "name": "Groq - llama 4 AI MODEL",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "position": [
+        680,
+        -200
+      ],
+      "parameters": {
+        "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "options": {}
+      },
+      "credentials": {
+        "groqApi": {
+          "id": "RBCtAUywXbI6hFmr",
+          "name": "Groq account -bbflight"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "adba9994-2c2e-40f2-9a73-8a57b48b3bc4",
+  "connections": {
+    "AI Agent": {
+      "main": [
+        []
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "GDocs - Get Job Desc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail:Notification": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GDocs - Get Job Desc": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq - llama 4 AI MODEL": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gdrive:Move-To-KIV-Folder": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gdrive:Move-To-Reject-Folder": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Resume File From Gdrive": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gsheet: Update Candidate Tracker": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gdrive:Move-To-Shortlisted-Folder": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Resume CV File Created": {
+      "main": [
+        [
+          {
+            "node": "Download Resume File From Gdrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

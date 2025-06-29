@@ -1,0 +1,689 @@
+{
+  "meta": {
+    "instanceId": "408f9fb9940c3cb18ffdef0e0150fe342d6e655c3a9fac21f0f644e8bedabcd9",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "ed993205-977a-43cd-8d0b-4faef216d766",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        360,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "predictions"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "67f2bb16-ee38-4bc8-9cc7-50a44614cc3b",
+      "name": "Imagen 3.0",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        140,
+        -120
+      ],
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{\n{\n  \"instances\": [\n    {\n      \"prompt\": [\n        $json.candidates[0].content.parts[0].text,\n       `Generate the following image: ${$('Variables').first().json.targetPrompt}`\n      ].join(' ')\n    }\n  ],\n  \"parameters\": {\n    \"sampleCount\": $('Variables').first().json.numberSamples.toNumber()\n  }\n}\n}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "dSxo6ns5wn658r8N",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "b1730c97-8c5c-48a5-90cf-7940f6c9e2d0",
+      "name": "Variables",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -940,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7616f991-76d0-4dd0-9385-f08ed14e8dfa",
+              "name": "sourceStyleUrl",
+              "type": "string",
+              "value": "={{ $json.SourceImage }}"
+            },
+            {
+              "id": "126cb06e-4d69-4163-ba76-c694103bf5bb",
+              "name": "targetPrompt",
+              "type": "string",
+              "value": "={{ $json.TargetPrompt }}"
+            },
+            {
+              "id": "055d247b-586d-4bb8-a319-262c241df48c",
+              "name": "numberSamples",
+              "type": "string",
+              "value": "={{\n(function(numSamples) {\n  if (!numSamples) return 1;\n  if (numSamples < 0) return 1;\n  if (numSamples > 4) return 4;\n  return numSamples;\n}($json['Number of Images']))\n}}"
+            },
+            {
+              "id": "77a27e0e-24f4-4358-8cdc-84552be6c0b5",
+              "name": "email",
+              "type": "string",
+              "value": "={{ $json['Your Email (Optional)'] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "5c26062c-74cf-4140-8dcb-8688c8daec67",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -620,
+        -120
+      ],
+      "parameters": {
+        "url": "={{ $json.sourceStyleUrl }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "20744adb-cdf5-4558-b6e6-4206d7c1f356",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        -1400,
+        -120
+      ],
+      "webhookId": "51f74db1-ffb4-491f-83b0-a44a7124be12",
+      "parameters": {
+        "options": {
+          "path": "style-copy-with-imagen3",
+          "ignoreBots": true,
+          "buttonLabel": "Generate!",
+          "appendAttribution": true
+        },
+        "formTitle": "Style Copy with Imagen 3.0",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "SourceImage",
+              "placeholder": "The image URL to copy the style from",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "TargetPrompt",
+              "placeholder": "The new image to generate",
+              "requiredField": true
+            },
+            {
+              "fieldType": "number",
+              "fieldLabel": "Number of Images",
+              "placeholder": "Default 1. Max. 4 images"
+            },
+            {
+              "fieldType": "email",
+              "fieldLabel": "Your Email (Optional)",
+              "placeholder": "The results will be sent to this email"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "formDescription": "Use this form to generate an image using another image as a style reference."
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "917db247-1be3-4814-a96d-145957aa5db3",
+      "name": "Form Validation",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -1180,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1b440b81-06c9-4133-bfd2-8ec07c7c3734",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.SourceImage.isUrl() }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "65a8b617-318c-429a-b37e-45ead00dbb7e",
+      "name": "Retry Form",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        -940,
+        60
+      ],
+      "webhookId": "0b4c88ed-d28b-4df4-abe6-4579e17c672d",
+      "parameters": {
+        "options": {
+          "formTitle": "Retry Submission",
+          "buttonLabel": "Generate!",
+          "formDescription": "Please enter a URL for the source image."
+        },
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "SourceImage",
+              "placeholder": "The image URL to copy the style from",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "TargetPrompt",
+              "placeholder": "The new image to generate",
+              "requiredField": true
+            },
+            {
+              "fieldType": "number",
+              "fieldLabel": "Number of Images",
+              "placeholder": "Max. 4 images"
+            },
+            {
+              "fieldLabel": "Your Email (Optional)",
+              "placeholder": "The results will be sent to this email"
+            }
+          ]
+        },
+        "limitWaitTime": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8a0e8dae-9f6f-488e-9977-fd89e885f30e",
+      "name": "Upload to Cloudinary",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        -120
+      ],
+      "parameters": {
+        "url": "https://api.cloudinary.com/v1_1/daglih2g8/image/upload",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendQuery": true,
+        "contentType": "multipart-form-data",
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "genericAuthType": "httpQueryAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "upload_preset",
+              "value": "n8n-workflows-preset"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "sT9jeKzZiLJ3bVPz",
+          "name": "Cloudinary API"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "525725ea-effe-410b-8f39-ad01ae755d1a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1480,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 760,
+        "height": 640,
+        "content": "## 1. Ask for Source Style and Target Image\n[Learn more about the Form Trigger](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.formtrigger/)\n\nWe'll use a form interface for this template which allows the users to specify an image whose style we'll use as reference and a prompt to generate the target image. Form validation loop can be achieved by combining another form node with the IF node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ba9d4bdc-b695-4acf-9593-2ce979053744",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -700,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 720,
+        "height": 440,
+        "content": "## 2. Visual Style Description using Gemini 2.0\n[Read more about Gemini Image Understanding](https://ai.google.dev/gemini-api/docs/image-understanding)\n\nThe trick to copying the style of an image is to get a multimodal LLM to describe it in detail. Using Gemini's image understanding capabilities, it can do a pretty good job to provide the comprehensive description we need."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "455f7956-6e39-4d84-af7e-d5908d4e5307",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        40,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 720,
+        "height": 440,
+        "content": "## 3. Image Generation using Imagen 3.0\n[Read more about Imagen Image Generation](https://ai.google.dev/gemini-api/docs/image-generation#imagen)\n\nTo generate the image, we'll be using Google's Imagen 3.0 model. We'll combine the visual style description generated in the previous Gemini model with the user's target image prompt and pass this to Imagen to do its magic! The result is something very close to style transfer which produces quite convincing and impressive results."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0c1d5a7f-9102-4558-a830-ed558f72c086",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        780,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 980,
+        "height": 600,
+        "content": "## 4. Render Results to HTML Page\n[Learn more about the HTML node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.html)\n\nFinally for presentation, we'll render the generated images as a webpage for easier viewing using the HTML node. This page can then be sent to the user's email if provided and downloaded as a file once we land on the form ending node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ccc1ff65-0416-4dae-9557-ba2f98c5ac80",
+      "name": "Convert to File1",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        1320,
+        60
+      ],
+      "parameters": {
+        "options": {
+          "encoding": "utf8",
+          "fileName": "={{ $('Variables').item.json.targetPrompt.toSnakeCase().urlEncode() }}.html"
+        },
+        "operation": "toText",
+        "sourceProperty": "html"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "0252d373-3678-4851-819d-d36efb40dfb2",
+      "name": "Generate HTML",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        1080,
+        -120
+      ],
+      "parameters": {
+        "html": "<h1>\n  {{ $('Variables').item.json.targetPrompt.toSentenceCase() }}\n</h1>\n<div class=\"gallery\">\n{{\n$input.all()\n  .chunk(2)\n  .map(row =>\n    `<div class=\"gallery-row\">\n      ${row.map(item =>\n        `<a href=\"${item.json.url}\" target=\"_blank\">\n          <img src=\"${item.json.url}\" width=\"320px\" height=\"240px\"  />\n        </a>`).join('')}\n    </div>`\n  ).join('')\n}}\n</div>\n<div class=\"fineprint\">\n  Generated by Imagen 3.0 (imagen-3.0-generate-002) @ {{ $now.format('d MMM yyyy') }}.\n</div>\n<div class=\"fineprint\">\n  <h3>Style Prompt</h3>\n  <div style=\"display:flex;gap: 10px;\">\n    <div>\n      <img\n        src=\"{{ $('Download Image').item.json.sourceStyleUrl }}\"\n        width=\"100px\"\n        height=\"auto\"\n      />\n    </div>\n    <div>\n      {{ $('Gemini 2.0').first().json.candidates[0].content.parts[0].text }}\n    </div>\n  </div>\n</div>\n<style>\n  body { padding: 32px 64px; font-family: sans-serif; background-color: #fffaf2; }\n  h1 { max-width: 640px; }\n  .gallery { display: inline-block; padding: 5px; border: 1px solid #ccc; background-color: white; margin-bottom: 32px;}\n  .gallery-row { display: flex; }\n  .gallery-row img { padding: 5px; background-color: white }\n  .gallery-row img:hover { background-color: orange; } \n  .fineprint { font-size: 0.7rem; max-width: 480px; text-align: justify;}\n  .fineprint h3 { font-size: 0.8rem; }\n</style>"
+      },
+      "executeOnce": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "b712bd74-8615-4080-aad2-dc0b0df0b07e",
+      "name": "Convert to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        580,
+        -120
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "={{ $execution.id }}_{{ $itemIndex }}.{{ $json.mimeType.split('/')[1] }}",
+          "mimeType": "={{ $json.mimeType }}"
+        },
+        "operation": "toBinary",
+        "sourceProperty": "bytesBase64Encoded"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "ee3e168a-038c-4524-93fc-ced5d4956fa1",
+      "name": "Form Ending",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        1540,
+        60
+      ],
+      "webhookId": "c4bacbac-0347-4c35-9333-3704630b45ef",
+      "parameters": {
+        "options": {
+          "formTitle": "Generation Complete"
+        },
+        "operation": "completion",
+        "respondWith": "returnBinary",
+        "completionTitle": "Image Generation Successful",
+        "completionMessage": "Download has started.\nOpen the HTML file to view results."
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "c4b1648a-c7d9-46cd-af28-527f9b169ab6",
+      "name": "Has Email?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1320,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "07d04523-f81a-4efa-b46a-cb640bcc608a",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $('Variables').item.json.email }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "bc0a8188-27ff-4834-9c7a-8760531f4252",
+      "name": "Send Results to Email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1540,
+        -120
+      ],
+      "webhookId": "de5684ed-6aa4-4c29-aac3-62e21c54c6f0",
+      "parameters": {
+        "sendTo": "={{ $('Variables').first().json.email }}",
+        "message": "={{ $json.html }}",
+        "options": {},
+        "subject": "=#{{$execution.id}} - Image Generated Successfully!"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Sf5Gfl9NiFTNXFWb",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "f18ab53b-d8e2-4625-a8f6-8b97959a15d1",
+      "name": "Image to Base64",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        -400,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "binaryToPropery"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ac6c1353-035c-4045-aed9-46285b757b98",
+      "name": "Gemini 2.0",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -180,
+        -120
+      ],
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n    \"contents\": [{\n      \"parts\": [\n        {\n          \"inline_data\": {\n            \"mime_type\":\"{{ $('Download Image').item.binary.data.mimeType }}\",\n            \"data\": \"{{ $json.data }}\"\n          }\n        },\n        {\"text\": \"Describe the visual style of this image. Do not include any character names or IP in the description. Include names of any famous artists associated with this style if known.\"}\n      ]\n    }]\n  }",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "dSxo6ns5wn658r8N",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "fae8c5f0-9d6f-4e45-8f7a-82f361bf9b1b",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1920,
+        -840
+      ],
+      "parameters": {
+        "width": 400,
+        "height": 1140,
+        "content": "## Try It Out!\n### This n8n template allows you to use AI to generate logos or images which mimic visual styles of other logos or images. The model used to generate the images is Google's Imagen 3.0.\n\nWith this template, users will be able to automate design and marketing tasks such as creating variants of existing designs, remixing existing assets to validate different styles and explore a range of designs which would have been otherwise too expensive and time-consming previously.\n\n### How it works\n* A form trigger is used to capture the source image to reference styles from and a prompt for the target image to generate.\n* The source image is passed to Gemini 2.0 to be analysed and its visual style and tone extracted as a detailed description.\n* This visual style description is then combined with the user's initial target image prompt. This final prompt is given to Imagen 3.0 to generate the images.\n* A quick webpage is put together with the generated images to present back to the user.\n* If the user provided an email address, a copy of this HTML page will be sent.\n\n### How to use\n* Ensure the workflow is live to share the form publicly.\n* The source image must be accessible to your n8n instance - either a public image of the internet or within your network.\n\n### Requirements\n* Gemini for LLM and Imagen model.\n* Cloudinary for image CDN.\n* Gmail for email sending.\n\n### Customising this workflow\n* Feel free to swap any of these out for tools and services you prefer.\n* Want to fully automate? Switch the form trigger for a webhook trigger!\n\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Hacking!"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Variables": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 2.0": {
+      "main": [
+        [
+          {
+            "node": "Imagen 3.0",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email?": {
+      "main": [
+        [
+          {
+            "node": "Send Results to Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagen 3.0": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Form": {
+      "main": [
+        [
+          {
+            "node": "Form Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Has Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Image to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Upload to Cloudinary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Validation": {
+      "main": [
+        [
+          {
+            "node": "Variables",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retry Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image to Base64": {
+      "main": [
+        [
+          {
+            "node": "Gemini 2.0",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "Form Ending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Form Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Cloudinary": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Results to Email": {
+      "main": [
+        []
+      ]
+    }
+  }
+}

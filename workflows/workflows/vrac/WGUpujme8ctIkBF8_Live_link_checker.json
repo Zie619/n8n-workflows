@@ -1,0 +1,532 @@
+{
+  "id": "WGUpujme8ctIkBF8",
+  "meta": {
+    "instanceId": "431560c610ab26f4776059ff809760704293c90767af32183943d4c54ac57441",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Live link checker",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "40009961-9c97-49ee-b9ce-440e65b41e47",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -280,
+        200
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "85a73ac8-a8c6-4b5e-a870-3b1a58336037",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -1060,
+        200
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "a1495fc5-d39d-4cf5-b8d3-a804d82ba1a5",
+      "name": "Reads Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -780,
+        200
+      ],
+      "parameters": {
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "range": "D1:E",
+              "rangeDefinition": "specifyRangeA1"
+            }
+          }
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 1573787772,
+          "cachedResultUrl": "",
+          "cachedResultName": "Lost links"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "10CYntk8OmYemJBpcfs1dH_7p_PJxiBMpsfATtLYw7jI",
+          "cachedResultUrl": "",
+          "cachedResultName": "Sheet with lost links"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "shxBIVyk68LlqTnb",
+          "name": "Google Sheets account 3"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "bd055fee-f66b-4b1d-9ee2-3581021d8b1f",
+      "name": "Cleans backlink url",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -560,
+        200
+      ],
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  let url = item.json['Backlink URL'];  // Get the URL from the current item's JSON\n  let domain = url.match(/https?:\\/\\/(?:www\\.)?([^/]+)/)[1]; \n  return { json: { domain, url } };\n});\n$input.first().json['Backlink URL']"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "030b04e9-da35-4448-b2f4-c1543eafabf5",
+      "name": "Sends HTTP POST Request to DataForSEO",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -20,
+        220
+      ],
+      "parameters": {
+        "url": "https://api.dataforseo.com/v3/on_page/task_post",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "=[{\n\"target\": \"{{ $json.domain }}\",\n\"start_url\": \"{{ $json.url }}\",\n\"max_crawl_pages\": 1\n}]",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "MeuonUXyXYX6lg4R",
+          "name": "Unnamed credential"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "6ac33fbd-2daf-4b5f-a7a2-fe742294765b",
+      "name": "Waits 20 seconds",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        200,
+        220
+      ],
+      "webhookId": "f1cc4df1-6443-4ecd-8708-fd40858f3762",
+      "parameters": {
+        "amount": 20
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2213992d-d782-4357-8f59-87a8afb3f7f1",
+      "name": "Sends HTTP links request to DataforSeo",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        440,
+        220
+      ],
+      "parameters": {
+        "url": "https://api.dataforseo.com/v3/on_page/links",
+        "method": "POST",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          }
+        },
+        "jsonBody": "=[\n  {\n    \"id\": \"{{ $json.tasks[0].id }}\"\n  }\n]\n",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "MeuonUXyXYX6lg4R",
+          "name": "Unnamed credential"
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "ab3b47d7-381a-48e9-aad3-8555d6c36145",
+      "name": "Checks which backlinks exists on the landing page",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        680,
+        220
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const result = $json.tasks?.[0]?.result?.[0];\nconst links = result?.items || []; // Safe fallback to an empty array\n\nlet backlink = $('Reads Google Sheets').item.json['Landing page']; // Expected backlink\n\n// Find the backlink in the scraped data\nlet foundLink = links.find(link => link.link_to === backlink);\n\n// Check if the backlink exists and if it's dofollow\nlet status = \"Lost\"; // Default to lost\nif (foundLink) {\n  status = foundLink.dofollow ? \"Live\" : \"Lost (Nofollow)\";\n}\n\nreturn {\n  json: {\n    backlink: backlink,\n    status: status\n  }\n};\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d07a8791-74d9-4f86-b9d8-e0847406a96e",
+      "name": "Sends data to Google sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        900,
+        220
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Status": "={{ $json.status }}",
+            "Backlink URL": "={{ $('Loop Over Items').item.json.url }}"
+          },
+          "schema": [
+            {
+              "id": "Company",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Company",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Contact A",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Contact A",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Channel",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Channel",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Backlink URL",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Backlink URL",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Landing page",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Landing page",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Anchor",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Anchor",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Money out",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Money out",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Money in",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Money in",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice OUT",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Invoice OUT",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice IN",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Invoice IN",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice out status",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Invoice out status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice in status",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Invoice in status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Backlink URL"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 1573787772,
+          "cachedResultUrl": "",
+          "cachedResultName": "Lost links"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "10CYntk8OmYemJBpcfs1dH_7p_PJxiBMpsfATtLYw7jI",
+          "cachedResultUrl": "",
+          "cachedResultName": "Sheet with lost links"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "shxBIVyk68LlqTnb",
+          "name": "Google Sheets account 3"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "f241c2f2-6a0b-4709-92ff-c6c11f9477f5",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -880,
+        -200
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 300,
+        "height": 340,
+        "content": "Connect your Google Sheets account.\nEnsure your Google Sheet has clearly defined columns:\n\n\"Backlink URL\": URL of the page containing the backlink.\n\n\"Landing page\": The exact URL of your website page you're checking the backlink for.\n\nDefine your data range explicitly (e.g., D1:E) to accurately fetch these columns. The columns must be named exactly as specified to ensure the workflow functions correctly."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "42390706-6877-4f67-92d5-fcc13903bb6c",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -140,
+        -320
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 380,
+        "height": 480,
+        "content": "## Configure your DataForSEO TASK POST NODE\n(Basic Authentication). Insert your API key and password into n8n's Credentials settings. This node sends each URL/domain pair to the DataForSEO On-Page API for analysis.\n\n\nSettings:\n\nMethod:POST\n\nURL:https://api.dataforseo.com/v3/on_page/task_post\n\nJSON body:\n\n[{\n  \"target\": \"{{ $json.domain }}\",\n  \"start_url\": \"{{ $json.url }}\",\n  \"max_crawl_pages\": 1\n}]\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "60d54c3d-a2be-4961-9932-4075d769896e",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        -320
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 400,
+        "height": 480,
+        "content": "## Configure your DataForSEO ON-PAGE LINKS NODE\n\nFetches the results from DataForSEO. Ensure your credentials are properly set (same as the previous DataForSEO node). This node retrieves link data, checking if the backlink exists and its status (dofollow/nofollow).\n\nSettings: \nMethod: Post\n\nURL:https://api.dataforseo.com/v3/on_page/links\n\nJSON body example:\n\n[\n  {\n    \"id\": \"{{ $json.tasks[0].id }}\"\n  }\n]\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1d800e2a-4385-4f98-b891-c40c7706bdee",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        760,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 440,
+        "height": 400,
+        "content": "## Send data to Google Sheets\n\nThis node updates your Google Sheet with backlink check results.\n\nMap each column manually as follows:\n\nMatching Column (used to find the correct row): Backlink URL\n\nBacklink URL: {{ $('Loop Over Items').item.json.url }}\n\nStatus: {{ $json.status }}\n\nMake sure these columns (Backlink URL and Status) already exist in your Google Sheet and have these exact names.\n\nThis will correctly update the backlink status (e.g., Live, Lost, or Lost (Nofollow)) based on each URL processed."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "When clicking ‘Test workflow’": [
+      {
+        "json": {}
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f74ca31f-8b7c-48d9-9b5f-d8295c642497",
+  "connections": {
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Sends HTTP POST Request to DataForSEO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Waits 20 seconds": {
+      "main": [
+        [
+          {
+            "node": "Sends HTTP links request to DataforSeo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleans backlink url": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reads Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Cleans backlink url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sends data to Google sheets": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Reads Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sends HTTP POST Request to DataForSEO": {
+      "main": [
+        [
+          {
+            "node": "Waits 20 seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sends HTTP links request to DataforSeo": {
+      "main": [
+        [
+          {
+            "node": "Checks which backlinks exists on the landing page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checks which backlinks exists on the landing page": {
+      "main": [
+        [
+          {
+            "node": "Sends data to Google sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

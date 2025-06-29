@@ -1,0 +1,426 @@
+{
+  "meta": {
+    "instanceId": "f0efd559def66ddc761033b0b2eb86ed3edec31121f2c1aa92ed05e63303529a"
+  },
+  "name": "Unsubscribe Mautic contacts from automated unsubscribe emails",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "55d6a64b-88e2-4162-a93a-b31ad32b94fd",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        140,
+        860
+      ],
+      "parameters": {
+        "filters": {
+          "includeSpamTrash": true
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a697b58c-e0c8-42e0-8211-49caf46ce222",
+      "name": "Is automated unsubscribe?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        460,
+        1000
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "= {{ $json[\"To\"] }}",
+              "value2": "unsubscribe",
+              "operation": "contains"
+            },
+            {
+              "value1": "={{ $json[\"From\"] }}",
+              "value2": "={{ $node[\"Edit Fields\"].json[\"emailAddress\"] }}",
+              "operation": "notEqual"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "72c76f4b-50da-481a-9c3e-204158f3a016",
+      "name": "Add to unsubscribed segment",
+      "type": "n8n-nodes-base.mautic",
+      "position": [
+        1520,
+        720
+      ],
+      "parameters": {
+        "resource": "contactSegment",
+        "contactId": "={{ $json[\"id\"] }}",
+        "segmentId": 3,
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "mauticOAuth2Api": {
+          "id": "4",
+          "name": "Mautic account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "44c85f57-0716-476f-bea5-00efeddf908f",
+      "name": "Remove newsletter segment",
+      "type": "n8n-nodes-base.mautic",
+      "position": [
+        1520,
+        920
+      ],
+      "parameters": {
+        "resource": "contactSegment",
+        "contactId": "={{ $json[\"id\"] }}",
+        "operation": "remove",
+        "segmentId": 1,
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "mauticOAuth2Api": {
+          "id": "4",
+          "name": "Mautic account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b26ddbb9-3209-458b-8e94-2854ed8bf8de",
+      "name": "Reply Unsubscribe Message",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1520,
+        1140
+      ],
+      "parameters": {
+        "message": "={{$node[\"Edit Fields\"].json[\"unsubscribeMessage\"]}}",
+        "options": {},
+        "messageId": "={{ $node[\"Gmail Trigger\"].json[\"id\"] }}",
+        "operation": "reply"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "34fc931b-f692-4383-a75b-76502c11452b",
+      "name": "Add to Do Not Contact List",
+      "type": "n8n-nodes-base.mautic",
+      "disabled": true,
+      "position": [
+        1520,
+        520
+      ],
+      "parameters": {
+        "contactId": "{{ $json[\"id\"] }}",
+        "operation": "editDoNotContactList",
+        "authentication": "oAuth2",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "mauticOAuth2Api": {
+          "id": "4",
+          "name": "Mautic account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b5dd2d22-c367-4f30-a1b3-e3a767aec96b",
+      "name": "Extract Email from 'From' Field",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        640,
+        840
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "var fromField = $input.item.json.From;\nvar extractedEmail;\nif (fromField.includes('<') && fromField.includes('>')) {\n    // From field is wrapped in carets\n    var regex = /[^< ]+(?=>)/g;\n    extractedEmail = fromField.match(regex)[0];\n} else {\n    // From field is not wrapped in carets\n    extractedEmail = fromField;\n}\nreturn {json: {extractedEmail}}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f11e57b5-7834-4654-8793-42b1aa297730",
+      "name": "Extract Unique Email Addresses",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        820,
+        1000
+      ],
+      "parameters": {
+        "jsCode": "// Access the input data using all() method\nconst inputData = $input.all();\nconst uniqueEmailsSet = new Set();\n\n// Loop through each item, extract the email, and add it to the Set\ninputData.forEach(item => {\n    uniqueEmailsSet.add(item.json.extractedEmail);\n});\n\n// Convert the Set to an array of objects in the n8n format\nconst uniqueEmailsArray = Array.from(uniqueEmailsSet).map(email => {\n    return { json: { extractedEmail: email } };\n});\n\nreturn uniqueEmailsArray;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "5e168e07-1a6b-4140-81b9-9d9ffb852f61",
+      "name": "Get Mautic Contact ID from Email Address",
+      "type": "n8n-nodes-base.mautic",
+      "position": [
+        1020,
+        840
+      ],
+      "parameters": {
+        "limit": 1,
+        "options": {
+          "search": "=email:{{ $json[\"extractedEmail\"] }}",
+          "rawData": false
+        },
+        "operation": "getAll",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "mauticOAuth2Api": {
+          "id": "4",
+          "name": "Mautic account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "ad1a7b7a-230a-4098-b419-c93e3a6398a1",
+      "name": "If Contact Exists in Mautic",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1180,
+        1060
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"id\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "17b999f9-9c50-488a-b5d2-d98bbd566048",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        200,
+        500
+      ],
+      "parameters": {
+        "content": "## Step 1\nSet your email address and unsubscribe message in the edit fields node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "11d28571-7335-4e53-a691-973412b6daef",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        140,
+        1020
+      ],
+      "parameters": {
+        "content": "## Step 2\nSet your credentials in the Gmail trigger"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2874fbc3-5735-471c-8c34-70854e0770bd",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        940,
+        660
+      ],
+      "parameters": {
+        "content": "## Step 3\nSet credentials in the mautic nodes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1e51f13f-3fba-4b5b-8c88-eb792c4c0b40",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1240,
+        460
+      ],
+      "parameters": {
+        "content": "## Step 4\nEdit segments (add or remove) in the mautic nodes, optionally add to do not contact list."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3b5f94df-864b-480c-a6f2-d572345e7d9a",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        580,
+        440
+      ],
+      "parameters": {
+        "width": 237.7703390037576,
+        "height": 194.55974544175768,
+        "content": "## Unsubscribe Mautic contacts from automated unsubscribe emails"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "69496c4b-254d-4a89-8ab1-9fe80cfaea14",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        300,
+        700
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "emailAddress",
+              "stringValue": "hello@example.com"
+            },
+            {
+              "name": "unsubscribeMessage",
+              "stringValue": "Your have successfully opted out from our marketing campaigns. Please reply if you believe this is an error."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "connections": {
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Is automated unsubscribe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is automated unsubscribe?": {
+      "main": [
+        [
+          {
+            "node": "Extract Email from 'From' Field",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Contact Exists in Mautic": {
+      "main": [
+        [
+          {
+            "node": "Add to unsubscribed segment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Remove newsletter segment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reply Unsubscribe Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add to Do Not Contact List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply Unsubscribe Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Unique Email Addresses": {
+      "main": [
+        [
+          {
+            "node": "Get Mautic Contact ID from Email Address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email from 'From' Field": {
+      "main": [
+        [
+          {
+            "node": "Extract Unique Email Addresses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Mautic Contact ID from Email Address": {
+      "main": [
+        [
+          {
+            "node": "If Contact Exists in Mautic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

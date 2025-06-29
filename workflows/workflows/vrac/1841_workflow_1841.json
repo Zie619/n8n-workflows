@@ -1,0 +1,441 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "dcd5f025-9af9-4e3a-96fc-25a33dcc6c00",
+      "name": "Ticket Exists",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        900,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"external_id\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a5e8ec4d-bc80-4153-a677-91be2e7d02b7",
+      "name": "Get user data of Ticket requester",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        220,
+        480
+      ],
+      "parameters": {
+        "id": "={{ $json[\"requester_id\"] }}",
+        "resource": "user",
+        "operation": "get"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6dc07af8-d446-4704-9a08-e65f89772a9b",
+      "name": "Only keep needed data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        440,
+        480
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "id",
+              "value": "={{ $json[\"id\"] }}"
+            },
+            {
+              "name": "contactExternalId",
+              "value": "={{ $json[\"external_id\"] }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "contactEmail",
+              "value": "={{ $json[\"email\"] }}"
+            },
+            {
+              "name": "contactName",
+              "value": "={{ $json[\"name\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c3ca22e4-ae76-49ee-b117-f6da9d90ec1a",
+      "name": "Add user data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        640,
+        320
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "requester_id",
+        "propertyName2": "id"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "713b919a-3a39-4466-b9b8-cc3575f02e45",
+      "name": "Update existing ticket",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        1280,
+        300
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "ticketId": "={{ $json[\"external_id\"] }}",
+        "operation": "update",
+        "updateFields": {
+          "ticketName": "={{ $json[\"raw_subject\"] }}",
+          "description": "={{ $json[\"description\"] }}"
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "21",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "id": "1eb40a93-2d36-4b3e-a39d-f19f369adc4e",
+      "name": "Update Zendesk ticket with External Id",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        2020,
+        480
+      ],
+      "parameters": {
+        "id": "={{ $node[\"Contact Exists\"].json[\"id\"] }}",
+        "operation": "update",
+        "updateFields": {
+          "externalId": "={{ $json[\"objectId\"] }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a11c8809-c22f-40f5-a019-79274eba4d70",
+      "name": "Get last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        -260,
+        300
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nif(!staticData.lastExecution){\n  staticData.lastExecution = new Date().toISOString();\n}\n\nitem.executionTimeStamp = new Date().toISOString();\nitem.lastExecution = staticData.lastExecution;\n\n\nreturn item;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a62685c9-f786-4e7c-9e2d-cdcb1e0a3aea",
+      "name": "Get tickets updated after last execution",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        -40,
+        300
+      ],
+      "parameters": {
+        "options": {
+          "query": "=updated>{{ $json[\"lastExecution\"] }}",
+          "sortBy": "updated_at",
+          "sortOrder": "desc"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c1b23aa8-a9f6-4966-b1dc-fe48c203364c",
+      "name": "Set new last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        2360,
+        300
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nstaticData.lastExecution = $item(0).$node[\"Get last execution timestamp\"].executionTimeStamp;\n\nreturn item;"
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "97ae70de-bce8-4861-a256-17002625da58",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        -460,
+        300
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 5
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1d2dd552-175c-4405-b304-d4136dd2968b",
+      "name": "Create new Ticket",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        1780,
+        480
+      ],
+      "parameters": {
+        "stageId": "1",
+        "resource": "ticket",
+        "pipelineId": "0",
+        "ticketName": "={{ $node['Ticket Exists'].json[\"raw_subject\"] }}",
+        "authentication": "oAuth2",
+        "additionalFields": {
+          "description": "={{ $node['Ticket Exists'].json[\"description\"] }}",
+          "associatedContactIds": "={{ [].concat($node[\"Create or update contact\"].json[\"vid\"]) }}"
+        }
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "21",
+          "name": "HubSpot account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1
+    },
+    {
+      "id": "e2217f74-f1b2-4449-9937-543758a333ea",
+      "name": "Update External Id in Zendesk for contact",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        1520,
+        480
+      ],
+      "parameters": {
+        "id": "={{ $node[\"Ticket Exists\"].json[\"requester_id\"] }}",
+        "resource": "user",
+        "operation": "update",
+        "updateFields": {
+          "external_id": "={{ $json[\"vid\"] }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "144a3395-9f61-4aad-99e0-4a689145f93d",
+      "name": "Create or update contact",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        1280,
+        480
+      ],
+      "parameters": {
+        "email": "={{ $json[\"contactEmail\"] }}",
+        "resource": "contact",
+        "authentication": "oAuth2",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "21",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Add user data": {
+      "main": [
+        [
+          {
+            "node": "Ticket Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket Exists": {
+      "main": [
+        [
+          {
+            "node": "Update existing ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create or update contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Get last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create new Ticket": {
+      "main": [
+        [
+          {
+            "node": "Update Zendesk ticket with External Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only keep needed data": {
+      "main": [
+        [
+          {
+            "node": "Add user data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Update existing ticket": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create or update contact": {
+      "main": [
+        [
+          {
+            "node": "Update External Id in Zendesk for contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last execution timestamp": {
+      "main": [
+        [
+          {
+            "node": "Get tickets updated after last execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get user data of Ticket requester": {
+      "main": [
+        [
+          {
+            "node": "Only keep needed data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Zendesk ticket with External Id": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get tickets updated after last execution": {
+      "main": [
+        [
+          {
+            "node": "Get user data of Ticket requester",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add user data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update External Id in Zendesk for contact": {
+      "main": [
+        [
+          {
+            "node": "Create new Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

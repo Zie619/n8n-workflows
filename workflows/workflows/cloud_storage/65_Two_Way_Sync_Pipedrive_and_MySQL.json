@@ -1,0 +1,482 @@
+{
+  "id": 65,
+  "meta": {
+    "instanceId": "104a4d08d8897b8bdeb38aaca515021075e0bd8544c983c2bb8c86e6a8e6081c"
+  },
+  "name": "Two Way Sync Pipedrive and MySQL",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "7355c5ac-a9a6-4fa5-8036-71fd09e95cd4",
+      "name": "Compare Datasets",
+      "type": "n8n-nodes-base.compareDatasets",
+      "position": [
+        1220,
+        480
+      ],
+      "parameters": {
+        "options": {},
+        "resolve": "includeBoth",
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "email",
+              "field2": "email"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7a422493-94d4-4f94-b39c-f6c3980a967c",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        800,
+        320
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b3a0e831-7030-43dd-863a-0c2a4697a14d",
+      "name": "MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "position": [
+        1000,
+        320
+      ],
+      "parameters": {
+        "query": "SELECT id, name, email, phone, updated_on FROM contact",
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "mySql": {
+          "id": "23",
+          "name": "MySQL account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a3a64bb5-8a6f-4011-bc2d-3996a823012c",
+      "name": "Pipedrive",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        800,
+        620
+      ],
+      "parameters": {
+        "resource": "person",
+        "operation": "getAll",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "29",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "089e91df-abf7-4de9-b088-357cffce6949",
+      "name": "Create Person",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        1420,
+        300
+      ],
+      "parameters": {
+        "name": "={{ $json[\"name\"] }}",
+        "resource": "person",
+        "additionalFields": {
+          "email": [
+            "={{ $json[\"email\"] }}"
+          ],
+          "phone": [
+            "={{ $json[\"phone\"] }}"
+          ]
+        }
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "29",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a99c3242-8263-4a92-a1f2-dcce7a9a6d81",
+      "name": "Create Contact",
+      "type": "n8n-nodes-base.mySql",
+      "position": [
+        1420,
+        620
+      ],
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "contact",
+          "cachedResultName": "contact"
+        },
+        "columns": "name, email, phone",
+        "options": {}
+      },
+      "credentials": {
+        "mySql": {
+          "id": "23",
+          "name": "MySQL account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7697d03a-7bc4-40b3-9e06-e38c13ccaaf3",
+      "name": "Date & Time",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        1760,
+        460
+      ],
+      "parameters": {
+        "value": "={{ $json[\"different\"][\"updated_on\"][\"input1\"] }}",
+        "custom": true,
+        "options": {},
+        "toFormat": "YYYY-MM-DD HH:mm:ss",
+        "dataPropertyName": "different.updated_on.input1"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f882a2e7-a8cf-4683-abe3-77a5b7376bb2",
+      "name": "Update Contact",
+      "type": "n8n-nodes-base.mySql",
+      "position": [
+        2340,
+        620
+      ],
+      "parameters": {
+        "query": "=UPDATE contact\nSET name = '{{$json[\"name\"]}}', phone= '{{$json[\"phone\"]}}'\nWHERE id = {{$json[\"id\"]}};",
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "mySql": {
+          "id": "23",
+          "name": "MySQL account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d7549678-5d35-4a8a-b440-5c347b4434f4",
+      "name": "Set Input2",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2120,
+        620
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "id",
+              "value": "={{ $json[\"different\"][\"id\"] ? $json[\"different\"][\"id\"][\"input1\"] : $json[\"same\"][\"id\"] }}"
+            },
+            {
+              "name": "name",
+              "value": "={{ $json[\"different\"][\"name\"] ? $json[\"different\"][\"name\"][\"input2\"] : $json[\"same\"][\"name\"] }}"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $json[\"different\"][\"phone\"] ? $json[\"different\"][\"phone\"][\"input2\"] : $json[\"same\"][\"phone\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0018751e-c295-4f8d-b9df-257b9538eedc",
+      "name": "Set Input1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2120,
+        300
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "id",
+              "value": "={{ $json[\"different\"][\"id\"] ? $json[\"different\"][\"id\"][\"input2\"] : $json[\"same\"][\"id\"] }}"
+            },
+            {
+              "name": "name",
+              "value": "={{ $json[\"different\"][\"name\"] ? $json[\"different\"][\"name\"][\"input1\"] : $json[\"same\"][\"name\"] }}"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $json[\"different\"][\"phone\"] ? $json[\"different\"][\"phone\"][\"input1\"] : $json[\"same\"][\"phone\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "89af3385-4788-4693-ad02-917b927e7384",
+      "name": "Update Person",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        2340,
+        300
+      ],
+      "parameters": {
+        "personId": "={{ $json[\"id\"] }}",
+        "resource": "person",
+        "operation": "update",
+        "updateFields": {
+          "name": "={{ $json[\"name\"] }}",
+          "phone": [
+            "={{ $json[\"phone\"] }}"
+          ]
+        }
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "29",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8ffbbb4b-7c2f-457e-ae73-464620aa1588",
+      "name": "IF Data Changed",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1560,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !!$json[\"different\"][\"name\"] || !!$json[\"different\"][\"phone\"] }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f8d60404-942d-4bb3-96e7-a247a9447a32",
+      "name": "IF Updated On",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1940,
+        460
+      ],
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{ $json[\"different\"][\"updated\"][\"input1\"] }} {{ $json[\"different\"][\"updated_on\"][\"input1\"] }}",
+              "value2": "={{ $json[\"different\"][\"updated\"][\"input2\"] }} {{ $json[\"different\"][\"updated_on\"][\"input2\"] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6965e281-10bd-4e8a-b016-f788030a6d9f",
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1000,
+        620
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "id",
+              "value": "={{ $json[\"id\"] }}"
+            },
+            {
+              "name": "name",
+              "value": "={{ $json[\"name\"] }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ $json[\"primary_email\"] }}"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $json[\"phone\"][0][\"value\"] }}"
+            },
+            {
+              "name": "updated_on",
+              "value": "={{ $json[\"update_time\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {},
+  "connections": {
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Compare Datasets",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MySQL": {
+      "main": [
+        [
+          {
+            "node": "Compare Datasets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipedrive": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Input1": {
+      "main": [
+        [
+          {
+            "node": "Update Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Input2": {
+      "main": [
+        [
+          {
+            "node": "Update Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "IF Updated On",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Updated On": {
+      "main": [
+        [
+          {
+            "node": "Set Input1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Input2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Data Changed": {
+      "main": [
+        [
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Datasets": {
+      "main": [
+        [
+          {
+            "node": "Create Person",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "IF Data Changed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "MySQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

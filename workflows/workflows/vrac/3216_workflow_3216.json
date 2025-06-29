@@ -1,0 +1,587 @@
+{
+  "meta": {
+    "instanceId": "4a8c4d3ed2f4423694f8ac022d1c321551900c7ab47e0c03549acecec1ab4a89",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "a5292068-5ace-4372-9869-46100ae81b8f",
+      "name": "Get video details",
+      "type": "n8n-nodes-base.youTube",
+      "notes": "Make a call to the YouTube API so that we have the thumbnail for the email and the duration to filter out shorts.",
+      "position": [
+        1000,
+        -60
+      ],
+      "parameters": {
+        "part": [
+          "contentDetails",
+          "snippet",
+          "id"
+        ],
+        "options": {},
+        "videoId": "={{ $json.id.replace(\"yt:video:\", \"\") }}",
+        "resource": "video",
+        "operation": "get"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "5lD8Hahvq4r7Og0F",
+          "name": "YouTube account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b9eb34aa-90c4-492a-a33e-37a32812fa32",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -840,
+        -160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 47
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "8f0dbe74-53e5-4b14-86f6-eb0f502c8471",
+      "name": "Filter out shorts",
+      "type": "n8n-nodes-base.if",
+      "notes": "Sometime, some live broadcasts that are then posted as regular videos do not have a duration. That is why we check if `duration` is present in `contentDetails`.",
+      "position": [
+        1180,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 1,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "5342ecc0-d764-4bef-8161-d1f571fcb931",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.contentDetails.duration }}",
+              "rightValue": "\"duration\""
+            },
+            {
+              "id": "b82e3373-a28b-49bd-afa0-4f48cafe2bfe",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ Duration.fromISO($json.contentDetails.duration).as('seconds') }}",
+              "rightValue": 61
+            }
+          ]
+        }
+      },
+      "notesInFlow": false,
+      "typeVersion": 2
+    },
+    {
+      "id": "14d54ed0-f5c0-4992-af56-0af2d8973963",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -900,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 460,
+        "content": "### Default frequency: every hour\nChanging it here is enough if you want to check for new videos at a higher or lower frequency. You don't have to edit anything else."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c4acbb10-1f57-4934-a324-f26d0532767c",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -660,
+        -340
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 880,
+        "height": 460,
+        "content": "### Get my subscriptions from the YouTube Data v3 API\nYou can expect to use 1 quota per 50 subscriptions per run, which is well within the 10 000/req a day allowed by default."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4ae2d2f3-53b5-4431-90d8-06e41a6950e2",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        -160
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 440,
+        "height": 280,
+        "content": "### Get the 15 latest videos of each channel with RSS\nUsing the YouTube API instead would cost too many quotas to make it viable."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "48894d79-7e59-49fc-beb5-445fb5ca2ff6",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        940,
+        -160
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 400,
+        "height": 280,
+        "content": "### Call YouTube's API for more data\nWe need the thumbnails for the email and the duration to filter out shorts."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e3da3f97-138c-481e-a763-9a3c9e402928",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1360,
+        -160
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 260,
+        "height": 280,
+        "content": "### Configure your email here\nTo go to the video from the email, simply click on the thumbnail."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0d092c3d-b2e1-4468-a044-c6cf0f37672b",
+      "name": "Get latest 15 videos of each channel",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "notes": "YouTube provides an RSS feed for each channel with the 15 latest videos.\nWe use this instead of the YouTube Data v3 API, as search requests cost a lot of \"quota points\" and would easily put us over the daily limit with just one workflow run.",
+      "position": [
+        540,
+        -60
+      ],
+      "parameters": {
+        "url": "=https://www.youtube.com/feeds/videos.xml?channel_id={{ $json.snippet.resourceId.channelId }}",
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "34823384-d8a5-415a-87ff-203d65aa9a75",
+      "name": "Get my subscriptions",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "Get subscriptions from YouTube Data v3 API",
+      "position": [
+        -600,
+        -160
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/subscriptions",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "pageToken",
+                    "value": "={{ $response.body.nextPageToken }}"
+                  }
+                ]
+              },
+              "completeExpression": "={{ !('nextPageToken' in $response.body) }}",
+              "paginationCompleteWhen": "other"
+            }
+          }
+        },
+        "sendQuery": true,
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "mine",
+              "value": "true"
+            },
+            {
+              "name": "part",
+              "value": "snippet,contentDetails"
+            },
+            {
+              "name": "maxResults",
+              "value": "50"
+            }
+          ]
+        },
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "5lD8Hahvq4r7Og0F",
+          "name": "YouTube account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "534e38f3-ac40-4194-8821-5926ee581605",
+      "name": "Check for errors",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -400,
+        -160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "5972ff90-aa5a-470c-aa96-87138eb60565",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "error"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "2d872c0f-30b9-4ffc-aba0-6644bf05d7bb",
+      "name": "Only keep channels with unwatched videos",
+      "type": "n8n-nodes-base.filter",
+      "notes": "It's not a perfect indicator for new videos but helps reduce the amount of channels to process.",
+      "position": [
+        40,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "4734ee8c-1655-47be-bd45-a9527aee2833",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.contentDetails.newItemCount }}",
+              "rightValue": 0
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "c7bd97ec-47c1-40b4-955d-bf89d3cde330",
+      "name": "Keep only videos published since last run",
+      "type": "n8n-nodes-base.filter",
+      "notes": "We dynamically figure out the last run's execution time through the settings of the \"Schedule Trigger\" node.",
+      "position": [
+        740,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "65d905a2-c89e-41f3-a2cf-0d1a76c48d8e",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              },
+              "leftValue": "={{ $json.pubDate.toDateTime() }}",
+              "rightValue": "={{ \n  $('Schedule Trigger').item.json.timestamp.toDateTime().minus(\n    $('Schedule Trigger').params.rule.interval[0].hoursInterval,\n    $('Schedule Trigger').params.rule.interval[0].field\n  ).toISO()\n}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "72341b1f-a391-4210-b3ca-4e74ae1f2e1b",
+      "name": "Send an email for each new video",
+      "type": "n8n-nodes-base.emailSend",
+      "notes": "The expression in the HTML for the thumbnail simply selects the last element of the thumbnails array so that we get the best possible resolution thumbnail available.",
+      "position": [
+        1440,
+        -60
+      ],
+      "webhookId": "44bf0e95-98e5-4b5b-a7c5-c802379ab3b0",
+      "parameters": {
+        "html": "=<h1 style=\"text-align: center;\">{{ $json.snippet.title }}</h1>\n<a href=\"https://www.youtube.com/watch?v={{ $json.id }}\">\n  <img src=\"{{ $json.snippet.thumbnails[Object.keys($json.snippet.thumbnails)[Object.keys($json.snippet.thumbnails).length - 1]].url }}\" alt=\"Watch on YouTube\" style=\"width:100%; height:auto; max-width:640px; display:block; margin: 10px auto;\">\n</a>",
+        "options": {
+          "appendAttribution": false
+        },
+        "subject": "={{ $json.snippet.channelTitle }}",
+        "toEmail": "My Name <to@email.com>",
+        "fromEmail": "YouTube <from@email.com>"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "ThrKm6bLUg1owKn1",
+          "name": "SMTP account"
+        }
+      },
+      "notesInFlow": false,
+      "typeVersion": 2.1
+    },
+    {
+      "id": "b82cfbd5-71e3-418f-9b6d-6d0ec007733a",
+      "name": "If the HTTP request failed, throw the error",
+      "type": "n8n-nodes-base.stopAndError",
+      "position": [
+        -180,
+        -260
+      ],
+      "parameters": {
+        "errorMessage": "=Status code: {{ $json.error.code }}\nMessage: {{ $json.error.message }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e89eca92-896f-46b5-8a4b-149d51682faa",
+      "name": "Split out subscriptions to process individually",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        -180,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "items"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0e00fda6-1489-4c1a-8205-22e620a554c5",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        240,
+        -240
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "## Manually filter out channels\nTo find the channel ID of a channel, click on the description → Share channel → Copy channel ID"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bcc2e57c-23b2-42b7-81ab-cdd88b70b8a3",
+      "name": "Filter out channels",
+      "type": "n8n-nodes-base.filter",
+      "notes": "Optional step",
+      "position": [
+        300,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b27b14a9-c86c-4ebd-8a0f-4e7db722796e",
+              "operator": {
+                "type": "array",
+                "operation": "notContains",
+                "rightType": "any"
+              },
+              "leftValue": "={{[\n  \"exampleChannelId1\",\n  \"exampleChannelId2\"\n]}}",
+              "rightValue": "={{ $json.snippet.resourceId.channelId }}"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Check for errors": {
+      "main": [
+        [
+          {
+            "node": "If the HTTP request failed, throw the error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split out subscriptions to process individually",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get my subscriptions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter out shorts": {
+      "main": [
+        [
+          {
+            "node": "Send an email for each new video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get video details": {
+      "main": [
+        [
+          {
+            "node": "Filter out shorts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter out channels": {
+      "main": [
+        [
+          {
+            "node": "Get latest 15 videos of each channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get my subscriptions": {
+      "main": [
+        [
+          {
+            "node": "Check for errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an email for each new video": {
+      "main": [
+        []
+      ]
+    },
+    "Get latest 15 videos of each channel": {
+      "main": [
+        [
+          {
+            "node": "Keep only videos published since last run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only keep channels with unwatched videos": {
+      "main": [
+        [
+          {
+            "node": "Filter out channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only videos published since last run": {
+      "main": [
+        [
+          {
+            "node": "Get video details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out subscriptions to process individually": {
+      "main": [
+        [
+          {
+            "node": "Only keep channels with unwatched videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

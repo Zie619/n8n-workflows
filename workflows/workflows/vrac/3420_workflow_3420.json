@@ -1,0 +1,336 @@
+{
+  "meta": {
+    "instanceId": "="
+  },
+  "nodes": [
+    {
+      "id": "a2d54127-d1d1-44d2-859e-b89e2e6c3b4d",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        260,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "=",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.subject }}",
+              "rightValue": "CSRD Reporting"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "6a664023-ea8c-4973-b3ac-13a9e0664a58",
+      "name": "Check the format",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        960,
+        260
+      ],
+      "parameters": {
+        "jsCode": "const content = $input.first().json.xhtml_content;\n\n// Helper to extract tags\nfunction extractTags(tagName) {\n  const regex = new RegExp(`<${tagName}[^>]*>(.*?)<\\\\/${tagName}>`, 'gs');\n  let matches = [];\n  let match;\n  while ((match = regex.exec(content)) !== null) {\n    matches.push(match[1].trim());\n  }\n  return matches;\n}\n\n// Basic Tests\nconst headerPresent = /<ix:header>/i.test(content);\nconst governanceTag = /<ix:nonNumeric[^>]*name=\"esrs:SustainabilityGovernance\"/i.test(content);\nconst strategyTag = /<ix:nonNumeric[^>]*name=\"esrs:StrategySustainability\"/i.test(content);\n\n// KPI Tags\nconst kpiTags = [\"esrs:GHGScope1Emissions\", \"esrs:GHGScope2Emissions\", \"esrs:GHGScope3Emissions\"];\nconst kpiMatches = kpiTags.filter(tag => content.includes(tag));\n\n// Check for empty tags\nconst emptyNonNumeric = (content.match(/<ix:nonNumeric[^>]*>\\s*<\\/ix:nonNumeric>/g) || []).length;\n\n// Check duplicate text\nconst nonNumericValues = extractTags(\"ix:nonNumeric\");\nconst duplicates = [...new Set(nonNumericValues.filter((v, i, arr) => arr.indexOf(v) !== i))];\n\n// Final Result\nreturn [\n  {\n    json: {\n      audit_results:{\n      total_nonNumeric_tags: nonNumericValues.length,\n      total_kpis_found: kpiMatches.length,\n      empty_disclosures: emptyNonNumeric,\n      governance_check: governanceTag ? \"PASS\" : \"MISSING\",\n      strategy_check: strategyTag ? \"PASS\" : \"MISSING\",\n      header_check: headerPresent ? \"PASS\" : \"MISSING\",\n      duplicate_disclosures: duplicates,\n      }\n\n    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a16b613e-a7c2-4079-9ff9-46c485019ca3",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1240,
+        260
+      ],
+      "parameters": {
+        "text": "=Generate an email to the sustainability team summarizing this CSRD XHTML report audit:\n\n{{JSON.stringify($json.audit_results, null, 2)}}\n\nReturn the output in the following JSON format:\n\n{\n  \"subject\": \"...\",\n  \"body\": \"...\"\n}",
+        "options": {
+          "systemMessage": "=You are LogiGreen CSRD Audit Bot, an ESG compliance assistant writing professional email summaries based on automated XHTML audits for CSRD compliance. Your role is to translate JSON audit results into clear, actionable summaries. Keep a neutral, helpful tone and highlight any risks or missing disclosures. Include key findings and suggest next steps if needed.\n\nWrite emails in plain English with no markdown (avoid **, #, ##, etc.).\nFormat your message with proper line breaks for readability.\nAlways sign with:\nBest regards,\nLogiGreen CSRD Audit Bot"
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "3dcbaf39-58be-465e-9ec2-0b2a9a8c8fe3",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1200,
+        420
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "6e742627-f315-4ee2-be1b-023b38103978",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1500,
+        440
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"subject\": \"CSRD XHTML Report Audit – Key Findings and Next Steps\",\n  \"body\": \"Content of the email\"\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "994e5b98-5bda-4a4f-a3eb-cb521de9d88a",
+      "name": "Reply",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1620,
+        260
+      ],
+      "webhookId": "=",
+      "parameters": {
+        "message": "={{ $json.output.body }}",
+        "options": {},
+        "emailType": "text",
+        "messageId": "={{ $('Gmail').item.json.id }}",
+        "operation": "reply"
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.1
+    },
+    {
+      "id": "8a7fbdcb-2197-437e-b3ba-126c7942ba4d",
+      "name": "Extract the HTML",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        800,
+        260
+      ],
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      xhtml_content:$input.first().json.data \n    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "90f271b9-4b8b-49ef-90cc-d10d8e22a203",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        20,
+        -140
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 680,
+        "content": "### 1. Workflow Trigger with Gmail Trigger\nThe workflow is triggered by a new email received in your Gmail mailbox. \nIf the subject includes the string \"CSRD Reporting\" we proceed, if not we do nothing.\n\n#### How to setup?\n- **Gmail Trigger Node:** set up your Gmail API credentials\n[Learn more about the Gmail Trigger Node](https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.gmailtrigger)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "803a758c-fba4-4f48-818b-1272c4509e81",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        440,
+        -140
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 640,
+        "height": 680,
+        "content": "### 2. Extract and Process the xHTML report\nThis block extract the attachment file from the email, process the xHTML and perform the audit of the content.\n\n#### How to setup?\n- **Gmail Node:** set up your Gmail API credentials\n[Learn more about the Gmail Trigger Node](https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.gmailtrigger)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0b72f7d8-23ce-4243-b2e5-e3ff5c7f163e",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1120,
+        -140
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 640,
+        "height": 680,
+        "content": "### 3. AI Agent write and sends an audit report to the send\nThis summarize the results of the analysis in an email sent as a reply to the sender.\n\n#### How to setup?\n- **Gmail Node:** set up your Gmail API credentials\n[Learn more about the Gmail Trigger Node](https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.gmailtrigger)\n- **AI Agent with the Chat Model**:\n   1. Add a **chat model** with the required credentials *(Example: Open AI 4o-mini)*\n   2. Adapt the system prompt to the format of emails you want to send\n  [Learn more about the AI Agent Node](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "18103fec-6761-4604-872e-dab251211ba0",
+      "name": "HTML from binary",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        660,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "text",
+        "binaryPropertyName": "attachment_0"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "5c31c49d-2324-4d08-a5b5-309925266517",
+      "name": "Email Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        40,
+        260
+      ],
+      "parameters": {
+        "simple": false,
+        "filters": {},
+        "options": {},
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "bacbd57d-af9b-49c8-82ae-c74aa2898fc8",
+      "name": "Download Attachment",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        480,
+        260
+      ],
+      "webhookId": "=",
+      "parameters": {
+        "simple": false,
+        "options": {
+          "downloadAttachments": true
+        },
+        "messageId": "={{ $json.id }}",
+        "operation": "get"
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.1
+    },
+    {
+      "id": "af087293-0c3c-4c96-9523-ddb9ed238e00",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1780,
+        -140
+      ],
+      "parameters": {
+        "width": 780,
+        "height": 540,
+        "content": "### 4. Do you need more details?\nFind a step-by-step guide in this tutorial\n![Guide](https://www.samirsaci.com/content/images/2025/04/temp-2.png)\n[🎥 Watch My Tutorial](https://www.youtube.com/watch?v=npeJZv5U7og)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the format": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract the HTML": {
+      "main": [
+        [
+          {
+            "node": "Check the format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML from binary": {
+      "main": [
+        [
+          {
+            "node": "Extract the HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

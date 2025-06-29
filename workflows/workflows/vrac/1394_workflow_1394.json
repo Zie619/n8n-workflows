@@ -1,0 +1,267 @@
+{
+  "nodes": [
+    {
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1240,
+        1120
+      ],
+      "parameters": {
+        "range": "A:D",
+        "options": {},
+        "sheetId": "qwertz",
+        "operation": "append",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2",
+          "name": "google_sheets_oauth"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "AWS Transcribe 2",
+      "type": "n8n-nodes-base.awsTranscribe",
+      "position": [
+        920,
+        1120
+      ],
+      "parameters": {
+        "operation": "get",
+        "transcriptionJobName": "={{$json[\"Key\"]}}"
+      },
+      "credentials": {
+        "aws": {
+          "id": "9",
+          "name": "aws"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "AWS Transcribe 1",
+      "type": "n8n-nodes-base.awsTranscribe",
+      "position": [
+        600,
+        1120
+      ],
+      "parameters": {
+        "options": {},
+        "mediaFileUri": "=s3://{{$node[\"AWS S3 2\"].parameter[\"bucketName\"]}}/{{$json[\"Key\"]}}",
+        "transcriptionJobName": "={{$json[\"Key\"]}}"
+      },
+      "credentials": {
+        "aws": {
+          "id": "9",
+          "name": "aws"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "AWS S3 1",
+      "type": "n8n-nodes-base.awsS3",
+      "position": [
+        280,
+        1120
+      ],
+      "parameters": {
+        "tagsUi": {
+          "tagsValues": [
+            {
+              "key": "source",
+              "value": "gdrive"
+            }
+          ]
+        },
+        "fileName": "={{$json[\"name\"]}}",
+        "operation": "upload",
+        "binaryData": false,
+        "bucketName": "mybucket",
+        "fileContent": "street",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "aws": {
+          "id": "9",
+          "name": "aws"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "AWS S3 2",
+      "type": "n8n-nodes-base.awsS3",
+      "position": [
+        440,
+        1120
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "getAll",
+        "bucketName": "mybucket"
+      },
+      "credentials": {
+        "aws": {
+          "id": "9",
+          "name": "aws"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1080,
+        1120
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "transcription_date",
+              "value": "={{$node[\"AWS Transcribe 1\"].json[\"CreationTime\"]}}"
+            }
+          ],
+          "string": [
+            {
+              "name": "recording_name",
+              "value": "={{$node[\"AWS Transcribe 1\"].json[\"TranscriptionJobName\"]}}"
+            },
+            {
+              "name": "recording_link",
+              "value": "={{$node[\"Google Drive Trigger\"].json[\"webContentLink\"]}}"
+            },
+            {
+              "name": "transcription",
+              "value": "={{$json[\"transcript\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Google Drive Trigger1",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "position": [
+        120,
+        1120
+      ],
+      "parameters": {
+        "event": "fileCreated",
+        "options": {},
+        "triggerOn": "specificFolder",
+        "folderToWatch": "https://drive.google.com/drive/folders/[your_id]"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "59",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        760,
+        1120
+      ],
+      "webhookId": "12345",
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "responsePropertyName": "transcript"
+        },
+        "responseMode": "lastNode"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "AWS Transcribe 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AWS S3 1": {
+      "main": [
+        [
+          {
+            "node": "AWS S3 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AWS S3 2": {
+      "main": [
+        [
+          {
+            "node": "AWS Transcribe 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AWS Transcribe 1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AWS Transcribe 2": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Trigger1": {
+      "main": [
+        [
+          {
+            "node": "AWS S3 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

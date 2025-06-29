@@ -1,0 +1,423 @@
+{
+  "nodes": [
+    {
+      "id": "d681d557-cb02-4fb1-9871-bfae504992ca",
+      "name": "HubSpot",
+      "type": "n8n-nodes-base.hubspot",
+      "notes": "Add meeting notes in the contact form",
+      "position": [
+        260,
+        40
+      ],
+      "parameters": {
+        "type": "meeting",
+        "metadata": {
+          "body": "={{ $('Summarization').item.json.response.text }}",
+          "title": "New meeting"
+        },
+        "resource": "engagement",
+        "authentication": "oAuth2",
+        "additionalFields": {
+          "associations": {
+            "contactIds": "={{ $json.properties.hs_object_id }}"
+          }
+        }
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "JxzF93M0SJ00jDD9",
+          "name": "HubSpot account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.1
+    },
+    {
+      "id": "e4849449-3464-4deb-a9be-07b3d0bb2d56",
+      "name": "HubSpot1",
+      "type": "n8n-nodes-base.hubspot",
+      "notes": "Search for the id",
+      "position": [
+        20,
+        40
+      ],
+      "parameters": {
+        "operation": "search",
+        "authentication": "oAuth2",
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "value": "={{ $('Enter Client Transcript').item.json['client email'] }}",
+                    "propertyName": "email|string"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "JxzF93M0SJ00jDD9",
+          "name": "HubSpot account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.1
+    },
+    {
+      "id": "16ac22b7-62fd-429c-b766-5ffe503a3231",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -60,
+        -80
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 540,
+        "height": 280,
+        "content": "## Save the data to Hubspot\n- Search for the client ID based on his email\n- Upload the summarized conversation as meeting notes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4f51bfc1-8270-4e04-b395-f4ceed9129a4",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -60,
+        220
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 540,
+        "height": 520,
+        "content": "## Router agent\nMakes decisions with the help of an LLM  \n- Analyzes the content\n- Decides which part of the transcript is relevant to the different departments\n- Sends the emails to the departments\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "96142f55-cbb4-47e9-a44e-b4f783eeeeb5",
+      "name": "Router Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "notes": "Route the client feedback topics to the relevant department ",
+      "position": [
+        20,
+        420
+      ],
+      "parameters": {
+        "text": "={{ $('Enter Client Transcript').item.json['client conversation'] }}",
+        "options": {
+          "systemMessage": "=You are provided with some client-company conversation and should decide who has to be informed about the feedback. Always only inform one person. Those are your options: \n- It's about a product, send an email to {{ $('Define routing emails here').item.json['Product Email'] }}\n- It's about an invoicing problem, send an email to {{ $('Define routing emails here').item.json['Administrative Email'] }}\n- It's  related to a problem with the product, send an email to {{ $('Define routing emails here').item.json['Support Email'] }}\n- It's commercial related, send an email to {{ $('Define routing emails here').item.json['Commercial Email'] }}\n\nAdd the email of the person (\"{{ $('Enter Client Transcript').item.json['client email'] }}\") at the beginning of the text preceded by \"FROM CLIENT: \"\nUse the Mailjet tool to inform each of the most related department. Provide mailjet with a subject, an email, and the email body formated as html which is the client conversation itself."
+        },
+        "promptType": "define"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.8
+    },
+    {
+      "id": "0485667e-befa-4b69-998f-26e1b8a9f67f",
+      "name": "Summarization",
+      "type": "@n8n/n8n-nodes-langchain.chainSummarization",
+      "notes": "The transcript is summarized",
+      "position": [
+        -360,
+        200
+      ],
+      "parameters": {
+        "options": {
+          "summarizationMethodAndPrompts": {
+            "values": {
+              "prompt": "=Summarize the following Converstaion in 2-3 sentences:\n\n\" {{ $json['client conversation'] }}\"\n\nJust output the summarized conversation and nothing else. Use the same language as the input",
+              "summarizationMethod": "stuff"
+            }
+          }
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "bb2826b5-18ec-4df7-990d-7fe99df759c8",
+      "name": "Enter Client Transcript",
+      "type": "n8n-nodes-base.formTrigger",
+      "notes": "The transcript can come from fireflies or Team etc.",
+      "position": [
+        -800,
+        200
+      ],
+      "webhookId": "4ba66bc9-8200-4b29-9d81-aaaca2ca8e0a",
+      "parameters": {
+        "options": {
+          "appendAttribution": false
+        },
+        "formTitle": "Automate Client issue",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "email",
+              "fieldLabel": "client email",
+              "requiredField": true
+            },
+            {
+              "fieldType": "textarea",
+              "fieldLabel": "client conversation",
+              "requiredField": true
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.2
+    },
+    {
+      "id": "4ec42125-16dd-4c05-8816-3f3d986335ac",
+      "name": "Form",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        360,
+        420
+      ],
+      "webhookId": "938c1d15-f510-4b66-abac-dca5ff89461d",
+      "parameters": {
+        "options": {},
+        "operation": "completion",
+        "completionTitle": "Ouput",
+        "completionMessage": "={{ $json.output }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5bdd3903-06f3-4c21-bc57-7127cfc6e433",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -272,
+        420
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "1IOLtYX7aTspCAN8",
+          "name": "OpenAI Pollup"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "1abb54f8-0f65-4280-8b35-4dc7c3b1bb07",
+      "name": "Define routing emails here",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -580,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "099d5326-3452-47b8-9dc0-acc0e6fd951e",
+              "name": "Support Email",
+              "type": "string",
+              "value": "support@pollup.net"
+            },
+            {
+              "id": "4ed84290-dbf7-47f7-8693-4f95e0c2fd7e",
+              "name": "Administrative Email",
+              "type": "string",
+              "value": "admin@pollup.net"
+            },
+            {
+              "id": "c39edf1f-b8e0-48ca-929c-294bbac52837",
+              "name": "Product Email",
+              "type": "string",
+              "value": "product@pollup.net"
+            },
+            {
+              "id": "614d4a5c-c9f2-4d82-bfcb-cfdcc8a4b07d",
+              "name": "Commercial Email",
+              "type": "string",
+              "value": "commercial@pollup.net"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "c2d345e2-ce32-4337-91d5-ae8bf54e3d25",
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [
+        180,
+        640
+      ],
+      "webhookId": "ea898d49-e017-441c-bfe0-7a966435a570",
+      "parameters": {
+        "sendTo": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('To', ``, 'string') }}",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {
+          "appendAttribution": false
+        },
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "DLjspol9TLgpGaXa",
+          "name": "Gmail account 2"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "11210b0c-c33d-4c40-b20c-a8d3a1761863",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -660,
+        100
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 260,
+        "height": 260,
+        "content": "## Set the emails HERE\nFor each responsible in your company."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0d2e217d-5c3a-4fdb-a60e-091a50de553b",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -860,
+        -120
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 200,
+        "content": "## Contact me\n- If you need any modification to this workflow\n- if you need some help with this workflow\n- Or if you need any workflow in n8n, Make, or Langchain / Langgraph\n\nWrite to me: [thomas@pollup.net](mailto:thomas@pollup.net)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e7e40c88-374b-49d4-8c66-b8543a9376ea",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -860,
+        100
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 180,
+        "height": 260,
+        "content": "## Starting form\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "Router Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot1": {
+      "main": [
+        [
+          {
+            "node": "HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router Agent": {
+      "main": [
+        [
+          {
+            "node": "Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarization": {
+      "main": [
+        [
+          {
+            "node": "Router Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HubSpot1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarization",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Router Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enter Client Transcript": {
+      "main": [
+        [
+          {
+            "node": "Define routing emails here",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define routing emails here": {
+      "main": [
+        [
+          {
+            "node": "Summarization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

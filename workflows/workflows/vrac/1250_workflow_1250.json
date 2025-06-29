@@ -1,0 +1,229 @@
+{
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -100,
+        470
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "Get news page",
+      "position": [
+        100,
+        470
+      ],
+      "parameters": {
+        "url": "=https://news.ycombinator.com/",
+        "options": {
+          "fullResponse": true,
+          "batchInterval": 500
+        },
+        "responseFormat": "file",
+        "queryParametersUi": {
+          "parameter": []
+        },
+        "headerParametersUi": {
+          "parameter": []
+        },
+        "allowUnauthorizedCerts": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "HTML Extract",
+      "type": "n8n-nodes-base.htmlExtract",
+      "notes": "extract news data",
+      "position": [
+        310,
+        470
+      ],
+      "parameters": {
+        "options": {},
+        "sourceData": "binary",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "news_title",
+              "cssSelector": ".storylink",
+              "returnArray": true
+            },
+            {
+              "key": "news_url",
+              "attribute": "href",
+              "cssSelector": ".storylink",
+              "returnArray": true,
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "list news url",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        500,
+        570
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "news_url"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "list news title",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        500,
+        390
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "news_title"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        700,
+        470
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Spreadsheet File",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "position": [
+        870,
+        470
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "=Ycombinator_news_{{new Date().toISOString().split('T', 1)[0]}}.{{$parameter[\"fileFormat\"]}}",
+          "sheetName": "Latest news"
+        },
+        "operation": "toFile"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send email notification",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1050,
+        470
+      ],
+      "parameters": {
+        "text": "=Here are the latest news attached!",
+        "options": {},
+        "subject": "Ycombinator news",
+        "toEmail": "",
+        "fromEmail": "",
+        "attachments": "data"
+      },
+      "credentials": {
+        "smtp": ""
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Spreadsheet File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Extract": {
+      "main": [
+        [
+          {
+            "node": "list news title",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "list news url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTML Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "list news url": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "list news title": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spreadsheet File": {
+      "main": [
+        [
+          {
+            "node": "Send email notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

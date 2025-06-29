@@ -1,0 +1,273 @@
+{
+  "nodes": [
+    {
+      "id": "25a28584-ae1b-4d14-9261-80be8f3c6727",
+      "name": "Create Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "jsonBody": "={\n  \"repo\": \"{{ $node['Create Session'].json['did'] }}\",\n  \"collection\": \"app.bsky.feed.post\",\n  \"record\": {\n    \"text\": {{ JSON.stringify($node['RSS Feed Trigger'].json['content:encodedSnippet']) }},\n    \"$type\": \"app.bsky.feed.post\",\n    \"embed\": {\n      \"$type\": \"app.bsky.embed.external\",\n      \"external\": {\n          \"uri\": \"{{ $node['RSS Feed Trigger'].json['link'] }}\",\n          \"title\": \"{{ $node['RSS Feed Trigger'].json['lintitlek'] }}\",\n          \"description\": \"{{ $node['RSS Feed Trigger'].json['contentSnippet'] }}\",\n          \"thumb\": {\n            \"$type\": \"{{ $json.blob.$type }}\",\n            \"ref\": {\n              \"$link\": \"{{ $json['blob']['ref']['$link'] }}\"\n            },\n            \"mimeType\": \"{{ $json.blob.mimeType }}\",\n            \"size\": {{ $json.blob.size }}\n          }\n        }\n    },\n    \"createdAt\": \"{{ $node['Get current datetime'].json['currentDate'] }}\",\n    \"langs\": [ \"es-ES\" ]\n  }\n}\n",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $item(\"0\").$node[\"Create Session\"].json[\"accessJwt\"] }}"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.1
+    },
+    {
+      "id": "b9d02b7f-f73d-4b53-a1ef-c693a0847bb2",
+      "name": "Upload image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        320,
+        0
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/com.atproto.repo.uploadBlob",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "binaryData",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $item(\"0\").$node[\"Create Session\"].json[\"accessJwt\"] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "={{ $json.enclosure.type }}"
+            }
+          ]
+        },
+        "inputDataFieldName": "data"
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.1
+    },
+    {
+      "id": "3593c517-03af-483f-b0d3-c538840a55d9",
+      "name": "Download image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $('RSS Feed Trigger').item.json.enclosure.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "71edf797-6aac-44dd-b988-a8b7e5667bac",
+      "name": "Create Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -320,
+        0
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "identifier",
+              "value": "<your username here>"
+            },
+            {
+              "name": "password",
+              "value": "<your app password here>"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.1
+    },
+    {
+      "id": "c28b280f-c169-4f03-9f93-20655cc0c095",
+      "name": "RSS Feed Trigger",
+      "type": "n8n-nodes-base.rssFeedReadTrigger",
+      "position": [
+        -580,
+        0
+      ],
+      "parameters": {
+        "feedUrl": "<your feed URL here>",
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1217c82c-694a-48dd-82d3-2ca5c24891c7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -380,
+        -120
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 300,
+        "content": "### Configure your credentials\nCreate [an app password](https://bsky.app/settings/app-passwords) first"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5e08fd12-8ba0-4c58-b813-0ffefb5be37c",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        -120
+      ],
+      "parameters": {
+        "width": 210,
+        "height": 300,
+        "content": "### Customize the text \nYou can customize the message text here"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3c472b8f-928a-44bc-b75d-56c7b263f490",
+      "name": "Get current datetime",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        -100,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "5d9905af-1194-41ff-acfd-773611092bee",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        60,
+        -120
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 300,
+        "content": "### Image preview \nBy default retrieved from the feed, but you can configure a custom one here from an URL"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "faeaf1bd-560e-4606-8a67-48ae8a18f17a",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -140,
+        -400
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 420,
+        "height": 180,
+        "content": "## Post new RSS feed items as BlueSky posts\nThis will create a BlueSky post with each new RSS feed item, including the feed title, post image, link and content (up to 200 characters)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Upload image": {
+      "main": [
+        [
+          {
+            "node": "Create Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Session": {
+      "main": [
+        [
+          {
+            "node": "Get current datetime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download image": {
+      "main": [
+        [
+          {
+            "node": "Upload image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Feed Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get current datetime": {
+      "main": [
+        [
+          {
+            "node": "Download image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

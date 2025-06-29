@@ -1,0 +1,671 @@
+{
+  "id": "Zrd98BnbmN1Px9an",
+  "meta": {
+    "instanceId": "edc0464b1050024ebda3e16fceea795e4fdf67b1f61187c4f2f3a72397278df0",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Youtube Searcher",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "5cb8757a-d8f0-49fa-803d-7f04b514f9f8",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        80,
+        220
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "28964bd5-dc53-4dfa-bbb1-4eb80b952063",
+      "name": "find_video_data1",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1440,
+        320
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/videos?",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $env[\"GOOGLE_API_KEY\"] }}"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.id.videoId }}"
+            },
+            {
+              "name": "part",
+              "value": "contentDetails, statistics"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5e8b9441-4b91-4460-a9ac-4a0a02aa57ad",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "disabled": true,
+      "position": [
+        -180,
+        220
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "793ef651-ea56-41bc-a0a9-feeaddf999c0",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -160,
+        -180
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "64e331ff-2cda-4ba0-94f9-03fa6c3d6590",
+      "name": "fetch_last_registered",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        360,
+        360
+      ],
+      "parameters": {
+        "query": "SELECT MAX(publish_time) AS latest_publish_time\nFROM video_statistics\nWHERE channel_id = '{{ $json.id }}';",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KQiQIZTArTBSNJH7",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.5
+    },
+    {
+      "id": "fb0a8208-c920-4344-8816-ef6509f07abc",
+      "name": "get_videos",
+      "type": "n8n-nodes-base.youTube",
+      "onError": "continueRegularOutput",
+      "position": [
+        640,
+        360
+      ],
+      "parameters": {
+        "limit": 50,
+        "filters": {
+          "channelId": "={{ $('Loop Over Items').item.json.id }}",
+          "regionCode": "US",
+          "publishedAfter": "={{ $json.latest_publish_time ? new Date(new Date($json.latest_publish_time).getTime() + 60 * 60 * 1000).toISOString() : new Date(Date.now() - 3 * 30 * 24 * 60 * 60 * 1000).toISOString() }}"
+        },
+        "options": {
+          "order": "relevance",
+          "safeSearch": "moderate"
+        },
+        "resource": "video"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "o3VUdoHEk6VhB1lq",
+          "name": "YouTube account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ea358d3c-9a83-49c9-a02e-745cf5b29097",
+      "name": "if_is_empty",
+      "type": "n8n-nodes-base.if",
+      "onError": "continueRegularOutput",
+      "position": [
+        940,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "7591deae-4626-4b2e-af26-d02042573a13",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $input.item.json }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "142e5c5e-f488-4667-a759-ef4494f2a194",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        80,
+        -180
+      ],
+      "parameters": {
+        "query": "WITH RankedVideos AS (\n    SELECT \n        channel_id,\n        id,\n        view_count,\n        like_count,\n        comment_count,\n        publish_time,\n        ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY view_count DESC) AS rank_desc,\n        ROW_NUMBER() OVER (PARTITION BY channel_id ORDER BY view_count ASC) AS rank_asc\n    FROM video_statistics\n),\nFilteredVideos AS (\n    SELECT \n        channel_id,\n        id,\n        view_count,\n        like_count,\n        comment_count,\n        publish_time\n    FROM RankedVideos\n    WHERE NOT (\n        rank_desc <= 2 OR rank_asc <= 2  -- Exclude top 2 and bottom 2 videos\n    )\n    OR (\n        (SELECT COUNT(*) FROM video_statistics WHERE video_statistics.channel_id = RankedVideos.channel_id) <= 10  -- Include all videos if 10 or fewer exist\n    )\n),\nChannelStats AS (\n    SELECT \n        channel_id,\n        ROUND(AVG(view_count)::NUMERIC, 0) AS average_views -- Round to 0 decimal places\n    FROM FilteredVideos\n    GROUP BY channel_id\n)\nSELECT \n    v.channel_id,\n    c.average_views,\n    JSON_AGG(\n        JSON_BUILD_OBJECT(\n            'id', v.id,\n            'view_count', v.view_count,\n            'like_count', v.like_count,\n            'comment_count', v.comment_count,\n            'publish_time', v.publish_time\n        )\n    ) AS channel_videos\nFROM video_statistics v\nLEFT JOIN ChannelStats c\nON v.channel_id = c.channel_id\nGROUP BY v.channel_id, c.average_views;\n",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KQiQIZTArTBSNJH7",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.5
+    },
+    {
+      "id": "a542b55e-bab4-476d-8333-692f5b3a5dcb",
+      "name": "insert_items",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        2980,
+        320
+      ],
+      "parameters": {
+        "query": "{{$json.query}}",
+        "options": {
+          "queryReplacement": "={{$json.parameters}}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KQiQIZTArTBSNJH7",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.5
+    },
+    {
+      "id": "6680728a-805e-4a45-8720-56726ad9e582",
+      "name": "create_table",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        620,
+        -180
+      ],
+      "parameters": {
+        "query": "CREATE TABLE video_statistics (\n    id VARCHAR(255) PRIMARY KEY, -- Unique identifier for the video\n    view_count INT NOT NULL, -- Number of views\n    like_count INT NOT NULL, -- Number of likes\n    comment_count INT NOT NULL, -- Number of comments\n    publish_time TIMESTAMP NOT NULL, -- Timestamp of publishing\n    channel_id VARCHAR(255) NOT NULL -- Channel ID\n);\n",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KQiQIZTArTBSNJH7",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.5
+    },
+    {
+      "id": "4e345df5-bdd6-4a93-9096-367bd911dbd4",
+      "name": "remove_shorts",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1720,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.all();\n\nconst iso8601ToSeconds = iso8601 => {\n  const match = iso8601 ? iso8601.match(/PT(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?/) : null;\n  if (!match) {\n    console.warn(`Invalid ISO8601 duration: ${iso8601}`);\n    return 0; \n  }\n  const hours = parseInt(match[1] || 0, 10);\n  const minutes = parseInt(match[2] || 0, 10);\n  const seconds = parseInt(match[3] || 0, 10);\n  return hours * 3600 + minutes * 60 + seconds;\n};\n\nconst filteredResponses = input.filter(response => {\n  if (response.json && response.json.items) {\n    const validItems = response.json.items.filter(item => {\n      const duration = item.contentDetails?.duration;\n      if (!duration) {\n        console.warn(`Missing duration for item: ${JSON.stringify(item)}`);\n        return false; \n      }\n      const durationInSeconds = iso8601ToSeconds(duration);\n\n      return durationInSeconds > 210;\n    });\n\n    response.json.items = validItems;\n\n    return validItems.length > 0; \n  }\n\n  return false;\n});\n\nreturn filteredResponses;\n"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "aadac7e3-8114-4c43-b0bf-d1a7de7c3e0c",
+      "name": "create_query",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2780,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.all();\n\nlet tableName = \"video_statistics\"; \n\nconst rows = input;\n\nconst formattedRows = rows.map(elements => {\n  const row = elements.json;\n  const formattedRow = {\n    id: row.id,\n    view_count: parseInt(row.viewCount, 10) || 0, \n    like_count: parseInt(row.likeCount, 10) || 0,\n    comment_count: parseInt(row.commentCount, 10) || 0,\n    publish_time: row.publishTime ? new Date(row.publishTime).toISOString() : null,\n    channel_id: $('Loop Over Items').first().json.id || \"unknown\"\n  };\n  return formattedRow;\n});\n\nconst columns = [\"id\", \"view_count\", \"like_count\", \"comment_count\", \"publish_time\", \"channel_id\"];\n\nconst valuePlaceholders = formattedRows.map((_, rowIndex) =>\n  `(${columns.map((_, colIndex) => `$${rowIndex * columns.length + colIndex + 1}`).join(\", \")})`\n).join(\", \");\n\nconst insertQuery = `INSERT INTO ${tableName} (${columns.map(col => `\\\"${col}\\\"`).join(\", \")}) VALUES ${valuePlaceholders};`;\n\nconst parameters = formattedRows.flatMap(row => \n  columns.map(col => row[col])\n);\n\nreturn [\n  {\n    query: insertQuery,\n    parameters: parameters\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "46376f7c-1ce1-4f8a-8392-7281aacfd1c5",
+      "name": "structure_data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2560,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.all(); \n\nconst filteredInput = input.filter(item => item.json.viewCount !== null);\n\nconst updatedInput = filteredInput.map(item => {\n    return {\n        ...item,\n        json: {\n            ...item.json,\n            likeCount: item.json.likeCount === null ? \"0\" : item.json.likeCount,\n            commentCount: item.json.commentCount === null ? \"0\" : item.json.commentCount\n        }\n    };\n});\n\nreturn updatedInput;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f66597ef-1324-45e0-b3e8-bc8a588315e4",
+      "name": "if_empty",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2020,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "dacc5370-f54c-4b90-a2aa-65efff196d3b",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "1176b08f-79bb-4f8f-8c83-25a7c2cee9e7",
+      "name": "already_populated",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1200,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7579fbc3-d702-4c36-b539-11b7db6c07fa",
+              "name": "report",
+              "type": "string",
+              "value": "={{ $('Loop Over Items').item.json.url }} already populated. Latest was: {{ $('fetch_last_registered').item.json.latest_publish_time }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "265b3062-ee60-4de0-8ee0-3973e653aa7d",
+      "name": "map_data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2340,
+        320
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1a76e4e8-cd56-4d55-bcbf-ed24708e1464",
+              "name": "id",
+              "type": "string",
+              "value": "={{ $json.items[0].id }}"
+            },
+            {
+              "id": "0b6d93ba-89fb-4781-809f-6c7bd887f9e2",
+              "name": "viewCount",
+              "type": "string",
+              "value": "={{ $json.items[0].statistics.viewCount }}"
+            },
+            {
+              "id": "9526b059-661a-49a2-81d3-3623d677ddd1",
+              "name": "likeCount",
+              "type": "string",
+              "value": "={{ $json.items[0].statistics.likeCount }}"
+            },
+            {
+              "id": "ca4adf8b-d74f-4dda-a96e-0a2ca3e864e3",
+              "name": "commentCount",
+              "type": "string",
+              "value": "={{ $json.items[0].statistics.commentCount }}"
+            },
+            {
+              "id": "8129ff1c-87c6-489b-83f8-88bdbf426b0f",
+              "name": "=publishTime",
+              "type": "string",
+              "value": "={{ $('get_videos').item.json.snippet.publishedAt }}"
+            },
+            {
+              "id": "16fc88dc-4772-4380-873d-2aa9642b31ac",
+              "name": "channelId",
+              "type": "string",
+              "value": "={{ $('if_is_empty').item.json.snippet.channelId }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "173ac548-89be-4e94-a0e3-e90c45489a0c",
+      "name": "sanitize_data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        300,
+        -180
+      ],
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);\n\nconst bestPerformingVideos = [];\n\n$input.all().forEach(channel => {\n  \n  const averageViews = parseInt(channel.json.average_views, 10);\n  \n  channel.json.channel_videos.forEach(video => {\n    const publishDate = new Date(video.publish_time);\n    const isWithinTwoWeeks = publishDate >= twoWeeksAgo && publishDate <= now;\n    const isAboveThreshold = video.view_count >= 2 * averageViews;\n\n  \n    if (isWithinTwoWeeks && isAboveThreshold) {\n      const score = (video.like_count / video.view_count) * 100;\n      bestPerformingVideos.push({\n        id: video.id,\n        videoUrl: `https://www.youtube.com/watch?v=${video.id}`,\n        viewCount: video.view_count,\n        likeCount: video.like_count,\n        score: parseFloat(score.toFixed(2)),\n        commentCount: video.comment_count,\n        channelId: `https://www.youtube.com/channel/${channel.json.channel_id}` \n      });\n    }\n  });\n});\n\nreturn bestPerformingVideos;\n"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "48e729ac-985c-47f5-8895-d2e52581e849",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -260,
+        140
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 3440,
+        "height": 720,
+        "content": "### Save Videos To Database"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "11c51123-27f7-4de7-9215-49d89679c2f6",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -260,
+        -260
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 780,
+        "height": 280,
+        "content": "### Fetch best performing videos from last 2 weeks"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7ef37f94-9283-4b51-a127-98c94542429a",
+      "name": "see table",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        920,
+        -180
+      ],
+      "parameters": {
+        "query": "SELECT * FROM video_statistics;",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KQiQIZTArTBSNJH7",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.5
+    },
+    {
+      "id": "e66af542-ea16-4c3c-9f6e-b5401bbd41da",
+      "name": "drop table",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1200,
+        -180
+      ],
+      "parameters": {
+        "query": "DROP TABLE video_statistics;",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "KQiQIZTArTBSNJH7",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.5
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "When clicking ‘Test workflow’": [
+      {
+        "json": {
+          "id": "UCMwVTLZIRRUyyVrkjDpn4pA",
+          "url": "https://www.youtube.com/@ColeMedin"
+        }
+      },
+      {
+        "json": {
+          "id": "UC2ojq-nuP8ceeHqiroeKhBA",
+          "url": "www.youtube.com/@nateherk"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8ee4a252-a795-4931-951f-024d1f0d801a",
+  "connections": {
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "sanitize_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if_empty": {
+      "main": [
+        [
+          {
+            "node": "map_data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "map_data": {
+      "main": [
+        [
+          {
+            "node": "structure_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_videos": {
+      "main": [
+        [
+          {
+            "node": "if_is_empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if_is_empty": {
+      "main": [
+        [
+          {
+            "node": "find_video_data1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "already_populated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_query": {
+      "main": [
+        [
+          {
+            "node": "insert_items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert_items": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "remove_shorts": {
+      "main": [
+        [
+          {
+            "node": "if_empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "structure_data": {
+      "main": [
+        [
+          {
+            "node": "create_query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "fetch_last_registered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "find_video_data1": {
+      "main": [
+        [
+          {
+            "node": "remove_shorts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "already_populated": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch_last_registered": {
+      "main": [
+        [
+          {
+            "node": "get_videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

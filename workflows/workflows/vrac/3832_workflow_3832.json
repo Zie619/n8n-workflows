@@ -1,0 +1,966 @@
+{
+  "meta": {
+    "instanceId": "d1b9b74c805fea7fca1b903ee192d1d4090b516d3c254da86beb2f13b7c2ed2e",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "be902a85-fc31-442c-b308-a2350ec5aabb",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -760,
+        440
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "d229b686-9de4-4633-9dba-3e1fe71eedf1",
+      "name": "No Operation, do nothing1",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1820,
+        800
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "f583bc97-8da8-488e-ab04-5167dc7a7701",
+      "name": "Information Extractor",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "position": [
+        2420,
+        540
+      ],
+      "parameters": {
+        "text": "={{ $json.buffer.reverse().toJsonString() }}",
+        "options": {
+          "systemPromptTemplate": "Eres un experto extrayendo información, tu objetivo es recolectar todos los mensajes. Procura no dejar duplicados. como resultado debes retornar un solo párrafo con todo los mensajes."
+        },
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n\t\"message\": \"all consolidated messages\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5b719416-4886-4d38-9d00-30b6237db168",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2440,
+        760
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-nano",
+          "cachedResultName": "gpt-4.1-nano"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "IogsrRzOBSmZJS5C",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "3d149fc0-caa7-4361-9bf9-33b6252b39eb",
+      "name": "get wait seconds",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -260,
+        500
+      ],
+      "parameters": {
+        "jsCode": "// Function: Compute waitSeconds\nconst wordCount = $json.message.split(' ').filter(w=>w).length;\nreturn [{ json: { \n  context_id: $json.context_id,\n  message: $json.message,\n  waitSeconds: wordCount < 5 ? 45 : 30 \n}}];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cc670735-d126-465f-b0a3-3a4c5e390fd7",
+      "name": "Set last_seen",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        280,
+        380
+      ],
+      "parameters": {
+        "key": "=last_seen:{{ $json.context_id}}",
+        "ttl": "={{ $json.waitSeconds + 60 }}",
+        "value": "={{$now.toMillis()}}",
+        "expire": true,
+        "keyType": "string",
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "20d97d1d-70d4-4c3c-aa12-b1aa31795240",
+      "name": "Get waiting_reply",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        180,
+        780
+      ],
+      "parameters": {
+        "key": "=waiting_reply:{{$json.context_id}}",
+        "options": {},
+        "operation": "get",
+        "propertyName": "waiting_reply"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7a2fc681-692f-4f72-9fab-f3ada4bda54b",
+      "name": "Mod input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        340,
+        800
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7ff99444-753d-4ef7-865c-7115761526b8",
+              "name": "waiting_reply",
+              "type": "string",
+              "value": "={{ $json.waiting_reply }}"
+            },
+            {
+              "id": "58ad6981-c35a-4dd6-b1cd-7c446b85e738",
+              "name": "context_id",
+              "type": "string",
+              "value": "={{$('When Executed by Another Workflow').item.json.context_id  }}"
+            },
+            {
+              "id": "bd0535a2-be03-436b-8a2e-222c3e26fd04",
+              "name": "message",
+              "type": "string",
+              "value": "={{$('When Executed by Another Workflow').item.json.message }}"
+            },
+            {
+              "id": "2f583f32-f231-4407-b773-c08b38d464f0",
+              "name": "waitSeconds",
+              "type": "number",
+              "value": "={{ $('get wait seconds').item.json.waitSeconds }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "84213bef-32be-4cd9-8387-cd76aff5cb38",
+      "name": "waiting_reply?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        540,
+        800
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "8136ea21-d798-41fd-81ed-5c0e7fda73c5",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.waiting_reply != null}}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "a8472217-aa83-4247-9d7d-3a471e24478a",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -740,
+        640
+      ],
+      "webhookId": "85115343-bb86-4bb8-b7a8-c4efded80b3f",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "ba4c81ba-92e2-4bef-a9e2-6f8d4c0aa722",
+      "name": "Set waiting_reply",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        840,
+        720
+      ],
+      "parameters": {
+        "key": "=waiting_reply:{{ $json.context_id }}",
+        "ttl": "={{ $json.waitSeconds }}",
+        "value": "true",
+        "expire": true,
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0ce783b6-b76b-4a5d-96ae-11708b7532ba",
+      "name": "Get buffer",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        1820,
+        600
+      ],
+      "parameters": {
+        "key": "=buffer_in:{{ $('get wait seconds').item.json.context_id }}",
+        "options": {},
+        "operation": "get",
+        "propertyName": "buffer"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "21864061-1d1f-4528-a03f-1237e9c69a31",
+      "name": "Delete buffer_in",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        2940,
+        680
+      ],
+      "parameters": {
+        "key": "=buffer_in:{{$json.context_id}}",
+        "operation": "delete"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8828aa7b-6153-4677-84a8-3ef2f884792c",
+      "name": "Delete waiting_reply",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        2940,
+        840
+      ],
+      "parameters": {
+        "key": "=waiting_reply:{{$json.context_id}}",
+        "operation": "delete"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fc369067-7213-4d8c-b515-c34c4db997e4",
+      "name": "WaitSeconds",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1020,
+        720
+      ],
+      "webhookId": "c218d471-2f0f-4bd7-87d1-5431ac602211",
+      "parameters": {
+        "amount": "={{ $json.waitSeconds }} "
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2daa2ab9-756a-4fdb-8573-b4570c58d6e5",
+      "name": "Buffer messages",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        -40,
+        440
+      ],
+      "parameters": {
+        "list": "=buffer_in:{{$json.context_id}}",
+        "operation": "push",
+        "messageData": "={\"text\": \"{{ $json.message }}\", \"timestamp\": \"{{$now}}\"}"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4d5bc5f0-11ce-4f7f-b44b-0514a5ab5671",
+      "name": "Set buffer_count increment",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        280,
+        560
+      ],
+      "parameters": {
+        "key": "=buffer_count:{{$json.context_id}}",
+        "expire": "={{$json.waitSeconds + 60}}",
+        "operation": "incr"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "dcaee1a8-ea32-4a9d-b32f-f0418644027c",
+      "name": "Get last_seen",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        1220,
+        720
+      ],
+      "parameters": {
+        "key": "=last_seen:{{$json.context_id}}",
+        "options": {},
+        "operation": "get",
+        "propertyName": "last_seen"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "908c4a4c-1c60-4e90-827a-064a0b4d6bfd",
+      "name": "Get buffer_count",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        1400,
+        720
+      ],
+      "parameters": {
+        "key": "=buffer_count:{{ $('Mod input').item.json.context_id }}",
+        "options": {},
+        "operation": "get",
+        "propertyName": "count"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1ceb472b-3944-4d74-994b-867ade006e4e",
+      "name": "Map ouput",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        3140,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e8d80ab4-74a2-4c30-8500-8dddc5802eec",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.output.message }}"
+            },
+            {
+              "id": "7e7fcee4-14b3-4393-b516-b07a53c018b3",
+              "name": "context_id",
+              "type": "string",
+              "value": "={{$('get wait seconds').item.json.context_id }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "0be7e5eb-1972-4a95-b5bf-4e564fc4ef7c",
+      "name": "Check Inactivity + Count",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1580,
+        720
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "0f294c51-0629-4ae1-a009-68c2f5fd30b5",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{$json.count != null && Number($json.count) >= 1}}",
+              "rightValue": ""
+            },
+            {
+              "id": "1626238d-fb00-4ce8-89df-a40a4f29f52a",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{$('Get last_seen').item.json.last_seen != null}}",
+              "rightValue": ""
+            },
+            {
+              "id": "df819099-1f6e-4bee-a017-32b729c836a3",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{($now.toMillis() - $('Get last_seen').item.json.last_seen) >= $('Mod input').item.json.waitSeconds * 1000}}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "0c3bd62b-8cf6-4b34-8010-ebe819db9667",
+      "name": "Delete waiting_reply1",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        2940,
+        1000
+      ],
+      "parameters": {
+        "key": "=buffer_count:{{$json.context_id}}",
+        "operation": "delete"
+      },
+      "credentials": {
+        "redis": {
+          "id": "zJtRI38KhsyVjUvP",
+          "name": "Redis account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bbf45966-833b-4f5f-ae11-0578614eb156",
+      "name": "No Operation, do nothing2",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        720,
+        540
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "5683eebf-ba51-4a6b-a803-de6acf1b1ea8",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        2080,
+        880
+      ],
+      "webhookId": "b8e2e214-f82b-49c2-96e2-91e093137857",
+      "parameters": {
+        "amount": "={{ Math.max(0, Math.ceil(( $('Mod input').item.json.waitSeconds * 1000 - ($now.toMillis() - $('Get last_seen').item.json.last_seen)) / 1000)) }}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "c0478f60-944e-4c85-bb9c-9abe0d4238c0",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -480,
+        720
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "context_id"
+            },
+            {
+              "name": "message"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "91a650b7-ddd4-4dbf-a300-523f72f0bdb5",
+      "name": "Mock input data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -500,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0543fdb7-4a22-4530-bdb7-ae7064732fae",
+              "name": "context_id",
+              "type": "string",
+              "value": "={{ $json.sessionId1 || '1lap075ha12' }}"
+            },
+            {
+              "id": "bead5646-a689-4deb-8f4b-b22aa97b51ca",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.chatInput || 'Chat 2'}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "cb450e32-7e19-469c-9a5c-3d9da5bf1dfa",
+      "name": "No Operation, do nothing3",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        3320,
+        840
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "b463e405-3355-48a2-a043-42941d7025c3",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2880,
+        660
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 700,
+        "height": 780,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### 🧹 Buffer Cleanup\n\nAfter consolidation and reply:\n\n* **DELETE** keys:\n\n  * `buffer_in:{{context_id}}`\n  * `buffer_count:{{context_id}}`\n  * `waiting_reply:{{context_id}}`\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1b5397f8-aa7e-4b2b-afb9-5da97d99e049",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        60
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 920,
+        "height": 940,
+        "content": "### 📥 Input Buffer\n\n1. **Save incoming message**\n\n   * Push the new message into Redis list `buffer_in:{{context_id}}`.\n2. **Update metadata**\n\n   * Set `last_seen:{{context_id}}` to the current timestamp (with a TTL of `waitSeconds + 60`).\n   * INCR the counter key `buffer_count:{{context_id}}` (also expiring after `waitSeconds + 60`).\n3. **Check “waiting” flag**\n\n   * GET `waiting_reply:{{context_id}}`.\n   * If it’s null (no batch in flight), SET it to `true` with TTL `waitSeconds` to block concurrent triggers."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "edc07500-ccad-4e72-adc1-1a63a3a06609",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1180,
+        340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1200,
+        "height": 820,
+        "content": "### ⏳ Inactivity & Threshold Check\n\n1. **Fetch state**\n\n   * GET `last_seen:{{context_id}}` (when the last message arrived)\n   * GET `buffer_count:{{context_id}}` (how many messages are queued)\n2. **Evaluate trigger**\n\n   * **Inactivity:** `(now – last_seen) ≥ waitSeconds * 1000`\n   * **Or threshold:** `buffer_count ≥ 1` (or your desired batch size)\n3. **Branch**\n\n   * **True:** proceed to “Get buffer” and consolidate.\n   * **False:** exit (noOp) and let the waiting‐node/flag mechanism retry later."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "message": "Mensaje del usuario despues de pasar por el workflow de n8n:\nTexto: ¡Hola! Quiero más información.;\nImagen: ;\nAudio: ;",
+        "context_id": "573058148988@s.whatsapp.net"
+      }
+    ]
+  },
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check Inactivity + Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map ouput": {
+      "main": [
+        []
+      ]
+    },
+    "Mod input": {
+      "main": [
+        [
+          {
+            "node": "waiting_reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get buffer": {
+      "main": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WaitSeconds": {
+      "main": [
+        [
+          {
+            "node": "Get last_seen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last_seen": {
+      "main": [
+        [
+          {
+            "node": "Get buffer_count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set last_seen": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "waiting_reply?": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set waiting_reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buffer messages": {
+      "main": [
+        [
+          {
+            "node": "Set buffer_count increment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set last_seen",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get waiting_reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock input data": {
+      "main": [
+        [
+          {
+            "node": "get wait seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete buffer_in": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get buffer_count": {
+      "main": [
+        [
+          {
+            "node": "Check Inactivity + Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get wait seconds": {
+      "main": [
+        [
+          {
+            "node": "Buffer messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get waiting_reply": {
+      "main": [
+        [
+          {
+            "node": "Mod input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set waiting_reply": {
+      "main": [
+        [
+          {
+            "node": "WaitSeconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete waiting_reply": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete waiting_reply1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Information Extractor": {
+      "main": [
+        [
+          {
+            "node": "Map ouput",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete buffer_in",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete waiting_reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete waiting_reply1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Inactivity + Count": {
+      "main": [
+        [
+          {
+            "node": "Get buffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set buffer_count increment": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Mock input data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "get wait seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Mock input data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

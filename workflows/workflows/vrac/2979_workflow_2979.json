@@ -1,0 +1,391 @@
+{
+  "meta": {
+    "instanceId": "d4d7965840e96e50a3e02959a8487c692901dfa8d5cc294134442c67ce1622d3",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "9252c041-d6b2-49fe-8edb-8d8cb8a1341d",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        240,
+        0
+      ],
+      "webhookId": "0c5c8b39-06a7-4d07-95be-b729d2a9eb6f",
+      "parameters": {
+        "options": {},
+        "formTitle": "Batch File Upload to Google Drive",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "file",
+              "fieldLabel": "file",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "folderName",
+              "requiredField": true
+            }
+          ]
+        },
+        "formDescription": "Use this form to upload multiple files to a specific Google Drive folder. Simply select your files and specify your target folder name. If the folder doesn't exist yet, we'll create it automatically for you. This streamlined process allows you to organize and store multiple files in one go, saving you time and effort."
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "e27712ac-238d-4b45-b842-a044dc40dccd",
+      "name": "Get Folder Name",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        560,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1b997842-86f3-4bce-b8d2-e8d73387dae1",
+              "name": "folderName",
+              "type": "string",
+              "value": "={{ $json.folderName }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "555e761a-ea79-40eb-b36f-72fbcc642fda",
+      "name": "Search specific folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        800,
+        0
+      ],
+      "parameters": {
+        "filter": {},
+        "options": {},
+        "resource": "fileFolder",
+        "queryString": "=mimeType='application/vnd.google-apps.folder' and name = '{{ $json.folderName }}' and '<folderId>' in parents\n",
+        "searchMethod": "query"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "2SIFnsVfdw9nx9I4",
+          "name": "Google Drive account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 3,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2a92c031-44e5-4e07-89ff-058251c43027",
+      "name": "Folder found ?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1280,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "11abd7e3-d90b-4bb1-a8ba-d3cbc4333d8f",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "e413cdc8-8424-41d3-8791-e036392a16ac",
+      "name": "Create Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        1680,
+        100
+      ],
+      "parameters": {
+        "name": "={{ $('On form submission').item.json.folderName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "17sGS9HdmAtgpd5rC1sVuiIUGyw2hq9IY",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/17sGS9HdmAtgpd5rC1sVuiIUGyw2hq9IY",
+          "cachedResultName": "n8n"
+        },
+        "resource": "folder"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "2SIFnsVfdw9nx9I4",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "aada549c-3bbd-453b-9d48-4ab25446d8ce",
+      "name": "Upload Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        2180,
+        -100
+      ],
+      "parameters": {
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Search specific folder').item.json.id }}"
+        },
+        "inputDataFieldName": "=data"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "2SIFnsVfdw9nx9I4",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "7b4bcb6e-3b63-4243-8f38-a18f3d5d44f2",
+      "name": "Prepare Files for Upload",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1920,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "let results = [];\nconst items = $(\"On form submission\").all()\n\nfor (item of items) {\n    for (key of Object.keys(item.binary)) {\n        results.push({\n            json: {\n                fileName: item.binary[key].fileName\n            },\n            binary: {\n                data: item.binary[key],\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "1d08ef78-68e7-4901-80fc-17923344fee3",
+      "name": "Prepare Files for New Folder",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1920,
+        100
+      ],
+      "parameters": {
+        "jsCode": "let results = [];\nconst items = $(\"On form submission\").all()\n\nfor (item of items) {\n    for (key of Object.keys(item.binary)) {\n        results.push({\n            json: {\n                fileName: item.binary[key].fileName\n            },\n            binary: {\n                data: item.binary[key],\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "557d2c63-7bbb-4280-b16e-71c6d900973b",
+      "name": "Upload to New Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        2180,
+        100
+      ],
+      "parameters": {
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Folder').item.json.id }}"
+        },
+        "inputDataFieldName": "=data"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "2SIFnsVfdw9nx9I4",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "e90ccfb0-cf21-45d2-860e-bc2049ed9682",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -400,
+        -200
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 520,
+        "height": 520,
+        "content": "# 🗂️ Bulk File Upload to Google Drive with Folder Management\n\n## Overview\nThis workflow processes a form submission that accepts:\n- Multiple file uploads (any format)\n- Target folder name input\n\nThe workflow automatically:\n- Checks if the specified folder exists in Google Drive\n- Creates the folder if it doesn't exist\n- Uploads all files to the correct folder\n- Maintains original file names and structure\n\nPerfect for batch uploading files while keeping your Drive organized!\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cd00c8a3-42e3-44f4-89b3-663da809346c",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1100,
+        -440
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 460,
+        "height": 380,
+        "content": "## 🔄 Decision Point: Folder Check\nThe workflow splits into two paths based on folder existence:\n- ✅ TRUE: Use existing folder path\n- 🆕 FALSE: Create new folder path\n\n## 🗂️ Existing Folder Path (Upper)\n1. Prepare Files for Upload: Splits files for individual processing\n2. Upload Files: Uploads to existing folder maintaining structure\n\n## 📁 New Folder Path (Lower)\n1. Create Folder: Generates new folder in Drive\n2. Prepare Files for New Folder: Splits files for individual processing\n3. Upload to New Folder: Uploads to newly created folder"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a0b1ff8a-3308-41da-bb4b-01b50cccc456",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1920,
+        -340
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 360,
+        "height": 200,
+        "content": "## ⚙️ File Processing Notes\n- All binary files are split individually for proper upload handling\n- Original file names and structure are preserved\n- Both paths ensure identical file organization\n\nalso see https://n8n.io/workflows/1621-split-out-binary-data/"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c16b2105-638d-4d48-b39d-ff8772375674",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        400,
+        -340
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 660,
+        "height": 280,
+        "content": "## 🔍 Search Query Pattern\n\nThe following search pattern looks for a folder with the specified name in a particular parent folder:\nMake sure to replace <folderId>\n\n```javascript\nmimeType='application/vnd.google-apps.folder' and name = '{{ $json.folderName }}' and '<folderId>' in parents\n```\n\n**Important**: Marl Always Output Data so you can check also if nothing found."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Create Folder": {
+      "main": [
+        [
+          {
+            "node": "Prepare Files for New Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Folder found ?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Files for Upload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Folder Name": {
+      "main": [
+        [
+          {
+            "node": "Search specific folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Get Folder Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search specific folder": {
+      "main": [
+        [
+          {
+            "node": "Folder found ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Files for Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Files for New Folder": {
+      "main": [
+        [
+          {
+            "node": "Upload to New Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

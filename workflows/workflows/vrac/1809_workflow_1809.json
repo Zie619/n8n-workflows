@@ -1,0 +1,216 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "1b1fd43f-5acb-45e7-bd98-e4774754cdfe",
+      "name": "On order updated",
+      "type": "n8n-nodes-base.shopifyTrigger",
+      "position": [
+        180,
+        520
+      ],
+      "webhookId": "0972ce92-d800-4049-ab60-7c71898ecbfa",
+      "parameters": {
+        "topic": "orders/updated"
+      },
+      "credentials": {
+        "shopifyApi": {
+          "id": "10",
+          "name": "Shopify account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d96cde15-f810-4302-aa45-554f6675b505",
+      "name": "Order exists in Zendesk",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1220,
+        540
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"ZendeskTicketId\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "62c09ef2-55c8-4269-9869-c15e8a955169",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1500,
+        460
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "68f867c3-842c-478a-8afd-c7299e12b98d",
+      "name": "Find if order already has a ticket in Zendesk",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        480,
+        660
+      ],
+      "parameters": {
+        "options": {
+          "query": "external_id:1027",
+          "status": "open"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "01d4acba-8641-43e8-b333-e4494a2594d1",
+      "name": "Keep only ticket Id",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        720,
+        660
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "external_Id",
+              "value": "={{ $json[\"external_id\"] }}"
+            },
+            {
+              "name": "ZendeskTicketId",
+              "value": "={{ $json[\"id\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "63099ec6-7ae5-4d88-881b-a6a8ae3a64b8",
+      "name": "Add ticket info to order data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        960,
+        540
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "order_number",
+        "propertyName2": "external_Id"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "79bf059e-d3b9-4323-88e5-7887deae74f7",
+      "name": "Create new ticket for new orders",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        1500,
+        640
+      ],
+      "parameters": {
+        "description": "=Order #{{ $json[\"order_number\"] }} - {{$json[\"line_items\"].length}} item(s)\n\nOrder:\nCustomer: {{$json[\"customer\"][\"first_name\"]}} {{$json[\"customer\"][\"last_name\"]}} \nemail: {{$json[\"customer\"][\"email\"]}}\nStatus: New order",
+        "additionalFields": {
+          "status": "open",
+          "subject": "=Order #{{ $json[\"order_number\"] }} - {{$json[\"line_items\"].length}} item(s)",
+          "externalId": "={{ $json[\"order_number\"] }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "On order updated": {
+      "main": [
+        [
+          {
+            "node": "Find if order already has a ticket in Zendesk",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add ticket info to order data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only ticket Id": {
+      "main": [
+        [
+          {
+            "node": "Add ticket info to order data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Order exists in Zendesk": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create new ticket for new orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add ticket info to order data": {
+      "main": [
+        [
+          {
+            "node": "Order exists in Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find if order already has a ticket in Zendesk": {
+      "main": [
+        [
+          {
+            "node": "Keep only ticket Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "meta": {
+    "instanceId": "411a4eea57cf88d4a82c27728a11bad4fe2fdcbc1ab5eae589890a37e4b909ca",
+    "templateId": "2043"
+  },
+  "nodes": [
+    {
+      "id": "9fd007e4-9d21-4fef-8a28-3be3e92af6f7",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        260,
+        600
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "5 * * * *"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "cd23c427-56f1-4924-8adf-4b38417ba652",
+      "name": "Binance 24h Price Change",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "Get data of changed price coins in last 24h",
+      "maxTries": 5,
+      "position": [
+        600,
+        600
+      ],
+      "parameters": {
+        "url": "https://api.binance.com/api/v3/ticker/24hr",
+        "options": {}
+      },
+      "notesInFlow": true,
+      "retryOnFail": true,
+      "typeVersion": 1,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "40e4f7bd-ac47-4617-9177-5a84ada3a92f",
+      "name": "Send Telegram Message",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1560,
+        600
+      ],
+      "webhookId": "75a4f97f-1a11-47fd-9f90-cbecd75ad2df",
+      "parameters": {
+        "text": "={{ $json.data }}\n\n",
+        "chatId": "-4685771678",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "d6O4BUmt3I6XZJ1D",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "424bbed3-f134-418c-9961-e966c8dc2592",
+      "name": "Analyze & Format Market Data",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        900,
+        600
+      ],
+      "parameters": {
+        "functionCode": "function escapeHTML(text) {\n  return String(text)\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;\");\n}\n\nfunction formatVolume(volume) {\n  const vol = parseFloat(volume);\n  if (vol >= 1_000_000_000) return (vol / 1_000_000_000).toFixed(2) + 'B';\n  if (vol >= 1_000_000) return (vol / 1_000_000).toFixed(2) + 'M';\n  if (vol >= 1_000) return (vol / 1_000).toFixed(2) + 'K';\n  return vol.toString();\n}\n\nfunction formatMoney(amount) {\n  return parseFloat(amount).toLocaleString('en-US', {\n    minimumFractionDigits: 2,\n    maximumFractionDigits: 2\n  });\n}\n\nfunction calculateVolatility(coin) {\n  const high = parseFloat(coin.highPrice);\n  const low = parseFloat(coin.lowPrice);\n  const volatility = ((high - low) / low) * 100;\n  return volatility.toFixed(2);\n}\n\nfunction calculateSpread(coin) {\n  const ask = parseFloat(coin.askPrice);\n  const bid = parseFloat(coin.bidPrice);\n  const spread = ((ask - bid) / bid) * 100;\n  return spread.toFixed(4);\n}\n\nfunction calculateMarketComparison(coin, avgMarketChange) {\n  const coinChange = parseFloat(coin.priceChangePercent);\n  const comparison = coinChange - avgMarketChange;\n  return comparison.toFixed(2);\n}\n\nfunction formatActivity(count) {\n  return count.toLocaleString('en-US');\n}\n\nfunction calculateMomentum(coin) {\n  const current = parseFloat(coin.lastPrice);\n  const weighted = parseFloat(coin.weightedAvgPrice);\n  return ((current - weighted) / weighted * 100).toFixed(2);\n}\n\nfunction estimateMarketCap(coin) {\n  return parseFloat(coin.lastPrice) * parseFloat(coin.quoteVolume);\n}\n\nfunction formatCoinWithAnalytics(coin, avgMarketChange) {\n  const change = parseFloat(coin.priceChangePercent);\n  const arrow = change > 0 ? '🔺' : '🔻';\n  const volatility = calculateVolatility(coin);\n  const spread = calculateSpread(coin);\n  const marketComparison = calculateMarketComparison(coin, avgMarketChange);\n  const momentum = calculateMomentum(coin);\n  \n  const comparisonEmoji = marketComparison > 0 ? '⭐' : '⬇️';\n  const momentumEmoji = parseFloat(momentum) > 0 ? '🔼' : '🔽';\n  \n  const timeFrameHours = (coin.closeTime - coin.openTime) / (1000 * 60 * 60);\n  \n  return `<b>${escapeHTML(coin.symbol)}</b>\\n` +\n         `${arrow} Change: ${escapeHTML(change.toFixed(2))}% (${timeFrameHours.toFixed(0)}h)\\n` +\n         `💰 Current: $${formatMoney(coin.lastPrice)}\\n` +\n         `📊 Range: $${formatMoney(coin.lowPrice)} - $${formatMoney(coin.highPrice)}\\n` +\n         `📈 Volatility: ${volatility}%\\n` +\n         `🔄 Volume: ${escapeHTML(formatVolume(coin.volume))} | $${formatMoney(coin.quoteVolume)}\\n` +\n         `⚖️ Bid-Ask Spread: ${spread}%\\n` +\n         `${comparisonEmoji} vs Market Avg: ${marketComparison}%\\n` +\n         `${momentumEmoji} Momentum: ${momentum}%\\n` +\n         `🔢 Trades: ${formatActivity(coin.count)}\\n\\n`;\n}\n\nfunction calculateMarketStats(coins) {\n  const totalVolume = coins.reduce((sum, coin) => sum + parseFloat(coin.quoteVolume), 0);\n  const averageChange = coins.reduce((sum, coin) => sum + parseFloat(coin.priceChangePercent), 0) / coins.length;\n  const mostVolatile = [...coins].sort((a, b) => calculateVolatility(b) - calculateVolatility(a))[0];\n  const mostTraded = [...coins].sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))[0];\n  const leastSpread = [...coins].sort((a, b) => calculateSpread(a) - calculateSpread(b))[0];\n  \n  const topByVolume = [...coins]\n    .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))\n    .slice(0, 3);\n  \n  return {\n    totalVolume,\n    averageChange,\n    mostVolatile,\n    mostTraded,\n    leastSpread,\n    topByVolume\n  };\n}\n\nconst now = new Date();\nconst dateString = now.toISOString().replace('T', ' ').split('.')[0] + ' UTC';\nconst rawData = items[0].json;\n\nconst binanceData = Array.isArray(rawData) ? rawData : [];\nconst usdcPairs = binanceData.filter(coin => coin.symbol.endsWith('USDC'));\n\n// Filter only for Solana, Bitcoin, Ethereum\nconst relevantSymbols = ['SOLUSDC', 'BTCUSDC', 'ETHUSDC'];\nconst filteredCoins = usdcPairs.filter(coin => relevantSymbols.includes(coin.symbol));\n\n// Calculate market cap for each coin\nfilteredCoins.forEach(coin => {\n  coin.estimatedMarketCap = estimateMarketCap(coin);\n});\n\nconst marketStats = calculateMarketStats(filteredCoins);\nconst avgMarketChange = marketStats.averageChange;\n\nconst gainers = filteredCoins\n  .filter(c => parseFloat(c.priceChangePercent) > 0)\n  .sort((a, b) => parseFloat(b.priceChangePercent) - parseFloat(a.priceChangePercent));\n\nconst losers = filteredCoins\n  .filter(c => parseFloat(c.priceChangePercent) < 0)\n  .sort((a, b) => parseFloat(a.priceChangePercent) - parseFloat(b.priceChangePercent));\n\n// Build message\nlet summary = `<b>📊 Crypto Market Summary — ${escapeHTML(dateString)}</b>\\n\\n`;\n\nsummary += `<b>🌐 Market Overview (BTC, ETH, SOL)</b>\\n` +\n           `Average Change: ${avgMarketChange.toFixed(2)}%\\n` +\n           `24h Volume: $${formatMoney(marketStats.totalVolume)}\\n` +\n           `Most Volatile: ${marketStats.mostVolatile.symbol} (${calculateVolatility(marketStats.mostVolatile)}%)\\n` +\n           `Most Liquid: ${marketStats.leastSpread.symbol} (${calculateSpread(marketStats.leastSpread)}% spread)\\n\\n`;\n\nsummary += `<b>💹 Top by Volume</b>\\n`;\nmarketStats.topByVolume.forEach(coin => {\n  summary += `${coin.symbol}: $${formatMoney(coin.quoteVolume)} | ${coin.priceChangePercent}%\\n`;\n});\nsummary += `\\n`;\n\nif (gainers.length) {\n  summary += `<b>📈 Gainers</b>\\n\\n`;\n  summary += gainers.map(coin => formatCoinWithAnalytics(coin, avgMarketChange)).join('');\n}\n\nif (losers.length) {\n  summary += `<b>📉 Losers</b>\\n\\n`;\n  summary += losers.map(coin => formatCoinWithAnalytics(coin, avgMarketChange)).join('');\n}\n\nconst chunks = [];\nlet current = \"\";\nsummary.split(/\\n/g).forEach(line => {\n  const lineWithBreak = line + \"\\n\";\n  if ((current + lineWithBreak).length > 4000) {\n    chunks.push({ json: { data: current.trim() } });\n    current = lineWithBreak;\n  } else {\n    current += lineWithBreak;\n  }\n});\n\nif (current.trim()) {\n  chunks.push({ json: { data: current.trim() } });\n}\n\nreturn chunks;"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "1c43afdc-b15a-4380-9c6f-2056e28a37f7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        220,
+        -100
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 940,
+        "height": 620,
+        "content": "## 📌 Daily Crypto Market Summary Bot\n\n### 📈 What It Does\nFetches hourly 24h price data from Binance for **BTC**, **ETH**, and **SOL** (USDC pairs), analyzes key market trends, and sends a well-formatted HTML summary to a Telegram chat.\n\n---\n### 📊 Metrics Analyzed\n- 🔺 Gainers / 📉 Losers\n- 💰 Price change %\n- 📈 Volatility (High vs Low)\n- ⚖️ Bid-Ask Spread %\n- 🔼 Momentum (vs Weighted Avg)\n- ⭐ vs Market Average\n - 🔢 Number of Trades\n\n---\n### ⚠️ Notes\n- Message output is automatically **split into chunks** to stay under Telegram’s **4096 character limit**.\n- Output is sent in **rich HTML format** for better readability.\n\n---\n\n✅ This note is for internal guidance. Feel free to delete or update it after setup.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5bbd9227-2a52-4130-abf1-f6745327dbd4",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1540,
+        780
+      ],
+      "parameters": {
+        "width": 340,
+        "height": 240,
+        "content": "### 🛠️ Setup Instructions\n\n4. **Telegram**\n   - Create a bot via [@BotFather](https://t.me/BotFather)\n   - Add the bot to a Telegram group or use a personal chat\n   - In the **Send Telegram Message** node:\n     - Add your bot token under credentials\n     - Replace the default `chatId` with your group/user chat ID\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ffa51aa0-181a-415b-933c-44fd01ca27da",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        800
+      ],
+      "parameters": {
+        "height": 180,
+        "content": "**Binance**\n   - No Binance API key required (uses public endpoint)\n   - Ensure internet access to call Binance API"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ba902bcb-f24c-491a-bcaa-ab7bf16e5bb1",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        220,
+        800
+      ],
+      "parameters": {
+        "height": 180,
+        "content": "\n### ⏱ Schedule\n- Runs **every hour**\n- Cron expression: `5 * * * *`  \n  _(At minute 5 of every hour)_"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ae8b4d48-90ab-4b28-bbc7-07ed5d333815",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        900,
+        820
+      ],
+      "parameters": {
+        "width": 560,
+        "content": "\n3. **Optional: Add More Coins**\n   - In the **Function node**, find the line:\n     ```js\n     const relevantSymbols = ['SOLUSDC', 'BTCUSDC', 'ETHUSDC'];\n     ```\n   - Add your preferred trading pairs (must end in `USDC`)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Binance 24h Price Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Binance 24h Price Change": {
+      "main": [
+        [
+          {
+            "node": "Analyze & Format Market Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze & Format Market Data": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

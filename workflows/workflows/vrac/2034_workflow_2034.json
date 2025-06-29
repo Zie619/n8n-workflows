@@ -1,0 +1,131 @@
+{
+  "meta": {
+    "instanceId": "dbd43d88d26a9e30d8aadc002c9e77f1400c683dd34efe3778d43d27250dde50"
+  },
+  "nodes": [
+    {
+      "id": "44eb446d-3775-4fe0-8f76-67f46913531e",
+      "name": "LoadDingTalkAccountMap",
+      "type": "n8n-nodes-base.mySql",
+      "position": [
+        -600,
+        720
+      ],
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tfs_dingtalk_account_map",
+          "cachedResultName": "tfs_dingtalk_account_map"
+        },
+        "options": {},
+        "operation": "select",
+        "returnAll": true
+      },
+      "credentials": {
+        "mySql": {
+          "id": "235",
+          "name": "MySQL account"
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "25d2a3aa-af18-4ff2-af6c-c2bf6618a511",
+      "name": "ReceiveTfsPullRequestCreatedMessage",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -860,
+        720
+      ],
+      "webhookId": "05a0f565-7a1e-44f2-956d-1c68982ce314",
+      "parameters": {
+        "path": "pr-notify-template",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "70d69753-9408-4a99-85a4-9dc4486fc460",
+      "name": "BuildDingTalkWebHookData",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -340,
+        720
+      ],
+      "parameters": {
+        "jsCode": "// Code here will run only once, no matter how many input items there are.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.function\n\nconsole.log(\"items:\");\nconsole.log(items);\n\nvar mapUserMobile = function (tfsAccount) {\n  for(var i = 0; i < items.length; i++) {\n    var map = items[i].json;\n    if(tfsAccount.lastIndexOf(map.TfsAccount) != -1) {\n      return map.DingTalkMobile;\n    }\n  }\n\n  return null;\n}\nvar mapUserName = function (tfsAccount) {\n  for(var i = 0; i < items.length; i++) {\n    var map = items[i].json;\n    if(tfsAccount.lastIndexOf(map.TfsAccount) != -1) {\n      return map.UserName;\n    }\n  }\n\n  return null;\n}\n\nvar tfsMessage = $node[\"ReceiveTfsPullRequestCreatedMessage\"].json.body;\nconsole.log(\"TFS Message:\");\nconsole.log(tfsMessage);\n\nvar output = {};\nvar atMobiles = [];\nvar isAtAll = false;\nvar atUsers = [];\nvar messageText = tfsMessage.message.markdown;\nvar prCreatorTfsDomainName = tfsMessage.resource.createdBy.uniqueName;\nvar prCreatorTfsDisplayName = tfsMessage.resource.createdBy.displayName;\nvar prCreatorDingTalkName = mapUserName(prCreatorTfsDomainName);\n\nif (prCreatorDingTalkName !== null) {\n  messageText = messageText.replace(prCreatorTfsDisplayName, prCreatorDingTalkName);\n}\n\nfor (reviewer of tfsMessage.resource.reviewers) {\n  console.log(reviewer.uniqueName);\n  if(reviewer.uniqueName.lastIndexOf(\"团队\") != -1) {\n    //当@所有人时，消息内容中的手机号就不会被转义成用户名了，暂时不启用该功能\n    isAtAll = true;\n    continue;\n  }\n\n  var mobile = mapUserMobile(reviewer.uniqueName);\n\n  if(mobile !== null) {\n    atMobiles.push(mobile);\n  }\n\n  var userName = mapUserName(reviewer.uniqueName);\n\n  if(userName !== null) {\n    atUsers.push(userName);\n  }\n}\n\nif(isAtAll) {\n  atUsers.unshift(\"所有人\");\n  atMobiles = [];\n} else {\n  atUsers = atMobiles;\n}\n\nif (atUsers.length > 0) {\n  messageText = messageText + \"<br />请 @\" + atUsers.join(\" @\") + \" 评审\";\n}\n\noutput.isAtAll = isAtAll;\noutput.text = messageText;\noutput.atMobiles = atMobiles.join(\", \");\n\nconsole.log('Done:');\nconsole.log(output);\n\nreturn [{json: output}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "dc6c235b-c1ac-4195-a404-e79c8ad1c8ef",
+      "name": "SendDingTalkMessageViaWebHook",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -80,
+        720
+      ],
+      "parameters": {
+        "url": "https://oapi.dingtalk.com/robot/send?access_token=4d684f0389cd4c24997c815344890faafeb9d300c25edf5e31151662a87e77c7",
+        "options": {},
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\n\t\"at\":\n\t{\n\t\t\"atMobiles\": [{{$json[\"atMobiles\"]}}],\n\t\t\"isAtAll\": \"{{$json[\"isAtAll\"]}}\"\n\t},\n\t\"msgtype\": \"markdown\",\n\t\"markdown\":\n\t{\n\t\t\"title\": \"New PR Notify\",\n\t\t\"text\": \"{{$json[\"text\"]}}\"\n\t}\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3476a787-387b-43e2-8646-6a682656f231",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1449,
+        560
+      ],
+      "parameters": {
+        "width": 484,
+        "height": 540,
+        "content": "## Send DingTalk message on new Azure DevOps Pull Request\nThis template automates sending a DingTalk message on new Azure Dev Ops Pull Request Created Events. It uses a MySQL database to store mappings between Azure users and DingTalk users; so the right users get notified. \n\n### Set up instructions\n1. Define the path value of ReceiveTfsPullRequestCreatedMessage Webhook node of your own, copy the webhook url to create a Azure DevOps ServiceHook that call webhook with Pull Request Created event.\n2. In order to configure the LoadDingTalkAccountMap node, you need to create a MySQL table as below:\n|Name|Type|Length|Key|\n|-|-|-|-|\n|TfsAccount|varchar|255|\n|UserName|varchar|255|\n|DingTalkMobile|varchar|255|\n3. You can customize the Ding Talk message content by editing the BuildDingTalkWebHookData node.\n4. Define the URL of SendDingTalkMessageViaWebHook Http Request node as your Ding Talk group chat robot webhook URL.\n5. Send test of production message from Azure DevOps to test.\n\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "LoadDingTalkAccountMap": {
+      "main": [
+        [
+          {
+            "node": "BuildDingTalkWebHookData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BuildDingTalkWebHookData": {
+      "main": [
+        [
+          {
+            "node": "SendDingTalkMessageViaWebHook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReceiveTfsPullRequestCreatedMessage": {
+      "main": [
+        [
+          {
+            "node": "LoadDingTalkAccountMap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,563 @@
+{
+  "nodes": [
+    {
+      "name": "chatID",
+      "type": "n8n-nodes-base.function",
+      "notes": "username and language",
+      "position": [
+        -100,
+        680
+      ],
+      "parameters": {
+        "functionCode": "// Telegram uses the following language codes: https://en.wikipedia.org/wiki/IETF_language_tag\r\n\r\nvar data = $node[\"Telegram Trigger\"].json;\r\nconst botlang = [\"ru\", \"en\"]; // Update this after adding new language in the dictionary\r\n\r\n// Assign the default language if the translation is not yet ready\r\nvar curlang = botlang.includes(data.message.from.language_code) ? data.message.from.language_code : \"en\";\r\n\r\nreturn [{json: {chatID  : data.message.chat.id,\r\n                lang    : curlang\r\n}}];"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "notes": "Wait for dictionary to load",
+      "position": [
+        480,
+        460
+      ],
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "notes": "check bot commands",
+      "position": [
+        620,
+        460
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "/start"
+            },
+            {
+              "output": 1,
+              "value2": "/help"
+            }
+          ]
+        },
+        "value1": "={{$node[\"Merge\"].json[\"message\"][\"text\"]}}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        940,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json[\"empty\"]}}",
+              "value2": "={{true}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "name": "msg_greet",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1260,
+        220
+      ],
+      "parameters": {
+        "text": "={{$evaluateExpression($node[\"botmessages\"].json[\"greeting\"][$node[\"chatID\"].json[\"lang\"]])}}",
+        "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "12",
+          "name": "n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "msg_welcomeback",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1260,
+        380
+      ],
+      "parameters": {
+        "text": "={{$evaluateExpression($node[\"botmessages\"].json[\"welcomeback\"][$node[\"chatID\"].json[\"lang\"]])}}",
+        "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "12",
+          "name": "n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "msg_help",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1260,
+        540
+      ],
+      "parameters": {
+        "text": "={{$evaluateExpression($node[\"botmessages\"].json[\"help\"][$node[\"chatID\"].json[\"lang\"]])}}",
+        "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "12",
+          "name": "n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "msg_wrongcommand",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1260,
+        700
+      ],
+      "parameters": {
+        "text": "={{$evaluateExpression($node[\"botmessages\"].json[\"wrongcommand\"][$node[\"chatID\"].json[\"lang\"]])}}",
+        "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "12",
+          "name": "n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "New user?",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        780,
+        300
+      ],
+      "parameters": {
+        "functionCode": "return [{json: {empty: Object.keys($node[\"CheckUser\"].json).length == 0}}];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "CheckUser",
+      "type": "n8n-nodes-base.nocoDb",
+      "position": [
+        380,
+        680
+      ],
+      "parameters": {
+        "table": "TG_users",
+        "options": {
+          "where": "=(TG_account_ID,eq,{{$node[\"chatID\"].json[\"chatID\"]}})"
+        },
+        "operation": "getAll",
+        "projectId": "n8n_multilang_bot_wzhb"
+      },
+      "credentials": {
+        "nocoDb": {
+          "id": "13",
+          "name": "NocoDB n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "name": "LoadDictionary",
+      "type": "n8n-nodes-base.nocoDb",
+      "position": [
+        60,
+        680
+      ],
+      "parameters": {
+        "table": "botmessages",
+        "options": {},
+        "operation": "getAll",
+        "projectId": "n8n_multilang_bot_wzhb",
+        "returnAll": true
+      },
+      "credentials": {
+        "nocoDb": {
+          "id": "13",
+          "name": "NocoDB n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "name": "botmessages",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        220,
+        680
+      ],
+      "parameters": {
+        "functionCode": "\nlet data = {};\n\nfor (item of items) {\n  data[item.json.botmessage]=item.json;\n}\n\nreturn data;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        240,
+        460
+      ],
+      "webhookId": "21dac5fa-6e6b-43a0-b099-4f57537d2271",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "12",
+          "name": "n8n multilang bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "HTTP AddUser",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1100,
+        220
+      ],
+      "parameters": {
+        "url": "https://database.digigin.eu/api/v1/db/data/noco/n8n_multilang_bot_wzhb/TG_users",
+        "options": {
+          "bodyContentType": "json"
+        },
+        "requestMethod": "POST",
+        "authentication": "headerAuth",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "TG_account_ID",
+              "value": "={{$node[\"chatID\"].json[\"chatID\"]}}"
+            },
+            {
+              "name": "Last_language_used",
+              "value": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"from\"][\"language_code\"]}}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "21",
+          "name": "Header Auth NocoDB"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "HTTP UpdateUser",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1100,
+        380
+      ],
+      "parameters": {
+        "url": "=https://database.digigin.eu/api/v1/db/data/noco/n8n_multilang_bot_wzhb/TG_users/{{$node[\"CheckUser\"].json[\"id\"]}}",
+        "options": {
+          "bodyContentType": "json"
+        },
+        "requestMethod": "PATCH",
+        "authentication": "headerAuth",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "TG_account_ID",
+              "value": "={{$node[\"chatID\"].json[\"chatID\"]}}"
+            },
+            {
+              "name": "Last_language_used",
+              "value": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"from\"][\"language_code\"]}}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "21",
+          "name": "Header Auth NocoDB"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "AddUser",
+      "type": "n8n-nodes-base.nocoDb",
+      "disabled": true,
+      "position": [
+        1460,
+        220
+      ],
+      "parameters": {
+        "table": "TG_users",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "TG_account_ID",
+              "fieldValue": "={{$node[\"chatID\"].json[\"chatID\"]}}"
+            },
+            {
+              "fieldName": "Last_language_used",
+              "fieldValue": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"from\"][\"language_code\"]}}"
+            }
+          ]
+        },
+        "operation": "create",
+        "projectId": "n8n_multilang_bot_wzhb"
+      },
+      "credentials": {
+        "nocoDb": {
+          "id": "13",
+          "name": "NocoDB n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "UpdateUser",
+      "type": "n8n-nodes-base.nocoDb",
+      "disabled": true,
+      "position": [
+        1460,
+        380
+      ],
+      "parameters": {
+        "id": "={{$node[\"CheckUser\"].json[\"id\"]}}",
+        "table": "TG_users",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "TG_account_ID",
+              "fieldValue": "={{$node[\"chatID\"].json[\"chatID\"]}}"
+            },
+            {
+              "fieldName": "Last_language_used",
+              "fieldValue": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"from\"][\"language_code\"]}}"
+            }
+          ]
+        },
+        "operation": "update",
+        "projectId": "n8n_multilang_bot_wzhb"
+      },
+      "credentials": {
+        "nocoDb": {
+          "id": "13",
+          "name": "NocoDB n8n multilang bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1440,
+        80
+      ],
+      "parameters": {
+        "width": 440,
+        "height": 460,
+        "content": "## What's this?\nDue to some breaking API changes in NocoDB some of its node options are not working at the moment (MAY 2022). These two nodes were replaced by HTTP request nodes. Functionality is still the same."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "HTTP AddUser",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP UpdateUser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "New user?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "msg_help",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        null,
+        [
+          {
+            "node": "msg_wrongcommand",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chatID": {
+      "main": [
+        [
+          {
+            "node": "LoadDictionary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckUser": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "New user?": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "botmessages": {
+      "main": [
+        [
+          {
+            "node": "CheckUser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP AddUser": {
+      "main": [
+        [
+          {
+            "node": "msg_greet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LoadDictionary": {
+      "main": [
+        [
+          {
+            "node": "botmessages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP UpdateUser": {
+      "main": [
+        [
+          {
+            "node": "msg_welcomeback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "chatID",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

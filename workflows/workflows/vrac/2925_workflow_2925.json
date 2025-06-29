@@ -1,0 +1,192 @@
+{
+  "nodes": [
+    {
+      "id": "4ca55c6e-cf2e-4239-82a9-88d0a201e761",
+      "name": "List upgradable packages",
+      "type": "n8n-nodes-base.ssh",
+      "notes": "apt list --upgradable",
+      "position": [
+        -280,
+        0
+      ],
+      "parameters": {
+        "command": "apt list --upgradable"
+      },
+      "credentials": {
+        "sshPassword": {
+          "id": "Ps31IKTeseWFlA0g",
+          "name": "SSH Password account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "ae1f0a55-31aa-494b-baa6-822dc606188e",
+      "name": "Send Email through SMTP",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        380,
+        0
+      ],
+      "webhookId": "8073c571-b36f-4330-a510-ca2ff2924fbf",
+      "parameters": {
+        "html": "=The following packages can be updated on your server:\n\n{{ $json.htmlList }}\n\nPlease login and perform upgrade.",
+        "options": {},
+        "subject": "Server needs updates",
+        "toEmail": "change.me@example.com",
+        "fromEmail": "change.me@example.com"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "uiNePdJaDng5a43S",
+          "name": "SMTP account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "e1d76671-d94c-40d5-9364-623db9319f11",
+      "name": "Run workflow every day",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -540,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "ec4d722a-b88c-42da-971c-28ad5774596d",
+      "name": "Format as HTML list",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -60,
+        0
+      ],
+      "parameters": {
+        "jsCode": "function formatStdoutAsHtmlList(stdoutData) {\n\n    // Split the stdout into lines and map to HTML list items\n    const htmlListItems = stdoutData.split('\\n').map((line) => {\n        if (line.trim() && line !== \"Listing...\") { // Optionally skip empty lines or headers\n            return `<li>${line.trim()}</li>`;\n        }\n    }).filter(item => item); // Remove any undefined items due to empty lines or skipped headers\n\n    // Wrap the list items in a <ul> tag\n    const htmlList = `<ul>${htmlListItems.join('')}</ul>`;\n\n    // Return the formatted HTML list as part of an object\n    return { \"htmlList\": htmlList };\n}\n\nreturn formatStdoutAsHtmlList($input.first().json.stdout);"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6f14eb02-c505-4f83-a5bb-68094e763fd9",
+      "name": "Check if there are updates",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        140,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "db66d892-26fb-406c-a0ac-2e4b8a60310a",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.htmlList }}",
+              "rightValue": "<ul></ul>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "3924c696-5b0e-4ae2-b2e2-435fed344028",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -740,
+        -180
+      ],
+      "parameters": {
+        "width": 300,
+        "content": "## VPS upgrade notify \nThis workflow will everyday check if server has upgradable packages and inform you by email if there is."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bb8ade2a-4ffe-4c79-91eb-55af568eb1b1",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        -180
+      ],
+      "parameters": {
+        "width": 300,
+        "content": "## Update email addresses\nUpdate From and To email addresses in this node to receive notifications"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Format as HTML list": {
+      "main": [
+        [
+          {
+            "node": "Check if there are updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run workflow every day": {
+      "main": [
+        [
+          {
+            "node": "List upgradable packages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email through SMTP": {
+      "main": [
+        []
+      ]
+    },
+    "List upgradable packages": {
+      "main": [
+        [
+          {
+            "node": "Format as HTML list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if there are updates": {
+      "main": [
+        [
+          {
+            "node": "Send Email through SMTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

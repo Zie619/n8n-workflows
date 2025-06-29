@@ -1,0 +1,851 @@
+{
+  "id": "q8IFGLeOCGSfoWZu",
+  "meta": {
+    "instanceId": "a4bfc93e975ca233ac45ed7c9227d84cf5a2329310525917adaf3312e10d5462",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Email AI Auto-responder. Summerize and send email",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "59885699-0f6c-4522-acff-9e28b2a07b82",
+      "name": "Email Trigger (IMAP)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "position": [
+        -440,
+        -20
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "imap": {
+          "id": "k31W9oGddl9pMDy4",
+          "name": "IMAP info@n3witalia.com"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b268ab9d-b2e3-46e6-b7ae-70aff0b5484d",
+      "name": "Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        -220,
+        -20
+      ],
+      "parameters": {
+        "html": "={{ $json.textHtml }}",
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "13c2d151-6f59-4e1f-a174-02d4d0bcaefd",
+      "name": "DeepSeek R1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -20,
+        160
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "deepseek/deepseek-r1:free",
+          "cachedResultName": "deepseek/deepseek-r1:free"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "XJTqRiKFJpFs5MuX",
+          "name": "OpenRouter account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "8149e40d-64e6-4fb9-aebc-2a2483961f07",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        500,
+        340
+      ],
+      "parameters": {
+        "html": "={{ $json.text }}",
+        "options": {},
+        "subject": "=Re: {{ $('Email Trigger (IMAP)').item.json.subject }}",
+        "toEmail": "={{ $('Email Trigger (IMAP)').item.json.from }}",
+        "fromEmail": "={{ $('Email Trigger (IMAP)').item.json.to }}"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "hRjP3XbDiIQqvi7x",
+          "name": "SMTP info@n3witalia.com"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "633f0ce9-04ff-4653-8bbc-7457ba0d18bd",
+      "name": "Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "position": [
+        -320,
+        600
+      ],
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "options": {},
+        "toolName": "company_knowladge_base",
+        "toolDescription": "Extracts information regarding the request made.",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=COLLECTION"
+        },
+        "includeDocumentMetadata": false
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "iyQ6MQiVaF3VMBmt",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "20daf5d3-dc9c-4fad-9f2f-98d86bc1660c",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        -340,
+        760
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "67699bca-4096-4259-bbd4-51a879539aca",
+      "name": "Email Classifier",
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "position": [
+        360,
+        -20
+      ],
+      "parameters": {
+        "options": {
+          "fallback": "other",
+          "multiClass": false,
+          "enableAutoFixing": true,
+          "systemPromptTemplate": "Please classify the text provided by the user into one of the following categories: {categories}, and use the provided formatting instructions below. Don't explain, and only output the json.\n"
+        },
+        "inputText": "=You must classify the following email::\n\n{{ $json.response.text }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "Company info request",
+              "description": "Company info request"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9f7742e9-87d5-40b9-9129-0777d8a37933",
+      "name": "Email Summarization Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainSummarization",
+      "position": [
+        0,
+        -20
+      ],
+      "parameters": {
+        "options": {
+          "binaryDataKey": "={{ $json.data }}",
+          "summarizationMethodAndPrompts": {
+            "values": {
+              "prompt": "=Write a concise summary of the following in max 100 words:\n\n\"{{ $json.data }}\"\n\nDo not enter the total number of words used.",
+              "combineMapPrompt": "=Write a concise summary of the following in max 100 words:\n\n\"{{ $json.data }}\"\n"
+            }
+          }
+        },
+        "operationMode": "nodeInputBinary"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e2d404c0-2aad-407d-b75e-5ef0c5105c0e",
+      "name": "Write email",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -440,
+        340
+      ],
+      "parameters": {
+        "text": "=Write the text to reply to the following email:\n\n{{ $json.response.text }}",
+        "options": {
+          "systemMessage": "You are an expert at answering emails. You need to answer them professionally based on the information you have. This is a business email. Be concise and never exceed 100 words."
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "3786c2de-c5cb-4233-826e-7265f2bccbdb",
+      "name": "Review email",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        40,
+        340
+      ],
+      "parameters": {
+        "text": "=Review at the following email:\n\n{{ $json.output }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=If you are an expert in reviewing emails before sending them. You need to review and structure them in such a way that you can send them. It must be in HTML format and you can insert (if you think it is appropriate) only HTML characters such as <br>, <b>, <i>, <p> where necessary.\n\nNon superare le 100 parole."
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "baf60eba-5e7b-467f-b27e-1388a91622d0",
+      "name": "When clicking \u2018Test workflow\u2019",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -500,
+        -980
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "77e6160f-20a7-4a75-9fef-bc875b953a16",
+      "name": "Create collection",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -200,
+        -1120
+      ],
+      "parameters": {
+        "url": "https://QDRANTURL/collections/COLLECTION",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "{\n \"filter\": {}\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "qhny6r5ql9wwotpn",
+          "name": "Qdrant API (Hetzner)"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "ab7764d1-531c-4281-8b89-015fb3f5e780",
+      "name": "Refresh collection",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -200,
+        -860
+      ],
+      "parameters": {
+        "url": "https://QDRANTURL/collections/COLLECTION/points/delete",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "{\n \"filter\": {}\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "qhny6r5ql9wwotpn",
+          "name": "Qdrant API (Hetzner)"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "cd3eaa81-0f94-484b-b0c2-ecf0ca4541dc",
+      "name": "Get folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        20,
+        -860
+      ],
+      "parameters": {
+        "filter": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive",
+            "cachedResultUrl": "https://drive.google.com/drive/my-drive",
+            "cachedResultName": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "=test-whatsapp"
+          }
+        },
+        "options": {},
+        "resource": "fileFolder"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "HEy5EuZkgPZVEa9w",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "b39ecd2d-4d5b-4885-86a9-2cfe9f6074ef",
+      "name": "Download Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        240,
+        -860
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "text/plain"
+            }
+          }
+        },
+        "operation": "download"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "HEy5EuZkgPZVEa9w",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "8171b8f2-998d-4d72-ac28-524daae4a2d7",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        620,
+        -660
+      ],
+      "parameters": {
+        "options": {},
+        "dataType": "binary"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ec6737ad-3fbe-4864-9df8-44f82d6f2c5c",
+      "name": "Token Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterTokenSplitter",
+      "position": [
+        600,
+        -500
+      ],
+      "parameters": {
+        "chunkSize": 300,
+        "chunkOverlap": 30
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "57b6a4f3-e935-4058-bfdf-309d606c0ca9",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        -1180
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 880,
+        "height": 220,
+        "content": "# STEP 1\n\n## Create Qdrant Collection\nChange:\n- QDRANTURL\n- COLLECTION"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "21e2326a-138d-46f3-a849-a80aa7917da9",
+      "name": "Qdrant Vector Store1",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "position": [
+        480,
+        -860
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {},
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=COLLECTION"
+        }
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "iyQ6MQiVaF3VMBmt",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0818fb6a-2adf-4725-90a4-11cdd7d14036",
+      "name": "Embeddings OpenAI1",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        500,
+        -620
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "8949d938-2743-45d6-b2ad-ce4ac139e0a3",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -220,
+        -920
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 620,
+        "height": 400,
+        "content": "# STEP 2\n\n\n\n\n\n\n\n\n\n\n\n\n## Documents vectorization with Qdrant and Google Drive\nChange:\n- QDRANTURL\n- COLLECTION"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "36d384be-3e11-43b1-b8c3-f63df600a6a6",
+      "name": "Do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        820,
+        0
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "386c27cb-6e69-4d96-a8ab-8cfd43e6b171",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -520,
+        580
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "0bd17bef-e205-464e-9b36-dcda75254e06",
+      "name": "DeepSeek",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        40,
+        540
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "deepseek/deepseek-r1:free",
+          "cachedResultName": "deepseek/deepseek-r1:free"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "XJTqRiKFJpFs5MuX",
+          "name": "OpenRouter account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "3e68a65f-af29-432f-8159-4a599e8a0866",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -540,
+        -320
+      ],
+      "parameters": {
+        "width": 1620,
+        "height": 240,
+        "content": "# STEP 3 - MAIN FLOW\n\n- Transform the email into Markdown format for optimal reading by the LLM model\n- Email Summarization through DeepSeek R1 (any model can be used)\n- I classify the email in such a way as to continue only with emails regarding general information about the company. In this way I can respond independently through the information obtained from the vector database\n- I create a chain where I entrust the review of the email to a high-performance model designed for this purpose\n- I send the response email\n\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3b6ae6aa-75a8-4038-bbc2-248ab533b3ab",
+      "name": "OpenAI 4-o-mini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        360,
+        160
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "Email Trigger (IMAP)": [
+      {
+        "json": {
+          "to": "info@n3witalia.com",
+          "date": "Wed, 5 Feb 2025 13:38:51 +0100",
+          "from": "n3w Italia <info@n3w.it>",
+          "subject": "Richiesta di informazioni aziendali",
+          "metadata": {
+            "x-gm-gg": "ASbGncsq6D/oyHjmnpbG4gCUuC0rZNUR8WW4c+LmGMSdGJ1lHkRnKn7b3ngCdndp8NB\tkyDG3unga3kPebzAv1LO7DS6rDMHTWb8F7kZoLijJUGlAy6wqmfX/n4z2DH1uSxp7EsnIP9K9",
+            "arc-seal": "i=1; s=arc-2022; d=mailchannels.net; t=1738759167; a=rsa-sha256;\tcv=none;\tb=Fdjl0FQlp2JxGTUy9B6U3UVZDgw2xRK0M9ge2H7QXFuX8Jhy2/eDktsWwyDOuAnebq+pZB\tZmt9/ZWM+VqpfvPc9j4+cpX1HnXkRnyV9HMp0KK1Srpkuc7iimLDX1puMEQP08mC8fBI9n\tYW9JAMVmy55D2xtcOgqQPe6HUsAM8vFfk0y7dv7aV/MMc4tW+lyBddf4BHedDPabmHtog9\tlI9qQB8f5o78KJoJHi9jUfoibHrw7ePCi/XNi1KzfLhkkcvaEhOIg82JgyaTOVuLX4TTpy\t713VrUVQKemdE8AJBgxrUyI8AM/XZDRxF92tDNRD5k+rFxVwZnNg1KzovEUFiw==",
+            "received": "from postfix-inbound-v2-3.inbound.mailchannels.net (inbound-egress-7.mailchannels.net [23.83.220.5])\t(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)\t key-exchange X25519 server-signature RSA-PSS (2048 bits) server-digest SHA256)\t(No client certificate requested)\tby pdx1-sub0-mail-mx201.dreamhost.com (Postfix) with ESMTPS id 4Yp0DP2WKvz6n5V\tfor <info@n3witalia.com>; Wed, 5 Feb 2025 04:39:33 -0800 (PST)",
+            "message-id": "<CACo-EPti-vvs3198N-KKhAMnm70ppkmGJPkUz3Y483wxAv_z3g@mail.gmail.com>",
+            "x-received": "by 2002:a05:6820:4ccb:b0:5fa:7e37:e42e with SMTP id 006d021491bc7-5fc479d7b7dmr1800193eaf.3.1738759166233; Wed, 05 Feb 2025 04:39:26 -0800 (PST)",
+            "return-path": "<info@n3w.it>",
+            "content-type": "multipart/alternative; boundary=\"000000000000742c2a062d646a8f\"",
+            "delivered-to": "x21967472@pdx1-sub0-mail-mx201.dreamhost.com",
+            "mime-version": "1.0",
+            "received-spf": "none (dmarc-service-75b56dd9b6-qz8tf: n3w.it does not provide an SPF record) client-ip=209.85.161.50; envelope-from=info@n3w.it; helo=mail-oo1-f50.google.com;",
+            "x-message-id": "YDPlyzG1R2Ky6usgMxqEJvf1",
+            "x-gm-features": "AWEUYZl838uJdYn-9fUMGZvOqArNBONSW_VOkpWSkn1OYyR-HUtJL8UAJf2I33g",
+            "x-original-to": "info@n3witalia.com",
+            "dkim-signature": "v=1; a=rsa-sha256; c=relaxed/relaxed; d=n3w-it.20230601.gappssmtp.com; s=20230601; t=1738759166; x=1739363966; darn=n3witalia.com; h=to:subject:message-id:date:from:mime-version:from:to:cc:subject :date:message-id:reply-to; bh=2N6Y8wbn3yS/TpkJr2ZQZ3rEEFMq1gc4mSHvPNXonAg=; b=eH1Dg2CwoWEuiif+VkxoPH8PcgiveMtY7urkbJAXXAEnpmkknbrSX7fLQ/pdfnV2YF RaDEVEFBYeYde7pra1NhNmQXQfamV6dxTZSoNOVj0DtdOuSZVYC4BQMMQiIk7emERgdx keDGBtYe2SifOK9QDK4deKKFPaswC7vATsPmBIAnN0MDahaOlsDPbm6aFSR39aK0qEpx MTylUSCNFx52cTYegrpzMGCRTrCxcHwvpq0gGZo1ol0mlq5WC4sa260qsVEQq566N1wh ICipbEhLdoX0nryrR67fJ+mq05kfg39gv++0p1aZl3/ahTdLTijPJswPs4phiTUj6fUH Z3Fg==",
+            "x-gm-message-state": "AOJu0YwNwfJ1yYtAsu71S9Oy+BVSQqPDS1EJCni+CLWs7aDwxkFYjxsP\tX0A935B/tHpnOhgJuR8W5FwuKnXSFMZ/xP8TFQz8zBVGw7DYInyaC0lKAxPSbBsLDIFyVj2LYki\tR4sfj6a9YJDaWKE/HYPwbidCOfOV/mZvqJ2ESL5uJgSL0W4FrMJKmondc",
+            "x-google-smtp-source": "AGHT+IFsZ2bQKEg+M9ddjCSDXjf2Okz49s6pteuNGyJAkFpjMLwhH4mshXYItB/GVj4r8fUIiAiACRT+QDfae1MMj48=",
+            "arc-message-signature": "i=1; a=rsa-sha256; c=relaxed/relaxed; d=mailchannels.net;\ts=arc-2022; t=1738759167;\th=from:from:reply-to:subject:subject:date:date:message-id:message-id:\t to:to:cc:mime-version:mime-version:content-type:content-type:\t dkim-signature; bh=2N6Y8wbn3yS/TpkJr2ZQZ3rEEFMq1gc4mSHvPNXonAg=;\tb=xytHIe/PVvcfCsSYAhcVE9VlTvmbJcVbkpq0oKRt4H0M1VOfZZlsg5ILysJvwLAzrRO7SZ\tDUrh4bw57jqMpcE+Sk5AAcbgBMc6x1G+Wf/2nqnjy0hRCyqtajuUwtFOS3kDM7TKvFOU+/\tMFChI5mg97hb/0loj8DWQ+J24bu4a6YixGDglupW3JYJoDsPWje2oA+mYyiI5tsnRXFEwe\tpku9KlXkPburbm/ASqKbbi1Y9bEOa2vlRwLL3fFontmC+3kgogunW2fjf4YJlFlSaAj/Xb\tZXQiytNgKOJtkBQMvb0AmYMLgBbYdOBVzUkOUTQCP3Wzbuu0zslvl7cS3HkFIg==",
+            "authentication-results": "inbound.mailchannels.net; spf=none smtp.mailfrom=info@n3w.it; dkim=temperror header.d=n3w-it.20230601.gappssmtp.com; dmarc=none; arc=none",
+            "x-google-dkim-signature": "v=1; a=rsa-sha256; c=relaxed/relaxed; d=1e100.net; s=20230601; t=1738759166; x=1739363966; h=to:subject:message-id:date:from:mime-version:x-gm-message-state :from:to:cc:subject:date:message-id:reply-to; bh=2N6Y8wbn3yS/TpkJr2ZQZ3rEEFMq1gc4mSHvPNXonAg=; b=h+GPFjY1knf3xPd+R62zD7JNhs37K+F1qx+6EA3codzYY+yTXSJyTuETXOGVW5r2VK GOcntvGBdeijxte5RLmN6ZwLjvzePLlJLQVOnY8FICowUbwClQbDW1vXvucD+WaGpnBg O95TH/8jKWRBU34EZ9kAY5EqtauKSt675WyhVCmmT864BPbVV335d0t9RgJwV86rM9zy /miMTqpWeDJxDcX4thRlIk19GDc2Wh+5bqFD9kacOAur46RWdwqWaU7T8+5bQmbrKUg5 hqeO8ZDefVV6AyOjSnuLItHcHhlk1PaQ9uOumkRnFQfLUjS08bvLEnJyMA1YrEdo7mCi tD2Q==",
+            "arc-authentication-results": "i=1;\tinbound-rspamd-8684fd6f95-jsctp;\tnone"
+          },
+          "textHtml": "<div dir=\"ltr\">mi chiamo Davide e sto scrivendo per richiedere alcune informazioni riguardanti il vostro negozio di tecnologia. Sto valutando diverse opzioni per [motivo della richiesta, ad esempio: acquistare un nuovo dispositivo, richiedere assistenza tecnica, o esplorare servizi aziendali] e sarei grato se poteste fornirmi alcuni dettagli utili.<br><br>In particolare, avrei bisogno di sapere:<br><br>Gli orari di apertura del vostro negozio, inclusi eventuali giorni di chiusura o orari ridotti durante i festivi.<br><br>Se offrite servizi di assistenza tecnica per dispositivi elettronici e, in caso affermativo, quali tipologie di dispositivi supportate (es. smartphone, computer, tablet).<br><br>Se disponete di un catalogo prodotti aggiornato o un sito web dove posso consultare l\u00e2\u0080\u0099offerta disponibile.<br><br>Se effettuate consegne a domicilio o se \u00c3\u00a8 possibile prenotare prodotti online per il ritiro in negozio.<br><br>Se offrite sconti o promozioni per studenti, aziende o clienti abituali.<br><br>Se organizzate eventi o workshop legati alla tecnologia, come corsi di formazione o presentazioni di nuovi prodotti.<br><br>Inoltre, sarei interessato a sapere se il vostro negozio aderisce a programmi di riciclo di dispositivi elettronici o se offrite servizi di smaltimento ecologico per apparecchiature obsolete.<br><br>Se possibile, gradirei ricevere anche informazioni sui metodi di pagamento accettati (es. carte di credito, PayPal, finanziamenti) e se \u00c3\u00a8 possibile richiedere un preventivo personalizzato per acquisti di grandi dimensioni.<br><br>Resto a disposizione per eventuali chiarimenti o per fornire ulteriori dettagli sulle mie esigenze. Vi ringrazio in anticipo per il tempo dedicato alla mia richiesta e attendo con interesse una vostra risposta.<br><br>Cordiali saluti,</div>\r\n",
+          "textPlain": "mi chiamo Davide e sto scrivendo per richiedere alcune informazioni\r\nriguardanti il vostro negozio di tecnologia. Sto valutando diverse opzioni\r\nper [motivo della richiesta, ad esempio: acquistare un nuovo dispositivo,\r\nrichiedere assistenza tecnica, o esplorare servizi aziendali] e sarei grato\r\nse poteste fornirmi alcuni dettagli utili.\r\n\r\nIn particolare, avrei bisogno di sapere:\r\n\r\nGli orari di apertura del vostro negozio, inclusi eventuali giorni di\r\nchiusura o orari ridotti durante i festivi.\r\n\r\nSe offrite servizi di assistenza tecnica per dispositivi elettronici e, in\r\ncaso affermativo, quali tipologie di dispositivi supportate (es.\r\nsmartphone, computer, tablet).\r\n\r\nSe disponete di un catalogo prodotti aggiornato o un sito web dove posso\r\nconsultare l\u00e2\u0080\u0099offerta disponibile.\r\n\r\nSe effettuate consegne a domicilio o se \u00c3\u00a8 possibile prenotare prodotti\r\nonline per il ritiro in negozio.\r\n\r\nSe offrite sconti o promozioni per studenti, aziende o clienti abituali.\r\n\r\nSe organizzate eventi o workshop legati alla tecnologia, come corsi di\r\nformazione o presentazioni di nuovi prodotti.\r\n\r\nInoltre, sarei interessato a sapere se il vostro negozio aderisce a\r\nprogrammi di riciclo di dispositivi elettronici o se offrite servizi di\r\nsmaltimento ecologico per apparecchiature obsolete.\r\n\r\nSe possibile, gradirei ricevere anche informazioni sui metodi di pagamento\r\naccettati (es. carte di credito, PayPal, finanziamenti) e se \u00c3\u00a8 possibile\r\nrichiedere un preventivo personalizzato per acquisti di grandi dimensioni.\r\n\r\nResto a disposizione per eventuali chiarimenti o per fornire ulteriori\r\ndettagli sulle mie esigenze. Vi ringrazio in anticipo per il tempo dedicato\r\nalla mia richiesta e attendo con interesse una vostra risposta.\r\n\r\nCordiali saluti,\r\n"
+        }
+      }
+    ],
+    "Email Summarization Chain": [
+      {
+        "json": {
+          "response": {
+            "text": "Davide contatta il negozio di tecnologia per richiedere informazioni in merito a: orari di apertura (compresi festivi e chiusure), assistenza tecnica (specificando dispositivi supportati come smartphone, computer, tablet), disponibilit\u00e0 di catalogo aggiornato/sito web, opzioni di consegna a domicilio o ritiro in negozio, sconti per studenti/aziende/clienti abituali, eventi/workshop tematici, programmi di riciclo/smaltimento ecologico, metodi di pagamento accettati (carte, PayPal, finanziamenti) e preventivi personalizzati per acquisti consistenti. Si rende disponibile per ulteriori chiarimenti e ringrazia per la risposta. (99 parole)"
+          }
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "eee08614-3096-477a-b462-859782a74188",
+  "connections": {
+    "OpenAI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Review email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Email Summarization Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get folder": {
+      "main": [
+        [
+          {
+            "node": "Download Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek R1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Email Summarization Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write email": {
+      "main": [
+        [
+          {
+            "node": "Review email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review email": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Files": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 4-o-mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Email Classifier",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Classifier": {
+      "main": [
+        [
+          {
+            "node": "Write email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh collection": {
+      "main": [
+        [
+          {
+            "node": "Get folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "Write email",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Summarization Chain": {
+      "main": [
+        [
+          {
+            "node": "Email Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \u2018Test workflow\u2019": {
+      "main": [
+        [
+          {
+            "node": "Create collection",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Refresh collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

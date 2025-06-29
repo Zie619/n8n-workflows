@@ -1,0 +1,721 @@
+{
+  "id": 114,
+  "name": "Standup Bot - Worker",
+  "nodes": [
+    {
+      "name": "publish report",
+      "type": "n8n-nodes-base.mattermost",
+      "position": [
+        1840,
+        1040
+      ],
+      "parameters": {
+        "message": "={{$node[\"Prep Report\"].json[\"post\"]}}",
+        "channelId": "={{$node[\"Prep Report\"].json[\"channel\"]}}",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "mattermostApi": {
+          "id": "2",
+          "name": "Mattermost account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "get user data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1400,
+        1040
+      ],
+      "parameters": {
+        "url": "={{$node[\"Read Config 2\"].json[\"config\"][\"mattermostBaseUrl\"]}}/api/v4/users/{{$node[\"Action from MM\"].json[\"body\"][\"user_id\"]}}",
+        "options": {},
+        "jsonParameters": true,
+        "headerParametersJson": "={\n\"Authorization\": \"Bearer {{$item(0).$node[\"Read Config 2\"].json[\"config\"][\"botUserToken\"]}}\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "open-standup-dialog?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1180,
+        1260
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Action from MM\"].json[\"body\"][\"context\"][\"action\"]}}",
+              "value2": "open-standup-dialog"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Action from MM",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        520,
+        820
+      ],
+      "webhookId": "6a28d86b-9f74-4825-9785-57e0d43b198f",
+      "parameters": {
+        "path": "standup-bot/action/f6f9b174745fa4651f750c36957d674c",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slash Cmd from MM",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        520,
+        600
+      ],
+      "webhookId": "72732516-1143-430f-8465-d193fe657311",
+      "parameters": {
+        "path": "standup-bot/slashCmd",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "config?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        740,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Slash Cmd from MM\"].json[\"body\"][\"text\"]}}",
+              "value2": "config"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "open config dialog",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1360,
+        580
+      ],
+      "parameters": {
+        "url": "={{$node[\"Read Config 1\"].json[\"config\"][\"mattermostBaseUrl\"]}}/api/v4/actions/dialogs/open",
+        "options": {
+          "bodyContentType": "json"
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{$json}}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Prep Config Dialog",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1160,
+        580
+      ],
+      "parameters": {
+        "functionCode": "const channelId =\n  $item(0).$node['Slash Cmd from MM'].json['body']['channel_id'];\n\nconst configuredStandups =\n  $item(0).$node['Read Config 1'].json['standups'] ?? [];\n\nlet standup = configuredStandups.find(\n  (standup) => standup.channelId == channelId\n);\n\n// define default values:\nif (!standup) {\n  standup = {\n    title: 'Team Standup',\n    time: '09:00',\n    days: [1, 2, 3, 4, 5],\n    questions: [\n      'What have you accomplished since your last report?',\n      'What do you want to accomplish until your next report?',\n      'Is anything blocking your progress?',\n    ],\n    users: [],\n  };\n}\n\nconst payload = {\n  trigger_id: $item(0).$node['Slash Cmd from MM'].json['body']['trigger_id'],\n  url: $item(0).$node['Read Config 1'].json['config']['n8nWebhookUrl'],\n  dialog: {\n    callback_id: 'standup-config',\n    title: 'Standup Configuration',\n    submit_label: 'Save',\n    notify_on_cancel: false,\n    state: JSON.stringify({ standupId: channelId }),\n    elements: [\n      {\n        display_name: 'Standup title',\n        name: 'title',\n        type: 'text',\n        placeholder: 'Team Standup',\n        default: standup.title,\n        optional: true,\n        help_text:\n          '💡 The standup can be deleted by setting its title to an empty string!',\n      },\n      {\n        display_name: 'Time',\n        name: 'time',\n        type: 'select',\n        default: standup.time,\n        options: [\n          {\n            text: '06:00',\n            value: '06:00',\n          },\n          {\n            text: '07:00',\n            value: '07:00',\n          },\n          {\n            text: '08:00',\n            value: '08:00',\n          },\n          {\n            text: '09:00',\n            value: '09:00',\n          },\n          {\n            text: '10:00',\n            value: '10:00',\n          },\n          {\n            text: '11:00',\n            value: '11:00',\n          },\n          {\n            text: '12:00',\n            value: '12:00',\n          },\n          {\n            text: '13:00',\n            value: '13:00',\n          },\n          {\n            text: '14:00',\n            value: '14:00',\n          },\n          {\n            text: '15:00',\n            value: '15:00',\n          },\n          {\n            text: '16:00',\n            value: '16:00',\n          },\n          {\n            text: '17:00',\n            value: '17:00',\n          },\n        ],\n      },\n      {\n        display_name: 'Days',\n        name: 'days',\n        type: 'text',\n        placeholder: '1,2,3,4,5',\n        help_text:\n          'comma-separated; 0=Sun | 1=Mon | 2=Tue | 3=Wed | 4=Thu | 5=Fri | 6=Sat',\n        default: standup.days.join(','),\n      },\n      {\n        display_name: 'Questions',\n        name: 'questions',\n        type: 'textarea',\n        help_text: 'Max 5 questions, one question per line;',\n        default: standup.questions.join('\\n'),\n      },\n      {\n        display_name: 'Users',\n        name: 'users',\n        type: 'textarea',\n        help_text: 'One user per line',\n        default: standup.users.join('\\n'),\n      },\n    ],\n  },\n};\n\nreturn [{ json: payload }];\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "callback ID?",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        960,
+        820
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "standup-config"
+            },
+            {
+              "output": 1,
+              "value2": "standup-answers"
+            }
+          ]
+        },
+        "value1": "={{$node[\"Action from MM\"].json[\"body\"][\"callback_id\"]}}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "standup-config",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1180,
+        820
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "standup-answers",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1180,
+        1040
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Prep Config Override",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1400,
+        820
+      ],
+      "parameters": {
+        "functionCode": "const mattermostInput = $item(0).$node['Action from MM'].json['body'];\nconst config = $item(0).$node['Read Config 2'].json;\n\n// ensure there is a \"standups\" array:\nconfig['standups'] = config['standups'] ?? [];\n\n// remove the standup from the list:\nconfig['standups'] = config['standups'].filter(\n  (standup) => standup.channelId != mattermostInput.channel_id\n);\n\nconst textToArray = (text, separator) => {\n  return text\n    .split(separator)\n    .map((e) => e.trim())\n    .filter((e) => e.length > 0);\n};\n\n// a standup can be deleted by updating its title to \"\"\nif (mattermostInput.submission.title.length > 0) {\n  const newStandup = {\n    channelId: mattermostInput.channel_id,\n    title: mattermostInput.submission.title,\n    time: mattermostInput.submission.time,\n    days: textToArray(mattermostInput.submission.days, ',').map((e) =>\n      parseInt(e)\n    ),\n    users: textToArray(mattermostInput.submission.users, '\\n'),\n    questions: textToArray(mattermostInput.submission.questions, '\\n'),\n  };\n\n  config['standups'].push(newStandup);\n}\n\nreturn [{ json: config }];\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Override Config",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        1620,
+        820
+      ],
+      "parameters": {
+        "workflowId": "1005"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Read Config 1",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        960,
+        580
+      ],
+      "parameters": {
+        "workflowId": "1004"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Read Config 2",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        740,
+        820
+      ],
+      "parameters": {
+        "workflowId": "1004"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "confirm success",
+      "type": "n8n-nodes-base.mattermost",
+      "position": [
+        1840,
+        820
+      ],
+      "parameters": {
+        "userId": "={{$node[\"Action from MM\"].json[\"body\"][\"user_id\"]}}",
+        "message": "new standup config was saved successfully",
+        "channelId": "={{$node[\"Action from MM\"].json[\"body\"][\"channel_id\"]}}",
+        "operation": "postEphemeral"
+      },
+      "credentials": {
+        "mattermostApi": {
+          "id": "2",
+          "name": "Mattermost account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Read Config 3",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        740,
+        380
+      ],
+      "parameters": {
+        "workflowId": "1004"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Filter Due Standups",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        960,
+        380
+      ],
+      "parameters": {
+        "functionCode": "const config = $item(0).$node['Read Config 3'].json;\n\n// ensure there is a \"standups\" array:\nconfig['standups'] = config['standups'] ?? [];\n\nconst now = new Date();\nconst duePattern = `${now.getDay()}_${now\n  .getHours()\n  .toString()\n  .padStart(2, '0')}:00`; // e.g. 1_13:00 => Monday 1 p.m.\n  \nconsole.log(duePattern);\n\n// filter standups that are due now:\nconst dueStandups = config.standups.filter((standup) =>\n  //true\n  standup.days.map((day) => `${day}_${standup.time}`).includes(duePattern)\n);\n\nreturn dueStandups.map((standup) => ({\n  json: standup,\n}));\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Prep Request Standup",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1180,
+        380
+      ],
+      "parameters": {
+        "functionCode": "const reminders = items.reduce((prev, curr) => {\n  return prev.concat(\n    curr.json.users.map((user) => ({\n      channelId: curr.json.channelId,\n      title: curr.json.title,\n      user: user,\n    }))\n  );\n}, []);\n\nreturn reminders.map((reminder) => ({\n  json: reminder,\n}));\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Create Channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1620,
+        380
+      ],
+      "parameters": {
+        "url": "={{$item(0).$node[\"Read Config 3\"].json[\"config\"][\"mattermostBaseUrl\"]}}/api/v4/channels/direct",
+        "options": {},
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "=[\"{{$node[\"Get User\"].json[\"id\"]}}\", \"{{$item(0).$node[\"Read Config 3\"].json[\"config\"][\"botUserId\"]}}\"]",
+        "headerParametersJson": "={\n  \"Authorization\": \"Bearer {{$item(0).$node[\"Read Config 3\"].json[\"config\"][\"botUserToken\"]}}\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Remind Users",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2060,
+        380
+      ],
+      "parameters": {
+        "url": "={{$item(0).$node[\"Read Config 3\"].json[\"config\"][\"mattermostBaseUrl\"]}}/api/v4/posts",
+        "options": {},
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{$json}}",
+        "headerParametersJson": "={\n\"Authorization\": \"Bearer {{$item(0).$node[\"Read Config 3\"].json[\"config\"][\"botUserToken\"]}}\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get User",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1400,
+        380
+      ],
+      "parameters": {
+        "url": "={{$item(0).$node[\"Read Config 3\"].json[\"config\"][\"mattermostBaseUrl\"]}}/api/v4/users/username/{{$node[\"Prep Request Standup\"].json[\"user\"]}}",
+        "options": {},
+        "jsonParameters": true,
+        "headerParametersJson": "={\n  \"Authorization\": \"Bearer {{$item(0).$node[\"Read Config 3\"].json[\"config\"][\"botUserToken\"]}}\"\n}"
+      },
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "name": "Prep Reminder",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1840,
+        380
+      ],
+      "parameters": {
+        "functionCode": "const webhookUrl =\n  $item(0).$node['Read Config 3'].json['config']['n8nWebhookUrl']; // e.g. https://xyz.app.n8n.cloud/webhook-test/standup-bot/action/top-secret-api-key\n\nconst botUserToken =\n  $item(0).$node['Read Config 3'].json['config']['botUserToken'];\n\nlet itemIndex = 0;\n\nfor (item of items) {\n  const directChannelId = item.json.id;\n\n  const payload = {\n    channel_id: directChannelId,\n    props: {\n      attachments: [\n        {\n          pretext: \"Hi there! It's time for standup!\",\n          text: `Please provide your input for: **${\n            $item(itemIndex).$node['Prep Request Standup'].json['title']\n          }**`,\n          actions: [\n            {\n              id: webhookUrl.includes('test') ? 'webhook-test' : 'webhook',\n              name: 'Provide Update',\n              integration: {\n                url: webhookUrl,\n                context: {\n                  action: 'open-standup-dialog',\n                  secret: botUserToken, // not ideal but good enough for now...\n                  standupId:\n                    $item(itemIndex).$node['Prep Request Standup'].json[\n                      'channelId'\n                    ],\n                },\n              },\n            },\n          ],\n        },\n      ],\n    },\n  };\n\n  item.json = payload;\n\n  itemIndex++;\n}\n\nreturn items;\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Prep Standup Dialog",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1400,
+        1240
+      ],
+      "parameters": {
+        "functionCode": "const standupId =\n  $item(0).$node['Action from MM'].json['body']['context']['standupId'];\n\nconst postId = $item(0).$node['Action from MM'].json['body']['post_id'];\n\nconst configuredStandups =\n  $item(0).$node['Read Config 2'].json['standups'] ?? [];\n\nlet standup = configuredStandups.find(\n  (standup) => (standup.channelId == standupId)\n);\n\nconst renderQuestions = (questions) => {\n  let questionId = 1;\n\n  return questions.map((question) => ({\n    display_name: question,\n    name: `q${questionId++}`,\n    type: 'textarea',\n  }));\n};\n\nconst payload = {\n  trigger_id: $item(0).$node['Action from MM'].json['body']['trigger_id'],\n  url: $item(0).$node['Read Config 2'].json['config']['n8nWebhookUrl'],\n  dialog: {\n    callback_id: 'standup-answers',\n    title: `Report for: ${standup.title}`,\n    submit_label: 'Submit',\n    notify_on_cancel: false,\n    state: JSON.stringify({ standupId, reminderPostId: postId }),\n    elements: renderQuestions(standup.questions),\n  },\n};\n\nreturn [{ json: payload }];\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "open standup dialog",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1600,
+        1240
+      ],
+      "parameters": {
+        "url": "={{$node[\"Read Config 2\"].json[\"config\"][\"mattermostBaseUrl\"]}}/api/v4/actions/dialogs/open",
+        "options": {
+          "bodyContentType": "json"
+        },
+        "requestMethod": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{$json}}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Prep Report",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1620,
+        1040
+      ],
+      "parameters": {
+        "functionCode": "const { standupId, reminderPostId } = JSON.parse(\n  $item(0).$node['Action from MM'].json['body']['state']\n);\nconst submission = $item(0).$node['Action from MM'].json['body']['submission'];\n\nconst configuredStandups = $item(0).$node['Read Config 2'].json['standups'];\n\nconst standup = configuredStandups.find(\n  (standup) => standup.channelId == standupId\n);\n\nconst emptyAnswers = [\n  '-',\n  '/',\n  ' ',\n  'x',\n  'n/a',\n  'nope',\n  'nopes',\n  'no',\n  'none',\n  'no.',\n  'nothing',\n];\n\nfunction capitalize(text) {\n  return text.charAt(0).toUpperCase() + text.slice(1);\n}\n\nconst renderPost = (submission, standup) => {\n  let postText = `### ${capitalize(\n    $item(0).$node['get user data'].json['username']\n  )}\\n`;\n\n  let questionIndex = 0;\n\n  postText += standup.questions\n    .map((question) => {\n      questionIndex++;\n\n      if (\n        !submission[`q${questionIndex}`] ||\n        emptyAnswers.includes(submission[`q${questionIndex}`].toLowerCase())\n      ) {\n        return '';\n      }\n\n      return `#### ${question}\\n${submission[`q${questionIndex}`]}`;\n    })\n    .join('\\n');\n\n  return postText;\n};\n\nreturn [\n  {\n    json: {\n      post: renderPost(submission, standup),\n      channel: standupId,\n      reminderPostId,\n      standupTitle: standup.title,\n    },\n  },\n];\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Delete ReminderPost",
+      "type": "n8n-nodes-base.mattermost",
+      "position": [
+        2280,
+        1040
+      ],
+      "parameters": {
+        "postId": "={{$node[\"Prep Report\"].json[\"reminderPostId\"]}}",
+        "operation": "delete"
+      },
+      "credentials": {
+        "mattermostApi": {
+          "id": "2",
+          "name": "Mattermost account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Update Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2060,
+        1040
+      ],
+      "parameters": {
+        "url": "={{$node[\"Read Config 2\"].json[\"config\"][\"mattermostBaseUrl\"]}}/api/v4/posts/{{$node[\"Prep Report\"].json[\"reminderPostId\"]}}",
+        "options": {},
+        "requestMethod": "PUT",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\n\"id\":\"{{$node[\"Prep Report\"].json[\"reminderPostId\"]}}\",\n\"message\": \"Thank you for providing your report for {{$node[\"Prep Report\"].json[\"standupTitle\"]}}\"\n}",
+        "headerParametersJson": "={\n\"Content-Type\":\"application/json\",\n\"Authorization\": \"Bearer {{$item(0).$node[\"Read Config 2\"].json[\"config\"][\"botUserToken\"]}}\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Every hour",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        520,
+        380
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 0 6-12 * * 1-5"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "config?": {
+      "main": [
+        [
+          {
+            "node": "Read Config 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User": {
+      "main": [
+        [
+          {
+            "node": "Create Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every hour": {
+      "main": [
+        [
+          {
+            "node": "Read Config 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Report": {
+      "main": [
+        [
+          {
+            "node": "publish report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "callback ID?": {
+      "main": [
+        [
+          {
+            "node": "standup-config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "standup-answers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "open-standup-dialog?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Reminder": {
+      "main": [
+        [
+          {
+            "node": "Remind Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Config 1": {
+      "main": [
+        [
+          {
+            "node": "Prep Config Dialog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Config 2": {
+      "main": [
+        [
+          {
+            "node": "callback ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Config 3": {
+      "main": [
+        [
+          {
+            "node": "Filter Due Standups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get user data": {
+      "main": [
+        [
+          {
+            "node": "Prep Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action from MM": {
+      "main": [
+        [
+          {
+            "node": "Read Config 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Channel": {
+      "main": [
+        [
+          {
+            "node": "Prep Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "publish report": {
+      "main": [
+        [
+          {
+            "node": "Update Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "standup-config": {
+      "main": [
+        [
+          {
+            "node": "Prep Config Override",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Override Config": {
+      "main": [
+        [
+          {
+            "node": "confirm success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "standup-answers": {
+      "main": [
+        [
+          {
+            "node": "get user data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slash Cmd from MM": {
+      "main": [
+        [
+          {
+            "node": "config?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Config Dialog": {
+      "main": [
+        [
+          {
+            "node": "open config dialog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Due Standups": {
+      "main": [
+        [
+          {
+            "node": "Prep Request Standup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Standup Dialog": {
+      "main": [
+        [
+          {
+            "node": "open standup dialog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Config Override": {
+      "main": [
+        [
+          {
+            "node": "Override Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Request Standup": {
+      "main": [
+        [
+          {
+            "node": "Get User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "open-standup-dialog?": {
+      "main": [
+        [
+          {
+            "node": "Prep Standup Dialog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

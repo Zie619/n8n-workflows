@@ -1,0 +1,398 @@
+{
+  "id": "5DiXT9FykJvuElc1",
+  "meta": {
+    "instanceId": "08daa2aa5b6032ff63690600b74f68f5b0f34a3b100102e019b35c4419168977",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Get Comments from Facebook Page",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "a9c1f0fb-396e-4c36-92d4-ec3eeb36c644",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        600,
+        240
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "9031abae-aaa0-4602-8fb1-29e89c73f3e8",
+      "name": "Split Out Comments",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        2400,
+        240
+      ],
+      "parameters": {
+        "include": "allOtherFields",
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c8216862-1d39-47e6-b59e-cf1fb17f7226",
+      "name": "Filter Out Null Comments",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        2180,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "4d8bd55c-35d0-40db-98ac-a954b0a99710",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.data }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "076c0619-21de-48df-83fa-f2ba5f8be2e2",
+      "name": "Select Result Field",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2640,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8065ebf7-4daf-44dc-ac2c-95cce2063166",
+              "name": "Post_id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "b0984969-2f90-4fa9-8e32-8d7c76750e83",
+              "name": "Post_created_time",
+              "type": "string",
+              "value": "={{ $json.created_time.toDateTime() }}"
+            },
+            {
+              "id": "5efb3600-9887-40d2-8350-9d3b02a49775",
+              "name": "Post_message",
+              "type": "string",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "id": "f469cdbc-16ba-4018-8b9c-7933dff7c9ae",
+              "name": "Comment_id",
+              "type": "string",
+              "value": "={{ $json.data.id }}"
+            },
+            {
+              "id": "a028828c-5054-45f0-bf1e-4ff1c9884b0a",
+              "name": "Comment_created_time",
+              "type": "string",
+              "value": "={{ $json.data.created_time.toDateTime()}}"
+            },
+            {
+              "id": "c40ea11c-762c-4e3c-9eda-a152fa7ec9c9",
+              "name": "Comment_message",
+              "type": "string",
+              "value": "={{ $json.data.message }}"
+            },
+            {
+              "id": "53fcd92c-cdaf-4663-9351-90da88cb13f7",
+              "name": "Comment_from",
+              "type": "string",
+              "value": "={{ $json.data.from ? $json.data.from.name : \"\"}}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "508cb3fa-5246-415c-97f8-c4f6575e45d5",
+      "name": "Split Out Posts",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1360,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ff6b3011-fd82-454e-a8f5-6b1a91221d0b",
+      "name": "Facebook Graph API : Get Post from Page",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "position": [
+        1120,
+        240
+      ],
+      "parameters": {
+        "node": "={{ $json.FB_Page_Id }}/feed",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "limit",
+                "value": "={{ $json.Number_of_Latest_Posts }}"
+              }
+            ]
+          }
+        },
+        "graphApiVersion": "v20.0"
+      },
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "Q0En38jY9jxkafFz",
+          "name": "Facebook Graph account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b8464152-d35f-44dc-9a2a-56a128b670e9",
+      "name": "Facebook : Get Each Post Comments",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "onError": "continueErrorOutput",
+      "position": [
+        1680,
+        160
+      ],
+      "parameters": {
+        "edge": "comments",
+        "node": "={{ $json.id }}",
+        "options": {
+          "fields": {
+            "field": [
+              {
+                "name": "id,from,message,created_time,comment_count"
+              }
+            ]
+          },
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "order",
+                "value": "reverse_chronological"
+              }
+            ]
+          }
+        },
+        "graphApiVersion": "v20.0"
+      },
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "Q0En38jY9jxkafFz",
+          "name": "Facebook Graph account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "470bc675-fab6-45d8-afe9-05c35576c210",
+      "name": "Merge Post & Comments",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2000,
+        240
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combineBy": "combineByPosition"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "c47c1f49-1343-423e-bce9-4cbdf8a2f6cc",
+      "name": "Reverse Item to Match another Branch",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1680,
+        400
+      ],
+      "parameters": {
+        "jsCode": "return items.reverse();\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "02092b77-7ae0-4fc3-8f3c-1c4428d95709",
+      "name": "Set PageID & Number of Latest Posts",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        860,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1d70f742-0848-44b1-8dbe-9b125dc046b3",
+              "name": "Number_of_Latest_Posts",
+              "type": "number",
+              "value": 10
+            },
+            {
+              "id": "6744bb50-c34f-429d-8364-da14c9cbaa77",
+              "name": "FB_Page_Id",
+              "type": "string",
+              "value": "219380258240005"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "788ab34e-fb5e-4bd0-8d1d-781062788f80",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        780,
+        100
+      ],
+      "parameters": {
+        "width": 263.6017705489105,
+        "height": 358.9292089122457,
+        "content": "## Set Parameter Here\nSet Facebook PageID & Number of Latest Posts to be fetched here\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "633e1bf0-854e-4c3b-a7d0-2d118e6055b7",
+  "connections": {
+    "Split Out Posts": {
+      "main": [
+        [
+          {
+            "node": "Facebook : Get Each Post Comments",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reverse Item to Match another Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Comments": {
+      "main": [
+        [
+          {
+            "node": "Select Result Field",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Post & Comments": {
+      "main": [
+        [
+          {
+            "node": "Filter Out Null Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Out Null Comments": {
+      "main": [
+        [
+          {
+            "node": "Split Out Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook : Get Each Post Comments": {
+      "main": [
+        [
+          {
+            "node": "Merge Post & Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set PageID & Number of Latest Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set PageID & Number of Latest Posts": {
+      "main": [
+        [
+          {
+            "node": "Facebook Graph API : Get Post from Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reverse Item to Match another Branch": {
+      "main": [
+        [
+          {
+            "node": "Merge Post & Comments",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Facebook Graph API : Get Post from Page": {
+      "main": [
+        [
+          {
+            "node": "Split Out Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

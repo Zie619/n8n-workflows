@@ -1,0 +1,357 @@
+{
+  "id": "ZI0PxugfKsyepqeH",
+  "meta": {
+    "instanceId": "e2c978396c9c745cf0aaa9ed3abe4464dbcef93c5fe2df809b9e14440e628df6"
+  },
+  "name": "Shopify order UTM to Baserow",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "2ba892fc-59c9-442b-aa21-a5c23b6076e5",
+      "name": "Baserow",
+      "type": "n8n-nodes-base.baserow",
+      "position": [
+        2860,
+        380
+      ],
+      "parameters": {
+        "tableId": 646,
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 6164,
+              "fieldValue": "={{ $json.order }}"
+            },
+            {
+              "fieldId": 6165,
+              "fieldValue": "={{ $json.campaign }}"
+            },
+            {
+              "fieldId": 6166,
+              "fieldValue": "={{ $json.content }}"
+            },
+            {
+              "fieldId": 6167,
+              "fieldValue": "={{ $json.medium }}"
+            },
+            {
+              "fieldId": 6168,
+              "fieldValue": "={{ $json.source }}"
+            },
+            {
+              "fieldId": 6170,
+              "fieldValue": "={{ $json.revenue }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "databaseId": 121
+      },
+      "credentials": {
+        "baserowApi": {
+          "id": "VaQgKQ8NPXVMrvMl",
+          "name": "Baserow account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e35a0417-7a6a-46bb-8970-20aa7c19d168",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2860,
+        720
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "76e327e9-2cc2-42dd-b31a-1aa1e9b02cd1",
+      "name": "Set Shopify Subdomain",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1900,
+        320
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "Shopify Subdomain",
+              "stringValue": "you-domain"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "85c0f561-a75d-44a4-a8a5-3791c10a2891",
+      "name": "Get orders from Shopify",
+      "type": "n8n-nodes-base.graphql",
+      "position": [
+        1900,
+        560
+      ],
+      "parameters": {
+        "query": "=query yersterdaysOrders {\n  orders(query: \"created_at:{{$today.minus({days: 1})}}\", first: 100) {\n    edges {\n      node {\n        id\n        name\n        totalReceived\n        customerJourneySummary {\n          firstVisit {\n            id\n            source\n            referrerUrl\n            landingPage\n            utmParameters {\n              campaign\n              content\n              medium\n              source\n              term\n            }\n          }\n        }\n      }\n    }\n  }\n}",
+        "endpoint": "=https://{{ $('Set Shopify Subdomain').params[\"fields\"][\"values\"][0][\"stringValue\"] }}.myshopify.com/admin/api/2024-01/graphql.json",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "dPZdfPnUTz1YJ54o",
+          "name": "Shopify Header Auth - lanakk.com"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4ddbe343-6d4f-4079-9c60-bdf2c34fb015",
+      "name": "Every day at 00:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        1660,
+        560
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6b3dd6f7-a761-4a01-bb77-cb8689fe64a0",
+      "name": "Split Shopify data into n8n items",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        2120,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data.orders.edges"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c50ca221-1330-44c9-9877-3b5bd36a05fb",
+      "name": "Transform incoming data structure",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2340,
+        560
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "order",
+              "stringValue": "={{ $json.node.name }}"
+            },
+            {
+              "name": "campaign",
+              "stringValue": "={{ $json.node.customerJourneySummary.firstVisit.utmParameters.campaign }}"
+            },
+            {
+              "name": "content",
+              "stringValue": "={{ $json.node.customerJourneySummary.firstVisit.utmParameters.content || \"\" }}"
+            },
+            {
+              "name": "medium",
+              "stringValue": "={{ $json.node.customerJourneySummary.firstVisit.utmParameters.medium || \"\" }}"
+            },
+            {
+              "name": "source",
+              "stringValue": "={{ $json.node.customerJourneySummary.firstVisit.utmParameters.medium || \"\" }}"
+            },
+            {
+              "name": "term",
+              "stringValue": "={{ $json.node.customerJourneySummary.firstVisit.utmParameters.term || \"\" }}"
+            },
+            {
+              "name": "revenue",
+              "type": "numberValue",
+              "numberValue": "={{ $json.node.totalReceived }}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "c84c3619-fd41-4d06-8894-1ba7998477fb",
+      "name": "Check if \"Campaign\" is present",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2560,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "61fe8905-1b9f-45d9-9742-2d5799200d18",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.campaign }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b0f07670-4fdd-4b64-8d77-87ea5cc399ac",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1240,
+        460
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 360.408084305475,
+        "height": 315.5897364788551,
+        "content": "## Shopify API\n\nThis workflow uses GraphQL calls to the Shopify Admin API. In order to get a better understanding for the queries and mutations please check the API Docs.\n\n\n[Shopify GraphQL API docs](https://shopify.dev/docs/api/admin-graphql)\n\nTo make it easy to build queries for the GraphQL API easy please check out the [GraphiQL App for the Admin API](https://shopify.dev/docs/apps/tools/graphiql-admin-api) from Shopify"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "742d92d7-9c3e-4515-a9ca-d840685d8ebf",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1720,
+        120
+      ],
+      "parameters": {
+        "width": 279.1188177339898,
+        "content": "## Set your Shopify Subdomain here"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4feb388-0d60-41ee-a269-d39717c6267c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1900,
+        760
+      ],
+      "parameters": {
+        "width": 279.1188177339898,
+        "content": "## Shopify \nThe n8n Shopify node cannot get the customer journey, so we get this from the Shopify GraphQL API"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "adc71ed1-fcb9-40fa-b3c8-ccca7e2fc699",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3060,
+        360
+      ],
+      "parameters": {
+        "width": 279.1188177339898,
+        "height": 157.78205353137358,
+        "content": "## Baserow\nPlease map the fields coming from the IF node to your own structure in Baserow"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c7fd635a-81e5-461b-885f-5b375bc51138",
+  "connections": {
+    "Every day at 00:00": {
+      "main": [
+        [
+          {
+            "node": "Set Shopify Subdomain",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get orders from Shopify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get orders from Shopify": {
+      "main": [
+        [
+          {
+            "node": "Split Shopify data into n8n items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if \"Campaign\" is present": {
+      "main": [
+        [
+          {
+            "node": "Baserow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Shopify data into n8n items": {
+      "main": [
+        [
+          {
+            "node": "Transform incoming data structure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform incoming data structure": {
+      "main": [
+        [
+          {
+            "node": "Check if \"Campaign\" is present",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

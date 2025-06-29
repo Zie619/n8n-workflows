@@ -1,0 +1,504 @@
+{
+  "id": "OuHrYOR3uWGmrhWQ",
+  "meta": {
+    "instanceId": "a4bfc93e975ca233ac45ed7c9227d84cf5a2329310525917adaf3312e10d5462",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "AI Email processing autoresponder with approval (Yes/No)",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "06a098db-160b-45f7-aeac-a73ef868148e",
+      "name": "Email Trigger (IMAP)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "position": [
+        -180,
+        -100
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "imap": {
+          "id": "k31W9oGddl9pMDy4",
+          "name": "IMAP info@n3witalia.com"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9589443b-efb7-4e0d-bafc-0be9858a4755",
+      "name": "Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        40,
+        -100
+      ],
+      "parameters": {
+        "html": "={{ $json.textHtml }}",
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8de7b2f3-bf75-4f3c-a1ee-eec047a7b82e",
+      "name": "DeepSeek R1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        240,
+        80
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "deepseek/deepseek-r1:free",
+          "cachedResultName": "deepseek/deepseek-r1:free"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "XJTqRiKFJpFs5MuX",
+          "name": "OpenRouter account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "babf37dc-99ca-439a-b094-91c52799b8df",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1840,
+        -120
+      ],
+      "webhookId": "f84fcde7-6aac-485a-9a08-96a35955af49",
+      "parameters": {
+        "html": "={{ $('Write email').item.json.output }}",
+        "options": {},
+        "subject": "=Re: {{ $('Email Trigger (IMAP)').item.json.subject }}",
+        "toEmail": "={{ $('Email Trigger (IMAP)').item.json.from }}",
+        "fromEmail": "={{ $('Email Trigger (IMAP)').item.json.to }}"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "hRjP3XbDiIQqvi7x",
+          "name": "SMTP info@n3witalia.com"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "ebeb986d-053a-420d-8482-ee00e75f2f10",
+      "name": "Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "position": [
+        1180,
+        200
+      ],
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "options": {},
+        "toolName": "company_knowladge_base",
+        "toolDescription": "Extracts information regarding the request made.",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=COLLECTION"
+        },
+        "includeDocumentMetadata": false
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "iyQ6MQiVaF3VMBmt",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ccc3d026-bfa3-4fda-be0a-ef70bf831aa7",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        1180,
+        380
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "1726aac9-a77d-4f19-8c07-70b032c3abeb",
+      "name": "Email Summarization Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainSummarization",
+      "position": [
+        260,
+        -100
+      ],
+      "parameters": {
+        "options": {
+          "binaryDataKey": "={{ $json.data }}",
+          "summarizationMethodAndPrompts": {
+            "values": {
+              "prompt": "=Write a concise summary of the following in max 100 words :\n\n\"{{ $json.data }}\"\n\nDo not enter the total number of words used.",
+              "combineMapPrompt": "=Write a concise summary of the following in max 100 words:\n\n\"{{ $json.data }}\"\n\nDo not enter the total number of words used."
+            }
+          }
+        },
+        "operationMode": "nodeInputBinary"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "81b889d0-e724-4c1f-9ce3-7593c796aaaf",
+      "name": "Write email",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        980,
+        -100
+      ],
+      "parameters": {
+        "text": "=Write the text to reply to the following email:\n\n{{ $('Email Summarization Chain').item.json.response.text }}",
+        "options": {
+          "systemMessage": "You are an expert at answering emails. You need to answer them professionally based on the information you have. This is a business email. Be concise and never exceed 100 words. Only the body of the email, not create the subject.\n\nIt must be in HTML format and you can insert (if you think it is appropriate) only HTML characters such as <br>, <b>, <i>, <p> where necessary."
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "cf38e319-59b3-490e-b841-579afc9fbc02",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        980,
+        200
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "19842e5f-c372-4dfd-b860-87dc5f00b1af",
+      "name": "Set Email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        760,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "759dc0f9-f582-492c-896c-6426f8410127",
+              "name": "email",
+              "type": "string",
+              "value": "={{ $json.response.text }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "2cf7a9af-c5e8-45dd-bda5-01c562a0defb",
+      "name": "Approve?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1560,
+        -100
+      ],
+      "parameters": {
+        "options": {
+          "ignoreCase": false
+        },
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "5c377c1c-43c6-45e7-904e-dbbe6b682686",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": "true"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "08cabec6-9840-4214-8315-b877c86794bf",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -220,
+        -680
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 580,
+        "height": 420,
+        "content": "# Main Flow\n\n## Preliminary step:\nCreate a vector database on Qdrant and tokenize the documents useful for generating a response\n\n\n## How it works\nThis workflow is designed to automate the process of handling incoming emails, summarizing their content, generating appropriate responses with RAG, and obtaining approval (YES/NO button) before sending replies.\n\nThis workflow is designed to handle general inquiries that come in via corporate email via IMAP and generate responses using RAG. You can quickly integrate Gmail and Outlook via the appropriate trigger nodes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "80692c8f-e236-43ac-aad2-91bd90f40065",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        -180
+      ],
+      "parameters": {
+        "height": 240,
+        "content": "Convert email to Markdown format for better understanding of LLM models"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e6957fde-bf05-4b67-aa0e-44c575fca04d",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        240,
+        -180
+      ],
+      "parameters": {
+        "width": 320,
+        "height": 240,
+        "content": "Chain that summarizes the received email"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7cfba59f-83ce-4f0b-b54a-b2c11d58fd82",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        940,
+        -180
+      ],
+      "parameters": {
+        "width": 340,
+        "height": 240,
+        "content": "Agent that retrieves business information from a vector database and processes the response"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "28c4bd00-6a47-422f-a50a-935f3724ba01",
+      "name": "Send Draft",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1340,
+        -100
+      ],
+      "webhookId": "d6dd2e7c-90ea-4b65-9c64-523d2541a054",
+      "parameters": {
+        "sendTo": "YOUR GMAIL ADDRESS",
+        "message": "=<h3>MESSAGE</h3>\n{{ $('Email Trigger (IMAP)').item.json.textHtml }}\n\n<h3>AI RESPONSE</h3>\n{{ $json.output }}",
+        "options": {},
+        "subject": "=[Approval Required] {{ $('Email Trigger (IMAP)').item.json.subject }}",
+        "operation": "sendAndWait",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "nyuHvSX5HuqfMPlW",
+          "name": "Gmail account (n3w.it)"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "0aae1689-cee7-403a-8640-396db32eceed",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1300,
+        -300
+      ],
+      "parameters": {
+        "color": 4,
+        "height": 360,
+        "content": "## IMPORTANT\n\nFor the \"Send Draft\" node, you need to send the draft email to a Gmail address because it is the only one that allows the \"Send and wait for response\" function."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6f7b864e-1589-418c-960e-b832cf032d1b",
+  "connections": {
+    "OpenAI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Email Summarization Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Email": {
+      "main": [
+        [
+          {
+            "node": "Write email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Draft": {
+      "main": [
+        [
+          {
+            "node": "Approve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek R1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Email Summarization Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write email": {
+      "main": [
+        [
+          {
+            "node": "Send Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "Write email",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Summarization Chain": {
+      "main": [
+        [
+          {
+            "node": "Set Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

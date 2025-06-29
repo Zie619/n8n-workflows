@@ -1,0 +1,369 @@
+{
+  "nodes": [
+    {
+      "name": "Google Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        540,
+        -320
+      ],
+      "parameters": {
+        "options": {},
+        "calendar": "xxxxx@gmail.com",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": "Google Accounts"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Function",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        540,
+        70
+      ],
+      "parameters": {
+        "functionCode": "var date = new Date().toISOString();\nvar day = new Date().getDay();\nconst weekday = [\"Sunday\", \"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"];\n\nitems[0].json.date_today = date;\nitems[0].json.day_today = weekday[day];\n\nreturn items;"
+      },
+      "notesInFlow": false,
+      "typeVersion": 1
+    },
+    {
+      "name": "Date & Time",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        720,
+        -320
+      ],
+      "parameters": {
+        "value": "={{$json[\"start\"][\"dateTime\"]}}",
+        "custom": true,
+        "options": {
+          "toTimezone": "Asia/Qatar"
+        },
+        "toFormat": "DD/MM/YYYY",
+        "dataPropertyName": "Event Start Date Only"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1410,
+        -110
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "= {{$json[\"Event Date\"]}}",
+              "value2": "= {{$json[\"Today's Date\"]}}"
+            }
+          ],
+          "dateTime": []
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Date & Time1",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        880,
+        70
+      ],
+      "parameters": {
+        "value": "={{$json[\"date_today\"]}}",
+        "custom": true,
+        "options": {
+          "toTimezone": "Asia/Qatar"
+        },
+        "toFormat": "DD/MM/YYYY",
+        "dataPropertyName": "Today's Date"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        910,
+        -320
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Event Name",
+              "value": "={{$json[\"summary\"]}}"
+            },
+            {
+              "name": "Event Date",
+              "value": "={{$json[\"Event Start Date Only\"]}}"
+            },
+            {
+              "name": "Today's Date",
+              "value": "="
+            },
+            {
+              "name": "Gcal URL",
+              "value": "={{$json[\"htmlLink\"]}}"
+            },
+            {
+              "name": "Location",
+              "value": "={{$json[\"location\"]}}"
+            },
+            {
+              "name": "Start Time",
+              "value": "={{$json[\"start\"][\"dateTime\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1200,
+        -110
+      ],
+      "parameters": {
+        "mode": "multiplex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1630,
+        -130
+      ],
+      "parameters": {
+        "values": {
+          "number": [],
+          "string": [
+            {
+              "name": "Name",
+              "value": "={{$json[\"Event Name\"]}}"
+            },
+            {
+              "name": "Time",
+              "value": "={{$json[\"Start Time\"]}}"
+            },
+            {
+              "name": "URL",
+              "value": "={{$json[\"Gcal URL\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Date & Time2",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        1800,
+        -130
+      ],
+      "parameters": {
+        "value": "={{$json[\"Time\"]}}",
+        "custom": true,
+        "options": {
+          "toTimezone": "Asia/Qatar"
+        },
+        "toFormat": "HH:mm",
+        "dataPropertyName": "Time"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Function1",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1960,
+        -130
+      ],
+      "parameters": {
+        "functionCode": "// Create our Slack message\n// This will output a list of Ticket URLs with the status and the subject\n// 12345 [STATUS] - Ticket Subject\nlet message = \"*Hello , Please find below a list of your meetings for today*. \\n\";\n\n// Loop the input items\nfor (item of items) {\n  // Append the ticket information to the message\n  message += \"*\" + item.json.Name +' @ '+ item.json.Time + \"\\n*  - \" + item.json.URL + \"\\n\"; \n}\n\n// Return our message\nreturn [{json: {message}}];\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        2150,
+        -130
+      ],
+      "parameters": {
+        "text": "={{$json[\"message\"]}}",
+        "channel": "virtual-assistant",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": "Slack account"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        250,
+        -130
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 6
+            }
+          ]
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Set1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set1": {
+      "main": [
+        [
+          {
+            "node": "Date & Time2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function": {
+      "main": [
+        [
+          {
+            "node": "Date & Time1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function1": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Date & Time2": {
+      "main": [
+        [
+          {
+            "node": "Function1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

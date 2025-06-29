@@ -1,0 +1,1044 @@
+{
+  "id": "fa2TGWrY9rPurC30",
+  "meta": {
+    "instanceId": "fb8bc2e315f7f03c97140b30aa454a27bc7883a19000fa1da6e6b571bf56ad6d",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Agent Access Control Template",
+  "tags": [
+    {
+      "id": "RKga6I6NviNI12bx",
+      "name": "template",
+      "createdAt": "2024-09-19T19:09:21.997Z",
+      "updatedAt": "2024-09-19T19:09:21.997Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "77771654-bfb9-4c34-b644-d4d6eeb15d37",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        560,
+        260
+      ],
+      "parameters": {
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "f1ef483e-4f84-40c7-957d-191a54ffb80e",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        360,
+        260
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "X7Jf0zECd3IkQdSw",
+          "name": "OpenAi (octionicsolutions)"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "c6ba00c9-8ca2-4cf0-9e2c-24ead9eb7c1b",
+      "name": "Check permissions",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "position": [
+        960,
+        260
+      ],
+      "parameters": {
+        "code": {
+          "supplyData": {
+            "code": "const { DynamicTool } = require(\"@langchain/core/tools\");\nconst connectedTools = await this.getInputConnectionData('ai_tool', 0);\nconst allowedTools = $input.item.json.allowed_tools;\n\nconst noTool = (tool) => {\n  return new DynamicTool({\n    name: tool.getName(),\n    description: tool.description,\n    func: async () => {\n        return \"Tell the user 'You are not authorized to use this tool'.\";\n    },\n  });\n}\n\nreturn connectedTools.map(connectedTool => {\n  const permissionGranted = allowedTools.includes(connectedTool.getName());\n  return permissionGranted ? connectedTool : noTool(connectedTool);\n});"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "ai_tool",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "ai_tool"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "db15e298-b8d0-4096-b606-18bc8d43bb39",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -240,
+        -120
+      ],
+      "webhookId": "4410accd-63e4-4c38-ad0b-26874f5eb673",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "3paV9xW2WWlusvsq",
+          "name": "octionictest_bot"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "3df9b9f5-c0a2-4905-95aa-285b492f2ec0",
+      "name": "Set input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        420,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9ea62c8f-984b-4c05-8e40-549d8035c4d3",
+              "name": "name",
+              "type": "string",
+              "value": "={{ $json.name }}"
+            },
+            {
+              "id": "bf74b2c4-f0d1-458a-9044-5cb1b62722e6",
+              "name": "granted_roles",
+              "type": "array",
+              "value": "={{ $json.granted_roles || [] }}"
+            },
+            {
+              "id": "e0f4d3d7-a916-43cb-a13d-e4453b0d1a3b",
+              "name": "allowed_tools",
+              "type": "array",
+              "value": "={{ $json.allowed_tools || [] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a5af8184-4a17-447e-96d3-809c6bd131f3",
+      "name": "Get user permissions",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        -20,
+        -120
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "app0K2OqeryZWxIt9",
+          "cachedResultUrl": "https://airtable.com/app0K2OqeryZWxIt9",
+          "cachedResultName": "Agent Access Control"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblRcEGwmycLfDuHt",
+          "cachedResultUrl": "https://airtable.com/app0K2OqeryZWxIt9/tblRcEGwmycLfDuHt",
+          "cachedResultName": "Users"
+        },
+        "options": {
+          "fields": [
+            "granted_roles",
+            "allowed_tools",
+            "name"
+          ]
+        },
+        "operation": "search",
+        "filterByFormula": "={username} = '{{ $json.message.from.username }}'"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "24eNAG2FrCu3ZCtz",
+          "name": "AAC read only"
+        }
+      },
+      "typeVersion": 2.1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4abf80e7-9b1f-4ef0-b742-da29e1208b78",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        0,
+        800
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "chatInput"
+            },
+            {
+              "name": "sessionId"
+            },
+            {
+              "name": "allowed_tools"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "10129d31-3446-47a0-aacd-3bd584b0bd79",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        220,
+        800
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "93b5d2ac-8c8a-4c61-999f-2727b7ba9514",
+              "name": "chatInput",
+              "type": "string",
+              "value": "={{ $json.chatInput }}"
+            },
+            {
+              "id": "3f65df4c-fae1-4da3-acfd-acf352a3f8d2",
+              "name": "sessionId",
+              "type": "string",
+              "value": "={{ $json.sessionId }}"
+            },
+            {
+              "id": "81020154-c869-4bc8-944a-a9aee900a656",
+              "name": "allowed_tools",
+              "type": "array",
+              "value": "={{ $json.allowed_tools }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "c45f4258-8ef6-4bf6-878f-5e86ac577712",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        340,
+        1060
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "X7Jf0zECd3IkQdSw",
+          "name": "OpenAi (octionicsolutions)"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e5cf82bc-c9a8-474e-bbeb-201e3431fa36",
+      "name": "Simple Memory1",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        540,
+        1060
+      ],
+      "parameters": {
+        "sessionKey": "={{ $('Settings').item.json.sessionId }}_weather_check",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "e9fd93c9-c008-470b-885a-4287950b9c3d",
+      "name": "Check permissions1",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "position": [
+        740,
+        1060
+      ],
+      "parameters": {
+        "code": {
+          "supplyData": {
+            "code": "const { DynamicTool } = require(\"@langchain/core/tools\");\nconst connectedTools = await this.getInputConnectionData('ai_tool', 0);\nconst allowedTools = $input.item.json.allowed_tools;\n\nconst noTool = (tool) => {\n  return new DynamicTool({\n    name: tool.getName(),\n    description: tool.description,\n    func: async () => {\n        return \"Tell the user 'You are not authorized to use this tool'.\";\n    },\n  });\n}\n\nreturn connectedTools.map(connectedTool => {\n  const permissionGranted = allowedTools.includes(connectedTool.getName());\n  return permissionGranted ? connectedTool : noTool(connectedTool);\n});"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "ai_tool",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "ai_tool"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f791deb0-9ebe-4451-8a1f-3119547dd576",
+      "name": "list_granted_roles",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "position": [
+        1000,
+        460
+      ],
+      "parameters": {
+        "name": "list_granted_roles",
+        "jsCode": "// Example: convert the incoming query to uppercase and return it\nreturn \"You are assigned the following roles: \" + $input.item.json.granted_roles.join(\", \");",
+        "description": "Call this tool to tell the user which roles they have been granted."
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "ab0c6dae-6259-4be1-b0df-e3276cafb938",
+      "name": "list_allowed_tools",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "position": [
+        1160,
+        460
+      ],
+      "parameters": {
+        "name": "list_allowed_tools",
+        "jsCode": "return \"You have access to the following tools: \" + $input.item.json.allowed_tools.join(\", \");",
+        "description": "Call this tool to tell the user which tools they have access to."
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "76529936-80ea-4f94-9a06-bae3b6ea0ce3",
+      "name": "calculator",
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "position": [
+        860,
+        460
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "fd7f4875-6838-4b53-9167-4a22d4f5f27f",
+      "name": "Wikipedia",
+      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
+      "position": [
+        760,
+        260
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "0dc5c3e6-b9d2-4a96-9539-dae86dc171a6",
+      "name": "get_coordinates",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        800,
+        1260
+      ],
+      "parameters": {
+        "url": "https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1",
+        "fields": "name,latitude,longitude",
+        "dataField": "results",
+        "fieldsToInclude": "selected",
+        "toolDescription": "Get the GEO position by city name",
+        "optimizeResponse": true,
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "city",
+              "type": "string",
+              "description": "Name of the city"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "e70a2cb2-832b-4741-85d2-c446be168ad4",
+      "name": "get_weather",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        980,
+        1260
+      ],
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current_weather=true",
+        "toolDescription": "Get current weather by GEO data (longitude, latitude)",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "longitude",
+              "type": "string",
+              "description": "Longitude of location. Dot as decimal separator."
+            },
+            {
+              "name": "latitude",
+              "type": "string",
+              "description": "Latitude of location. Dot as decimal separator."
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "66c5568d-d2fe-4938-b577-b005a5c32e37",
+      "name": "weather_agent",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        1360,
+        460
+      ],
+      "parameters": {
+        "name": "weather_agent",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "C1fIIooUO64D56t6",
+          "cachedResultName": "Agent Access Control with Airtable and Telegram"
+        },
+        "workflowInputs": {
+          "value": {
+            "chatInput": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('chatInput', ``, 'string') }}",
+            "sessionId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+            "allowed_tools": "={{ $input.item.json.allowed_tools }}"
+          },
+          "schema": [
+            {
+              "id": "sessionId",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "sessionId",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "chatInput",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "chatInput",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "allowed_tools",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "allowed_tools",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "ffcf4df4-f969-4bc1-9393-0e7a4317626a",
+      "name": "Weather Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        440,
+        800
+      ],
+      "parameters": {
+        "options": {
+          "systemMessage": "=You are a weather data assistant.\nYou MUST only use the provided tools to process any user input. Never use general knowledge to answer questions. If you can't use a tool, tell the user why."
+        }
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "eae759d7-fa4a-4993-bbcf-cc430f2dfa60",
+      "name": "Unknown user",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        200,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1d042f5b-ef39-4b9e-8d9c-900b39dbe3fb",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "df377324-d57d-45ab-85c7-88446a07abcd",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        -260
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 300,
+        "content": "## Choose Base\nCopy [this Airtable Template](https://airtable.com/appi5nijuvzQbZLJJ/shr8OkLysG1VtlCiz) into your workspace and select that Base here"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b1ddd130-07fa-47e3-ba24-7b4e85f94b6a",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        300
+      ],
+      "parameters": {
+        "height": 300,
+        "content": "## Choose workflow\nSelect the current workflow as the workflow that should be called"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7d24fc8e-36e7-4087-88cc-7f1c725ce814",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        900,
+        160
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 220,
+        "content": "Uses list of allowed tools gathered from Airtable to check for permissions and replaces denied tools with a fixed instruction to return a message to the user."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "987b3372-1703-4284-a285-d2edfd032422",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        700,
+        160
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 200,
+        "height": 220,
+        "content": "Tools can also be connected without a permission check"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "885b0117-bae1-4aac-a91f-e140259b32e2",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        580,
+        -80
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 240,
+        "content": "Main agent with the instruction to always use the connected tools instead of general knowledge"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "25f17f39-a777-4386-b14d-1ed7db3c54f4",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        360,
+        -80
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 240,
+        "content": "Collects input and formats it using required keys"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a0abbeea-d9c1-4005-b996-d4e8e4fd97d3",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        720
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 240,
+        "content": "Collects and formats input from parent workflow / agent"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8e25e640-7b6d-4ca7-b3fd-06eac3cebbea",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        680,
+        960
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 220,
+        "content": "Uses the same technique as the main agent to check for permissions using the same parameters which were passed to this sub-agent."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1168726e-2a39-40f6-aea6-77c12dc2b37b",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        720
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 240,
+        "content": "Sub-agent with specific role to handle weather information. Also having the instruction to strictly only use the connected tools."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e65e1ea3-c773-4e65-8c49-b9f7fe75df28",
+      "name": "Reply: unknown user",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        420,
+        -240
+      ],
+      "webhookId": "510028ef-060f-4ce7-898e-f1a2a376780c",
+      "parameters": {
+        "text": "=Unknown user '{{ $('Telegram Trigger').item.json.message.from.username }}'. Please contact your supervisor.",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "3paV9xW2WWlusvsq",
+          "name": "octionictest_bot"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "aa5937b9-22d2-4719-9d51-00f7d28beb43",
+      "name": "Reply with results",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1020,
+        0
+      ],
+      "webhookId": "97bc8ca7-d40a-41d6-9cc2-4c9943313fb4",
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "3paV9xW2WWlusvsq",
+          "name": "octionictest_bot"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "623328d8-e9ad-431e-b3ca-df0cdbcb7430",
+      "name": "Main Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        640,
+        0
+      ],
+      "parameters": {
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
+        "options": {
+          "systemMessage": "=You are a personal assistant. The name of the current user is \"{{ $json.name }}\"\nYou MUST only use the provided tools to process any user input. Never use general knowledge to answer questions. If you can't use a tool, tell the user why.",
+          "returnIntermediateSteps": true
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "cacefd8b-082c-43a4-9e25-fb497d0d8dd9",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        160
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 200,
+        "height": 220,
+        "content": "Be aware, that previous responses may still exist after permission changes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "802ba649-b56e-4e90-a780-a3a1935a7907",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        960
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 200,
+        "height": 220,
+        "content": "Uses different session ID (suffix), since every agent needs its own memory"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b82c9149-e583-4c98-a6d8-c92080fd44ba",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -300,
+        -200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 240,
+        "content": "Listens to messages directly sent to the bot"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b74fcbc1-aa66-440a-9a75-340858bba6c5",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        140,
+        -200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 240,
+        "content": "Checks if the user was found in Airtable"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "errorWorkflow": "gGHnVxFBZDQlm6QE",
+    "executionOrder": "v1"
+  },
+  "versionId": "08372ec4-0f43-411a-b600-61e8d80da545",
+  "connections": {
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set input": {
+      "main": [
+        [
+          {
+            "node": "Main Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia": {
+      "ai_tool": [
+        [
+          {
+            "node": "Main Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Main Agent": {
+      "main": [
+        [
+          {
+            "node": "Reply with results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Check permissions",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_weather": {
+      "ai_tool": [
+        [
+          {
+            "node": "Check permissions1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unknown user": {
+      "main": [
+        [
+          {
+            "node": "Reply: unknown user",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Main Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "weather_agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Check permissions",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_coordinates": {
+      "ai_tool": [
+        [
+          {
+            "node": "Check permissions1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get user permissions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check permissions": {
+      "ai_tool": [
+        [
+          {
+            "node": "Main Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Main Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check permissions1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "list_allowed_tools": {
+      "ai_tool": [
+        [
+          {
+            "node": "Check permissions",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "list_granted_roles": {
+      "ai_tool": [
+        [
+          {
+            "node": "Check permissions",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get user permissions": {
+      "main": [
+        [
+          {
+            "node": "Unknown user",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

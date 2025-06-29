@@ -1,0 +1,278 @@
+{
+  "nodes": [
+    {
+      "id": "ba168090-4727-4b72-a0cf-3f15ef3a9f17",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        580,
+        360
+      ],
+      "parameters": {
+        "text": "=System resources are above the threshold.\n\nCPU: {{ $json.CPU.toNumber().round(2) }}%\nRAM: {{ $json.RAM.toNumber().round(2) }}%\nDisk: {{ $json.Disk.toNumber().round(2) }}%",
+        "options": {},
+        "subject": "System Resource Alert",
+        "toEmail": "change@me.com",
+        "fromEmail": "change@me.com"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "EuaQtRc5t8pWPY9b",
+          "name": "SMTP account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "79afc30f-c3db-4ba1-8f0d-a1000b5e0abe",
+      "name": "Check RAM usage",
+      "type": "n8n-nodes-base.ssh",
+      "position": [
+        160,
+        40
+      ],
+      "parameters": {
+        "command": "free | awk '/Mem:/ {printf \"%.2f\", (1 - $7/$2) * 100}'"
+      },
+      "credentials": {
+        "sshPassword": {
+          "id": "VMCCUQkaq46q3CpB",
+          "name": "SSH Password account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1
+    },
+    {
+      "id": "d09aa314-8d60-42a8-9933-d7e8d73e2c7d",
+      "name": "Check Disk usage",
+      "type": "n8n-nodes-base.ssh",
+      "position": [
+        380,
+        40
+      ],
+      "parameters": {
+        "command": "df -h | awk '$NF==\"/\"{printf \"%.2f\", $5}'"
+      },
+      "credentials": {
+        "sshPassword": {
+          "id": "VMCCUQkaq46q3CpB",
+          "name": "SSH Password account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1
+    },
+    {
+      "id": "bc6a0df2-f4cc-484a-ac39-c92e8795175e",
+      "name": "Check CPU usage",
+      "type": "n8n-nodes-base.ssh",
+      "position": [
+        580,
+        40
+      ],
+      "parameters": {
+        "command": "top -bn 1 | grep \"Cpu(s)\" | sed \"s/.*, *\\([0-9.]*\\)%* id.*/\\1/\" | awk '{print 100 - $1}'"
+      },
+      "credentials": {
+        "sshPassword": {
+          "id": "VMCCUQkaq46q3CpB",
+          "name": "SSH Password account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1
+    },
+    {
+      "id": "de0df734-1e4a-4bf0-9f7d-d60b52e06f48",
+      "name": "Merge check results",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        -40,
+        380
+      ],
+      "parameters": {
+        "mode": "combineBySql",
+        "query": "SELECT input1.stdout as CPU, input2.stdout as Disk, input3.stdout as RAM FROM input1 LEFT JOIN input2 ON input1.name = input2.id LEFT JOIN input3 ON input1.name = input3.id",
+        "numberInputs": 3
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "7b7d6c0a-3f46-48b3-aa1d-191839540196",
+      "name": "Check results against thresholds",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        240,
+        380
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.CPU }}",
+              "value2": 80,
+              "operation": "largerEqual"
+            },
+            {
+              "value1": "={{ $json.Disk }}",
+              "value2": 80,
+              "operation": "largerEqual"
+            },
+            {
+              "value1": "={{ $json.RAM }}",
+              "value2": 80,
+              "operation": "largerEqual"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "92331c38-cab8-4719-8746-6fb341954516",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        260
+      ],
+      "parameters": {
+        "width": 320,
+        "height": 280,
+        "content": "## Update email addresses\nUpdate From and To email addresses in this node to receive notifications"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3117fdbc-fde9-469b-bd47-59f45c349162",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -260,
+        -120
+      ],
+      "parameters": {
+        "width": 320,
+        "height": 260,
+        "content": "## Check VPS resource usage every 15 minutes\nThis workflow checks VPS CPU, RAM and Disk usage every 15 minutes and if any of it exceeds 80% will inform you by email"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "45b4c33a-8f02-4535-b67f-56d9d0aaf2ae",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        260
+      ],
+      "parameters": {
+        "width": 360,
+        "height": 280,
+        "content": "## Update threshold\nIf needed, you can increase/decrease the 80% threshold in this node individually per resource "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0bf83ea8-b1c4-40f7-8a60-39f765e8ec2c",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -40,
+        40
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Check CPU usage": {
+      "main": [
+        [
+          {
+            "node": "Merge check results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check RAM usage": {
+      "main": [
+        [
+          {
+            "node": "Check Disk usage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge check results",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Check Disk usage": {
+      "main": [
+        [
+          {
+            "node": "Check CPU usage",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge check results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check RAM usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge check results": {
+      "main": [
+        [
+          {
+            "node": "Check results against thresholds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check results against thresholds": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

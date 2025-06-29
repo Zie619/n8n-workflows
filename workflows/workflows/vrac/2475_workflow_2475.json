@@ -1,0 +1,500 @@
+{
+  "meta": {
+    "instanceId": "6b6a2db47bdf8371d21090c511052883cc9a3f6af5d0d9d567c702d74a18820e"
+  },
+  "nodes": [
+    {
+      "id": "f4570aad-db25-4dcd-8589-b1c8335935de",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        200,
+        2800
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "92aae60e-5fcd-4588-9a41-92e7c1b7f2ff",
+      "name": "SERP results",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1286,
+        2800
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b3e662aa-7ace-45ca-815a-0ad1d65ef7a0",
+              "name": "organicResults",
+              "type": "array",
+              "value": "={{ $json.result.organicResults }}"
+            },
+            {
+              "id": "ac655bf2-181f-4117-a7d6-aa4ec2738bd9",
+              "name": "peopleAlsoAsk",
+              "type": "array",
+              "value": "={{ $json.result.peopleAlsoAsk }}"
+            },
+            {
+              "id": "9e045f00-006e-4b8b-863d-cb25d682b69d",
+              "name": "searchQuery",
+              "type": "string",
+              "value": "={{ $json.result.searchQuery.term }}"
+            },
+            {
+              "id": "08c1f92b-deac-4951-863f-721e0714739b",
+              "name": "paidAds",
+              "type": "string",
+              "value": "={{ $json.result.paidResults }}"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "e8a7a918-7afd-4c2b-8b79-1c5652362a53",
+      "name": "Separate",
+      "type": "n8n-nodes-base.splitOut",
+      "notes": "Split SERP into rows",
+      "position": [
+        1457,
+        2800
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "organicResults"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "e2683fec-1a04-47ff-82b9-11749921a34c",
+      "name": "Title <> Empty",
+      "type": "n8n-nodes-base.filter",
+      "notes": "Title is not empty",
+      "position": [
+        1637,
+        2800
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "6dd422fc-0b66-4d7e-9b40-ee4a6d713e83",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.title }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "e2a21776-86f4-4c99-973c-19e5ede4eab3",
+      "name": "Assign SERP #pos",
+      "type": "n8n-nodes-base.code",
+      "notes": "Assign SERP position",
+      "position": [
+        2020,
+        2800
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all(); // Get all input items\n\n// Group items by searchQuery\nconst groupedItems = items.reduce((acc, item) => {\n  const searchQuery = item.json.searchQuery || 'default';\n  if (!acc[searchQuery]) {\n    acc[searchQuery] = [];\n  }\n  acc[searchQuery].push(item);\n  return acc;\n}, {});\n\n// Assign positions within each group\nconst result = Object.values(groupedItems).flatMap(group => \n  group.map((item, index) => ({\n    json: {\n      ...item.json,\n      position: index + 1, // Add the position based on the index within the group\n    },\n  }))\n);\n\nreturn result; // Return the modified items"
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "34a38c07-6439-4177-a12a-a2f6295cd914",
+      "name": "GET SERP",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "SERP results - scrapingRobot\n\nhttps://dashboard.scrapingrobot.com/dashboard",
+      "position": [
+        1106,
+        2800
+      ],
+      "parameters": {
+        "url": "https://api.scrapingrobot.com",
+        "method": "POST",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 20
+            }
+          }
+        },
+        "jsonBody": "={\n  \"url\": \"https://www.google.com\",\n  \"module\": \"GoogleScraper\",\n  \"params\": {\n    \"query\": \"{{ $json[\"Keyword\"] }}\"\n  }\n}  ",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "6DyKxvSsLAZLluDL",
+          "name": "Query Auth - Scraping Robot"
+        },
+        "httpHeaderAuth": {
+          "id": "QWp7emU1xKIVm5GD",
+          "name": "Header Auth - Scraping Robot"
+        }
+      },
+      "notesInFlow": false,
+      "retryOnFail": false,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "6bf86303-6aa1-4afd-834b-35bc84b1fd82",
+      "name": "Sticky Note29",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        356,
+        2760
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 669.4820758928554,
+        "height": 205.68165856370325,
+        "content": "**Get data from airtable and check if already done** "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0ff2885f-f372-40c5-94e4-f1d90a66b6b7",
+      "name": "Sticky Note30",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1046,
+        2760
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 208.81803918109597,
+        "height": 205.68165856370314,
+        "content": "**POST to Scraping Robot API** "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ee9e47b4-5137-4909-8c3d-3cb023517e03",
+      "name": "Sticky Note22",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        360,
+        2980
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 284.87764467541297,
+        "height": 119.14378614369562,
+        "content": "**REQUIRED**\nConnect to your database of keywords. Name the column 'Keyword' or alternatively enter keywords in the `Set Keywords to get SERPs for` array"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fee9236d-4c04-4d05-90a3-fbff8e15c4f8",
+      "name": "Connect to your own database - ",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        420,
+        2800
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "d506d14f-1871-4176-97a2-09da6062729b",
+      "name": "Set Keywords to get SERPs for",
+      "type": "n8n-nodes-base.set",
+      "notes": "Array of keywords",
+      "position": [
+        660,
+        2800
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "859ba768-9ae1-4d11-bab9-6b5f085adc59",
+              "name": "Keyword",
+              "type": "array",
+              "value": "[\"constant contact email automation\", \"business worfklow software\", \"n8n automation\"]"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "d65f61f6-5c6b-4145-915b-af4cb56da1cb",
+      "name": "Sticky Note24",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        2980
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 284.87764467541297,
+        "height": 150.1322172211123,
+        "content": "**REQUIRED**\nUpdate the Auth parameter to your own [Scraping Robot](https://billing.scrapingrobot.com/aff.php?aff=2) token\n\n**Query Auth parameter**\nname - token\nvalue - your-own-api-key"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bea785be-b146-4bd8-92f5-f7e14127d969",
+      "name": "Sticky Note31",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1420,
+        2760
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 749.5454794091054,
+        "height": 205.68165856370314,
+        "content": "**Splits out queries for organic search and assigns them a ranking 1-10** "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e7e3ce78-a8ec-45e2-9fb9-c4f615085985",
+      "name": "Sticky Note27",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2200,
+        2740
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 231.51775697271012,
+        "height": 223.71949738241096,
+        "content": "**Update record in own Database**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "02ccb470-a6a6-49f3-9bda-7429c5dd3150",
+      "name": "Connect to your own database2",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2263,
+        2800
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "92922d26-3e68-47dd-94eb-b6be13161efe",
+      "name": "Assign SearchQuery",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1820,
+        2800
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e69839b4-9ab5-4792-b6c0-a4d0e1172fa8",
+              "name": "searchQuery",
+              "type": "string",
+              "value": "={{ $('SERP results').item.json.searchQuery }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "53d835d0-d656-4255-abe2-b4bfb23f455e",
+      "name": "Split out Keywords",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        860,
+        2800
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "Keyword"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5dc6f9b0-4f75-4e71-bd3d-86fa41d862b9",
+      "name": "Sticky Note40",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2200,
+        2980
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 284.87764467541297,
+        "height": 91.91340067739628,
+        "content": "**REQUIRED** \nOutput the data to your own data source e.g. Airtable"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6b2bf27e-de9b-41da-9f27-17a6541fd2f9",
+      "name": "Sticky Note18",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -540,
+        2400
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 697.67602815855,
+        "height": 735.4043641289052,
+        "content": "## Get Google Search Results (SERPs) for SEO Research\n\n## Use Case\nResearch search engine rankings for SEO analysis:\n- You need to track keyword rankings for your website\n- You want to analyze competitor positions in search results\n- You need data for SEO competition analysis\n- You want to monitor SERP changes over time\n\n## What this Workflow Does\nThe workflow uses ScrapingRobot API to fetch Google search results:\n- Retrieves SERP data for your target keywords\n- Captures URL rankings and page titles\n- Processes up to 5000 searches with free account\n- Organizes results for SEO analysis\n\n## Setup\n1. Create a [ScrapingRobot account](https://billing.scrapingrobot.com/aff.php?aff=2) and get your API key\n2. Add your ScrapingRobot API key to the HTTP Request node's `GET SERP` token parameter\n3. Either connect your keyword database (column name \"Keyword\") or use the \"Set Keywords\" node\n4. Configure your preferred output database connection\n\n## How to Adjust it to Your Needs\n- Modify keyword source to pull from different databases\n- Adjust the number of SERP results to capture\n- Customize output format for your reporting needs\n\n\nMade by Simon @ [automake.io](https://automake.io)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "GET SERP": {
+      "main": [
+        [
+          {
+            "node": "SERP results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separate": {
+      "main": [
+        [
+          {
+            "node": "Title <> Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SERP results": {
+      "main": [
+        [
+          {
+            "node": "Separate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Title <> Empty": {
+      "main": [
+        [
+          {
+            "node": "Assign SearchQuery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign SERP #pos": {
+      "main": [
+        [
+          {
+            "node": "Connect to your own database2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign SearchQuery": {
+      "main": [
+        [
+          {
+            "node": "Assign SERP #pos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out Keywords": {
+      "main": [
+        [
+          {
+            "node": "GET SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Keywords to get SERPs for": {
+      "main": [
+        [
+          {
+            "node": "Split out Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connect to your own database - ": {
+      "main": [
+        [
+          {
+            "node": "Set Keywords to get SERPs for",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Connect to your own database - ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

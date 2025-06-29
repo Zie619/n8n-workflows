@@ -1,0 +1,266 @@
+{
+  "id": "0H2mo5k35e0nzMEE",
+  "meta": {
+    "instanceId": "2e2d423885cf86d4b5420a96c93cd261c847d0419e9bb242fa12caf4a4c298c3",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "New Ticket Alerts to Teams",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "80c29a2a-c005-4a19-a71e-3e862a4f9b49",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -120,
+        540
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/1 8-16 * * 1-5"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "24b7e81c-51ea-4a0f-9684-e5aef53021ad",
+      "name": "Add Filterable Parameter",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        460,
+        460
+      ],
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  // Assuming 'id' is the field with the Connectwise Ticket ID\n  // Convert 'id' to a string to ensure it has quotes in the JSON output\n  item.json.id = item.json.id.toString();\n\n  // If 'filterOnThis' is another field you want to set with the id as a string\n  item.json.FilterOnThis = item.json.id;\n\n  // ... any other operations you want to perform on each item\n}\n\nreturn $input.all();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "1ab5a549-34a2-4bed-9c4c-9c268bf04e0d",
+      "name": "Query Database",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        460,
+        620
+      ],
+      "parameters": {
+        "key": "={{ $json.id.toString() }}",
+        "keyType": "string",
+        "options": {},
+        "operation": "get",
+        "propertyName": "=Tickets"
+      },
+      "credentials": {
+        "redis": {
+          "id": "nm82iTY9aRTp8ZQm",
+          "name": "Redis-Dispatch"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c6f3bb14-3385-4b5a-95b1-f0ac787d056a",
+      "name": "Filter Out Tickets that have already been sent",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        780,
+        540
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {
+          "fuzzyCompare": true
+        },
+        "joinMode": "keepNonMatches",
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "FilterOnThis",
+              "field2": "Tickets"
+            }
+          ]
+        },
+        "outputDataFrom": "input1"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "18bb4e45-cfaf-47b7-88fa-4edb316f05d5",
+      "name": "Get New Tickets",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        180,
+        540
+      ],
+      "parameters": {
+        "url": "https://na.myconnectwise.net/v4_6_release/apis/3.0/service/tickets?conditions=(status/name=\"New\" or status/name=\"New (email)\" or status/name=\"New (portal)\") and (board/id=25 or board/id=26 or board/id=1 or board/id=28) and parentTicketId=null&PageSize=999",
+        "options": {},
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "clientId",
+              "value": "934a9a6d-480a-4502-ab77-46bd80b368d7"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "MlbbiZdsGxeWRyMH",
+          "name": "Header Auth account"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "5a827e46-b257-4078-ba1f-a27bfba7cb02",
+      "name": "Combine like Companies",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1040,
+        620
+      ],
+      "parameters": {
+        "jsCode": "// would need to be adapted to your specific data structure.\nreturn Object.values(items.reduce((accumulator, current) => {\n  const siteName = current.json.siteName; // assuming 'siteName' is the common property\n  const companyName = current.json.company; // replace with the correct path to the company name\n  const ticketType = current.json.recordType; // replace with the correct path to the ticket type\n\n  // Use a combined key of siteName and companyName to group tickets\n  const groupKey = `${siteName} - ${companyName}`;\n\n  if (!accumulator[groupKey]) {\n    accumulator[groupKey] = {\n      siteName,\n      companyName,\n      ticketType,\n      tickets: []\n    };\n  }\n\n  // Create a string that combines the ticket number and summary with a <br> for HTML line breaks\n  const ticketInfo = `${current.json.id}: ${current.json.summary}<br>`;\n  accumulator[groupKey].tickets.push(ticketInfo);\n\n  // If ticketType is not consistent within the same groupKey, handle accordingly\n  if (!accumulator[groupKey].ticketType) {\n    accumulator[groupKey].ticketType = ticketType;\n  } else if (accumulator[groupKey].ticketType !== ticketType) {\n    // Handle the case where different ticket types exist within the same groupKey\n    accumulator[groupKey].ticketType += `, ${ticketType}`;\n  }\n\n  return accumulator;\n}, {})).map(group => {\n  // Join the tickets array into a single string, separating each ticket with an empty string (effectively nothing)\n  const ticketsString = group.tickets.join('');\n\n  // Return the final object structure, with each property as needed\n  return {\n    siteName: group.siteName,\n    companyName: group.companyName,\n    ticketType: group.ticketType,\n    tickets: ticketsString // This is now a single string with <br> as separators\n  };\n});\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "0a69f405-cb56-4cb5-b56c-9015602376eb",
+      "name": "Teams to Dispatch",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "position": [
+        1320,
+        540
+      ],
+      "parameters": {
+        "chatId": "19:3a9ec7df-5b99-4311-9a78-61ac2192da07_449d57c9-64d0-496f-ad07-147a6b388a32@unq.gbl.spaces",
+        "message": "=Hey Dispatch Team!, A new {{ $json.ticketType }} has come in.<br><br> <strong>Ticket:</strong> {{ $json.tickets }} <strong>Company: </strong> {{ $json.companyName.name }}",
+        "options": {},
+        "resource": "chatMessage",
+        "messageType": "html"
+      },
+      "credentials": {
+        "microsoftTeamsOAuth2Api": {
+          "id": "9eUxYgQYNgePrgUD",
+          "name": "Microsoft Teams account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "59beaef0-77af-4ae2-a68d-43313e933a10",
+      "name": "Log in Redis",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        1040,
+        460
+      ],
+      "parameters": {
+        "key": "={{ $json.id }}",
+        "value": "={{ $json.id }}",
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "nm82iTY9aRTp8ZQm",
+          "name": "Redis-Dispatch"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ab7ae9df-5adf-4be4-8c56-39b433641673",
+  "connections": {
+    "Query Database": {
+      "main": [
+        [
+          {
+            "node": "Filter Out Tickets that have already been sent",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get New Tickets": {
+      "main": [
+        [
+          {
+            "node": "Query Database",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add Filterable Parameter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get New Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine like Companies": {
+      "main": [
+        [
+          {
+            "node": "Teams to Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Filterable Parameter": {
+      "main": [
+        [
+          {
+            "node": "Filter Out Tickets that have already been sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Out Tickets that have already been sent": {
+      "main": [
+        [
+          {
+            "node": "Combine like Companies",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log in Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,508 @@
+{
+  "meta": {
+    "instanceId": "cb484ba7b742928a2048bf8829668bed5b5ad9787579adea888f05980292a4a7"
+  },
+  "nodes": [
+    {
+      "id": "3102dc76-7123-4e87-b30f-e15c240e77da",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "simple": false,
+        "filters": {},
+        "options": {},
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "H4Vkp5Iwb0wrQOR6",
+          "name": "Nik's gmail"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "1e4a55e5-289e-4d67-a161-9109bd430e75",
+      "name": "Only n8n Paddle invoice mails",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        420,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "229200d1-ec13-4970-ae0e-2c8e17da0bdf",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.from.value[0].address }}",
+              "rightValue": "help@paddle.com"
+            },
+            {
+              "id": "1830d49a-5ee0-472c-bb9d-0090c0e1f5a4",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.subject }}",
+              "rightValue": "Your invoice"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "a87ed337-a582-44ed-9185-ea0dd9486245",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        820,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "link"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3a4dd56b-3177-4364-ac48-ce9e475b773f",
+      "name": "Only keep invoice link",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1000,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d8a78835-46bd-40c0-b9ef-c1a631ab0a00",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.link }}",
+              "rightValue": "/receipt/"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "2da9e7c0-8954-442a-a33c-a942cd634b27",
+      "name": "Do nothing on other emails",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        640,
+        80
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "dd837661-97af-4abc-8b44-a10931cda54c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        -280
+      ],
+      "parameters": {
+        "height": 440,
+        "content": "## Setup\n1. Setup your **Gmail** and **Google Drive** credentials\n1. Create a free account at https://pdflayer.com/\n2. Insert your **pdflayer** API key into the `Setup` node\n3. Insert the URL to the wanted drive folder into the setup node (make sure to remove everything after the `?`)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8de9b630-0a5f-4d2c-ac7f-e3264314a97c",
+      "name": "Setup",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "86a22cf3-262a-4089-88ab-fafc01307bb4",
+              "name": "api_key",
+              "type": "string",
+              "value": "{{ your_key_here }}"
+            },
+            {
+              "id": "4cca07a2-6a70-4011-a025-65246e652fb9",
+              "name": "url_to_drive_folder",
+              "type": "string",
+              "value": "{{ folder_URL }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "b06860a4-3895-4a28-9365-71c31f220d10",
+      "name": "Download Invoice PDF from URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1200,
+        -120
+      ],
+      "parameters": {
+        "url": "http://api.pdflayer.com/api/convert",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_key",
+              "value": "={{ $('Setup').first().json.api_key }}"
+            },
+            {
+              "name": "document_url",
+              "value": "={{ $json.link }}"
+            },
+            {
+              "name": "page_size",
+              "value": "A4"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c2be351e-76ce-4bfa-8965-e41d59a6c49a",
+      "name": "Rename file",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        1580,
+        -120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {},
+        "operation": "update",
+        "newUpdatedFileName": "=n8n_cloud_invoice_{{ $now.format('yyyy-MM-dd') }}.pdf"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "jMxk7HGWZs6ucm5P",
+          "name": "Nik's Google Drive"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "20b90e38-dd17-462c-8007-e83dcc2dc8df",
+      "name": "Move to the correct folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        1760,
+        -120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Setup').item.json.url_to_drive_folder }}"
+        },
+        "operation": "move"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "jMxk7HGWZs6ucm5P",
+          "name": "Nik's Google Drive"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "5c2930eb-90f8-4f4f-ae6a-638a01faccd3",
+      "name": "Upload PDF to Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1400,
+        -120
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/upload/drive/v3/files",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendQuery": true,
+        "contentType": "binaryData",
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "uploadType",
+              "value": "media"
+            }
+          ]
+        },
+        "inputDataFieldName": "data",
+        "nodeCredentialType": "googleDriveOAuth2Api"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "jMxk7HGWZs6ucm5P",
+          "name": "Nik's Google Drive"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "1806abe4-d80e-4ab8-8303-6b92d569aac5",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1353.6776457357505,
+        -255.65646735405625
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 608.5129596994967,
+        "height": 306.2353014680544,
+        "content": "## Adjust me\nYou can adjust this part and save the file wherever you want. E.g. you could save it in your local file system by using the `Read/Write Files from Disk` node or save it in Dropbox by using the `Dropbox` node. You could even email the PDF to the right person instead."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "efa55724-3b42-4abd-a30a-ad7e9836ede5",
+      "name": "Extract \"a-tags\" from email",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        640,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "html",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "link",
+              "attribute": "href",
+              "cssSelector": "a",
+              "returnArray": true,
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    }
+  ],
+  "pinData": {
+    "Gmail Trigger": [
+      {
+        "id": "19198ee012d8f882",
+        "to": {
+          "html": "<span class=\"mp_address_group\"><span class=\"mp_address_name\">Niklas Hatje</span> &lt;<a href=\"mailto:niklas@n8n.io\" class=\"mp_address_email\">niklas@n8n.io</a>&gt;</span>",
+          "text": "\"Niklas Hatje\" <niklas@n8n.io>",
+          "value": [
+            {
+              "name": "Niklas Hatje",
+              "address": "niklas@n8n.io"
+            }
+          ]
+        },
+        "date": "2024-08-28T12:20:20.000Z",
+        "from": {
+          "html": "<span class=\"mp_address_group\"><span class=\"mp_address_name\">Niklas Hatje</span> &lt;<a href=\"mailto:niklas@n8n.io\" class=\"mp_address_email\">niklas@n8n.io</a>&gt;</span>",
+          "text": "\"Niklas Hatje\" <niklas@n8n.io>",
+          "value": [
+            {
+              "name": "Niklas Hatje",
+              "address": "help@paddle.com"
+            }
+          ]
+        },
+        "html": "<div dir=\"ltr\"><br><br><div class=\"gmail_quote\"><div dir=\"ltr\" class=\"gmail_attr\">---------- Forwarded message ---------<br>From: <strong class=\"gmail_sendername\" dir=\"auto\">n8n Sandbox (via Paddle.com)</strong> <span dir=\"auto\">&lt;<a href=\"mailto:help@paddle.com\">help@paddle.com</a>&gt;</span><br>Date: Thu, Oct 12, 2023 at 3:30 AM<br>Subject: Your invoice<br>To:  &lt;<a href=\"mailto:niklas%2B12may2023@n8n.io\">niklas+12may2023@n8n.io</a>&gt;<br></div><br><br><div class=\"msg940821289515909318\">\n        \n        \n  \n        \n        \n        \n        \n      \n      \n      \n      <div style=\"letter-spacing:0;background-color:#f5f5f8;margin:0;padding:0;font-family:Lato,Helvetica,Roboto,sans-serif\"><center style=\"margin:0\">\n    <table cellspacing=\"0\" cellpadding=\"0\" width=\"100%\" style=\"max-width:600px;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n        <tbody><tr>\n            <td height=\"100%\" width=\"100%\" style=\"padding:0\">\n                <table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"margin-top:0\">\n                    <tbody><tr>\n                        <td height=\"30\" class=\"m_940821289515909318mJJIf\" style=\"height:30px\"></td>\n                    </tr>\n                </tbody></table>\n                <center style=\"margin:0\">\n                    <table cellspacing=\"0\" cellpadding=\"0\" width=\"100%\" style=\"max-width:600px;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                        <tbody><tr>\n                            <td height=\"100%\" width=\"100%\" style=\"padding:0\">\n                                <table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"margin:0;border-top:0;border-radius:0;background-color:#ffffff\" bgcolor=\"#FFFFFF\">\n                                    <tbody><tr>\n                                        <td align=\"center\" valign=\"top\">\n                                            <table cellspacing=\"0\" cellpadding=\"0\" width=\"100%\" style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                <tbody><tr>\n                                                    <td style=\"padding:50px\" class=\"m_940821289515909318dsRHJY\">\n                                                        <table style=\"max-width:none;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\">\n                                                            <tbody><tr>\n                                                                <td align=\"center\" style=\"text-align:left\"><img height=\"70\" src=\"https://sandbox-static.paddle.com/assets/images/checkout/default_product_icon.png\" style=\"display:block;margin:auto;margin-bottom:28px\">\n                                                                    <div>\n                                                                        \n                                                                    </div>\n                                                                    <h3 style=\"font-weight:900;font-size:24px;line-height:32px;margin-bottom:12px;text-align:center;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Beleg für Ihr Cloud Pro-1-Abonnement</h3>\n                                                                    <p style=\"font-size:14px;font-weight:500;line-height:24px;margin-bottom:24px;text-align:center;margin-top:0;margin-right:0;margin-left:0;color:#73809c;font-family:Lato,Helvetica,Roboto,sans-serif\">Beleg Nr. 624743-6710887</p>\n                                                                    <table cellspacing=\"0\" cellpadding=\"0\" width=\"100%\" style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                        <tbody><tr style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                            <td class=\"m_940821289515909318ecARAV\" style=\"vertical-align:top;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" valign=\"top\">\n                                                                                <p style=\"font-size:12px;font-weight:500;line-height:24px;margin-bottom:0;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Betrag</p>\n                                                                                <p style=\"font-size:14px;font-weight:900;line-height:24px;margin-bottom:4px;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">50,00 $</p>\n                                                                            </td>\n                                                                            <td class=\"m_940821289515909318dnuTcc\" style=\"vertical-align:top;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" valign=\"top\">\n                                                                                <p style=\"font-size:12px;font-weight:500;line-height:24px;margin-bottom:0;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Beleg Datum</p>\n                                                                                <p style=\"font-size:14px;font-weight:900;line-height:24px;margin-bottom:4px;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">12. Oktober 2023</p>\n                                                                            </td>\n                                                                            <td class=\"m_940821289515909318dnuTcc\" style=\"vertical-align:top;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" valign=\"top\">\n                                                                                <p style=\"font-size:12px;font-weight:500;line-height:24px;margin-bottom:0;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Bezahlmethode</p>\n                                                                                <table role=\"presentation\" style=\"min-width:150px\">\n                                                                                    <tbody>\n                                                                                        <tr>\n                                                                                            <td style=\"vertical-align:middle;margin-right:4px\"><img height=\"28\" src=\"https://cdn.paddle.com/email-templates/images/icon-visa.png\" alt=\"visa\" style=\"display:block\"></td>\n                                                                                            <td style=\"vertical-align:middle\"><img height=\"28\" alt=\"visa\" src=\"https://cdn.paddle.com/email-templates/images/icon-visa.png\" style=\"display:none;margin-right:4px\"></td>\n                                                                                            <td style=\"vertical-align:middle\"><img height=\"28\" alt=\"visa\" src=\"https://cdn.paddle.com/email-templates/images/icon-visa-dark-mode.png\" style=\"display:none\"></td>\n                                                                                                <td style=\"vertical-align:middle\">\n                                                                                                    <p style=\"font-size:14px;font-weight:900;line-height:24px;margin-bottom:4px;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">mit Endziffern 4242</p>\n                                                                                                </td>\n                                                                                        </tr>\n                                                                                    </tbody>\n                                                                                </table>\n                                                                            </td>\n                                                                        </tr>\n                                                                    </tbody></table>\n                                                                    <table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"margin-top:0\">\n                                                                        <tbody><tr>\n                                                                            <td height=\"26\" class=\"m_940821289515909318bibbXQ\" style=\"height:26px\"></td>\n                                                                        </tr>\n                                                                    </tbody></table>                                                                    <table cellspacing=\"0\" cellpadding=\"0\" width=\"100%\" class=\"m_940821289515909318dNxHHs\" style=\"border:1px solid #d2d4de;border-top-right-radius:4px;border-top-left-radius:4px;border-bottom-right-radius:0;border-bottom-left-radius:0;border-collapse:separate;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                        <tbody style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                                <tr style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                                    <td class=\"m_940821289515909318idljME\" style=\"color:#45567c;line-height:20px;padding:20px 28px 16px 28px;text-align:left;font-weight:900;font-size:14px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"left\">\n                                                                                        <p style=\"margin-top:0;margin-bottom:0;font-size:14px;font-weight:500;line-height:20px;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Cloud Pro-1 </p>\n                                                                                    </td>\n                                                                                    <td class=\"m_940821289515909318cwzaMf\" style=\"color:#45567c;line-height:20px;padding:20px 28px 16px 28px;text-align:right;font-weight:900;font-size:14px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"right\">\n                                                                                        <p style=\"margin-top:0;margin-bottom:0;font-size:14px;font-weight:500;line-height:20px;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">42,02 $</p>\n                                                                                    </td>\n                                                                                </tr>                                                                                \n                                                                                                                                                            \n                                                                            <tr style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                                <td class=\"m_940821289515909318joqGUf\" style=\"color:#45567c;line-height:20px;padding:20px 28px 0 28px;text-align:left;font-weight:200;font-size:11px;border-top:1px solid #d2d4de;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"left\"></td>\n                                                                                <td class=\"m_940821289515909318joqGUf\" style=\"color:#45567c;line-height:20px;padding:20px 28px 0 28px;text-align:left;font-weight:200;font-size:11px;border-top:1px solid #d2d4de;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"left\"></td>\n                                                                            </tr>\n                                                                                <tr style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                                    <td class=\"m_940821289515909318kTjnKY\" style=\"color:#45567c;line-height:20px;padding:0 28px 12px 28px;text-align:left;font-weight:500;font-size:14px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"left\">\n                                                                                        <p style=\"margin-top:0;margin-bottom:0;font-size:14px;font-weight:500;line-height:20px;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">MwSt. (19%)</p>\n                                                                                    </td>\n                                                                                    <td class=\"m_940821289515909318cGUKLL\" style=\"color:#45567c;line-height:20px;padding:0 28px 12px 28px;text-align:right;font-weight:500;font-size:14px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"right\">\n                                                                                        <p style=\"margin-top:0;margin-bottom:0;font-size:14px;font-weight:500;line-height:20px;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">7,98 $</p>\n                                                                                    </td>\n                                                                                </tr>\n                                                                            <tr style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                                <td class=\"m_940821289515909318fVuKma\" style=\"color:#45567c;line-height:20px;padding:0 28px 20px 28px;text-align:left;font-weight:500;font-size:14px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"left\">\n                                                                                    <p style=\"margin-top:0;margin-bottom:0;font-size:14px;font-weight:900;line-height:20px;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Betrag</p>\n                                                                                </td>\n                                                                                <td class=\"m_940821289515909318bWUSjt\" style=\"color:#45567c;line-height:20px;padding:0 28px 20px 28px;text-align:right;font-weight:900;font-size:14px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"right\">\n                                                                                    <p style=\"margin-top:0;margin-bottom:0;font-size:14px;font-weight:900;line-height:20px;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">50,00 $</p>\n                                                                                </td>\n                                                                            </tr>\n                                                                        </tbody>\n                                                                    </table>\n                                                                    <table style=\"border:1px solid #d2d4de;border-top-right-radius:0;border-top-left-radius:0;border-bottom-right-radius:4px;border-bottom-left-radius:4px;border-collapse:separate;margin-bottom:40px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\" class=\"m_940821289515909318kpydUo\">\n                                                                        <tbody style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                            <tr style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                                <td class=\"m_940821289515909318bORRIC\" style=\"color:#45567c;line-height:20px;padding:15px;text-align:center;font-weight:200;font-size:11px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"center\">\n                                                                                    <table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" style=\"text-align:center;width:100%\" width=\"100%\" align=\"center\">\n                                                                                        <tbody><tr>\n                                                                                            <td style=\"border-radius:&#39;50px&#39;;text-align:&#39;center&#39;\" align=\"&#39;center&#39;\">\n                                                                                                <div>\n                                                                                                    <div>\n                                                                                                        \n                                                                                                    </div><a href=\"http://sandbox-my.paddle.com/receipt/624743-6710887/1448886-chre844ceca16cc-47fea87994\" width=\"216px\" class=\"m_940821289515909318icPhtA\" style=\"background-color:#0096ff;border:2px solid none;border-radius:4px;color:#ffffff;display:inline-block;font-size:16px;font-weight:900;line-height:44px;padding-top:0;padding-right:0;padding-left:0;padding-bottom:0;margin-bottom:0;text-align:center;text-decoration:none;width:216px;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" target=\"_blank\"><span style=\"color:#ffffff\">Beleg ansehen</span></a>\n                                                                                                </div>\n                                                                                            </td>\n                                                                                        </tr>\n                                                                                    </tbody></table>\n                                                                                        <p style=\"font-size:12px;font-weight:500;line-height:20px;margin-top:0;margin-right:0;margin-bottom:10px;margin-left:0;color:#73809c;margin:12px 13px 5px 13px;font-family:Lato,Helvetica,Roboto,sans-serif\">Die 50,00 $-Zahlung wird auf Ihrem Kontoauszug/Ihrer Kreditkartenabrechnung wie folgt angezeigt: <br><b style=\"font-weight:700\"><a href=\"http://PADDLE.NET\" target=\"_blank\">PADDLE.NET</a>* N8N STAGE</b></p>\n                                                                                </td>\n                                                                            </tr><tr style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                                                                                <td class=\"m_940821289515909318iXHUu\" style=\"color:#45567c;line-height:20px;padding:0px;text-align:left;font-weight:200;font-size:11px;border-top:0;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" align=\"left\"></td>\n                                                                            </tr>\n                                                            </tbody></table></td></tr>\n                                                            \n                                                        </tbody></table>                                                        <hr style=\"margin:40px 0;border:none;border-bottom:1px solid #a2abbd;margin-top:0;margin-bottom:10px;border-bottom-color:#d2d4de\">\n                                                        <p style=\"font-size:14px;font-weight:500;line-height:24px;margin-top:0;margin-right:0;margin-bottom:10px;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Falls Sie Hilfe mit Ihrem Cloud Pro-1-Abonnement benötigen, kontaktieren Sie uns bitte unter <a href=\"https://paddle.net?h=5ff337a9e53874c895f99e498a540988a2ce498555eb6029bc33f138f3042d3950d915ee7d8146ceaef5\" style=\"text-decoration:none;color:#3fb0ff\" target=\"_blank\">paddle.net</a> oder antworten Sie auf diese <a href=\"mailto:help@paddle.com?subject=Re:+Your++invoice\" style=\"text-decoration:none;color:#3fb0ff\" target=\"_blank\">E-Mail</a>.</p>\n                                                        <hr style=\"margin:40px 0;border:none;border-bottom:1px solid #a2abbd;margin-top:2px;margin-bottom:28px;border-bottom-color:#d2d4de\">                                                        <p style=\"font-size:14px;font-weight:500;line-height:24px;margin-bottom:0;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">Mit freundlichen Grüßen,</p>\n                                                        <p style=\"font-size:14px;font-weight:500;line-height:24px;margin-bottom:0;margin-top:0;margin-right:0;margin-left:0;color:#45567c;font-family:Lato,Helvetica,Roboto,sans-serif\">n8n Sandbox</p>\n                                                    </td>\n                                                </tr>\n                                            </tbody></table>\n                                        </td>\n                                    </tr>\n                                </tbody></table>\n                            </td>\n                        </tr>\n                    </tbody></table>\n            </center></td>\n        </tr>\n    </tbody></table>\n</center>\n<table class=\"m_940821289515909318footerContainer\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"margin:0;border-top:0;border-radius:0;background-color:#f5f5f8\" bgcolor=\"#F5F5F8\">\n    <tbody><tr>\n        <td align=\"center\" valign=\"top\">\n            <table cellspacing=\"0\" cellpadding=\"0\" width=\"100%\" style=\"font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\">\n                <tbody><tr>\n                    <td style=\"padding:35px\" class=\"m_940821289515909318dsRHJY\">\n                        <table style=\"max-width:none;font-family:&#39;Lato&#39;,&#39;Helvetica&#39;,&#39;Roboto&#39;,sans-serif\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\">\n                            <tbody><tr>\n                                <td align=\"center\"><img width=\"95\" height=\"30\" src=\"https://cdn.paddle.com/email-templates/images/paddle-logo-light.png\" alt=\"logo\" style=\"margin-bottom:10px\">\n                                    <div style=\"display:none\"><img width=\"95\" height=\"30\" src=\"https://cdn.paddle.com/email-templates/images/paddle-logo-light.png\" alt=\"logo\" style=\"display:none;margin-bottom:10px\"></div>\n                                    <div style=\"display:none\"><img width=\"95\" height=\"30\" src=\"https://cdn.paddle.com/email-templates/images/paddle-logo-dark.png\" alt=\"logo\" style=\"display:none;margin-bottom:10px\"></div>\n                                    <div class=\"m_940821289515909318jKMVET\" style=\"display:none\">\n                                        <p style=\"margin-bottom:0;font-weight:500;font-size:12px;line-height:20px;margin-top:0;margin-right:0;margin-left:0;color:#a2abbd;font-family:Lato,Helvetica,Roboto,sans-serif\">Paddle.com Market Ltd, Judd House, 18-29 Mora Street, London EC1V 8BT. © 2023 Paddle. All rights reserved.</p>\n                                    </div>\n                                    <div class=\"m_940821289515909318hNHNzH\" style=\"display:block\">\n                                        <p style=\"margin-bottom:0;font-weight:500;font-size:12px;line-height:20px;margin-top:0;margin-right:0;margin-left:0;color:#a2abbd;font-family:Lato,Helvetica,Roboto,sans-serif\">Paddle.com Market Ltd, Judd House, 18-29 Mora Street, London EC1V 8BT </p>\n                                        <p style=\"margin-bottom:0;font-weight:500;font-size:12px;line-height:20px;margin-top:0;margin-right:0;margin-left:0;color:#a2abbd;font-family:Lato,Helvetica,Roboto,sans-serif\">© 2023 Paddle. All rights reserved.</p>\n                                    </div>\n                                        <table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"margin-top:0\">\n                                            <tbody><tr>\n                                                <td height=\"10\" class=\"m_940821289515909318hSDLeU\" style=\"height:10px\"></td>\n                                            </tr>\n                                        </tbody></table>\n                                        <p id=\"m_940821289515909318order-id\" style=\"margin-bottom:0;font-weight:500;font-size:12px;line-height:20px;margin-top:0;margin-right:0;margin-left:0;color:#a2abbd;font-family:Lato,Helvetica,Roboto,sans-serif\">624743-6710887</p>\n                                    <div style=\"display:none\">\n                                        <u></u>Your invoice<u></u>\n                                        <div id=\"m_940821289515909318paddle-lang\">de</div>\n                                        <div id=\"m_940821289515909318paddle-type\">subscription-receipt</div>\n                                        <div id=\"m_940821289515909318paddle-sub-type\">recurring</div>\n                                        <div id=\"m_940821289515909318paddle-hash\">5ff337a9e53874c895f99e498a540988a2ce498555eb6029bc33f138f3042d3950d915ee7d8146ceaef5</div>\n                                    </div>\n                                </td>\n                            </tr>\n                        </tbody></table>\n                    </td>\n                </tr>\n            </tbody></table>\n        </td>\n    </tr>\n</tbody></table>\n\n\n\n<img src=\"https://ea.pstmrk.it/open?m=v3_1.qcT0BSoIS8So_NHmVqXvsQ.W2XinJpIizdNVDECCGgn99CzpHs6N8NLNJJ4IgiOd46xuf6yKLgk7mLXkeHmXAZJkNfzXusj-7f_LdlDA4qWujrr0tpiQvgZvMNBlziAzes7Ebf8RRztySfwp2x58IHuexri7mOvl2ol1Nbp7pbW5zjtkrWOEo-GHOOhNdRWcb-gx846QnXn0PqD9OZAhujKYIx2Gtb7GAmY9lOdRStvEZW_D5AS2ArYQU3voRNIsr_ZsU3wPIei-J96GzvWrG7zdSRP2kaqaY9uthTqmPcl2DeNGiespHR7e_qCwlhaeKvLUHeC7ot9Dgx6X185wbz3fCvaQebDsv9beDJHweppkc5AT0a54EqEeBW5maLWAo2RnEqIOK-icYjVgbtpKuHDdIcnFp6MqbWm6HyYQyPgy_RS6-YpzE3KUBMN77ME7o30VEA3izNgSyesQDk3JZG7zqn4ndjsTIrT0uxMXekFjNOs38vDwwJ8_1FBwokJUxZUO6JNrWTpDiXu2nDK5iH_pC8LhChw97Yo7FQA8f44ag\" width=\"1\" height=\"1\" border=\"0\" alt=\"\"></div></div></div></div>\n",
+        "text": "---------- Forwarded message ---------\nFrom: n8n Sandbox (via Paddle.com) <help@paddle.com>\nDate: Thu, Oct 12, 2023 at 3:30 AM\nSubject: Your invoice\nTo: <niklas+12may2023@n8n.io>\n\n\nBeleg für Ihr Cloud Pro-1-Abonnement\n\nBeleg Nr. 624743-6710887\n\nBetrag\n\n50,00 $\n\nBeleg Datum\n\n12. Oktober 2023\n\nBezahlmethode\n[image: visa] [image: visa] [image: visa]\n\nmit Endziffern 4242\n\nCloud Pro-1\n\n42,02 $\n\nMwSt. (19%)\n\n7,98 $\n\nBetrag\n\n50,00 $\nBeleg ansehen\n<http://sandbox-my.paddle.com/receipt/624743-6710887/1448886-chre844ceca16cc-47fea87994>\n\nDie 50,00 $-Zahlung wird auf Ihrem Kontoauszug/Ihrer Kreditkartenabrechnung\nwie folgt angezeigt:\n*PADDLE.NET <http://PADDLE.NET>* N8N STAGE*\n------------------------------\n\nFalls Sie Hilfe mit Ihrem Cloud Pro-1-Abonnement benötigen, kontaktieren\nSie uns bitte unter paddle.net\n<https://paddle.net?h=5ff337a9e53874c895f99e498a540988a2ce498555eb6029bc33f138f3042d3950d915ee7d8146ceaef5>\noder antworten Sie auf diese E-Mail\n<help@paddle.com?subject=Re:+Your++invoice>.\n------------------------------\n\nMit freundlichen Grüßen,\n\nn8n Sandbox\n[image: logo]\n[image: logo]\n[image: logo]\n\nPaddle.com Market Ltd, Judd House, 18-29 Mora Street, London EC1V 8BT. ©\n2023 Paddle. All rights reserved.\n\nPaddle.com Market Ltd, Judd House, 18-29 Mora Street, London EC1V 8BT\n\n© 2023 Paddle. All rights reserved.\n\n624743-6710887\nYour invoice\nde\nsubscription-receipt\nrecurring\n5ff337a9e53874c895f99e498a540988a2ce498555eb6029bc33f138f3042d3950d915ee7d8146ceaef5\n",
+        "headers": {
+          "to": "To: Niklas Hatje <niklas@n8n.io>",
+          "date": "Date: Wed, 28 Aug 2024 14:20:20 +0200",
+          "from": "From: Niklas Hatje <niklas@n8n.io>",
+          "subject": "Subject: Fwd: Your invoice",
+          "message-id": "Message-ID: <CAMmGHAVOEo4znp5x=XdDHsaqsPC+Kvg70f6YqiO9DsuAS_d4Jg@mail.gmail.com>",
+          "references": "References: <2a560e95-b888-44fd-99f6-3b2ef12e8d95@mtasv.net>",
+          "in-reply-to": "In-Reply-To: <2a560e95-b888-44fd-99f6-3b2ef12e8d95@mtasv.net>",
+          "content-type": "Content-Type: multipart/alternative; boundary=\"000000000000b159ff0620bd6127\"",
+          "mime-version": "MIME-Version: 1.0"
+        },
+        "subject": "Fwd: Your invoice",
+        "labelIds": [
+          "UNREAD",
+          "IMPORTANT",
+          "SENT",
+          "INBOX"
+        ],
+        "threadId": "18b21819526d9ccc",
+        "inReplyTo": "<2a560e95-b888-44fd-99f6-3b2ef12e8d95@mtasv.net>",
+        "messageId": "<CAMmGHAVOEo4znp5x=XdDHsaqsPC+Kvg70f6YqiO9DsuAS_d4Jg@mail.gmail.com>",
+        "references": "<2a560e95-b888-44fd-99f6-3b2ef12e8d95@mtasv.net>",
+        "textAsHtml": "<p>---------- Forwarded message ---------<br/>From: n8n Sandbox (via <a href=\"http://Paddle.com\">Paddle.com</a>) &lt;<a href=\"mailto:help@paddle.com\">help@paddle.com</a>&gt;<br/>Date: Thu, Oct 12, 2023 at 3:30&#x202F;AM<br/>Subject: Your invoice<br/>To: &lt;<a href=\"mailto:niklas+12may2023@n8n.io\">niklas+12may2023@n8n.io</a>&gt;</p><p>Beleg f&uuml;r Ihr Cloud Pro-1-Abonnement</p><p>Beleg Nr. 624743-6710887</p><p>Betrag</p><p>50,00 $</p><p>Beleg Datum</p><p>12. Oktober 2023</p><p>Bezahlmethode<br/>[image: visa] [image: visa] [image: visa]</p><p>mit Endziffern 4242</p><p>Cloud Pro-1</p><p>42,02 $</p><p>MwSt. (19%)</p><p>7,98 $</p><p>Betrag</p><p>50,00 $<br/>Beleg ansehen<br/>&lt;<a href=\"http://sandbox-my.paddle.com/receipt/624743-6710887/1448886-chre844ceca16cc-47fea87994\">http://sandbox-my.paddle.com/receipt/624743-6710887/1448886-chre844ceca16cc-47fea87994</a>&gt;</p><p>Die 50,00 $-Zahlung wird auf Ihrem Kontoauszug/Ihrer Kreditkartenabrechnung<br/>wie folgt angezeigt:<br/>*<a href=\"http://PADDLE.NET\">PADDLE.NET</a> &lt;<a href=\"http://PADDLE.NET\">http://PADDLE.NET</a>&gt;* N8N STAGE*<br/>------------------------------</p><p>Falls Sie Hilfe mit Ihrem Cloud Pro-1-Abonnement ben&ouml;tigen, kontaktieren<br/>Sie uns bitte unter <a href=\"http://paddle.net\">paddle.net</a><br/>&lt;<a href=\"https://paddle.net?h=5ff337a9e53874c895f99e498a540988a2ce498555eb6029bc33f138f3042d3950d915ee7d8146ceaef5\">https://paddle.net?h=5ff337a9e53874c895f99e498a540988a2ce498555eb6029bc33f138f3042d3950d915ee7d8146ceaef5</a>&gt;<br/>oder antworten Sie auf diese E-Mail<br/>&lt;<a href=\"mailto:help@paddle.com\">help@paddle.com</a>?subject=Re:+Your++invoice&gt;.<br/>------------------------------</p><p>Mit freundlichen Gr&uuml;&szlig;en,</p><p>n8n Sandbox<br/>[image: logo]<br/>[image: logo]<br/>[image: logo]</p><p><a href=\"http://Paddle.com\">Paddle.com</a> Market Ltd, Judd House, 18-29 Mora Street, London EC1V 8BT. &copy;<br/>2023 Paddle. All rights reserved.</p><p><a href=\"http://Paddle.com\">Paddle.com</a> Market Ltd, Judd House, 18-29 Mora Street, London EC1V 8BT</p><p>&copy; 2023 Paddle. All rights reserved.</p><p>624743-6710887<br/>Your invoice<br/>de<br/>subscription-receipt<br/>recurring<br/>5ff337a9e53874c895f99e498a540988a2ce498555eb6029bc33f138f3042d3950d915ee7d8146ceaef5</p>",
+        "sizeEstimate": 30783
+      }
+    ]
+  },
+  "connections": {
+    "Setup": {
+      "main": [
+        [
+          {
+            "node": "Only n8n Paddle invoice mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Only keep invoice link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rename file": {
+      "main": [
+        [
+          {
+            "node": "Move to the correct folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload PDF to Drive": {
+      "main": [
+        [
+          {
+            "node": "Rename file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only keep invoice link": {
+      "main": [
+        [
+          {
+            "node": "Download Invoice PDF from URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract \"a-tags\" from email": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Invoice PDF from URL": {
+      "main": [
+        [
+          {
+            "node": "Upload PDF to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only n8n Paddle invoice mails": {
+      "main": [
+        [
+          {
+            "node": "Extract \"a-tags\" from email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Do nothing on other emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

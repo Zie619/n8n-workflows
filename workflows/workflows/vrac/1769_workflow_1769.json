@@ -1,0 +1,334 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "daaa472a-fff3-41e2-9b6f-f7f54655ea16",
+      "name": "Determine create/update",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1380,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"action\"] }}",
+              "value2": "Create"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1b047238-80b4-4144-929d-f860510b68c6",
+      "name": "Update task",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1580,
+        420
+      ],
+      "parameters": {
+        "pageId": "={{ $json[\"database_id\"] }}",
+        "resource": "databasePage",
+        "operation": "update",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Task|title",
+              "title": "={{ $json[\"name\"] }}"
+            },
+            {
+              "key": "Deadline|date",
+              "date": "={{ $json[\"due_on\"] }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "71801502-14bd-42d2-beb9-e44e90bcac49",
+      "name": "Create task",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1580,
+        180
+      ],
+      "parameters": {
+        "title": "={{$json[\"name\"]}}",
+        "resource": "databasePage",
+        "databaseId": "6181df20-c949-42e3-9999-7168d746efab",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Asana GID|number",
+              "numberValue": "={{ parseInt($json[\"gid\"]) }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "76d95145-89ff-477f-9e28-a64c3601b4ea",
+      "name": "Get tasks",
+      "type": "n8n-nodes-base.asana",
+      "position": [
+        780,
+        300
+      ],
+      "parameters": {
+        "id": "={{ $json[\"gid\"] }}",
+        "operation": "get"
+      },
+      "credentials": {
+        "asanaApi": {
+          "id": "8",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "id": "b79c96eb-ad00-4aa7-b02e-306a940396fc",
+      "name": "Find tasks",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        980,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "6181df20-c949-42e3-9999-7168d746efab",
+        "filterJson": "={{$node[\"Get unique tasks\"].json[\"notionfilter\"]}}",
+        "filterType": "json"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9804b81f-b2f9-45dc-9bbd-a652543668fd",
+      "name": "Get unique tasks",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        580,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const gids = [];\n\n// get all the unique Asana task gids\nfor (item of items) {\n  var gid = parseInt(item.json.resource.gid);\n  var resource_type = item.json.resource.resource_type;\n  if (!(gids.includes(gid)) && resource_type == \"task\") {\n    gids.push(gid);\n  }\n}\n\n// show in output\nconst new_items = [];\nfor (gid of gids) {\n  var new_item = {\n    \"json\": {\n      \"gid\": 0,\n      \"gids\": [],\n      \"notionfilter\": \"\"\n    }\n  };\n  new_item = JSON.stringify(new_item);\n  new_item = JSON.parse(new_item);\n  new_item.json.gid = gid;\n  new_item.json.gids = gids;\n  new_items.push(new_item);\n\n  // Notion filter\n  notionfilter = {\n    or: [],\n  }\n\n  for (gid of gids) {\n    const filter = {\n      property: 'Asana GID',\n      number: {\n        equals: gid\n      }\n    }\n    notionfilter[\"or\"].push(filter);\n  }\n\n\n  new_item.json.notionfilter = JSON.stringify(notionfilter); \n}\n\nconsole.log(gids);\nreturn new_items;"
+      },
+      "executeOnce": false,
+      "typeVersion": 1
+    },
+    {
+      "id": "91883ca1-91f8-41ce-84d5-00f9f3296cc7",
+      "name": "Determine",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1180,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const gids_to_update = [];\nconst database_ids = [];\n\nfor (item of $items(\"Find tasks\")) {\n  gids_to_update.push(parseInt(item.json.property_asana_gid));\n  database_ids.push(item.json.id);\n}\nconsole.log(gids_to_update);\nconsole.log(database_ids);\n\nvar gid;\nlet i = 0;\nfor (item of $items(\"Get tasks\")) {\n  gid = parseInt(item.json.gid);\n  if (gids_to_update.includes(gid)) {\n    item.json.action = \"Update\"\n    item.json.database_id = database_ids[i];\n  } else {\n    item.json.action = \"Create\"\n  }\n  i++;\n}\n\nreturn $items(\"Get tasks\");"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8ba512bb-671a-47d2-88fc-19ed358df728",
+      "name": "Check required fields exist",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1780,
+        180
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $node[\"Determine\"].json[\"due_on\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "512a09e0-c595-4613-a4d9-ed3160fd403b",
+      "name": "Update deadline",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1980,
+        180
+      ],
+      "parameters": {
+        "pageId": "={{ $json[\"id\"] }}",
+        "resource": "databasePage",
+        "operation": "update",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Deadline|date",
+              "date": "={{ $node[\"Determine\"].json[\"due_on\"] }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4b08a930-93ef-4f88-8109-9afa45af703e",
+      "name": "On update",
+      "type": "n8n-nodes-base.asanaTrigger",
+      "position": [
+        380,
+        300
+      ],
+      "webhookId": "61055fe2-63c7-4b93-adcb-ddb7556c3060",
+      "parameters": {
+        "resource": "1202718722261680",
+        "workspace": "1177253494675264"
+      },
+      "credentials": {
+        "asanaApi": {
+          "id": "8",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Determine": {
+      "main": [
+        [
+          {
+            "node": "Determine create/update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get tasks": {
+      "main": [
+        [
+          {
+            "node": "Find tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Determine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On update": {
+      "main": [
+        [
+          {
+            "node": "Get unique tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find tasks": {
+      "main": [
+        [
+          {
+            "node": "Determine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create task": {
+      "main": [
+        [
+          {
+            "node": "Check required fields exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get unique tasks": {
+      "main": [
+        [
+          {
+            "node": "Get tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine create/update": {
+      "main": [
+        [
+          {
+            "node": "Create task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check required fields exist": {
+      "main": [
+        [
+          {
+            "node": "Update deadline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

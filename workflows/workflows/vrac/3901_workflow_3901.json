@@ -1,0 +1,352 @@
+{
+  "meta": {
+    "instanceId": "4a11afdb3c52fd098e3eae9fad4b39fdf1bbcde142f596adda46c795e366b326"
+  },
+  "nodes": [
+    {
+      "id": "f1b36f4b-6558-4e83-a999-e6f2d24e196c",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "position": [
+        620,
+        240
+      ],
+      "parameters": {
+        "model": "openai/gpt-4.1",
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "89ca0a07-286f-4e68-9e85-0327a4859cc0",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        900,
+        240
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"array\",\n  \"items\": {\n    \"type\": \"object\",\n    \"properties\": {\n      \"name\": { \"type\": \"string\" },\n      \"description\": { \"type\": \"string\" },\n      \"rating\": { \"type\": \"number\" },\n      \"reviews\": { \"type\": \"integer\" },\n      \"price\": { \"type\": \"string\" }\n    },\n    \"required\": [\"name\", \"description\", \"rating\", \"reviews\", \"price\"]\n  }\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e4800c1d-c0d8-4093-81ec-fc19ad0034cd",
+      "name": "scrap url",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        240,
+        60
+      ],
+      "parameters": {
+        "url": "https://api.brightdata.com/request",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "zone",
+              "value": "web_unlocker1"
+            },
+            {
+              "name": "url",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "name": "format",
+              "value": "raw"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "{{BRIGHTDATA_TOKEN}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "1a1f768f-615d-4035-81b0-63b860f8e6ac",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        -140
+      ],
+      "parameters": {
+        "content": "## Web Scraper API\n\n[Inscription - Free Trial](https://get.brightdata.com/website-scraper)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2f260d96-4fff-4a4f-af29-1e43f465d54c",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -440,
+        200
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "4be9033f-0b9f-466d-916e-88fbb2a80417",
+      "name": "url",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        20,
+        200
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "21b6d21c-b977-4175-9068-e0e2e19fa472",
+      "name": "get urls to scrape",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -200,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": "{{TRACK_SHEET_GID}}",
+        "documentId": "{{WEB_SHEET_ID}}"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KsXWRZTrfCUFrrHD",
+          "name": "Google Sheets"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "25ef76ec-cf0d-422e-b060-68c49192a008",
+      "name": "clean html",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        460,
+        60
+      ],
+      "parameters": {
+        "jsCode": "// CleanHtmlFunction.js\n// Purpose: n8n Function node to clean HTML: remove doctype, scripts, styles, head, comments, classes, extra blank lines, and non-whitelisted tags\n\nreturn items.map(item => {\n  const rawHtml = item.json.data;\n\n  // 1) remove doctype, scripts, styles, comments and head section, and strip class attributes\n  let cleaned = rawHtml\n    .replace(/<!doctype html>/gi, '')\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<!--[\\s\\S]*?-->/g, '')\n    .replace(/<head[\\s\\S]*?<\\/head>/gi, '')\n    .replace(/\\sclass=\"[^\"]*\"/gi, '');\n\n  // 2) define whitelist of tags to keep\n  const allowedTags = [\n    'h1','h2','h3','h4','h5','h6',\n    'p','ul','ol','li',\n    'strong','em','a','blockquote',\n    'code','pre'\n  ];\n\n  // 3) strip out all tags not in the whitelist, reconstruct allowed tags cleanly\n  cleaned = cleaned.replace(\n    /<\\/?([a-z][a-z0-9]*)\\b[^>]*>/gi,\n    (match, tagName) => {\n      const name = tagName.toLowerCase();\n      if (allowedTags.includes(name)) {\n        return match.startsWith('</') ? `</${name}>` : `<${name}>`;\n      }\n      return '';\n    }\n  );\n\n  // 4) collapse multiple blank or whitespace-only lines into a single newline\n  cleaned = cleaned.replace(/(\\s*\\r?\\n\\s*){2,}/g, '\\n');\n\n  // 5) trim leading/trailing whitespace\n  cleaned = cleaned.trim();\n\n  return {\n    json: { cleanedHtml: cleaned }\n  };\n});"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f72660d5-8427-4655-acbe-10365273c27b",
+      "name": "extract data",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        680,
+        60
+      ],
+      "parameters": {
+        "text": "={{ $json.cleanedHtml }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are an expert in web page scraping. Provide a structured response in JSON format. Only the response, without commentary.\n\nExtract the product information for {{ $(‘url’).item.json.url.split(’/s?k=’)[1].split(’&’)[0] }} present on the page.\n\nname\ndescription\nrating\nreviews\nprice"
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.6
+    },
+    {
+      "id": "8b4af1bb-d7f8-456e-b630-ecd9b6e4bcdc",
+      "name": "add results",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1280,
+        200
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "name": "={{ $json.output.name }}",
+            "price": "={{ $json.output.price }}",
+            "rating": "={{ $json.output.rating }}",
+            "reviews": "={{ $json.output.reviews }}",
+            "description": "={{ $json.output.description }}"
+          },
+          "schema": [
+            {
+              "id": "name",
+              "type": "string"
+            },
+            {
+              "id": "description",
+              "type": "string"
+            },
+            {
+              "id": "rating",
+              "type": "string"
+            },
+            {
+              "id": "reviews",
+              "type": "string"
+            },
+            {
+              "id": "price",
+              "type": "string"
+            }
+          ],
+          "mappingMode": "defineBelow"
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": "{{RESULTS_SHEET_GID}}",
+        "documentId": "{{WEB_SHEET_ID}}"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "KsXWRZTrfCUFrrHD",
+          "name": "Google Sheets"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "7a5ba438-2ede-4d6c-b8fa-9a958ba1ef3e",
+      "name": "Split items",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1060,
+        60
+      ],
+      "parameters": {
+        "include": "allOtherFields",
+        "options": {},
+        "fieldToSplitOut": "output"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "url": {
+      "main": [
+        [],
+        [
+          {
+            "node": "scrap url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scrap url": {
+      "main": [
+        [
+          {
+            "node": "clean html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean html": {
+      "main": [
+        [
+          {
+            "node": "extract data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split items": {
+      "main": [
+        [
+          {
+            "node": "add results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "add results": {
+      "main": [
+        [
+          {
+            "node": "url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract data": {
+      "main": [
+        [
+          {
+            "node": "Split items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get urls to scrape": {
+      "main": [
+        [
+          {
+            "node": "url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "extract data",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "extract data",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "get urls to scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

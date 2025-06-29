@@ -1,0 +1,252 @@
+{
+  "id": "SvYHgLmzosuLAe4A",
+  "meta": {
+    "instanceId": "a4bfc93e975ca233ac45ed7c9227d84cf5a2329310525917adaf3312e10d5462",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Google Calendar Event Reminder",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "dff5d952-23cb-4822-9aec-0dcae3de568a",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "disabled": true,
+      "position": [
+        -40,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "a6de9944-1dd7-430e-a1d9-100710ddfa9c",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        700,
+        500
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "6d2208a6-6000-4b6b-a82c-e346b7885409",
+      "name": "Get upcoming event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "limit": 5,
+        "options": {},
+        "timeMax": "={{ $now.plus({ hour: 1, minute:1 }) }}",
+        "timeMin": "={{ $now.plus({ hour: 1 }) }}",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "davide.boizza@gmail.com",
+          "cachedResultName": "davide.boizza@gmail.com"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "8RFK3u13g2PJEGa9",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "e6f6e744-60b0-4b22-93bc-f3ffcfac71f6",
+      "name": "Already sent?",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.id }}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "882d08f5-790a-40bb-bda5-60744d587633",
+      "name": "Secretary Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "text": "=These are the details of the event/appointment:\n\nEvent Name: {{ $('Get upcoming event').item.json.summary }}\nDescription: {{ $('Get upcoming event').item.json.description }}\nLocation: {{ $('Get upcoming event').item.json.location }}\nStart: {{ $('Get upcoming event').item.json.start.dateTime }}\nEnd: {{ $('Get upcoming event').item.json.end.dateTime }}\nCreated by: {{ $('Get upcoming event').item.json.creator.email }}",
+        "options": {
+          "systemMessage": "=## Core Identity\nYou are a professional and friendly virtual secretary, dedicated to reminder appointments with efficiency and a warm personal touch.\n\n## Communication Style\n- Communicate in a conversational, approachable manner\n- Maintain a balance between professional competence and friendly rapport\n- Use a tone that is informal yet precise\n- Inject occasional light humor and personality into interactions\n\n## Key Responsibilities\n1. Calendar Management\n   - Provide timely reminders and scheduling updates\n\n2. Communication Approach\n   - Respond promptly and clearly\n   - Maintain confidentiality and discretion\n\n## Interaction Guidelines\n- Use a friendly, conversational tone\n- Just describe the details of the event without asking questions\n\n## Tone and Language\n- Warm and approachable\n- Professional but not overly formal\n- Direct and clear in communication\n- Use simple, straightforward language\n- Show genuine care and attentiveness\n\nRemember: Your primary goal is to make the user's life easier, more organized, and less stressful through efficient and friendly administrative support."
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "82509a0f-9086-423e-8928-f882e59333b8",
+      "name": "Send reminder",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1100,
+        300
+      ],
+      "webhookId": "dbb6a96e-db3b-4827-9455-a91007b89616",
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "chatId": "CHAT_ID",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "0hSq9VwaiJifiscT",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "d08dd565-4718-4fbc-af7c-7a2e042c96f8",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        -140
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 620,
+        "content": "## Google Calendar Event Reminder\nThis smart **Google Calendar** workflow fixes that by sending you a clear, friendly reminder exactly **1 hour before your event starts**—delivered through **Telegram** as if a personal assistant were looking out for you. Powered by **AI**, it transforms cold calendar alerts into warm, conversational nudges you won't ignore."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7a9379ca-f301-40b9-ae90-742663bbcdf2",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        40
+      ],
+      "parameters": {
+        "width": 620,
+        "height": 140,
+        "content": "## STEP 1\n- In the \"Get upcoming event\" node enter how much time before the event starts you want to be notified. It is currently set to 1 hour\n- In the Telegram node replace CHAT_ID with that of your personal Bot"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d7852912-6501-4a1b-8928-6eb890e4aea8",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        420,
+        240
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 200,
+        "content": "Prevent multiple reminders for the same event"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "timezone": "Europe/Rome",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionOrder": "v1"
+  },
+  "versionId": "d0dd74db-e96c-4a09-a8d1-6fb193b6e015",
+  "connections": {
+    "Already sent?": {
+      "main": [
+        [
+          {
+            "node": "Secretary Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Secretary Agent": {
+      "main": [
+        [
+          {
+            "node": "Send reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get upcoming event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Secretary Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get upcoming event": {
+      "main": [
+        [
+          {
+            "node": "Already sent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,231 @@
+{
+  "nodes": [
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        -700,
+        1500
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 10,
+              "mode": "everyWeek"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Shopify",
+      "type": "n8n-nodes-base.shopify",
+      "position": [
+        -500,
+        1500
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "getAll"
+      },
+      "credentials": {
+        "shopifyApi": "shopify_nodeqa"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Function",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        300,
+        1400
+      ],
+      "parameters": {
+        "functionCode": "let totalOrders = items.length;\nlet ordersSum = 0;\n\nfor(let i=0; i < items.length; i++) {\n  ordersSum = ordersSum + parseFloat(items[i].json.orderPrice);\n}\nreturn [{json:{totalOrders, ordersSum}}]"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        500,
+        1500
+      ],
+      "parameters": {
+        "options": {},
+        "sheetId": "1GVyV1yYwWZu510NTzVgi2RyesrsnuP3RxXmWbX1O7DQ",
+        "operation": "append",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": "google_sheets_oauth"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        500,
+        1300
+      ],
+      "parameters": {
+        "text": "=Hey team, this week we had {{$json[\"totalOrders\"]}} orders with a total value of € {{$json[\"ordersSum\"]}}.",
+        "channel": "shopify",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": "slack_nodeqa"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Date & Time",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        -300,
+        1500
+      ],
+      "parameters": {
+        "value": "={{$json[\"created_at\"]}}",
+        "options": {},
+        "dataPropertyName": "order_date"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -100,
+        1500
+      ],
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{$node[\"Date & Time\"].json[\"order_date\"]}}",
+              "value2": "2021-08-17T15:00:53.223Z"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        100,
+        1600
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Set price",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        100,
+        1400
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "orderPrice",
+              "value": "={{$json[\"total_price\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Set price",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Shopify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify": {
+      "main": [
+        [
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set price": {
+      "main": [
+        [
+          {
+            "node": "Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

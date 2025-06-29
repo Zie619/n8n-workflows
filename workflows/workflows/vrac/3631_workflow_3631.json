@@ -1,0 +1,642 @@
+{
+  "meta": {
+    "instanceId": "408f9fb9940c3cb18ffdef0e0150fe342d6e655c3a9fac21f0f644e8bedabcd9",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "0c49141e-128c-424e-afdf-ea131b7a3dd8",
+      "name": "GetTableSchema",
+      "type": "n8n-nodes-base.postgresTool",
+      "position": [
+        -460,
+        220
+      ],
+      "parameters": {
+        "query": "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1",
+        "options": {
+          "queryReplacement": "={{ $fromAI('tableName', 'The name of the table.') }}"
+        },
+        "operation": "executeQuery",
+        "descriptionType": "manual",
+        "toolDescription": "Read a table's schema."
+      },
+      "credentials": {
+        "postgres": {
+          "id": "elRn5sxKOfCdlEs6",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "8ffeefb9-357c-41bc-8239-0c07c706be97",
+      "name": "ListTables",
+      "type": "n8n-nodes-base.postgresTool",
+      "position": [
+        -340,
+        300
+      ],
+      "parameters": {
+        "query": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'",
+        "options": {},
+        "operation": "executeQuery",
+        "descriptionType": "manual",
+        "toolDescription": "List all available tables."
+      },
+      "credentials": {
+        "postgres": {
+          "id": "elRn5sxKOfCdlEs6",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "efcf7ff3-976e-448a-9d47-47a98f3b0fcb",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        280,
+        200
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "operation"
+            },
+            {
+              "name": "tableName"
+            },
+            {
+              "name": "values",
+              "type": "object"
+            },
+            {
+              "name": "where",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "abd292d7-fc2b-4e98-a474-b50e44d16b6c",
+      "name": "CreateTableRecords",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        -240,
+        400
+      ],
+      "parameters": {
+        "name": "CreateTableRows",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $workflow.id }}"
+        },
+        "description": "Call this tool to create a row in the database.",
+        "workflowInputs": {
+          "value": {
+            "where": "={{ {} }}",
+            "values": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('values', `An object of key-value pair where key represents the column name.`, 'string') }}",
+            "operation": "insert",
+            "tableName": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('tableName', `Name of table to update`, 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "operation",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "operation",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tableName",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "tableName",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "values",
+              "type": "object",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "values",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "where",
+              "type": "object",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "where",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "4a71d42a-99a5-489e-b449-09c3c5081505",
+      "name": "ReadTableRecord",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        760,
+        0
+      ],
+      "parameters": {
+        "query": "SELECT * FROM {{ $json.tableName }}\n{{ $json.where && Object.keys($json.where).length > 0\n  ? `WHERE ` + Object.keys($json.where).map((key,idx) => `${key} = $${idx+1}`).join(' AND ')\n  : ''\n}}",
+        "options": {
+          "queryReplacement": "={{ Object.values($json.where).join(',') }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "elRn5sxKOfCdlEs6",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "bdc60aa8-9ab1-4bbd-8b9e-89c968d54043",
+      "name": "Operation",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        460,
+        200
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "READ",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "81b134bc-d671-4493-b3ad-8df9be3f49a6",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "read"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "INSERT",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "8d57914f-6587-4fb3-88e0-aa1de6ba56c1",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "insert"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "UPDATE",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "7c38f238-213a-46ec-aefe-22e0bcb8dffc",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "update"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "cdb5b556-3638-4fa5-94c6-bff0c03f6c89",
+      "name": "UpdateTableRecord",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        760,
+        400
+      ],
+      "parameters": {
+        "query": "UPDATE {{ $json.tableName }}\nSET\n  {{ Object.keys($json.values)\n  .map((key,idx) => `${key} = $${idx+1}`)\n  .join(',')\n}}\nWHERE\n  {{ Object.keys($json.where)\n  .map((key,idx) => `${key} = $${idx+Object.keys($json.values).length+1}`)\n  .join(' AND ')\n}}",
+        "options": {
+          "queryReplacement": "={{ Object.values($json.values).join(',') }},{{ Object.values($json.where).join(',') }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "elRn5sxKOfCdlEs6",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "9263fc78-321e-4c83-90d3-890dd87d6aed",
+      "name": "UpdateTableRecords",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        -100,
+        320
+      ],
+      "parameters": {
+        "name": "UpdateTableRows",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $workflow.id }}"
+        },
+        "description": "Call this tool to create a row in the database.",
+        "workflowInputs": {
+          "value": {
+            "where": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('where', `An object of key-value pair where key represents the column name.`, 'string') }}",
+            "values": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('values', `An object of key-value pair where key represents the column name.`, 'string') }}",
+            "operation": "=update",
+            "tableName": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('tableName', `Table to update`, 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "operation",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "operation",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tableName",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "tableName",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "values",
+              "type": "object",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "values",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "where",
+              "type": "object",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "where",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "dd7e28fb-b2c7-4084-bc9b-9aa3e0187682",
+      "name": "CreateTableRecord",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        760,
+        200
+      ],
+      "parameters": {
+        "query": "INSERT INTO {{ $json.tableName }}\n  ({{ Object.keys($json.values).join(',') }})\nVALUES\n  ({{ Object.keys($json.values).map((_,idx) => `$${idx+1}`).join(',') }})",
+        "options": {
+          "queryReplacement": "={{ Object.values($json.values).join(',') }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "elRn5sxKOfCdlEs6",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "324503c0-117b-45ec-97dd-7074eb1db22e",
+      "name": "ReadTableRows",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        20,
+        240
+      ],
+      "parameters": {
+        "name": "ReadTableRows",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $workflow.id }}"
+        },
+        "description": "Call this tool to read a row in the database.",
+        "workflowInputs": {
+          "value": {
+            "where": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('where', `An object of key-value pair where key represents the column name.`, 'string') }}",
+            "values": "{}",
+            "operation": "read",
+            "tableName": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('tableName', ``, 'string') }}"
+          },
+          "schema": [
+            {
+              "id": "operation",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "operation",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tableName",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "tableName",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "values",
+              "type": "object",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "values",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "where",
+              "type": "object",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "where",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "9cf39ca3-b704-49ce-b6e2-db2703c4acad",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -520,
+        -120
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 680,
+        "height": 660,
+        "content": "## 1. Set up an MCP Server Trigger\n[Read more about the MCP Server Trigger](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-langchain.mcptrigger)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ac3d9b98-8f1e-4abd-972c-1725aac1ad1e",
+      "name": "PostgreSQL MCP Server",
+      "type": "@n8n/n8n-nodes-langchain.mcpTrigger",
+      "position": [
+        -340,
+        20
+      ],
+      "webhookId": "a5fd7047-e31b-4c0d-bd68-c36072c3da0d",
+      "parameters": {
+        "path": "a5fd7047-e31b-4c0d-bd68-c36072c3da0d"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "416a09d5-c327-410d-b951-a2d08402c6fe",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        -120
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 820,
+        "height": 720,
+        "content": "## 2. Keep Secure by Preventing Raw SQL Statements\n[Read more about the PostgreSQL Node](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.postgres/)\n\nWhilst it may be easier to just let the Agent provide the full raw SQL statement,\nit may expose you or your organisation to a real security risk where in the worst\ncase, data may be unknowingly leaked or deleted.\n\nForcing the agent to provide only the parameters of the query\nmeans we can guard somewhat against this risk and also allows\nuse of query parameters as best practice against SQL injection attacks.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0187fb3f-4c31-461d-84e9-4a4a0bf4188d",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1000,
+        -560
+      ],
+      "parameters": {
+        "width": 440,
+        "height": 1320,
+        "content": "## Try It Out!\n### This n8n demonstrates how to build a simple PostgreSQL MCP server to manage your PostgreSQL database such as HR, Payroll, Sale, Inventory and More!\n\nThis MCP example is based off an official MCP reference implementation which can be found here -https://github.com/modelcontextprotocol/servers/tree/main/src/postgres\n\n### How it works\n* A MCP server trigger is used and connected to 5 tools: 2 postgreSQL and 3 custom workflow.\n* The 2 postgreSQL tools are simple read-only queries and as such, the postgreSQL tool can be simply used.\n* The 3 custom workflow tools are used for select, insert and update queries as these are operations which require a bit more discretion.\n* Whilst it may be easier to allow the agent to use raw SQL queries, we may find it a little safer to just allow for the parameters instead. The custom workflow tool allows us to define this restricted schema for tool input which we'll use to construct the SQL statement ourselves.\n* All 3 custom workflow tools trigger the same \"Execute workflow\" trigger in this very template which has a switch to route the operation to the correct handler.\n* Finally, we use our standard PostgreSQL node to handle select, insert and update operations. The responses are then sent back to the the MCP client.\n\n### How to use\n* This PostgreSQL MCP server allows any compatible MCP client to manage a PostgreSQL database by supporting select, create and update operations. You will need to have a database available before you can use this server.\n* Connect your MCP client by following the n8n guidelines here - https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-langchain.mcptrigger/#integrating-with-claude-desktop\n* Try the following queries in your MCP client:\n  * \"Please help me check if Alex has an entry in the users table. If not, please help me create a record for her.\"\n  * \"What was the top selling product in the last week?\"\n  * \"How many high priority support tickets are still open this morning?\"\n\n### Requirements\n* PostgreSQL for database. This can be an external database such as Supabase or one you can host internally.\n* MCP Client or Agent for usage such as Claude Desktop - https://claude.ai/download\n\n### Customising this workflow\n* If the scope of schemas or tables is too open, try restrict it so the MCP serves a specific purpose for business operations. eg. Confine the querying and editing to HR only tables before providing access to people in that department.\n* Remember to set the MCP server to require credentials before going to production and sharing this MCP server with others!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bc4e427f-f6fd-4243-844a-8edf2dc1a0e9",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -520,
+        -240
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 380,
+        "height": 100,
+        "content": "### Always Authenticate Your Server!\nBefore going to production, it's always advised to enable authentication on your MCP server trigger."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Operation": {
+      "main": [
+        [
+          {
+            "node": "ReadTableRecord",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CreateTableRecord",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "UpdateTableRecord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ListTables": {
+      "ai_tool": [
+        [
+          {
+            "node": "PostgreSQL MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReadTableRows": {
+      "ai_tool": [
+        [
+          {
+            "node": "PostgreSQL MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetTableSchema": {
+      "ai_tool": [
+        [
+          {
+            "node": "PostgreSQL MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReadTableRecord": {
+      "main": [
+        []
+      ]
+    },
+    "CreateTableRecords": {
+      "ai_tool": [
+        [
+          {
+            "node": "PostgreSQL MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UpdateTableRecords": {
+      "ai_tool": [
+        [
+          {
+            "node": "PostgreSQL MCP Server",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

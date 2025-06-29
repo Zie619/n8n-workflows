@@ -1,0 +1,672 @@
+{
+  "meta": {
+    "instanceId": "84ba6d895254e080ac2b4916d987aa66b000f88d4d919a6b9c76848f9b8a7616",
+    "templateId": "2285",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "96c1dcb2-1fbe-4be5-b8e3-b5d2626bb5e8",
+      "name": "If no playlist",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1180,
+        635.2020978272825
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "4cd09fd5-f5bf-4f82-94f4-938e6d6fc1db",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.isEmpty() }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d17fdd6c-b998-4d41-9e44-34133577067b",
+      "name": "Create Downloads Playlist",
+      "type": "n8n-nodes-base.spotify",
+      "position": [
+        1840,
+        435.2020978272825
+      ],
+      "parameters": {
+        "name": "Downloads",
+        "resource": "playlist",
+        "operation": "create",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "id": "MXfVMBGiR5OTHLNn",
+          "name": "Spotify account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2250ac0d-5a7c-460c-a9b2-d3b1bcb44ac7",
+      "name": "Get Liked Tracks",
+      "type": "n8n-nodes-base.spotify",
+      "position": [
+        2500,
+        735.2020978272825
+      ],
+      "parameters": {
+        "limit": "={{ $('Globals').item.json.download_limit }}",
+        "resource": "library"
+      },
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "id": "MXfVMBGiR5OTHLNn",
+          "name": "Spotify account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ce3eed87-3d8a-4c37-84b7-7f08dd8d91bb",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        2960,
+        735.2020978272825
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "0d5b326e-7bfa-48b6-a618-083e8e374632",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1400,
+        735.2020978272825
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "name"
+            },
+            {
+              "fieldToAggregate": "uri"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "113305f3-8003-4771-a260-2136d62d45ca",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1840,
+        735.2020978272825
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "name, uri"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8684eaf3-104e-40b6-91b3-738b15f2b361",
+      "name": "Add tracks to Downloads",
+      "type": "n8n-nodes-base.spotify",
+      "position": [
+        3220,
+        835.2020978272825
+      ],
+      "parameters": {
+        "id": "={{ $('Filter out Downloads Playlist').item.json.uri }}",
+        "trackID": "={{ $('Get Liked Tracks').item.json.track.uri }}",
+        "resource": "playlist",
+        "additionalFields": {
+          "position": 0
+        }
+      },
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "id": "MXfVMBGiR5OTHLNn",
+          "name": "Spotify account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a9f44907-b324-4a89-b81c-7b514b0a52cb",
+      "name": "Get Downloads Playlist",
+      "type": "n8n-nodes-base.spotify",
+      "position": [
+        2280,
+        735.2020978272825
+      ],
+      "parameters": {
+        "id": "={{ $json.uri }}",
+        "resource": "playlist",
+        "operation": "get"
+      },
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "id": "MXfVMBGiR5OTHLNn",
+          "name": "Spotify account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "75f69264-9653-46de-a571-f080238d0df1",
+      "name": "Filter out new tracks",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2720,
+        735.2020978272825
+      ],
+      "parameters": {
+        "jsCode": "var downloades_uris = [];\nfor (const download of $('Get Downloads Playlist').first().json.tracks.items) {\n  downloades_uris.push(download.track.uri);\n}\n\nvar result = [];\nfor (const item of $input.all()) {\n  if (!downloades_uris.includes(item.json.track.uri)) {\n    result.push(item);\n  }\n}\n\nreturn result.reverse();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "54fa426a-f37c-4e9a-a817-f31a9e820d76",
+      "name": "Get tracks to remove",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3440,
+        640
+      ],
+      "parameters": {
+        "jsCode": "var liked_uris = [];\nfor (const liked of $('Get Liked Tracks').all()) {\n  liked_uris.push(liked.json.track.uri);\n}\n\nvar result = [];\nfor (const item of $input.first().json.tracks.items) {\n  if (!liked_uris.includes(item.track.uri)) {\n    result.push(item);\n  }\n}\n\nreturn result;"
+      },
+      "executeOnce": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "3368ac49-64bc-4c51-8796-0fb5843ad899",
+      "name": "Remove oldest tracks from Downloads",
+      "type": "n8n-nodes-base.spotify",
+      "position": [
+        3660,
+        635.2020978272825
+      ],
+      "parameters": {
+        "id": "={{ $('Get Downloads Playlist').item.json.uri }}",
+        "trackID": "={{ $json.track.uri }}",
+        "resource": "playlist",
+        "operation": "delete"
+      },
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "id": "MXfVMBGiR5OTHLNn",
+          "name": "Spotify account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6ba744e0-f925-4901-8a01-b6da9c6b9e61",
+      "name": "Filter out Downloads Playlist",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        2060,
+        735.2020978272825
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "04fec444-230c-4b55-a887-d4dd290c99ee",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "Downloads"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d1a583cb-1c60-44f3-9111-755805e81bf1",
+      "name": "Get Updated Downloads Playlist",
+      "type": "n8n-nodes-base.spotify",
+      "position": [
+        3220,
+        635.2020978272825
+      ],
+      "parameters": {
+        "id": "={{ $('Filter out Downloads Playlist').item.json.uri }}",
+        "resource": "playlist",
+        "operation": "get"
+      },
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "id": "MXfVMBGiR5OTHLNn",
+          "name": "Spotify account"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "1f976308-b9db-4c59-8321-582a84c45374",
+      "name": "Get all Playlists",
+      "type": "n8n-nodes-base.spotify",
+      "position": [
+        960,
+        635.2020978272825
+      ],
+      "parameters": {
+        "resource": "playlist",
+        "operation": "getUserPlaylists",
+        "returnAll": true
+      },
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "id": "MXfVMBGiR5OTHLNn",
+          "name": "Spotify account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c715d18a-981f-4cfa-b3ca-3ee9753ef7ca",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        460,
+        635.2020978272825
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "b3afc8a7-39dc-429a-b440-8d2394ab528e",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        640,
+        475.2020978272825
+      ],
+      "parameters": {
+        "width": 251.77358490566033,
+        "height": 334.6415094339622,
+        "content": "## Set Globals\nDefine the `download_limit` of how many songs should be kept in the Downloads playlist.\n*This setup currently supports a maximum of 50.*"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1867b7d6-771c-4915-b8ef-227b3ad21c09",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        475.2020978272825
+      ],
+      "parameters": {
+        "width": 251.77358490566033,
+        "height": 334.6415094339622,
+        "content": "## Setup Trigger\nDefine the update interval. By default the playlist gets updated ones a day."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3f48a599-e41f-42ec-94c3-03315039612b",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        240
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 511.919459860262,
+        "height": 227.98938005910577,
+        "content": "## Information\nThis workflow automatically creates a playlist in Spotify named \"Downloads\". It keeps a list of a defined amount of the latest liked songs up to date.\n\nThis enables only the Downloads playlist to set for automatic downloading and thus free up space on the device.\n\n**Beware that it can take several minutes until a newly created Spotify developer app is fully functioning.**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6b101255-c9ef-407c-9cf4-d9afde6d8613",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        900,
+        395.2020978272825
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1535.0943396226407,
+        "height": 509.28301886792553,
+        "content": "Get the \"Downloads\" playlist by name. Create it, if it does not exist."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ae08fb14-34e5-454f-95f7-5de3a17dc6f7",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2440,
+        655.2020978272825
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 435.1879320261786,
+        "height": 247.95572576973242,
+        "content": "Get all latest liked songs and check whether they already exist in the Downloads playlist."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5603cad0-6b4d-479c-89e4-af0c950a95c3",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2880,
+        575.2020978272825
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 955.93368580286,
+        "height": 452.51466620839244,
+        "content": "Add new tracks to the Downloads playlist. Remove tracks if they exceed the defined limit."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6c40ce51-3361-4baf-b81e-b6e9b94a0a1c",
+      "name": "If no Downloads Playlist found",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1620,
+        735.2020978272825
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "faf80ff7-8870-4f2e-94c0-998535caeac4",
+              "operator": {
+                "type": "array",
+                "operation": "notContains",
+                "rightType": "any"
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "Downloads"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "637e0927-387f-46f9-8402-f87300f1fb6d",
+      "name": "Globals",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        720,
+        640
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "077181f9-80b9-40c2-81db-69d49376da7d",
+              "name": "download_limit",
+              "type": "number",
+              "value": 50
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Globals": {
+      "main": [
+        [
+          {
+            "node": "Get all Playlists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "If no Downloads Playlist found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Filter out Downloads Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If no playlist": {
+      "main": [
+        [
+          {
+            "node": "Create Downloads Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Get Updated Downloads Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add tracks to Downloads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Liked Tracks": {
+      "main": [
+        [
+          {
+            "node": "Filter out new tracks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Globals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all Playlists": {
+      "main": [
+        [
+          {
+            "node": "If no playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get tracks to remove": {
+      "main": [
+        [
+          {
+            "node": "Remove oldest tracks from Downloads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter out new tracks": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Downloads Playlist": {
+      "main": [
+        [
+          {
+            "node": "Get Liked Tracks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add tracks to Downloads": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Downloads Playlist": {
+      "main": [
+        [
+          {
+            "node": "Get all Playlists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter out Downloads Playlist": {
+      "main": [
+        [
+          {
+            "node": "Get Downloads Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Updated Downloads Playlist": {
+      "main": [
+        [
+          {
+            "node": "Get tracks to remove",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If no Downloads Playlist found": {
+      "main": [
+        [
+          {
+            "node": "Create Downloads Playlist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

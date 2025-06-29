@@ -1,0 +1,295 @@
+{
+  "meta": {
+    "instanceId": "ac9d33c4ed758aeca18fdf8990bc14f18826f99beb38fb06a023fa013ee39a0b"
+  },
+  "nodes": [
+    {
+      "id": "9cfeb58b-140f-4941-8442-4e33c671e325",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        440,
+        840
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "c4e7c596-4f2a-48e0-a932-ad40157c6282",
+      "name": "Get interest name",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        100,
+        660
+      ],
+      "webhookId": "3c85f114-6321-4e6d-9b5e-726e1493ee4e",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "JR5rQqmm6CGac5CF",
+          "name": "Sender Token"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "69d432d1-4ab1-4059-af5c-ba589dfe16bc",
+      "name": "Check message contents",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        280,
+        660
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.message.chat.id }}",
+              "value2": -1001805495093,
+              "operation": "equal"
+            }
+          ],
+          "string": [
+            {
+              "value1": "={{ $json.message.text }}",
+              "value2": "#interest",
+              "operation": "startsWith"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "345274b6-2d56-4d54-937a-dd9153fd1fdc",
+      "name": "Extract message",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        460,
+        460
+      ],
+      "parameters": {
+        "jsCode": "let inputData = items[0].json; // get the input data\nlet message = inputData.message; // replace 'message' with the correct field name\n\nlet messageContent = '';\n\nif (message && message.text) {\n  messageContent = message.text;\n}\n\nreturn [\n  {\n    json: {\n      messageContent: messageContent\n    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cd808029-1a46-4fad-9065-c726960fb427",
+      "name": "Split Message",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        660,
+        460
+      ],
+      "parameters": {
+        "jsCode": "let inputData = items[0].json; // get the input data\nlet variableContent = String(inputData.messageContent || ''); // replace 'variable' with the correct field name, convert to string and assign empty string if undefined\n\nlet regex = /#(\\w+)\\b(.*)/; // regex to match hashtag word and rest of the content\nlet matches = regex.exec(variableContent);\n\nlet extractedContent = '';\nlet remainingContent = '';\n\nif (matches !== null) {\n  extractedContent = matches[1];\n  remainingContent = matches[2].trim();\n} else {\n  remainingContent = variableContent.trim();\n}\n\nreturn [\n  {\n    json: {\n      extractedContent: extractedContent,\n      remainingContent: remainingContent    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6f541faf-7756-415e-8391-5470166b8a01",
+      "name": "Connect to Graph API",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "position": [
+        840,
+        460
+      ],
+      "parameters": {
+        "edge": "=",
+        "node": "=search?type=adinterest&q={{ $json.remainingContent }}\n&limit=1000000&locale=en_US ",
+        "options": {},
+        "graphApiVersion": "v17.0"
+      },
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AEVlPxPoTe92kkJS",
+          "name": "Facebook Graph account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "394a34ce-f56d-4a79-8fbb-f37681cbee76",
+      "name": "Split Interests into a Table",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1020,
+        460
+      ],
+      "parameters": {
+        "jsCode": "let inputData = items[0].json; // get the input data\nlet outputData = [];\n\nfor(let key in inputData) {\n    if(inputData.hasOwnProperty(key)) {\n        let itemKey = key;\n        let itemValue = inputData[key];\n        \n        for(let subKey in itemValue) {\n            if(itemValue.hasOwnProperty(subKey)) {\n                let formattedItem = {\n                    'Item': itemKey,\n                    'SubItem': subKey,\n                    'Value': itemValue[subKey]\n                };\n                \n                outputData.push({json: formattedItem});\n            }\n        }\n    }\n}\n\nreturn outputData;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "1d3f66a4-322f-4398-b887-52ccd2f2f5fe",
+      "name": "Get variables",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1200,
+        460
+      ],
+      "parameters": {
+        "jsCode": "let outputData = items.map(item => {\n    let data = item.json.Value;\n    \n    return {\n        json: {\n            'name': data.name,\n            'audience_size_lower_bound': data.audience_size_lower_bound,\n            'audience_size_upper_bound': data.audience_size_upper_bound,\n            'path': data.path,\n            'description': data.description,\n            'topic': data.topic\n        }\n    };\n});\n\nreturn outputData;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "082ddf0f-29ef-424a-a2a2-4bf9e260657f",
+      "name": "Create a Spreadsheet",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "position": [
+        1380,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "toFile",
+        "fileFormat": "csv"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "44e4f97a-cd86-4b60-b761-49dc46f7e36b",
+      "name": "Send the Spreadsheet file",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1560,
+        460
+      ],
+      "parameters": {
+        "chatId": "-1001805495093",
+        "operation": "sendDocument",
+        "binaryData": true,
+        "additionalFields": {
+          "fileName": "report.csv"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "JR5rQqmm6CGac5CF",
+          "name": "Sender Token"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "22bc6129-7d10-46fd-98e2-0f3fc7a93344",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        340
+      ],
+      "parameters": {
+        "width": 948.6687115198118,
+        "height": 296.5325040542755,
+        "content": "## Facebook API\n\nTo get the API Key you need to follow these steps:\nhttps://developers.facebook.com/docs/commerce-platform/setup/api-setup/"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get variables": {
+      "main": [
+        [
+          {
+            "node": "Create a Spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Message": {
+      "main": [
+        [
+          {
+            "node": "Connect to Graph API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract message": {
+      "main": [
+        [
+          {
+            "node": "Split Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get interest name": {
+      "main": [
+        [
+          {
+            "node": "Check message contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Connect to Graph API": {
+      "main": [
+        [
+          {
+            "node": "Split Interests into a Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a Spreadsheet": {
+      "main": [
+        [
+          {
+            "node": "Send the Spreadsheet file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check message contents": {
+      "main": [
+        [
+          {
+            "node": "Extract message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Interests into a Table": {
+      "main": [
+        [
+          {
+            "node": "Get variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

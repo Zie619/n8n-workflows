@@ -1,0 +1,302 @@
+{
+  "meta": {
+    "instanceId": "26ba763460b97c249b82942b23b6384876dfeb9327513332e743c5f6219c2b8e"
+  },
+  "nodes": [
+    {
+      "id": "382dddd4-da50-49fa-90a2-f7d6d160afdf",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        920,
+        280
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "efa8f415-62f7-43b3-a76a-a2eabf779cb8",
+      "name": "Map Workflows & Credentials",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1360,
+        280
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0fd19a68-c561-4cc2-94d6-39848977e6d2",
+              "name": "workflow_id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "a81f9e6f-9c78-4c3d-9b79-e820f8c5ba29",
+              "name": "workflow_name",
+              "type": "string",
+              "value": "={{ $json.name }}"
+            },
+            {
+              "id": "58ab0f2f-7598-48de-bea1-f3373c5731fe",
+              "name": "credentials",
+              "type": "array",
+              "value": "={{ $json.nodes.map(node => node.credentials).compact().reduce((acc,cred) => { const keys = Object.keys(cred); const items = keys.map(key => ({ type: key,  ...cred[key] })); acc.push(...items); return acc; }, []) }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "9e9b4f9c-12b7-47ba-8cf4-a9818902a538",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1084,
+        252
+      ],
+      "parameters": {
+        "width": 216,
+        "height": 299.56273929030715,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n### 🚨Required\nYou'll need an n8n API key. Note: available workflows will be scoped to your key."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cf04eff5-12b2-42fb-9089-2d0c992af1b8",
+      "name": "Save to Database",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1540,
+        280
+      ],
+      "parameters": {
+        "language": "python",
+        "pythonCode": "import json\nimport sqlite3\ncon = sqlite3.connect(\"n8n_workflow_credentials.db\")\n\ncur = con.cursor()\ncur.execute(\"CREATE TABLE IF NOT EXISTS n8n_workflow_credentials (workflow_id TEXT PRIMARY KEY, workflow_name TEXT, credentials TEXT);\")\n\nfor item in _input.all():\n  cur.execute('INSERT OR REPLACE INTO n8n_workflow_credentials VALUES(?,?,?)', (\n    item.json.workflow_id,\n    item.json.workflow_name,\n    json.dumps(item.json.credentials.to_py())\n  ))\n\ncon.commit()\ncon.close()\n\nreturn [{ \"affected_rows\": len(_input.all()) }]"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "7e32cf83-0498-4666-8677-7fd32eec779c",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        1880,
+        280
+      ],
+      "webhookId": "993ce267-a1e5-4657-a38c-08f86715063d",
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "8c37f2ae-192b-4f98-a6fa-5aabf870e9e0",
+      "name": "Query Workflow Credentials Database",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "position": [
+        2320,
+        440
+      ],
+      "parameters": {
+        "name": "query_workflow_credentials_database",
+        "language": "python",
+        "pythonCode": "import json\nimport sqlite3\ncon = sqlite3.connect(\"n8n_workflow_credentials.db\")\n\ncur = con.cursor()\nres = cur.execute(query);\n\noutput = json.dumps(res.fetchall())\n\ncon.close()\nreturn output;",
+        "description": "Call this tool to query the workflow credentials database. The database is already set. The available tables are as follows:\n* n8n_workflow_credentials (workflow_id TEXT PRIMARY KEY, workflow_name TEXT, credentials TEXT);\n   * n8n_workflow_credentials.credentials are stored as json string and the app name may be obscured. Prefer querying using the %LIKE% operation for best results.\n\nPass a SQL SELECT query to this tool for the available tables."
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "60b2ab16-dc7c-4cb8-a58f-696f721b8d6f",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2060,
+        440
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "adf576c1-ddb0-4fef-980c-5b485a3204f2",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        2180,
+        440
+      ],
+      "parameters": {},
+      "typeVersion": 1.2
+    },
+    {
+      "id": "4335b038-3e9f-4173-986d-cabdb87cc0b4",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        860,
+        100
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 930.8402221561373,
+        "height": 488.8805508857059,
+        "content": "## Step 1. Store Workflows Credential Mappings to Database\n\nWe'll achieve this by querying n8n's built-in API to query all workflows, extract the credentials list from the nodes within and then store them in a SQLite database. Don't worry, the actual credential data won't be exposed! For the database, we'll abuse the fact that the code node is able to create Sqlite databases - however, this is created in memory and will be wiped if the n8n instance is restarted."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c1f557ee-1176-4f3e-8431-d162f1a59990",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1820,
+        100
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 688.6507290693205,
+        "height": 527.3794193342486,
+        "content": "## Step 2. Use Agent as Search Interface\n\nInstead of building a form interface like a regular person, we'll just use an AI tools agent who is given aaccess to perform queries on our database. You can ask it things like \"which workflows are using slack + airtable + googlesheets?\""
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9bdc3fa9-d4a0-4040-bb32-6c76aaca3ad9",
+      "name": "Workflow Credentials Helper Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2080,
+        280
+      ],
+      "parameters": {
+        "options": {
+          "systemMessage": "=You help find information on n8n workflow credentials. When user mentions an app, assume they mean the workflow credential for the app.\n* Only if the user requests to provide a link to the workflow, replace $workflow_id with the workflow id in the following url schema: {{ window.location.protocol + '//' + window.location.host }}/workflow/$workflow_id"
+        }
+      },
+      "typeVersion": 1.6
+    },
+    {
+      "id": "ff39f504-9953-47c9-81eb-3146dfd6c8c5",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        420,
+        100
+      ],
+      "parameters": {
+        "width": 415.13049730628427,
+        "height": 347.7398931123371,
+        "content": "## Try It Out!\n\n### This workflow let's you query workflow credentials using an AI SQL agent. Example use-case could be:\n* \"Which workflows are using Slack and Google Calendar?\"\n* \"Which workflows have AI in their name but are not using openAI?\"\n\n### Run the Steps separately!\n* Step 1 populates a local database\n* Step 2 engages with the chatbot"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3db2116c-abde-4856-bd1e-a15e0275477f",
+      "name": "n8n",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        1140,
+        280
+      ],
+      "parameters": {
+        "filters": {},
+        "requestOptions": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "5vELmsVPmK4Bkqkg",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "n8n": {
+      "main": [
+        [
+          {
+            "node": "Map Workflows & Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Workflow Credentials Helper Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Workflow Credentials Helper Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Workflow Credentials Helper Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Workflows & Credentials": {
+      "main": [
+        [
+          {
+            "node": "Save to Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Test workflow\"": {
+      "main": [
+        [
+          {
+            "node": "n8n",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Workflow Credentials Database": {
+      "ai_tool": [
+        [
+          {
+            "node": "Workflow Credentials Helper Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

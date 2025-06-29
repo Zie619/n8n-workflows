@@ -1,0 +1,218 @@
+{
+  "id": "RMxcTgpFGpE3RdLZ",
+  "meta": {
+    "instanceId": "1a1a56e303d37d31a273d2dd1d2c6ab5d45185370759d2a4763eabe48f3be2df",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Telegram Tron Wallet Blacklist Checker",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "fbd55c61-91ad-43e7-aa89-c30d14fc3b92",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -240,
+        -40
+      ],
+      "webhookId": "b384e76e-5f33-452c-b4eb-13a8d5fc377e",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "utGUX9B8SmbwjN5s",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f7b2d70e-9a5c-4a31-b445-68e9a37cfdb3",
+      "name": "Telegram Send Message",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1160,
+        -60
+      ],
+      "webhookId": "4148b55e-c227-491c-8a3a-f9579c604cc3",
+      "parameters": {
+        "text": "={{ $json.text }}",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "additionalFields": {
+          "reply_to_message_id": "={{ $('Telegram Trigger').item.json.message.message_id }}"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "utGUX9B8SmbwjN5s",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2ed30255-373c-485b-bffe-ab3682ddb3b8",
+      "name": "Check Wallet Address Format",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        60,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "bc914e89-d74c-479e-9246-f028a9efe2bc",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              },
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "T[A-Za-z1-9]{33}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "8a05f33e-71bd-4053-b182-baf721a3a650",
+      "name": "Tron BlackList Stable Token Api Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        380,
+        -60
+      ],
+      "parameters": {
+        "url": "=https://apilist.tronscanapi.com/api/stableCoin/blackList?blackAddress={{ $json.message.text }}",
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f4e89604-4721-45b9-a7e6-57d0d1e77a10",
+      "name": "Check Api Response",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        760,
+        -60
+      ],
+      "parameters": {
+        "jsCode": "const response = items[0].json;\nlet message;\n\nif (response.total && response.total > 0) {\n  message = `🚨🛑 **This Wallet is Blacklisted!** 🛑🚨: ${response.data[0].blackAddress}`;\n} else {\n  message = `✅💚 **This Wallet is NOT Blacklisted!** 💚✅.`;\n}\n\nreturn [\n  {\n    json: {\n      text: message,\n    },\n  },\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "71e16929-f5f8-4d71-8fa0-d5230e4e7b5a",
+      "name": "Set Error Message (Wallet Address Format)",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        600,
+        320
+      ],
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      text: 'Please enter your wallet address correctly and completely.',\n    },\n  },\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "34835c57-19bf-49c2-935c-74deb0c5c3f0",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -340,
+        -200
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 1760,
+        "height": 700,
+        "content": "## TRON USDT Blacklist Checker\n**This template checks USDT wallets on the TRON blockchain and queries whether they have been blacklisted.**"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "0595cea0-5444-42aa-a988-5169f29b85b2",
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Check Wallet Address Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Api Response": {
+      "main": [
+        [
+          {
+            "node": "Telegram Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Wallet Address Format": {
+      "main": [
+        [
+          {
+            "node": "Tron BlackList Stable Token Api Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Error Message (Wallet Address Format)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tron BlackList Stable Token Api Request": {
+      "main": [
+        [
+          {
+            "node": "Check Api Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Error Message (Wallet Address Format)": {
+      "main": [
+        [
+          {
+            "node": "Telegram Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "description": "This n8n workflow template allows users to check if a Tron wallet address is blacklisted on the USDT contract via a Telegram bot. When a user sends the command {walletAddress} through the Telegram bot, the workflow queries the Tronscan API to determine if the provided wallet address is blacklisted. The result is then sent back to the user via the Telegram bot."
+}

@@ -1,0 +1,617 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "a4280167-97e0-4d12-bdfc-735dd9c69f03",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1160,
+        540
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "a3ad4e3b-0841-4a6e-993b-5239d9e56eaf",
+      "name": "Get last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        420,
+        300
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nif(!staticData.lastExecution){\n  staticData.lastExecution = new Date().toISOString();\n}\n\nitem.executionTimeStamp = new Date().toISOString();\nitem.lastExecution = staticData.lastExecution;\n\n\nreturn item;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f917bc42-8b9f-4b60-860c-360eeb86b88c",
+      "name": "Set new last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        4440,
+        140
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nstaticData.lastExecution = $item(0).$node[\"Get last execution timestamp\"].executionTimeStamp;\n\nreturn item;"
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "ff141018-5307-4754-a48a-2311fcd15f85",
+      "name": "Pipedrive person Id found",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2280,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"PipeDrivePersonId\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d06b1dae-77cb-4c0b-98dc-0e7184f95095",
+      "name": "NoOp1",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2620,
+        480
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "e8a01cec-06d1-4fe6-8920-55fdd143f626",
+      "name": "Get Zendesk comments for tickets",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2620,
+        280
+      ],
+      "parameters": {
+        "url": "=https://n8n.zendesk.com/api/v2/tickets/{{$json[\"id\"]}}/comments",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "7f7addcb-4858-4fd0-b1c2-29800365241b",
+      "name": "Add comments to tickets",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2860,
+        160
+      ],
+      "parameters": {
+        "join": "inner",
+        "mode": "mergeByIndex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4ab3e897-b3d1-47f8-8c81-640e2ca6b3de",
+      "name": "Add Pipedrive person Id to Zendesk tickets",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2060,
+        300
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "via.source.from.address",
+        "propertyName2": "primary_email"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1b25adda-15eb-4e23-bfb2-0a034656d8e2",
+      "name": "Get tickets updated after last execution",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        640,
+        300
+      ],
+      "parameters": {
+        "options": {
+          "query": "=updated>{{ $json[\"lastExecution\"] }}",
+          "sortBy": "updated_at",
+          "sortOrder": "desc"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4884b8f5-d3f1-404d-87b3-1a802553cbee",
+      "name": "Channel is email",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        860,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"via\"].channel }}",
+              "value2": "email"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "48541dcf-8ea6-47b8-ad52-1b3045df6832",
+      "name": "Rename fields and keep only needed fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1820,
+        360
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "PipeDrivePersonId",
+              "value": "={{ $json[\"id\"] }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "primary_email",
+              "value": "={{ $json[\"primary_email\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e66d6b04-6a4e-4ab4-98a4-efba4bc5ec12",
+      "name": "Search persons by email",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        1600,
+        360
+      ],
+      "parameters": {
+        "term": "={{ $json[\"SearchEmail\"] }}",
+        "resource": "person",
+        "operation": "search",
+        "additionalFields": {
+          "fields": "email"
+        }
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "1",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "01e008cf-6867-48b3-9a0d-b1b264bb5c08",
+      "name": "Remove duplicates to make search efficient",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        1360,
+        360
+      ],
+      "parameters": {
+        "compare": "selectedFields",
+        "options": {},
+        "operation": "removeDuplicates",
+        "fieldsToCompare": {
+          "fields": [
+            {
+              "fieldName": "SearchEmail"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bc3ac74d-ac87-46b8-bd59-6cafe0e0e59c",
+      "name": "Set search email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1160,
+        360
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "SearchEmail",
+              "value": "={{ $json[\"via\"].source.from.address }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e0cf4204-7640-41c7-9adc-39d2d86b6144",
+      "name": "Process commenst per ticket",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        3080,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 1
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "056646c3-7e1f-4195-92bd-1c3c1c9e8d25",
+      "name": "New comment",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        3540,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{ $json[\"created_at\"] }}",
+              "value2": "={{$item(0).$node[\"Get last execution timestamp\"].json[\"lastExecution\"]}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "77ef979c-313e-4904-bf3e-8716f1e5c86f",
+      "name": "Split comments to seperate items",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        3320,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "comments"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "01fbc85c-0c85-48d1-b2b2-cdf8d6310578",
+      "name": "Add comment as a note in Pipedrive",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        3820,
+        0
+      ],
+      "parameters": {
+        "content": "=Message imported from Zendesk\n------------------------------------------------\nFrom {{$json[\"via\"][\"source\"][\"from\"][\"name\"] ?? 'Zendesk user'}}\n------------------------------------------------\n{{$json[\"body\"]}}",
+        "resource": "note",
+        "additionalFields": {
+          "person_id": "={{$item(0).$node[\"Process commenst per ticket\"].json[\"PipeDrivePersonId\"]}}"
+        }
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "1",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "12296cee-7786-489d-9a33-7d0d1d7d755b",
+      "name": "NoOp2",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        3820,
+        180
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "0c21dbce-0820-4300-8da4-6e795288aa0b",
+      "name": "Every day at 09:00",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 9
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e6990744-45e2-4c08-b611-7f5bbac7ad9a",
+      "name": "Done processing",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        4160,
+        160
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Process commenst per ticket\"].context[\"noItemsLeft\"]}}",
+              "value2": true
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "New comment": {
+      "main": [
+        [
+          {
+            "node": "Add comment as a note in Pipedrive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Done processing": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process commenst per ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channel is email": {
+      "main": [
+        [
+          {
+            "node": "Set search email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add Pipedrive person Id to Zendesk tickets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set search email": {
+      "main": [
+        [
+          {
+            "node": "Remove duplicates to make search efficient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every day at 09:00": {
+      "main": [
+        [
+          {
+            "node": "Get last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add comments to tickets": {
+      "main": [
+        [
+          {
+            "node": "Process commenst per ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search persons by email": {
+      "main": [
+        [
+          {
+            "node": "Rename fields and keep only needed fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipedrive person Id found": {
+      "main": [
+        [
+          {
+            "node": "Get Zendesk comments for tickets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add comments to tickets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process commenst per ticket": {
+      "main": [
+        [
+          {
+            "node": "Split comments to seperate items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last execution timestamp": {
+      "main": [
+        [
+          {
+            "node": "Get tickets updated after last execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Zendesk comments for tickets": {
+      "main": [
+        [
+          {
+            "node": "Add comments to tickets",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Split comments to seperate items": {
+      "main": [
+        [
+          {
+            "node": "New comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add comment as a note in Pipedrive": {
+      "main": [
+        [
+          {
+            "node": "Done processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get tickets updated after last execution": {
+      "main": [
+        [
+          {
+            "node": "Channel is email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rename fields and keep only needed fields": {
+      "main": [
+        [
+          {
+            "node": "Add Pipedrive person Id to Zendesk tickets",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Add Pipedrive person Id to Zendesk tickets": {
+      "main": [
+        [
+          {
+            "node": "Pipedrive person Id found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove duplicates to make search efficient": {
+      "main": [
+        [
+          {
+            "node": "Search persons by email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

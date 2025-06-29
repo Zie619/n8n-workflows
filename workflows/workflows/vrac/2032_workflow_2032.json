@@ -1,0 +1,214 @@
+{
+  "nodes": [
+    {
+      "id": "31b6611c-e4d1-4ab8-9351-74718caf938d",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        820,
+        360
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "5b8a2148-f8e3-4c21-ba39-6aa8cc492c5e",
+      "name": "Get mailboxes",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1260,
+        360
+      ],
+      "parameters": {
+        "url": "https://api.fastmail.com/jmap/api/",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "using",
+              "value": "={{ [ \"urn:ietf:params:jmap:core\", \"urn:ietf:params:jmap:mail\" ] }}"
+            },
+            {
+              "name": "methodCalls",
+              "value": "={{\n[\n  [ \n    \"Mailbox/get\",\n    {\n      \"accountId\": $json.primaryAccounts['urn:ietf:params:jmap:mail'],\n      \"ids\": null\n    },\n    \"mailboxes\"\n  ] \n]\n}}"
+            }
+          ]
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZzWBkLUs2mg2xJBW",
+          "name": "Fastmail"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "8477a075-1341-4b69-8e20-4a56b2a96711",
+      "name": "Fetch API details",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1040,
+        360
+      ],
+      "parameters": {
+        "url": "https://api.fastmail.com/jmap/session",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZzWBkLUs2mg2xJBW",
+          "name": "Fastmail"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "87188d6d-eb94-4b83-aaa4-e5c744d65c45",
+      "name": "Format results",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1480,
+        360
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "account_id",
+              "stringValue": "={{ $('Fetch API details').first().json.primaryAccounts['urn:ietf:params:jmap:mail'] }}"
+            },
+            {
+              "name": "mailbox_id",
+              "stringValue": "={{ $json.methodResponses.find(e => e[2] == 'mailboxes')[1].list.find(e => e.role == 'inbox').id }}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "550b20c1-57ff-497e-b20a-e772e5fbfe86",
+      "name": "Get unread messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1700,
+        360
+      ],
+      "parameters": {
+        "url": "https://api.fastmail.com/jmap/api/",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "using",
+              "value": "={{ [ \"urn:ietf:params:jmap:core\", \"urn:ietf:params:jmap:mail\" ] }}"
+            },
+            {
+              "name": "methodCalls",
+              "value": "={{\n[\n  [ \n    \"Email/query\",\n    {\n      \"accountId\": $json.account_id,\n      \"filter\": {\n        \"inMailbox\": $json.mailbox_id,\n        \"notKeyword\": \"$seen\"\n      },\n      \"sort\": [\n        {\n          \"property\": \"receivedAt\",\n          \"isAscending\": false\n        }\n      ],\n      \"limit\": 3,\n      \"calculateTotal\": true,\n    },\n    \"messages\"\n  ], [\n    \"Email/get\",\n    {\n      \"accountId\": $json.account_id,\n      \"#ids\": {\n        \"name\": \"Email/query\",\n        \"path\": \"/ids\",\n        \"resultOf\": \"messages\"\n      },\n      \"properties\": [\n        \"id\",\n        \"receivedAt\",\n        \"from\",\n        \"subject\",\n        \"keywords\"\n      ]\n    },\n    \"emails\"\n  ] \n]\n}}"
+            }
+          ]
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZzWBkLUs2mg2xJBW",
+          "name": "Fastmail"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "7298d504-8e68-481b-a2cb-07a64dcef159",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        980,
+        200
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 671,
+        "height": 328,
+        "content": "## ℹ️ Replacing the initial nodes\n\nThese nodes fetch your account and mailbox IDs. Consider saving these values instead of querying them on every execution to improve performance and reduce the load on the JMAP API."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b279bb2d-e76e-4e3b-abaf-e351d1c3462d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        980,
+        -60
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 671,
+        "height": 232,
+        "content": "## ℹ️ Credentials\n\nThe JMAP standard does not limit the available authentication options. Fastmail (the sponsor of the standard) supports Bearer authentication as well as OAuth2.\n\nIn n8n you can implement the Fastmail Bearer authentication by creating Header Auth credentials with a name of `Authorization` and a value of `Bearer $apiToken` (replacing `$apiToken` with your actual [token from Fastmail](https://www.fastmail.com/settings/security/tokens))."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get mailboxes": {
+      "main": [
+        [
+          {
+            "node": "Format results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format results": {
+      "main": [
+        [
+          {
+            "node": "Get unread messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch API details": {
+      "main": [
+        [
+          {
+            "node": "Get mailboxes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Fetch API details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

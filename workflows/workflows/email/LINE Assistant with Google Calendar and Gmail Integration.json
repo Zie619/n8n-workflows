@@ -1,0 +1,551 @@
+{
+  "id": "Z5OgwYfK4reCTv9y",
+  "meta": {
+    "instanceId": "c59c4acfed171bdc864e7c432be610946898c3ee271693e0303565c953d88c1d"
+  },
+  "name": "LINE Assistant with Google Calendar and Gmail Integration",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "9e1e1c11-f406-47de-8f65-9669cf078d3d",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -1140,
+        120
+      ],
+      "parameters": {
+        "text": "={{ $json.body.events[0].message.text }}",
+        "options": {
+          "systemMessage": "=You are a helpful assistant.\n\nHere is the current date {{ $now }}"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "fa722820-8804-47da-bb21-02c0d2b5d665",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        -1020,
+        580
+      ],
+      "parameters": {
+        "sessionKey": "={{ $json.body.events[0].source.userId }}",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "5149b91a-5934-4037-a444-dfdb93d0cd16",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -1180,
+        580
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "211a120d-d65f-4708-adc2-66dc8f4a40d6",
+      "name": "Wikipedia",
+      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
+      "position": [
+        -360,
+        380
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "0e03137d-0300-47a4-bbd8-03c87c93d6e2",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        -780,
+        120
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "options": {},
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Your task is to extract and condense the answer into an easily readable format. Don't provide a link or details such as \"\u0e14\u0e39\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e40\u0e15\u0e34\u0e21\" or \"\u0e14\u0e39\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14\u0e44\u0e14\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48.\""
+            },
+            {
+              "content": "={{ $json.output }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "8c6e96bc-aa9d-44d1-b7ce-6bb85b175cf1",
+      "name": "Switch Between Text and Others",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -1820,
+        640
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Line Receiving').item.json.body.events[0].message.type }}",
+                    "rightValue": "text"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "721a5e5e-3a9a-435e-9302-03ca7cf64fb7",
+      "name": "Line Receiving",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -2320,
+        560
+      ],
+      "webhookId": "********-****-****-****-************",
+      "parameters": {
+        "path": "linechatbotagent",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2b47f8f1-a501-4204-9221-c838edfceae7",
+      "name": "Error Handling from AI Response",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -220,
+        100
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.message.content }}",
+                    "rightValue": "={{ $json.output }}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "99218c08-5ec7-44b9-a795-e98f1ec4aab3",
+      "name": "Text Cleansing",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "********-****-****-****-************",
+              "name": "message.content",
+              "type": "string",
+              "value": "={{ $json.message.content.replaceAll(\"\\n\",\"\\\\n\").replaceAll(\"\\n\",\"\").removeMarkdown().removeTags().replaceAll('\"',\"\") }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "39476f44-9dc7-4c72-a857-9e79f85ccd72",
+      "name": "Line Answering (Error Case)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        760,
+        680
+      ],
+      "parameters": {
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n \"replyToken\": \"{{ $('Line Receiving').item.json.body.events[0].replyToken }}\",\n \"messages\": [\n {\n \"type\": \"text\",\n \"text\": \"\u0e01\u0e23\u0e38\u0e13\u0e32\u0e2a\u0e48\u0e07\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e2d\u0e37\u0e48\u0e19\u0e40\u0e16\u0e2d\u0e30\u0e19\u0e30\u0e40\u0e15\u0e07\u0e2d\u0e31\u0e27\"\n }\n ]}",
+        "sendBody": true,
+        "jsonHeaders": "{\n\"Authorization\": \"Bearer ****************************************\",\n\"Content-Type\": \"application/json\"\n}",
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "specifyHeaders": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "a7f8837d-c21b-457d-ad8b-b0b69e3c1ba7",
+      "name": "Line Answering (Ordinary Case)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        600,
+        120
+      ],
+      "parameters": {
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n \"replyToken\": \"{{ $('Line Receiving').item.json.body.events[0].replyToken }}\",\n \"messages\": [\n {\n \"type\": \"text\",\n \"text\": \"{{ $json.message.content }}\"\n }\n ]}",
+        "sendBody": true,
+        "jsonHeaders": "{\n\"Authorization\": \"Bearer ****************************************\",\n\"Content-Type\": \"application/json\"\n}",
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "specifyHeaders": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "3280f331-0130-41c2-a581-14feccf76514",
+      "name": "Google Calendar Create",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        -640,
+        400
+      ],
+      "parameters": {
+        "end": "= {{ $fromAI(\"createenddate\",\"end date and time to create event\") }}",
+        "start": "= {{ $fromAI(\"createstartdate\",\"start date and time to create event\") }}",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "***********@gmail.com",
+          "cachedResultName": "***********@gmail.com"
+        },
+        "additionalFields": {
+          "summary": "={{ $fromAI(\"event_name\",\"Name of an Event\") }}"
+        }
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "0PzHsuCKdTBU5E2Q",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "7701895f-9781-41b9-aa80-8440e4e9cbd3",
+      "name": "Google Calendar Read",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        -880,
+        580
+      ],
+      "parameters": {
+        "limit": 5,
+        "options": {
+          "timeMax": "={{ $fromAI(\"enddate\",\"end date user mentioned about\") }}",
+          "timeMin": "={{ $fromAI(\"startdate\",\"start date user mentioned about\") }}"
+        },
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "***********@gmail.com",
+          "cachedResultName": "***********@gmail.com"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "0PzHsuCKdTBU5E2Q",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "881daa7f-cf9a-4d1f-8235-55d206925ac0",
+      "name": "Gmail Read",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [
+        -700,
+        560
+      ],
+      "webhookId": "********-****-****-****-************",
+      "parameters": {
+        "limit": 5,
+        "filters": {
+          "receivedAfter": "={{ $fromAI(\"receiveddate\",\"the date email received\") }}"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "cZmU8EQya5OtXVgQ",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "Line Receiving": [
+      {
+        "json": {
+          "body": {
+            "events": [
+              {
+                "mode": "active",
+                "type": "message",
+                "source": {
+                  "type": "user",
+                  "userId": "****************************************"
+                },
+                "message": {
+                  "id": "539986086979174564",
+                  "text": "",
+                  "type": "text",
+                  "quoteToken": "****************************************"
+                },
+                "timestamp": 1734688093030,
+                "replyToken": "********************************",
+                "webhookEventId": "01JFHQFD2KQE4BA5VVW32YDBZV",
+                "deliveryContext": {
+                  "isRedelivery": false
+                }
+              }
+            ],
+            "destination": "****************************************"
+          },
+          "query": {},
+          "params": {},
+          "headers": {
+            "host": "n8n-9pul.onrender.com",
+            "cf-ray": "****************",
+            "rndr-id": "****************",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-ew-via": "15",
+            "cf-worker": "onrender.com",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "user-agent": "LineBotWebhook/2.0",
+            "cf-ipcountry": "JP",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "619",
+            "true-client-ip": "***.***.***.**",
+            "accept-encoding": "gzip, br",
+            "x-forwarded-for": "***.***.***.***, ***.***.***.**",
+            "x-request-start": "1734688093431195",
+            "cf-connecting-ip": "***.***.***.**",
+            "render-proxy-ttl": "4",
+            "x-line-signature": "****************************************",
+            "x-forwarded-proto": "https"
+          },
+          "webhookUrl": "https://n8n-9pul.onrender.com/webhook/linechatbotagent",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "14065639-6706-4161-9380-4f4dde6eb501",
+  "connections": {
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Error Handling from AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Read": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Line Receiving": {
+      "main": [
+        [
+          {
+            "node": "Switch Between Text and Others",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Cleansing": {
+      "main": [
+        [
+          {
+            "node": "Line Answering (Ordinary Case)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar Read": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar Create": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Between Text and Others": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Line Answering (Error Case)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handling from AI Response": {
+      "main": [
+        [
+          {
+            "node": "Text Cleansing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Line Answering (Error Case)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

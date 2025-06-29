@@ -1,0 +1,222 @@
+{
+  "meta": {
+    "instanceId": "0000"
+  },
+  "nodes": [
+    {
+      "id": "b2015e98-23bf-4bdb-b588-2991ee4d69d5",
+      "name": "Confluence: Get template content",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1460,
+        660
+      ],
+      "parameters": {
+        "url": "={{ $('Set parameters').item.json.confluence_base_url }}/wiki/rest/api/template/{{ $json.template_id }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "wQWJ3gbaDYd4nNIK",
+          "name": "Atlassian"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "b5b665d6-f92e-43f1-bfd8-5de4155b73d4",
+      "name": "Confluence: Create page from template",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1900,
+        660
+      ],
+      "parameters": {
+        "url": "={{ $('Set parameters').item.json.confluence_base_url }}/wiki/rest/api/content/",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "page"
+            },
+            {
+              "name": "title",
+              "value": "={{ $now.format(\"yyyy-MM-dd-HH-mm\") }}-{{ $('Replace placeholders in template body and title').item.json.page_title }}"
+            },
+            {
+              "name": "space",
+              "value": "={{ { \"key\" : $('Set parameters').item.json.target_space_key } }}"
+            },
+            {
+              "name": "body",
+              "value": "={{ { \"storage\" : { \"value\" : $('Replace placeholders in template body and title').item.json.page_body, \"representation\" : \"storage\" } } }}"
+            },
+            {
+              "name": "ancestors",
+              "value": "={{ [{\"type\" : \"page\", \"id\" : $('Set parameters').item.json.target_parent_page_id} ] }}"
+            }
+          ]
+        },
+        "genericAuthType": "httpBasicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "wQWJ3gbaDYd4nNIK",
+          "name": "Atlassian"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "571a104e-4112-4898-8e63-08dd8809b328",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 610,
+        "height": 315,
+        "content": "## Create Atlassian Confluence page from template\n\nCreates a new page in Confluence from a space template.\n\n### Setup\nAll parameters you need to change are defined in the _Set parameters_ node\nFor detailled setup instructions and explanation how it all works --> [🎥 Video](https://www.tella.tv/video/automate-confluence-page-creation-e994)\n\n### Credentials\nAs the password for the basic auth credential, you need to use an API key. \nDocumentation on those is [here](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/).\n[Here's](https://id.atlassian.com/manage-profile/security/api-tokens) where you create and manage Atlassian API keys."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eac6d0bc-0ea5-4e23-977c-8e06b346ea79",
+      "name": "Set parameters",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1240,
+        660
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "01116d20-ddaf-405a-99ec-81197f71cd4f",
+              "name": "confluence_base_url",
+              "type": "string",
+              "value": "https://your-domain.atlassian.net"
+            },
+            {
+              "id": "4a5a8737-5694-40ef-99c5-d5aa4fab1220",
+              "name": "template_id",
+              "type": "string",
+              "value": "834764824"
+            },
+            {
+              "id": "27c1681d-4f44-4b6f-9e6b-6013bfcac6a0",
+              "name": "target_space_key",
+              "type": "string",
+              "value": "~5f5915647187b8006ffffe8e"
+            },
+            {
+              "id": "5de1868b-ee33-4ef4-aa45-0d951b5ce5ff",
+              "name": "target_parent_page_id",
+              "type": "string",
+              "value": "312344667"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "c28299ef-8ce7-497f-98d8-356a741f461d",
+      "name": "Replace placeholders in template body and title",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1680,
+        660
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function replacePlaceholders(template, values) {\n    // Regular expression to find placeholders in the format $some.place.holder$\n    const placeholderPattern = /\\$(.*?)\\$/g;\n\n    // Replace function to look up the value from the object\n    return template.replace(placeholderPattern, (match, p1) => {\n        // Split the placeholder into parts by dot notation\n        const keys = p1.split('.');\n        let value = values;\n\n        // Traverse the object based on the dot notation\n        for (const key of keys) {\n            if (value && key in value) {\n                value = value[key];\n            } else {\n                // If the key is not found, return the original placeholder\n                return match;\n            }\n        }\n        // Return the value found in the object\n        return value;\n    });\n}\n\nconst templateTitle = $('Confluence: Get template content').item.json.name;\nconst templateBody = $('Confluence: Get template content').item.json.body.storage.value;\nconst values = $('Webhook').item.json;\n\nconst pageTitle = replacePlaceholders(templateTitle, values); \nconst pageBody = replacePlaceholders(templateBody, values);\n\nreturn { \"page_title\": pageTitle, \"page_body\" :  pageBody};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "42bbd727-e3ea-4e36-be11-1f7def28f134",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        1020,
+        660
+      ],
+      "webhookId": "d291ef27-c27f-42cf-90cf-4dad7dd71a7c",
+      "parameters": {
+        "path": "d291ef27-c27f-42cf-90cf-4dad7dd71a7c",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "user": {
+          "name": "Alice",
+          "messages": {
+            "count": 5
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set parameters": {
+      "main": [
+        [
+          {
+            "node": "Confluence: Get template content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confluence: Get template content": {
+      "main": [
+        [
+          {
+            "node": "Replace placeholders in template body and title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace placeholders in template body and title": {
+      "main": [
+        [
+          {
+            "node": "Confluence: Create page from template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

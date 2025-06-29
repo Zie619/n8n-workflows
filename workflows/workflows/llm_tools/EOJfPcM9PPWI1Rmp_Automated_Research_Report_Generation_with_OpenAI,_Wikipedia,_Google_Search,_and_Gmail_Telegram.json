@@ -1,0 +1,885 @@
+{
+  "id": "EOJfPcM9PPWI1Rmp",
+  "meta": {
+    "instanceId": "3aaeb6eaba3494bbdbe57e25fa3d02783cfbc460b1e823f7b741cf26edc7ca3d",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Automated Research Report Generation with OpenAI, Wikipedia, Google Search, and Gmail/Telegram",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "46c09535-cd6b-481c-b520-67ecb4aad812",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        776,
+        -100
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "WLM64KJjQFXGWGWi",
+          "name": "OpenAi account N8N"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "574ec863-e557-4196-b1b9-5c275a7de73a",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        896,
+        -100
+      ],
+      "parameters": {
+        "sessionKey": "={{ $json.output.searchQueries }}",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "661349c2-7bb1-4c95-af8f-3a108a619c84",
+      "name": "Search News",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        1016,
+        -100
+      ],
+      "parameters": {
+        "url": "=https://newsapi.org/v2/everything?q={{ encodeURIComponent($input.cleanedQuery) }}&apiKey=\"YOURAPIKEY\"",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "q"
+            },
+            {
+              "name": "pageSize",
+              "value": "3",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "sortBy",
+              "value": "publishedAt",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "language",
+              "value": "en",
+              "valueProvider": "fieldValue"
+            }
+          ]
+        },
+        "toolDescription": "Fetches recent news articles",
+        "optimizeResponse": true
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6d43251f-db88-45fa-be65-de368d4db408",
+      "name": "Wikipedia",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        1136,
+        -100
+      ],
+      "parameters": {
+        "url": "=https://en.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&exintro&explaintext&titles={{ $input.query ? encodeURIComponent($input.query) : encodeURIComponent($json.refined_query) }}\n\n",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "action",
+              "valueProvider": "modelOptional"
+            },
+            {
+              "name": "prop",
+              "value": "extracts",
+              "valueProvider": "fieldValue"
+            }
+          ]
+        },
+        "toolDescription": "Fetches structured data from Wikipedia",
+        "optimizeResponse": true
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "c94b1446-82bf-47c8-8f5d-c5da9a43a7e7",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        380,
+        -80
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "WLM64KJjQFXGWGWi",
+          "name": "OpenAi account N8N"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "834efc04-b05f-4ddc-a8d9-b93d9c4e099a",
+      "name": "Query Refiner",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        400,
+        -320
+      ],
+      "parameters": {
+        "text": "=You are a query generation expert. Based on the refined query provided, generate exactly 5 related search queries that can help broaden the research scope. Each query should focus on a different aspect of the topic (e.g., applications, challenges, recent developments, specific domains, case studies). The output must match the following JSON schema:\n{\n  \"topic\": \"The refined query\",\n  \"searchQueries\": [\"query1\", \"query2\", \"query3\", \"query4\", \"query5\"]\n}\n\nRefined Query: {{ $json.cleanedQuery}}\nExamples:\n- Refined Query: \"current trends in artificial intelligence 2025\"\n  Output: {\n    \"topic\": \"current trends in artificial intelligence 2025\",\n    \"searchQueries\": [\n      \"AI applications in healthcare 2025\",\n      \"ethical challenges of artificial intelligence 2025\",\n      \"recent developments in generative AI 2025\",\n      \"AI trends in education 2025\",\n      \"AI startup funding trends 2025\"\n    ]\n  }\n- Refined Query: \"artificial intelligence applications in healthcare diagnostics and treatment\"\n  Output: {\n    \"topic\": \"artificial intelligence applications in healthcare diagnostics and treatment\",\n    \"searchQueries\": [\n      \"AI in medical diagnostics 2025\",\n      \"artificial intelligence for personalized treatment plans\",\n      \"challenges of AI in healthcare diagnostics\",\n      \"recent studies on AI in healthcare\",\n      \"AI healthcare diagnostics case studies\"\n    ]\n  }",
+        "options": {},
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "1f83e2d8-23ee-46e2-998a-b644ea0fff3c",
+      "name": "Research AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        900,
+        -320
+      ],
+      "parameters": {
+        "text": "=Perform research on the topic \n\"{{ $json.output.topic }}\"\"\n\n\nusing the following search queries: {{ $json.output.searchQueries.join(\",\") }}\n\n",
+        "options": {
+          "systemMessage": "=You are a research assistant named \"ResearchBot\". Your role is to perform thorough and comprehensive research based on the topic and search queries provided. Follow these steps to gather data:\n- Search the web for general information using the provided topic and queries, focusing on recent trends, developments, and applications (2024-2025).\n- Search Wikipedia for foundational knowledge about the topic to provide context.\n- Search for recent news articles (from 2024-2025) to identify current developments, announcements, and trends.\n- Search Google Scholar for academic papers (from 2020-2025) to gather scholarly insights and research findings.\n- Summarize and aggregate all findings into a structured JSON format.\n- Ensure all data is directly relevant to the topic:  {{ $json.output.topic }}.\nReturn the research findings as a raw JSON object with the following structure:\n{\n  \"introduction\": \"A detailed 4-6 sentence introduction to the topic, providing context, significance, and a brief overview of current trends.\",\n  \"summary\": \"A comprehensive 6-8 sentence summary of the key findings, covering trends, challenges, opportunities, and notable applications.\",\n  \"key_findings\": [\"A list of 8-12 specific key points or trends, each as a concise sentence. This must always be an array with at least 8 items.\"],\n  \"news_highlights\": [\"A list of 4-6 recent news headlines with sources (from 2024-2025), each in the format 'Headline - Source, Year'. This must always be an array with at least 4 items.\"],\n  \"scholarly_insights\": [\"A list of 4-6 insights from academic papers with sources (from 2020-2025), each in the format 'Insight (Author et al., Year, Journal)'. This must always be an array with at least 4 items.\"],\n  \"wikipedia_summary\": \"A detailed 4-6 sentence summary of foundational knowledge from Wikipedia, providing background and historical context on the topic.\",\n  \"sources\": [\"A list of all source URLs (at least 8-12 unique, relevant sources, including web articles, news, and academic papers). This must always be an array with at least 8 items.\"]\n}\nIf insufficient data is found for any field, perform additional searches using variations of the topic and queries to meet the minimum requirements. For example:\n- For news, search for terms like \"[topic] 2025 news\", \"[topic] recent developments\", or \"[topic] industry trends\".\n- For scholarly insights, search for \"[topic] machine learning 2020-2025\", \"[topic] applications research\", or \"[topic] ethical concerns\".\n- For sources, ensure a mix of web articles, news, and academic papers.\nDo NOT include irrelevant information or sources. Do NOT wrap the JSON in a string, an \"output\" field, or any Markdown formatting (e.g., ```json). Return only the raw JSON object.\n\n\nTopic: {{ $json.output.topic }}\nSearch Queries: {{ $json.output.searchQueries }}"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "a53cfaac-425a-4558-a661-1042cb63599d",
+      "name": "Google Search Web",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        1256,
+        -100
+      ],
+      "parameters": {
+        "url": "=https://www.googleapis.com/customsearch/v1?key=\"YOURAPIKEY\"={{ encodeURIComponent($input.query) }}",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "num",
+              "value": "5",
+              "valueProvider": "fieldValue"
+            }
+          ]
+        },
+        "toolDescription": "Searches the web for a given query using Google Custom Search API",
+        "optimizeResponse": true
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "27548bf6-7f86-4e38-befb-3ad55c4d6c46",
+      "name": "SerpApi",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        1376,
+        -100
+      ],
+      "parameters": {
+        "url": "=https://serpapi.com/search?engine=google_scholar&q={{ encodeURIComponent( $json.refined_query ) }}&api_key=\"YOURAPIKEY\"",
+        "sendQuery": true,
+        "authentication": "predefinedCredentialType",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "num",
+              "value": "3",
+              "valueProvider": "fieldValue"
+            }
+          ]
+        },
+        "toolDescription": "Searches Google Scholar for academic papers",
+        "optimizeResponse": true,
+        "nodeCredentialType": "serpApi"
+      },
+      "credentials": {
+        "serpApi": {
+          "id": "9LoJ3XtPiLBGUI5W",
+          "name": "SerpAPI account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "51c1b9be-a3e1-4a93-bb5c-bbde5919de0c",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        580,
+        -80
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"output\": {\n    \"topic\": \"the best ai models 2025\",\n    \"searchQueries\": [\n      \"best AI models 2025 natural language processing\",\n      \"top AI models 2025 computer vision\",\n      \"best AI models 2025 generative AI\",\n      \"recent advancements in AI models 2025 news\",\n      \"scholarly research on AI models 2020-2025\",\n      \"ethical concerns in AI models 2025\",\n      \"AI models 2025 applications in healthcare\",\n      \"AI models 2025 trends in automation\"\n    ]\n  }\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "2d30f75e-baa0-4dd3-a0f9-cb74d7272d08",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1500,
+        -320
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": " introduction, summary, key_findings, news_highlights, scholarly_insights, wikipedia_summary, sources"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b89d5c35-64c4-4e8c-b432-c2219aba8acc",
+      "name": "Input Validation",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        180,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "// Validate input and prepare for processing\nconst query = $input.all()[0].json.query;\n\nif (!query || query.trim().length < 3) {\n  throw new Error('Research query must be at least 3 characters long');\n}\n\nreturn {\n  json: {\n    originalQuery: query,\n    cleanedQuery: query.trim().toLowerCase(),\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e34f9b0e-a9ca-4011-bfee-c7845c68942b",
+      "name": "Parse Research Output",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1300,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "// Get the output string from the Research AI Agent\nconst outputString = $input.first().json.output;\n\n// Parse the string into a JSON object\nconst parsedOutput = JSON.parse(outputString);\n\n// Return the parsed JSON as a single item\nreturn [{\n  json: parsedOutput\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f4e6e449-1c56-4500-9701-623620360c83",
+      "name": "Merge Split Items",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1700,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "const mergedItem = {\n  key_findings: [],\n  news_highlights: [],\n  scholarly_insights: [],\n  sources: []\n};\n\n$input.all().forEach(item => {\n  const data = item.json;\n\n  if (data.introduction) mergedItem.introduction = data.introduction;\n  if (data.summary) mergedItem.summary = data.summary;\n  if (data.wikipedia_summary) mergedItem.wikipedia_summary = data.wikipedia_summary;\n\n  if (data.key_findings) {\n    const findingsToAdd = Array.isArray(data.key_findings) ? data.key_findings : [data.key_findings];\n    mergedItem.key_findings = mergedItem.key_findings.concat(findingsToAdd);\n  }\n  if (data.news_highlights) {\n    const highlightsToAdd = Array.isArray(data.news_highlights) ? data.news_highlights : [data.news_highlights];\n    mergedItem.news_highlights = mergedItem.news_highlights.concat(highlightsToAdd);\n  }\n  if (data.scholarly_insights) {\n    const insightsToAdd = Array.isArray(data.scholarly_insights) ? data.scholarly_insights : [data.scholarly_insights];\n    mergedItem.scholarly_insights = mergedItem.scholarly_insights.concat(insightsToAdd);\n  }\n  if (data.sources) {\n    const sourcesToAdd = Array.isArray(data.sources) ? data.sources : [data.sources];\n    mergedItem.sources = mergedItem.sources.concat(sourcesToAdd);\n  }\n});\n\nreturn [{ json: mergedItem }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e63a3f5d-dba7-4fc4-afa0-150e63aedbac",
+      "name": "Store Research Metadata",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2100,
+        -720
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Topic": "={{ $json.topic }}",
+            "Sources": "={{ $json.sources }}",
+            "Timestamp": "={{ $json.timestamp }}",
+            "Search Queries": "={{ $json.searchQueries }}"
+          },
+          "schema": [
+            {
+              "id": "Topic",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Topic",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Search Queries",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Search Queries",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sources",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Sources",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timestamp",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Timestamp",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/196eJesF2ke3AQjoWvave51m6FltAyBFj5pvVW7wIsUA/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "196eJesF2ke3AQjoWvave51m6FltAyBFj5pvVW7wIsUA",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/196eJesF2ke3AQjoWvave51m6FltAyBFj5pvVW7wIsUA/edit?usp=drivesdk",
+          "cachedResultName": "Research AI Agent Records"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PRTItuUGXlUOvF9a",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "2501bc98-a1b4-473b-b4ac-7fd78efcb6be",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1080,
+        -1200
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 2900,
+        "height": 1600,
+        "content": "# 📋 Research Report Workflow 🧠💻\n\nThis workflow generates a professional PDF research report on a given topic, sends it via Telegram, and emails🚀\n\n\n---\n\n## 🔍 **Query Refiner**\n- **What it does**: Refines the input topic for better readability. 🧹\n- **Input**: Topic from the HTTP Request (e.g., \"the best ai models 2025\").\n- **Output**: Formatted topic (e.g., \"The Best AI Models 2025\").\n- **✨ Detail**: Capitalizes words and ensures \"AI\" is uppercase.\n\n---\n\n## 📊 **Aggregate Research Data**\n- **What it does**: Collects research data for the topic. 📚\n- **Input**: Refined topic.\n- **Output**: Research data (introduction, summary, key findings, etc.) with a timestamp.\n- **⏰ Note**: The timestamp is used to date the report.\n\n---\n\n## 🔗 **Merge Split Items**\n- **What it does**: Combines and organizes research data into sections. 🗂️\n- **Input**: Data from Aggregate Research Data.\n- **Output**: Structured JSON with sections like `introduction`, `key_findings`, `sources`.\n- **📑 Purpose**: Prepares data for the PDF report.\n\n---\n\n## 📝 **Generate PDF HTML**\n- **What it does**: Creates an HTML template for the PDF report. 🖥️\n- **Input**: Refined topic and research data.\n- **Output**: HTML content, file name (e.g., `research-report-the-best-ai-models-2025-2025-04-09.pdf`), and formatted date.\n- **🎨 Features**:\n  - Professional styling (Helvetica, Georgia fonts, deep blue accents).\n  - Sections: Cover page, introduction, summary, key findings, etc.\n  - Escapes special characters to prevent HTML errors.\n- **⏳ Timestamp Fix**: Stores `rawTimestamp` and `formattedDate` (e.g., \"April 9, 2025\").\n\n---\n\n## 📄 **Convert HTML to PDF (PDFShift)**\n- **What it does**: Converts the HTML to a PDF using the PDFShift API. 🖨️\n- **Input**: HTML content from the previous node.\n- **Output**: JSON response with a URL to the generated PDF.\n- **🔑 Requirement**: Needs a valid PDFShift API key.\n- **⚠️ Note**: Outputs a URL, not the PDF binary data.\n\n---\n\n## ⬇️ **Download PDF**\n- **What it does**: Downloads the PDF from the URL provided by PDFShift. 📥\n- **Input**: PDF URL from the Convert HTML to PDF node.\n- **Output**: Binary PDF data (MIME type: `application/pdf`, ~98 KB).\n- **📛 File Name**: Uses the file name from the previous node (e.g., `research-report-the-best-ai-models-2025-2025-04-09.pdf`).\n\n---\n\n## 📱 **Gmail/Telegram**\n- **What it does**: Sends the PDF to a Gmail/Telegram chat. 💬\n- **Input**: PDF binary data and metadata (topic, formatted date).\n- **Output**: Sends the PDF as a document to the specified chat.\n- **📝 Caption**:"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b2219fba-c5e5-4c0e-abf2-04a8ef60b795",
+      "name": "Generate PDF HTML",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2120,
+        -320
+      ],
+      "parameters": {
+        "jsCode": "// Function to escape HTML special characters\nfunction escapeHtml(unsafe) {\n  if (typeof unsafe !== 'string') return unsafe;\n  return unsafe\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;\")\n    .replace(/\"/g, \"&quot;\")\n    .replace(/'/g, \"&#039;\");\n}\n\n// Get topic from Query Refiner\nconst queryRefinerData = $('Query Refiner').first().json;\nconsole.log('Debugging queryRefinerData:', JSON.stringify(queryRefinerData, null, 2));\nconst topicRaw = queryRefinerData.output?.topic || 'Untitled';\nconst topic = topicRaw.split(' ').map(word => {\n  if (word.toLowerCase() === 'ai') return 'AI';\n  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();\n}).join(' ');\n\n// Get timestamp from Aggregate Research Data\nconst aggregateData = $input.first().json;\nconsole.log('Debugging aggregateData:', JSON.stringify(aggregateData, null, 2));\n\n// Validate and parse the timestamp\nlet rawTimestamp = aggregateData.timestamp;\nif (!rawTimestamp || isNaN(new Date(rawTimestamp))) {\n  rawTimestamp = new Date().toISOString(); // Fallback to current date if invalid\n}\nconst formattedDate = new Date(rawTimestamp).toLocaleDateString('en-US', {\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric'\n});\nconsole.log('Raw timestamp:', rawTimestamp);\nconsole.log('Formatted date:', formattedDate);\n\n// Get the aggregated research data from Merge Split Items\nconst mergeSplitItems = $('Merge Split Items').first().json;\nconsole.log('Data from Merge Split Items:', JSON.stringify(mergeSplitItems, null, 2));\n\n// Use data from Merge Split Items\nconst data = {\n  topic: topic,\n  rawTimestamp: rawTimestamp, // Store the raw timestamp\n  formattedDate: formattedDate, // Store the formatted date\n  introduction: mergeSplitItems.introduction,\n  summary: mergeSplitItems.summary,\n  key_findings: mergeSplitItems.key_findings,\n  news_highlights: mergeSplitItems.news_highlights,\n  scholarly_insights: mergeSplitItems.scholarly_insights,\n  wikipedia_summary: mergeSplitItems.wikipedia_summary,\n  sources: mergeSplitItems.sources\n};\n\n// Ensure array fields are arrays, default to empty array if not\nconst keyFindings = Array.isArray(data.key_findings) ? data.key_findings : [];\nconst newsHighlights = Array.isArray(data.news_highlights) ? data.news_highlights : [];\nconst scholarlyInsights = Array.isArray(data.scholarly_insights) ? data.scholarly_insights : [];\nconst sources = Array.isArray(data.sources) ? data.sources : [];\n\n// Define the file name based on the topic\nconst fileName = `research-report-${(data.topic || 'untitled').replace(/\\s+/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.pdf`;\n\n// Create an HTML template for the PDF with enhanced styling\nconst htmlContent = `\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Research Report: ${escapeHtml(data.topic)}</title>\n  <style>\n    @page {\n      size: A4;\n      margin: 0;\n      @top-center {\n        content: \"Research Report: ${escapeHtml(data.topic)}\";\n        font-family: 'Helvetica', sans-serif;\n        font-size: 10pt;\n        color: #666;\n      }\n      @bottom-right {\n        content: counter(page);\n        font-family: 'Helvetica', sans-serif;\n        font-size: 10pt;\n        color: #666;\n      }\n    }\n    body {\n      font-family: 'Helvetica', 'Arial', sans-serif;\n      margin: 0;\n      padding: 0;\n      color: #333;\n      line-height: 1.6;\n      font-size: 12pt;\n    }\n    .page-break {\n      page-break-before: always;\n    }\n    .container {\n      width: 90%;\n      max-width: 800px;\n      margin: 0 auto;\n      padding: 40px 30px;\n      background-color: #fff;\n    }\n    /* Cover Page */\n    .cover-page {\n      text-align: center;\n      padding: 100px 30px;\n      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);\n      height: 100vh;\n      display: flex;\n      flex-direction: column;\n      justify-content: center;\n      box-sizing: border-box;\n    }\n    .cover-page h1 {\n      font-family: 'Georgia', serif;\n      font-size: 40pt;\n      font-weight: bold;\n      color: #1a3c5e;\n      margin: 0;\n      text-transform: uppercase;\n      letter-spacing: 2px;\n    }\n    .cover-page p {\n      font-size: 14pt;\n      color: #555;\n      margin: 20px 0;\n      font-style: italic;\n    }\n    /* Header */\n    .header {\n      border-bottom: 2px solid #1a3c5e;\n      padding: 15px 0;\n      text-align: center;\n      margin-bottom: 30px;\n    }\n    .header h1 {\n      font-family: 'Georgia', serif;\n      font-size: 24pt;\n      font-weight: bold;\n      color: #1a3c5e;\n      margin: 0;\n      text-transform: uppercase;\n    }\n    .header p {\n      font-size: 10pt;\n      color: #666;\n      margin: 5px 0 0;\n      font-style: italic;\n    }\n    /* Sections */\n    .section {\n      margin: 40px 0;\n      padding-bottom: 20px;\n      border-bottom: 1px solid #e0e0e0;\n    }\n    .section:last-child {\n      border-bottom: none;\n    }\n    .section h2 {\n      font-family: 'Georgia', serif;\n      font-size: 18pt;\n      font-weight: bold;\n      color: #1a3c5e;\n      margin-bottom: 15px;\n      position: relative;\n    }\n    .section h2::after {\n      content: '';\n      position: absolute;\n      left: 0;\n      bottom: -5px;\n      width: 50px;\n      height: 2px;\n      background-color: #1a3c5e;\n    }\n    .section p {\n      font-size: 12pt;\n      margin: 0 0 15px;\n      color: #444;\n    }\n    .section ul {\n      margin: 0;\n      padding-left: 20px;\n    }\n    .section li {\n      font-size: 12pt;\n      margin: 10px 0;\n      color: #444;\n    }\n    /* Highlighted Key Findings */\n    .key-finding-highlight {\n      background-color: #f0f5fa;\n      padding: 15px;\n      border-left: 4px solid #1a3c5e;\n      margin: 10px 0;\n      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);\n      border-radius: 4px;\n    }\n    .key-finding-highlight span {\n      font-weight: bold;\n      color: #1a3c5e;\n    }\n    /* Sources */\n    .sources ol {\n      margin: 0;\n      padding-left: 20px;\n    }\n    .sources li {\n      font-size: 11pt;\n      margin: 8px 0;\n      word-break: break-all;\n    }\n    .sources a {\n      color: #1a73e8;\n      text-decoration: none;\n    }\n    .sources a:hover {\n      text-decoration: underline;\n    }\n    /* Footer */\n    .footer {\n      text-align: center;\n      font-size: 10pt;\n      color: #666;\n      padding: 20px 0;\n      border-top: 1px solid #e0e0e0;\n      margin-top: 40px;\n      font-style: italic;\n    }\n  </style>\n</head>\n<body>\n  <!-- Cover Page -->\n  <div class=\"cover-page\">\n    <h1>Research Report: ${escapeHtml(data.topic)}</h1>\n    <p>Generated on: ${escapeHtml(data.formattedDate)}</p>\n  </div>\n\n  <!-- Main Content -->\n  <div class=\"page-break\"></div>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>Research Report: ${escapeHtml(data.topic)}</h1>\n      <p>Generated on: ${escapeHtml(data.formattedDate)}</p>\n    </div>\n\n    <div class=\"section\" id=\"introduction\">\n      <h2>Introduction</h2>\n      <p>${escapeHtml(data.introduction) || 'No introduction available.'}</p>\n    </div>\n\n    <div class=\"section\" id=\"summary\">\n      <h2>Summary</h2>\n      <p>${escapeHtml(data.summary) || 'No summary available.'}</p>\n    </div>\n\n    <div class=\"section\" id=\"key-findings\">\n      <h2>Key Findings</h2>\n      <ul>\n        ${keyFindings.length > 0 ? keyFindings.map((finding, index) => {\n          if (index < 3) {\n            return `<li class=\"key-finding-highlight\"><span>${escapeHtml(finding)}</span></li>`;\n          }\n          return `<li>${escapeHtml(finding)}</li>`;\n        }).join('') : '<li>No key findings available.</li>'}\n      </ul>\n    </div>\n\n    <div class=\"section\" id=\"news-highlights\">\n      <h2>News Highlights</h2>\n      <ul>\n        ${newsHighlights.length > 0 ? newsHighlights.map(highlight => `<li>${escapeHtml(highlight)}</li>`).join('') : '<li>No news highlights available.</li>'}\n      </ul>\n    </div>\n\n    <div class=\"section\" id=\"scholarly-insights\">\n      <h2>Scholarly Insights</h2>\n      <ul>\n        ${scholarlyInsights.length > 0 ? scholarlyInsights.map(insight => `<li>${escapeHtml(insight)}</li>`).join('') : '<li>No scholarly insights available.</li>'}\n      </ul>\n    </div>\n\n    <div class=\"section\" id=\"wikipedia-summary\">\n      <h2>Wikipedia Summary</h2>\n      <p>${escapeHtml(data.wikipedia_summary) || 'No Wikipedia summary available.'}</p>\n    </div>\n\n    <div class=\"section sources\" id=\"sources\">\n      <h2>Sources</h2>\n      <ol>\n        ${sources.length > 0 ? sources.map(source => `<li><a href=\"${escapeHtml(source)}\" target=\"_blank\">${escapeHtml(source)}</a></li>`).join('') : '<li>No sources available.</li>'}\n      </ol>\n    </div>\n\n    <div class=\"footer\">\n      <p>Generated by ResearchBot | © 2025</p>\n    </div>\n  </div>\n</body>\n</html>\n`;\n\n// Return the HTML content and file name\nreturn [{\n  json: {\n    htmlContent: htmlContent,\n    fileName: fileName,\n    topic: data.topic,\n    rawTimestamp: data.rawTimestamp,\n    formattedDate: data.formattedDate\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e43bd216-af6a-43a4-9432-c092e34b83ba",
+      "name": "Convert HTML to PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2300,
+        -320
+      ],
+      "parameters": {
+        "url": "https://api.pdfshift.io/v3/convert/pdf",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=source",
+              "value": "={{ $json.htmlContent }}"
+            },
+            {
+              "name": "landscape",
+              "value": "false"
+            },
+            {
+              "name": "use_print",
+              "value": "false"
+            },
+            {
+              "name": "filename",
+              "value": "={{ $json.fileName }}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "authorization",
+              "value": "Basic YXBpOnNrX2VhNDVmY2YxN2E1NjMxY2I1ZmQxZGVmNjJmZTY3Y2JiYjM3MjQ2N2M="
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "fef45c7d-578b-4202-b804-db4de8a3ab5f",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1900,
+        -320
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3d942072-ad3f-4d9a-a5f4-48df2d1644b4",
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2500,
+        -320
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5763bd13-f98a-4983-b61d-72efad31f488",
+      "name": "Send Research to Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2820,
+        0
+      ],
+      "webhookId": "ef2f7336-e7d4-4476-a65e-951d92138f0b",
+      "parameters": {
+        "sendTo": "example@gmail.com",
+        "message": "=<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Research Report: {{ $('Generate PDF HTML').item.json.topic }}</title>\n  <style>\n    body {\n      font-family: 'Arial', sans-serif;\n      color: #333;\n      line-height: 1.6;\n      background-color: #f4f4f4;\n      margin: 0;\n      padding: 0;\n    }\n    .container {\n      max-width: 600px;\n      margin: 20px auto;\n      background-color: #ffffff;\n      padding: 30px;\n      border-radius: 8px;\n      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\n    }\n    .header {\n      text-align: center;\n      border-bottom: 2px solid #1a3c5e;\n      padding-bottom: 15px;\n      margin-bottom: 20px;\n    }\n    .header h1 {\n      font-size: 24px;\n      color: #1a3c5e;\n      margin: 0;\n    }\n    .content p {\n      font-size: 16px;\n      margin: 0 0 15px;\n    }\n    .content p strong {\n      color: #1a3c5e;\n    }\n    .content a {\n      color: #1a73e8;\n      text-decoration: none;\n    }\n    .content a:hover {\n      text-decoration: underline;\n    }\n    .signature {\n      margin-top: 20px;\n      font-size: 14px;\n      color: #666;\n      border-top: 1px solid #e0e0e0;\n      padding-top: 15px;\n    }\n    .signature p {\n      margin: 5px 0;\n    }\n    .footer {\n      text-align: center;\n      font-size: 12px;\n      color: #999;\n      margin-top: 20px;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>Research Report: {{ $('Generate PDF HTML').item.json.topic }}</h1>\n    </div>\n    <div class=\"content\">\n      <p>Dear Immanuel,</p>\n      <p>I hope this email finds you well. I am pleased to share with you a comprehensive research report on \"<strong>\n{{ $('Generate PDF HTML').item.json.topic }}</strong>\", generated on <strong>{{ $('Generate PDF HTML').item.json.formattedDate }}</strong>.</p>\n      <p>This report provides an in-depth analysis, including a detailed introduction, summary, key findings, news highlights, scholarly insights, and a Wikipedia summary, all supported by credible sources. It is designed to offer valuable insights and actionable information to support your research, decision-making, or project needs.</p>\n      <p>Please find the report attached as a PDF for your review. Should you have any questions, require further details, or wish to discuss the findings, feel free to reach out—I’d be happy to assist.</p>\n      <p>Thank you for your interest, and I look forward to your feedback.</p>\n    </div>\n    <div class=\"signature\">\n      <p>Best regards,</p>\n      <p>Immanuel</p>\n    \n    </div>\n    <div class=\"footer\">\n      <p>Generated by Em | © 2025</p>\n    </div>\n  </div>\n</body>\n</html>\n\n\n\n\n\n\n\n\n\n",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          },
+          "appendAttribution": false
+        },
+        "subject": "=Research Report: {{ $('Query Refiner').first().json.output.topic.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') }}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "EGZrlZO8SHs37XwL",
+          "name": "Gmail Email "
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "438acbf5-5609-4c89-8448-c248e5d9bcaf",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -40,
+        -220
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "9545380e-e0aa-405c-9230-eb89354b6775",
+      "name": "Send PDF",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        2800,
+        -340
+      ],
+      "webhookId": "1b2f4bf7-8838-48db-ae75-e50c2a18b815",
+      "parameters": {
+        "chatId": "1274041539",
+        "operation": "sendDocument",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "0BctZPpJYxRsKfET",
+          "name": "Telegram Airbnb A"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "0c0e336e-12f7-4fa2-b375-c3fcc6630f7e",
+      "name": "Executed by Main AI Agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -40,
+        -420
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "c12851da-98dd-4785-8dc2-844bedfd5f1e",
+      "name": "Search Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        2500,
+        -720
+      ],
+      "parameters": {
+        "filter": {},
+        "options": {},
+        "resource": "fileFolder",
+        "queryString": "=name='Research Reports'"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "9wskupj06ArN8KFy",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "c8f7d2db-f5b2-4e6d-8c43-2d37e5a9306a",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2700,
+        -720
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "14231a0f-aae8-4e31-af03-b7a1da1cbc3d",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $node[\"Google Drive\"].json.length > 0 }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "When clicking ‘Test workflow’": [
+      {
+        "json": {
+          "query": "Facts about Thailand"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e51160d8-0107-48ec-ad91-54843134df2c",
+  "connections": {
+    "SerpApi": {
+      "ai_tool": [
+        [
+          {
+            "node": "Research AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Store Research Metadata",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate PDF HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Merge Split Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia": {
+      "ai_tool": [
+        [
+          {
+            "node": "Research AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search News": {
+      "ai_tool": [
+        [
+          {
+            "node": "Research AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Send Research to Gmail",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Refiner": {
+      "main": [
+        [
+          {
+            "node": "Research AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Folder": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Research AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Validation": {
+      "main": [
+        [
+          {
+            "node": "Query Refiner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate PDF HTML": {
+      "main": [
+        [
+          {
+            "node": "Convert HTML to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Search Web": {
+      "ai_tool": [
+        [
+          {
+            "node": "Research AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Split Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Research AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Research Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Query Refiner",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert HTML to PDF": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Research Output": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Research to Gmail": {
+      "main": [
+        []
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Query Refiner",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Executed by Main AI Agent": {
+      "main": [
+        []
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Input Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

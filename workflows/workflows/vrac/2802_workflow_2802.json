@@ -1,0 +1,765 @@
+{
+  "meta": {
+    "instanceId": "e0be1457dbb383bea07059c263a59b383a5b9420e6a22d3e5f1d80ae7f4f6629"
+  },
+  "nodes": [
+    {
+      "id": "200098a9-1a49-49c1-8703-eea0c496a020",
+      "name": "Refresh Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1300,
+        100
+      ],
+      "parameters": {
+        "url": "https://graph.threads.net/refresh_access_token",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "grant_type",
+              "value": "th_refresh_token"
+            },
+            {
+              "name": "access_token",
+              "value": "=Your Threads Long-Live Token"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "58373d28-8f22-4224-8ef1-aca9c24d5777",
+      "name": "Get Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -960,
+        100
+      ],
+      "parameters": {
+        "url": "https://graph.threads.net/v1.0/<Your Threads ID>/threads?fields=id,media_product_type,media_type,media_url,permalink,owner,username,text,timestamp,shortcode,thumbnail_url,children,is_quote_post",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "since",
+              "value": "={{ new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0] }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json.access_token }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7d9923b5-2fdc-46d4-8734-fe044a5a8951",
+      "name": "Get Post ID",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -640,
+        100
+      ],
+      "parameters": {
+        "functionCode": "// 獲取 API 返回的完整資料 (假設只有一個 \"data\" 陣列)\nconst allData = items[0].json.data;\n\n// 過濾符合條件的貼文：\n// 條件 1: media_type = \"TEXT_POST\" 或 \"VIDEO\"\n// 條件 2: is_quote_post = false\nconst filteredPosts = allData.filter(post => {\n  return (\npost.media_type === \"TEXT_POST\" || \npost.media_type === \"IMAGE\" || \npost.media_type === \"VIDEO\" || \npost.media_type === \"CAROUSEL_ALBUM\" || \npost.media_type === \"AUDIO\");\n});\n\n// 抽取所需的欄位：id, permalink, timestamp\nconst extractedData = filteredPosts.map(post => {\n  return {\n    id: post.id,\n    type: post.media_type,\n    permalink: post.permalink,\n    timestamp: post.timestamp,\n  };\n});\n\n// 將結果以 n8n 所需格式輸出\nreturn extractedData.map(post => ({ json: post }));\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "95ed0a59-7a6d-4358-aded-7ce49ef04916",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -300,
+        100
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "77720564-acf5-4a55-afa9-ae559965a5b9",
+      "name": "Replace Me",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2820,
+        200
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "3b4e5eda-f354-4ef4-a260-378c06708cb5",
+      "name": "Threads / Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        0,
+        180
+      ],
+      "parameters": {
+        "url": "=https://graph.threads.net/v1.0/{{ $json.id }}/conversation?fields=id,text,username,permalink,timestamp,media_product_type,media_type,media_url,children{media_url}&reverse=false",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "access_token",
+              "value": "={{ $('Refresh Token').first().json.access_token }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6331c1f6-e1a4-4749-a17a-c129ab7ab0e0",
+      "name": "Threads / Root",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "=https://graph.threads.net/v1.0/{{ $json.id }}?fields=id,media_product_type,media_type,media_url,children{media_url},permalink,owner,username,text,timestamp,children",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "access_token",
+              "value": "={{ $('Refresh Token').first().json.access_token }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "76c518b6-3c21-4879-8f0a-080fab60895a",
+      "name": "Comment's Filter",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        240,
+        180
+      ],
+      "parameters": {
+        "jsCode": "// 確保 items 是否有內容\nif (!items || items.length === 0) {\n  console.log('No items found');\n  return [];\n}\n\n// 取得輸入數據\nconst inputData = items[0].json;\nconsole.log('Input data:', JSON.stringify(inputData, null, 2));\n\nif (!inputData || !inputData.data || !Array.isArray(inputData.data)) {\n  console.log('Invalid data structure');\n  return [];\n}\n\n// 過濾出 username 為 yourThreadsName 的資料\nconst filteredPosts = inputData.data.filter(post => post.username === 'geekaz');\nconsole.log('Filtered posts count:', filteredPosts.length);\n\n// 處理每個 post，提取所需的資料\nconst processedData = filteredPosts.map(post => {\n  // 初始化 mediaUrls，用來存放所有的 media_url\n  let mediaUrls = [];\n\n  // 如果有 children，則提取 children 裡的 media_url\n  if (post.children?.data && Array.isArray(post.children.data)) {\n    mediaUrls = post.children.data\n      .map(child => child.media_url) // 提取每個 child 的 media_url\n      .filter(url => url); // 過濾掉 undefined 或 null 的 URL\n  } else if (post.media_url) {\n    // 如果沒有 children，使用最外層的 media_url\n    mediaUrls.push(post.media_url);\n  }\n\n  // 返回每個 post 的處理後結果\n  return {\n    text: post.text || '',\n    media_urls: mediaUrls\n  };\n});\n\nconsole.log('Processed data:', JSON.stringify(processedData, null, 2));\n\n// 將結果轉換為 n8n 所需格式\nreturn processedData.map(post => ({ json: post }));"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "c0cae676-acff-493e-b957-26df0366cf98",
+      "name": "Root's Filter",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// 確保 items 是否有內容\nif (!items || items.length === 0) {\n  return [];\n}\n\n// 確保 items 的資料結構是正確的\nconst allData = items.map(item => item.json);\n\nconst processedData = allData.map(post => {\n  // 初始化 mediaUrls，用來存放所有的 media_url\n  let mediaUrls = [];\n\n  // 如果有 children，則提取 children 裡的 media_url\n  if (post.children?.data && Array.isArray(post.children.data)) {\n    mediaUrls = post.children.data\n      .map(child => child.media_url) // 提取每個 child 的 media_url\n      .filter(url => url); // 過濾掉 undefined 或 null 的 URL\n  } else if (post.media_url) {\n    // 如果沒有 children，使用最外層的 media_url\n    mediaUrls.push(post.media_url);\n  }\n\n  // 返回每個 post 的處理後結果\n  return {\n    id: post.id || null,\n    username: post.username || null,\n    text: post.text || null,\n    timestamp: post.timestamp || null,\n    media_type: post.media_type || null,\n    media_urls: mediaUrls, // 包含所有的媒體 URL\n    permalink: post.permalink || null,\n  };\n});\n\n// 將結果轉換為 n8n 所需格式\nreturn processedData.map(post => ({ json: post }));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "367c2475-4dff-4858-9756-ad8f8383521c",
+      "name": "Threads ID",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1060,
+        100
+      ],
+      "parameters": {
+        "simple": false,
+        "options": {},
+        "resource": "databasePage",
+        "operation": "getAll",
+        "returnAll": true,
+        "databaseId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "175931b1-f5b8-8047-8620-f0e7ccde8407",
+          "cachedResultUrl": "https://www.notion.so/175931b1f5b880478620f0e7ccde8407",
+          "cachedResultName": "Posts Automation"
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "P3mnylwFncmx1P3h",
+          "name": "Notion account"
+        }
+      },
+      "typeVersion": 2.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "2aaa224f-598b-4f8a-a247-03a873ac19a3",
+      "name": "Extract IDs",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1260,
+        100
+      ],
+      "parameters": {
+        "functionCode": "// 檢查輸入是否存在\nif (!items?.length) return [{ json: { threadsIds: [] } }];\n\n// 取得所有頁面\nconst pages = items.map(item => item.json).flat();\nconsole.log('Number of pages:', pages.length);\n\n// 提取所有 Threads ID\nconst threadsIds = pages\n  .map(page => {\n    if (!page?.properties) return null;\n    const threadsIdField = page.properties['Threads ID'];\n    if (!threadsIdField?.rich_text?.length) return null;\n    return threadsIdField.rich_text[0]?.text?.content || null;\n  })\n  .filter(Boolean);\n\nconsole.log('Found Threads IDs:', threadsIds);\n\n// 將結果轉換為 n8n 所需格式\nreturn [{ json: { threadsIds } }];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "83fdaf18-47e7-4b1c-8f1b-523f87a439f3",
+      "name": "Compare IDs",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1500,
+        100
+      ],
+      "parameters": {
+        "functionCode": "// 檢查輸入是否存在\nif (!items?.length) return [{ json: { isExist: false } }];\n\n// 從 Threads Post 節點取得 ID\nconst newId = $('Threads Post').last().json.id;\nconst existingIds = $json.threadsIds || [];\n\n// 檢查是否重複\nconst isExist = existingIds.includes(newId);\n\nreturn [{ json: { isExist } }];\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f1a831b1-fc5f-4569-9b9b-7de0bce9b9cd",
+      "name": "Create Page",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        2080,
+        20
+      ],
+      "parameters": {
+        "simple": false,
+        "options": {
+          "iconType": "emoji"
+        },
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "175931b1-f5b8-8047-8620-f0e7ccde8407",
+          "cachedResultUrl": "https://www.notion.so/175931b1f5b880478620f0e7ccde8407",
+          "cachedResultName": "Posts Automation"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "title": "={{ $('Threads Post').first().json.permalink }}"
+            },
+            {
+              "key": "Threads ID|rich_text",
+              "textContent": "={{ $('Threads Post').first().json.id }}"
+            },
+            {
+              "key": "Post Date|date",
+              "date": "={{ $('Threads Post').first().json.timestamp }}",
+              "timezone": "America/Los_Angeles",
+              "includeTime": false
+            },
+            {
+              "key": "Source|multi_select",
+              "multiSelectValue": "=Threads"
+            },
+            {
+              "key": "Import Check|checkbox"
+            },
+            {
+              "key": "Username|rich_text",
+              "textContent": "={{ $('Threads Post').first().json.username }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "P3mnylwFncmx1P3h",
+          "name": "Notion account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8a5e4752-a8fa-480f-8271-c15a66679e00",
+      "name": "Upload Medias",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2560,
+        20
+      ],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/blocks/{{ $('Create Page').item.json.id }}/children",
+        "options": {},
+        "requestMethod": "PATCH",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ { \"children\": $('Threads Post').last().json.blocks } }}",
+        "queryParametersJson": "=",
+        "headerParametersJson": "{\n  \"Authorization\": \"bearer Your Notion Token\",\n  \"Content-Type\": \"application/json\",\n  \"Notion-Version\": \"2022-06-28\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f3f3a8f7-1137-4013-83dd-b5efc18ab095",
+      "name": "If Post Exist",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1740,
+        100
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Create Page",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.isExist }}",
+                    "rightValue": "=false"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Update Page",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "38564f41-157d-46ed-843f-4e5a43415e21",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.isExist }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "a378c107-d3f5-43cd-bc8c-ad9a39a9ec60",
+      "name": "Threads Post",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        800,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// 確保 items 是否有內容\nif (!items || items.length === 0) {\n  console.log('No items found');\n  return [];\n}\n\n// 取得所有貼文\nconst posts = items.map(item => item.json).flat();\nconsole.log('Number of posts:', posts.length);\n\n// 取得第一篇貼文的基本資訊\nconst firstPost = posts[0] || {};\n\n// 生成 blocks 結構\nconst blocks = [];\n\n// 處理每個貼文\nposts.forEach(post => {\n  // 如果有文字，加入文字區塊\n  if (post.text) {\n    blocks.push({\n      object: \"block\",\n      type: \"paragraph\",\n      paragraph: {\n        rich_text: [{\n          type: \"text\",\n          text: { content: post.text }\n        }]\n      }\n    });\n  }\n  \n  // 如果有媒體連結，加入 embed 區塊\n  if (post.media_urls && post.media_urls.length > 0) {\n    post.media_urls.forEach(url => {\n      blocks.push({\n        object: \"block\",\n        type: \"embed\",\n        embed: { url }\n      });\n    });\n  }\n});\n\n// 合併基本資訊和 blocks\nconst combinedPost = {\n  id: firstPost.id || '',\n  permalink: firstPost.permalink || '',\n  username: firstPost.username || '',\n  timestamp: firstPost.timestamp || '',\n  blocks\n};\n\n// 將結果轉換為 n8n 所需格式\nreturn [{ json: combinedPost }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d2e6c8dd-5751-48f9-a158-c3b39f279f60",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        540,
+        100
+      ],
+      "parameters": {},
+      "typeVersion": 3
+    },
+    {
+      "id": "a79e46eb-bb45-4d80-9f99-adae1e51f94d",
+      "name": "Run This First to Get Long Live Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -940,
+        -340
+      ],
+      "parameters": {
+        "url": "https://graph.threads.net/access_token",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "grant_type",
+              "value": "th_exchange_token"
+            },
+            {
+              "name": "client_secret",
+              "value": "=Threads App Secret"
+            },
+            {
+              "name": "access_token",
+              "value": "=Short Live Access Token"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6b7a17d2-c58c-45f6-9ab1-1e39fbc7e18c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1260,
+        -380
+      ],
+      "parameters": {
+        "height": 240,
+        "content": "## Get Threads API Access Token\n\nGet Threads Access Token Tutorial and ID/教學 [Link](https://nijialin.com/2024/08/17/python-threads-sdk-introduction/)\n\nPlease get your access token and Threads ID first before you start\n(It only need to run once)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a8b5b6f0-b2ec-4aa3-bd9d-375acffd6655",
+      "name": "Get Posts Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -1660,
+        100
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "a86f7373-3a98-4ec2-bf66-88dd835ad17f",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1360,
+        260
+      ],
+      "parameters": {
+        "height": 180,
+        "content": "## Refresh Token\n\nUpdate your long live token here / 在此放上剛剛拿到的長期 Token\n\n[Check Facebook Docs Refresh Token](https://developers.facebook.com/docs/threads/get-started/long-lived-tokens/)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1b9b7fe0-78d3-4a70-8df7-a06b0c0f6fda",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1020,
+        260
+      ],
+      "parameters": {
+        "height": 600,
+        "content": "## Set your Theads ID & Post Time\n\nChage the your with your Threads ID to get your posts / 請先透過上方教學獲取 Threads ID\n\nSet the time of the Post you wanna get / 設置抓取的貼文時間\n\n[Check Facebook Docs Post API](https://developers.facebook.com/docs/threads/threads-media)\n\nsince is scrape the post after the date /\nsince 為抓取日期之後的貼文\n\nuntil is scrape the post before the date /\nuntil 為抓取日期之前的貼文\n\nsince can set\n\n{{ new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0] }}\n\nit will scrape the post since one day ago"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eed94a4e-7fc4-4a23-8581-d5903e7a2ec4",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1000,
+        -60
+      ],
+      "parameters": {
+        "height": 140,
+        "content": "## Set Notion Acc\n\nSet your notion account and database you wanna save the post"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "51bada43-0a37-48fa-b5f6-18731f605afb",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2000,
+        -140
+      ],
+      "parameters": {
+        "height": 140,
+        "content": "## Create Page\n\nBefore create page, please the properties of your post by your demands"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "144b494d-515a-44e1-9720-35cc50d457da",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2500,
+        -200
+      ],
+      "parameters": {
+        "height": 200,
+        "content": "## Support Medias\n\nIt also can scrape the Threads Media like Images and Videos\n\nUpdate your Notion token here:\n\nbearer <your notion token>"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "44657b1e-6537-4344-9f78-3e9ef440e27b",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2360,
+        80
+      ],
+      "parameters": {
+        "width": 600,
+        "height": 180,
+        "content": "## Get your Threads Post automatically\n\nCreator: [Geekaz](https://www.threads.net/@geekaz?hl=zh-tw)\n\nIf your have any problems or question, please send message to my instagram!\n有任何問題都歡迎透過 Instagram 私訊詢問！"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6eeb4af1-7c4f-4f63-8386-384fd3549459",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        400
+      ],
+      "parameters": {
+        "height": 140,
+        "content": "## Comment's Filter\n\nSet your Threads Username"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Threads Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Post": {
+      "main": [
+        [
+          {
+            "node": "Get Post ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads ID": {
+      "main": [
+        [
+          {
+            "node": "Extract IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare IDs": {
+      "main": [
+        [
+          {
+            "node": "If Post Exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Page": {
+      "main": [
+        [
+          {
+            "node": "Upload Medias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract IDs": {
+      "main": [
+        [
+          {
+            "node": "Compare IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Post ID": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads Post": {
+      "main": [
+        [
+          {
+            "node": "Threads ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Post Exist": {
+      "main": [
+        [
+          {
+            "node": "Create Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Token": {
+      "main": [
+        [
+          {
+            "node": "Get Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Root's Filter": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Medias": {
+      "main": [
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads / Root": {
+      "main": [
+        [
+          {
+            "node": "Root's Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Threads / Root",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Threads / Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comment's Filter": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Posts Schedule": {
+      "main": [
+        [
+          {
+            "node": "Refresh Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Threads / Comments": {
+      "main": [
+        [
+          {
+            "node": "Comment's Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

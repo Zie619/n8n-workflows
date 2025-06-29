@@ -1,0 +1,183 @@
+{
+  "meta": {
+    "instanceId": "84ba6d895254e080ac2b4916d987aa66b000f88d4d919a6b9c76848f9b8a7616",
+    "templateId": "2353"
+  },
+  "nodes": [
+    {
+      "id": "8a36e8d4-a3bf-44e1-894a-db00bad99151",
+      "name": "Fetch Github Repo Releases",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        240
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json[\"github-org\"] }}/{{ $json[\"github-repo\"] }}/releases/latest",
+        "options": {}
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "4803248b-3ff7-4994-a105-3d8ef68bd45d",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        380,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "0b2122d7-18cf-49b8-b10e-a8132df8ceb9",
+      "name": "RepoConfig",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        620,
+        240
+      ],
+      "parameters": {
+        "jsCode": "return [\n  {\n    \"github-org\": \"n8n-io\",\n    \"github-repo\": \"n8n\"\n  },\n  {\n    \"github-org\": \"home-assistant\",\n    \"github-repo\": \"core\"\n  }\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "60918b67-76bb-4c9e-bc84-845d59fced76",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        100
+      ],
+      "parameters": {
+        "width": 269,
+        "height": 278,
+        "content": "### Setup repos here to check releases for.\n\nAdd a new json object to the array setting the org and repo, these will be used by the following nodes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "66fbb663-cd52-471c-be8b-4175f754d02d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1300,
+        120
+      ],
+      "parameters": {
+        "height": 254,
+        "content": "### Setup Slack notification\n\nUpdate this node to customise your Slack notification"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9b04cdd2-e369-4862-b376-9945e93c0aaf",
+      "name": "Wether Release is new",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1080,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "014670a7-6f9e-466c-a403-24ad4e230dff",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              },
+              "leftValue": "={{ $json.published_at.toDateTime() }}",
+              "rightValue": "={{ DateTime.utc().minus(1, 'days') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4ad55bb4-89d2-4f1d-bcb5-fe60aa4f8c79",
+      "name": "Send Message",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1380,
+        220
+      ],
+      "parameters": {
+        "text": "=:tada: New release for *{{ $('RepoConfig').item.json[\"github-repo\"] }}* - {{ $('Fetch Github Repo Releases').item.json[\"name\"] }}\n\n{{ $json.body.slice(0, 500) }}\n\n{{ $('Fetch Github Repo Releases').item.json[\"url\"] }}",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#dk-test"
+        },
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "typeVersion": 2.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "RepoConfig": {
+      "main": [
+        [
+          {
+            "node": "Fetch Github Repo Releases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "RepoConfig",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wether Release is new": {
+      "main": [
+        [
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Github Repo Releases": {
+      "main": [
+        [
+          {
+            "node": "Wether Release is new",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

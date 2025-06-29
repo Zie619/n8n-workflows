@@ -1,0 +1,541 @@
+{
+  "id": "G3yjjk93c1bBM5tc",
+  "meta": {
+    "instanceId": "a4bfc93e975ca233ac45ed7c9227d84cf5a2329310525917adaf3312e10d5462",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "YouTube Video Analyzer with AI",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "fbf55337-4b64-43f5-9fed-a08b4ab43a8c",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -80,
+        -160
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "48f88f6d-9817-4984-beb0-e37fff747317",
+      "name": "YouTube Video ID",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        360,
+        -160
+      ],
+      "parameters": {
+        "jsCode": "const extractYoutubeId = (url) => {\n  // Regex pattern that matches both youtu.be and youtube.com URLs\n  const pattern = /(?:youtube\\.com\\/(?:[^\\/]+\\/.+\\/|(?:v|e(?:mbed)?)\\/|.*[?&]v=)|youtu\\.be\\/)([^\"&?\\/\\s]{11})/;\n  const match = url.match(pattern);\n  return match ? match[1] : null;\n};\n\n// Input URL from previous node\nconst youtubeUrl = items[0].json.youtubeUrl; // Adjust this based on your workflow\n\n// Process the URL and return the video ID\nreturn [{\n  json: {\n    videoId: extractYoutubeId(youtubeUrl)\n  }\n}];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "88b5df30-064a-4735-9753-96ca7c272642",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1520,
+        140
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "CDX6QM4gLYanh0P4",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "1b7c052d-445e-476d-97be-24f7f625af69",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "position": [
+        1520,
+        300
+      ],
+      "parameters": {
+        "model": "deepseek/deepseek-r1:free",
+        "options": {}
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "pb06rfB4xmxzVe3Q",
+          "name": "OpenRouter"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "afc522d2-50ff-49a2-a192-a26c4ae7057d",
+      "name": "DeepSeek Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "position": [
+        1520,
+        -40
+      ],
+      "parameters": {
+        "model": "deepseek-reasoner",
+        "options": {}
+      },
+      "credentials": {
+        "deepSeekApi": {
+          "id": "sxh1rfZxonXV83hS",
+          "name": "DeepSeek account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "444ca87e-e9c6-4841-b868-f51474a36f8f",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1720,
+        -40
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"title\": {\n\t\t\t\"type\": \"string\"\n\t\t},\n\t\t\"text\": {\n\t\t\t\"type\": \"string\"\n\t\t}\n\t}\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "f5e30fba-d13a-492e-b7d9-e6006436af87",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        -240
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 260,
+        "content": "Get a FREE API on youtube-transcript.io and insert the Authentication"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "16335cd6-2ad1-4d2a-a908-68e6908f2ecc",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1900,
+        -220
+      ],
+      "webhookId": "12b73cc6-5aa0-44f4-8e5b-96aea0e59300",
+      "parameters": {
+        "text": "={{ $json.output.text }}",
+        "options": {},
+        "subject": "={{ $json.output.title }}",
+        "emailFormat": "text"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "hRjP3XbDiIQqvi7x",
+          "name": "SMTP info@n3witalia.com"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "59170266-f914-4e7c-805c-0014ca2f77de",
+      "name": "Generate transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        600,
+        -160
+      ],
+      "parameters": {
+        "url": "=https://www.youtube-transcript.io/api/transcripts",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={ \n  \"ids\": [\"{{ $json.videoId }}\"] \n} ",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RfHIslxMFRjQZ043",
+          "name": "Youtube Transcript Extractor API"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "d73aef68-ad5f-4cca-85fb-cb2cb4ac110a",
+      "name": "Exist?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1060,
+        -160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3aefe867-1533-41e5-b5e9-e0fb94eed082",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.transcript }}",
+              "rightValue": "null"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "133529a4-dd56-4454-8862-053f63c04687",
+      "name": "Analyze LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1540,
+        -220
+      ],
+      "parameters": {
+        "text": "={{ $json.fulltext }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Please analyze the given text and create a structured summary following these guidelines:\n\n1. Insert what is requested in a json in the \"text\" variable and also generate a title that will be inserted in the \"title\" variable of the response json.\n2. Under each header:\n   - List only the most essential concepts and key points\n   - Use bullet points for clarity\n   - Keep explanations concise\n   - Preserve technical accuracy\n   - Highlight key terms in bold\n3. Organize the information in this sequence:\n   - Definition/Background\n   - Main characteristics\n   - Implementation details\n   - Advantages/Disadvantages\n4. Format requirements:\n   - Use markdown formatting\n   - Keep bullet points simple (no nesting)\n   - Bold important terms \n   - Use tables for comparisons\n   - Include relevant technical details\n\nPlease provide a clear, structured summarythat captures the core concepts while maintaining technical accuracy."
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "ec77b844-125b-40e3-bc49-0f4b89aed427",
+      "name": "Set YouTube URL",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        120,
+        -160
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ee42e4c-3cee-4934-97e7-64c96b5691ed",
+              "name": "youtubeUrl",
+              "type": "string",
+              "value": "=https://youtu.be/VIDEOID"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "10080965-e266-48ca-8a8c-934e76cfa127",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        -240
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 260,
+        "content": "Get the Youtube video ID from the URL"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0ab1ae8d-dad8-4795-9f67-9252370ee8ce",
+      "name": "Get transcript",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        840,
+        -160
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d7dab19f-0275-4454-a270-420f20090d9b",
+              "name": "transcript",
+              "type": "array",
+              "value": "={{ $json.tracks[0].transcript }}"
+            },
+            {
+              "id": "ec7da104-7c1e-4a60-8e94-73cd9cbdc930",
+              "name": "language",
+              "type": "string",
+              "value": "={{ $json.tracks[0].language }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "971ccc67-3fd2-4b13-86de-a7a11903e2ec",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        780,
+        -240
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 260,
+        "content": "Get the Youtube video transcript"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0ee50d32-14f7-4fad-95ab-0e5ae949c24c",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1020,
+        -240
+      ],
+      "parameters": {
+        "width": 200,
+        "height": 260,
+        "content": "Not all videos have text translations of the video"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "89a4e59a-58fa-4e3c-bb30-4a6a816e8e15",
+      "name": "Get Fulltext",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1320,
+        -220
+      ],
+      "parameters": {
+        "jsCode": "let fulltext = \"\";\n\nfor (const item of $input.all()[0].json.transcript) {\n  fulltext += item.text + \" \";\n}\n\nfulltext = fulltext.trim();\n\nreturn { fulltext };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "87520f4d-4a05-4953-aadc-324625c8e769",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1260,
+        -300
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 240,
+        "content": "Get the full video transcript in a single variable"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bb3ffedf-e547-439d-a25a-0dcb2f58b86c",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1500,
+        -300
+      ],
+      "parameters": {
+        "width": 340,
+        "height": 240,
+        "content": "Generate detailed video analysis and create a title"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c5e7337a-1ddb-4a82-854d-dfeb6e824172",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        -480
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 660,
+        "height": 200,
+        "content": "## YouTube Video Analyzer\n\nThis workflow is designed to analyze YouTube videos by extracting their transcripts, summarizing the content using AI models, and sending the analysis via email.\n\nThis workflow is ideal for content creators, marketers, or anyone who needs to quickly analyze and summarize YouTube videos for research, content planning, or educational purposes."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "68fecd4f-12be-4a81-b5b9-c0419464e27e",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        80,
+        -240
+      ],
+      "parameters": {
+        "width": 200,
+        "height": 260,
+        "content": "Set Youtube video URL manually"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8740fcfa-44cf-40bc-bf23-7c210378b49b",
+  "connections": {
+    "Exist?": {
+      "main": [
+        [
+          {
+            "node": "Get Fulltext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Fulltext": {
+      "main": [
+        [
+          {
+            "node": "Analyze LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get transcript": {
+      "main": [
+        [
+          {
+            "node": "Exist?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set YouTube URL": {
+      "main": [
+        [
+          {
+            "node": "YouTube Video ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube Video ID": {
+      "main": [
+        [
+          {
+            "node": "Generate transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate transcript": {
+      "main": [
+        [
+          {
+            "node": "Get transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Analyze LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set YouTube URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

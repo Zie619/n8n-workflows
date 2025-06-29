@@ -1,0 +1,257 @@
+{
+  "name": "Steam + CF Report",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        110,
+        200
+      ],
+      "parameters": {
+        "path": "steam",
+        "responseData": "allEntries",
+        "responseMode": "lastNode",
+        "authentication": "basicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": "credentials"
+      },
+      "retryOnFail": false,
+      "typeVersion": 1
+    },
+    {
+      "name": "Add bind-tools",
+      "type": "n8n-nodes-base.executeCommand",
+      "color": "#FF8000",
+      "notes": "Install bind-tools",
+      "position": [
+        480,
+        180
+      ],
+      "parameters": {
+        "command": "=which dig || apk add bind-tools"
+      },
+      "retryOnFail": true,
+      "typeVersion": 1,
+      "continueOnFail": true,
+      "waitBetweenTries": 1000
+    },
+    {
+      "name": "dig check CF",
+      "type": "n8n-nodes-base.executeCommand",
+      "color": "#FF8000",
+      "notes": "Install bind-tools",
+      "position": [
+        1300,
+        -50
+      ],
+      "parameters": {
+        "command": "=dig NS  {{$node[\"Webhook\"].data[\"query\"][\"q\"]}} +short | grep cloudflare.com.$ | wc -l"
+      },
+      "retryOnFail": true,
+      "typeVersion": 1,
+      "continueOnFail": true,
+      "waitBetweenTries": 1000
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1550,
+        -50
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "= {{$node[\"dig check CF\"].data[\"stdout\"]}}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Mail CloudFlare",
+      "type": "n8n-nodes-base.mailgun",
+      "position": [
+        1830,
+        160
+      ],
+      "parameters": {
+        "text": "=Hello,\n\nI am emailing you to let you know about a Steam phishing website on your network: {{$node[\"Webhook\"].data[\"query\"][\"q\"]}}.\n\nThank you,\nYour Name Here",
+        "ccEmail": "yourCCemail",
+        "subject": "={{$node[\"Webhook\"].data[\"query\"][\"q\"]}} - Steam Phishing Website on your network",
+        "toEmail": "security@cloudflare.com",
+        "fromEmail": "yourFROMemail"
+      },
+      "credentials": {
+        "mailgunApi": "Mailgun"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Mail Steam",
+      "type": "n8n-nodes-base.mailgun",
+      "position": [
+        1830,
+        340
+      ],
+      "parameters": {
+        "text": "=Hello,\n\nI am emailing you to let you know about a Steam phishing website: {{$node[\"Webhook\"].data[\"query\"][\"q\"]}}.\n\nThank you,\nYour Name Here",
+        "ccEmail": "yourCCemail",
+        "subject": "={{$node[\"Webhook\"].data[\"query\"][\"q\"]}} - Steam Phishing Website",
+        "toEmail": "security@valvesoftware.com",
+        "fromEmail": "yourFROMemail"
+      },
+      "credentials": {
+        "mailgunApi": "Mailgun"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "dig check if domain is valid",
+      "type": "n8n-nodes-base.executeCommand",
+      "color": "#FF8000",
+      "notes": "Install bind-tools",
+      "position": [
+        720,
+        180
+      ],
+      "parameters": {
+        "command": "=dig NS  {{$node[\"Webhook\"].data[\"query\"][\"q\"]}} +short | wc -l"
+      },
+      "retryOnFail": true,
+      "typeVersion": 1,
+      "continueOnFail": true,
+      "waitBetweenTries": 1000
+    },
+    {
+      "name": "If it has nameservers",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        970,
+        180
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "= {{$node[\"dig check if domain is valid\"].data[\"stdout\"]}}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        270,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Webhook\"].data[\"query\"][\"q\"]}}",
+              "value2": "/^[a-zA-Z0-9-_.]+$/",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Mail CloudFlare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF1": {
+      "main": [
+        [
+          {
+            "node": "Add bind-tools",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "IF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dig check CF": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add bind-tools": {
+      "main": [
+        [
+          {
+            "node": "dig check if domain is valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If it has nameservers": {
+      "main": [
+        [
+          {
+            "node": "dig check CF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mail Steam",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dig check if domain is valid": {
+      "main": [
+        [
+          {
+            "node": "If it has nameservers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

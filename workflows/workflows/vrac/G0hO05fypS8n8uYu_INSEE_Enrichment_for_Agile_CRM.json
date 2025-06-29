@@ -1,0 +1,397 @@
+{
+  "id": "G0hO05fypS8n8uYu",
+  "meta": {
+    "instanceId": "8fb286e504ea5ce6aeb12bf5c0c97ce11908b5b1aaa495ddfa0ef349661b832e"
+  },
+  "name": "INSEE Enrichment for Agile CRM",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "a45b34c1-514e-4221-b363-abf2d4de43c4",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -3440,
+        -320
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "d406941b-80a1-43a3-ba19-2e29570192f2",
+      "name": "Find Company in SIREN database",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueErrorOutput",
+      "position": [
+        -2660,
+        -220
+      ],
+      "parameters": {
+        "url": "=https://api.insee.fr/api-sirene/3.11/siren?q=periode(denominationUniteLegale:\"{{ $json.denominationUniteLegale }}\")",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "X-INSEE-Api-Key-Integration",
+              "value": "={{ $('Set Insee API Key').all()[0].json['X-INSEE-Api-Key-Integration']  }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "6ab3818b-2f09-44e2-874a-87c51478572b",
+      "name": "Request all data from SIREN database",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -2420,
+        -240
+      ],
+      "parameters": {
+        "url": "=https://api.insee.fr/api-sirene/3.11/siret/{{ $json.unitesLegales[0].siren }}{{ $json.unitesLegales[0].periodesUniteLegale[0].nicSiegeUniteLegale }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "X-INSEE-Api-Key-Integration",
+              "value": "={{ $('Set Insee API Key').all()[0].json['X-INSEE-Api-Key-Integration']  }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "89c223fe-289b-4d0f-922a-e9c0ad672b51",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3420,
+        -640
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 240,
+        "content": "### Enrich CRM data with data from French INSEE OpenDatabase API\nThis workflow takes all company entries from **Agile CRM** and enriches their data using the French [Insee Opendata API](https://portail-api.insee.fr/) (Free Access)\n\n__This will update :__ \n1) Official Address of the company headquarters\n2) Add government company id number (SIREN) in a Custom Field"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0bdc49dd-6f26-447f-a8ba-c2ba615dc7ec",
+      "name": "FilterOut all Company that have the ReadOnly Key set",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -2880,
+        -220
+      ],
+      "parameters": {
+        "jsCode": "// Get input data\nconst input = $input.all();\nconst output = input.filter(item => {\n    const properties = item.json.properties || [];\n    return !properties.some(property => property.name === \"RO\" && property.value === \"1\"); // Remove all ReadOnly entries\n}).map(item => {\n    const companyId = item.json.id;\n    const denominationUniteLegale = item.json.properties[0]?.value || null; \n    return {\n        json: {\n            companyId,\n            denominationUniteLegale\n        }\n    };\n});\n\n// Return the transformed output\nreturn output;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "0ef184f7-219c-4eb3-bfe0-4e68d2ce0b43",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2940,
+        -640
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 647,
+        "height": 232,
+        "content": "### 👨‍🎤 Setup\n1. Add your **Agile CRM** credentials\n2. Link each AgileCRM node to the correct **Agile CRM** credentials\n3. Add your **INSEE** API Key to the **\"Set Insee API Key\"** node\n4. Make sure the **Custom Fields** for the **companies** are set as below (Admin Settings):\n   - Label : \"SIREN\", Type : \"Text Field\", Description \"N° de SIREN\"\n   - Label : \"RO\", Type : \"Number\", Description \"Locks entry from update\"\n5. Click on **Test Workflow** to make sure everything is working\n6. Configure schedule if needed and don't forget to change status to **Active**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "78255253-195d-472d-a76c-ab63ceac126b",
+      "name": "Set Insee API Key",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -3260,
+        -220
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e993e665-cf31-48b1-8ca8-a4829dc82642",
+              "name": "X-INSEE-Api-Key-Integration",
+              "type": "string",
+              "value": "put-your-insee-api-key-here"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "90b13481-6570-4bfc-b3dc-4b6017c6c8b5",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -3440,
+        -140
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "88c8a6c6-2175-42c3-bfdb-f1d32a5d1c2d",
+      "name": "clean_route",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        -2660,
+        -360
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "522d83f6-752e-40b4-a889-334f0a96998b",
+      "name": "Get all Compagnies from Agile CRM",
+      "type": "n8n-nodes-base.agileCrm",
+      "position": [
+        -3080,
+        -220
+      ],
+      "parameters": {
+        "options": {},
+        "resource": "company",
+        "operation": "getAll"
+      },
+      "credentials": {
+        "agileCrmApi": {
+          "id": "wb0EgiQFLQbiFuy4",
+          "name": "AgileCRM account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8ff0632b-6aca-47d8-b611-72dbc8dec09b",
+      "name": "Enrich CRM with INSEE Data",
+      "type": "n8n-nodes-base.agileCrm",
+      "position": [
+        -1960,
+        -340
+      ],
+      "parameters": {
+        "resource": "company",
+        "companyId": "={{ $json.companyId }}",
+        "operation": "update",
+        "additionalFields": {
+          "addressOptions": {
+            "addressProperties": [
+              {
+                "address": "={{ $json.etablissement.adresseEtablissement.complementAdresseEtablissement }}\n{{ $json.etablissement.adresseEtablissement.typeVoieEtablissement }} {{ $json.etablissement.adresseEtablissement.libelleVoieEtablissement }}\n{{ $json.etablissement.adresseEtablissement.codePostalEtablissement }}{{ $json.etablissement.adresseEtablissement.libelleCommuneEtablissement }}",
+                "subtype": "office"
+              }
+            ]
+          },
+          "customProperties": {
+            "customProperty": [
+              {
+                "name": "SIREN",
+                "value": "={{ $json.etablissement.siren }}",
+                "subtype": "TEXT"
+              }
+            ]
+          }
+        }
+      },
+      "credentials": {
+        "agileCrmApi": {
+          "id": "wb0EgiQFLQbiFuy4",
+          "name": "AgileCRM account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8720be96-8181-4ea7-b114-ce0f5b8e09c1",
+      "name": "Merge data from CRM and SIREN database with enriched for the CRM",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        -2180,
+        -340
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "denominationUniteLegale",
+              "field2": "etablissement.uniteLegale.denominationUniteLegale"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "855a39e2-83ef-49d9-b630-ec31aaa96e72",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3460,
+        20
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "👆 You can use any of those two Trigger to start the process."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b003c1b8-6244-4b72-bbb0-025f563b5d71",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2260,
+        -640
+      ],
+      "parameters": {
+        "width": 380,
+        "height": 240,
+        "content": "### 🗒️ Notes : \n1. This workflow is made to write over any entry already present. You can change this for each company by setting the **\"RO\"** Custom Field to **1**, making it read-only for this workflow.\n\n2. If you want to make it readonly after the update from this workflow, then **add a custom property** in the last node **Enrich CRM with INSEE Data** named **\"RO\"**, SubType **\"Number\"** and Value **\"1\"**"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9f328182-d131-4300-a1f4-2cb3dfe91632",
+  "connections": {
+    "clean_route": {
+      "main": [
+        [
+          {
+            "node": "Merge data from CRM and SIREN database with enriched for the CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Insee API Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Insee API Key": {
+      "main": [
+        [
+          {
+            "node": "Get all Compagnies from Agile CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Company in SIREN database": {
+      "main": [
+        [
+          {
+            "node": "Request all data from SIREN database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all Compagnies from Agile CRM": {
+      "main": [
+        [
+          {
+            "node": "FilterOut all Company that have the ReadOnly Key set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Insee API Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request all data from SIREN database": {
+      "main": [
+        [
+          {
+            "node": "Merge data from CRM and SIREN database with enriched for the CRM",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FilterOut all Company that have the ReadOnly Key set": {
+      "main": [
+        [
+          {
+            "node": "Find Company in SIREN database",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "clean_route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge data from CRM and SIREN database with enriched for the CRM": {
+      "main": [
+        [
+          {
+            "node": "Enrich CRM with INSEE Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

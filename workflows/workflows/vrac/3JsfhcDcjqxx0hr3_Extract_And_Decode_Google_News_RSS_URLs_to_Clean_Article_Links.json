@@ -1,0 +1,509 @@
+{
+  "id": "3JsfhcDcjqxx0hr3",
+  "meta": {
+    "instanceId": "38fb1860cc6284b8af9ba3b485f32cc1851cd97470ef1b4a472b5e707f1c93b5"
+  },
+  "name": "Extract And Decode Google News RSS URLs to Clean Article Links",
+  "tags": [
+    {
+      "id": "ROumyeVDIszTv7f5",
+      "name": "no-ai",
+      "createdAt": "2025-02-08T15:29:36.956Z",
+      "updatedAt": "2025-02-08T15:29:36.956Z"
+    },
+    {
+      "id": "XuoLgc5Eegoi3VEP",
+      "name": "scraping",
+      "createdAt": "2025-01-31T18:19:12.753Z",
+      "updatedAt": "2025-01-31T18:19:12.753Z"
+    },
+    {
+      "id": "nBHkkAND8NXbkg8m",
+      "name": "news",
+      "createdAt": "2025-03-13T15:47:18.420Z",
+      "updatedAt": "2025-03-13T15:47:18.420Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "cdb0a726-e961-40ae-b679-43f7bd73650d",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        560,
+        1240
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "028ddd3b-069c-43be-ad56-8f898805fccf",
+      "name": "Limit",
+      "type": "n8n-nodes-base.limit",
+      "position": [
+        1040,
+        1000
+      ],
+      "parameters": {
+        "maxItems": 5
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2215bfdc-1e6e-475c-9753-b05fd5b0d63a",
+      "name": "Reading Google News RSS",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        840,
+        1000
+      ],
+      "parameters": {
+        "url": "https://news.google.com/rss?hl=it&gl=IT&ceid=IT:it",
+        "options": {
+          "ignoreSSL": false
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "23b50dac-9506-41cb-8b57-15373468ab3c",
+      "name": "Decoded url",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1520,
+        1420
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c51f320e-4fb8-4bd4-8e36-9330e251936e",
+              "name": "google_news_url",
+              "type": "string",
+              "value": "={{ JSON.parse(JSON.parse($json.data.split('\\n\\n')[1])[0][2])[1] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "40f54966-41c7-4dc3-95ac-18b8eaffe1db",
+      "name": "Call decoding URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1280,
+        1420
+      ],
+      "parameters": {
+        "url": "https://news.google.com/_/DotsSplashUi/data/batchexecute",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "f.req",
+              "value": "={{ $json.f_req }}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded;charset=UTF-8"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Referer",
+              "value": "https://www.google.com/"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e7a208d3-bf65-4170-bb11-d13287f8dd78",
+      "name": "Prepare decoding variables",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1040,
+        1420
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n    const gn_art_id = item.json.base64Str;\n    const timestamp = item.json.timestamp;\n    const signature = item.json.signature;\n\n    const articlesReq = [\n        'Fbv4je',\n        `[\"garturlreq\",[[\"X\",\"X\",[\"X\",\"X\"],null,null,1,1,\"US:en\",null,1,null,null,null,null,null,0,1],\"X\",\"X\",1,[1,1,1],1,1,null,0,0,null,0],\"${gn_art_id}\",${timestamp},\"${signature}\"]`,\n    ];\n\n    return {\n        json: {\n            f_req: JSON.stringify([[articlesReq]])  // Questo verrà usato nel nodo HTTP Request\n        }\n    };\n});"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "35fe85f1-82c7-4b50-b47b-14c56678e377",
+      "name": "Get encoded news URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1280,
+        1000
+      ],
+      "parameters": {
+        "url": "={{ $('Limit').item.json.link }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "3d640138-4247-4e6d-a0e9-fefc9f41e057",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        760
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 400,
+        "content": "## Get Google News\n\nChange the language parameters on ISO639-1 standard \n\n1. hl=it\n2. gl=IT\n3. ceid=IT:it"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1e7a5638-8829-49f1-a445-f510eb18bbd7",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        980,
+        760
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 400,
+        "content": "## Limit result\n\nI suggest limiting the results to a maximum of 3 because the entire workflow makes a lot of HTTP requests"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "24a405df-c334-461a-ab0d-91ebc39185c1",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        760
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 220,
+        "height": 820,
+        "content": "## INFO\n\nDisclaimer:\nYou can add a cron trigger but... don't do too often: Google could block your ip.\n\nThis workflow works until works: the decoding procedure is hardcoded and based on reverse engineering. Requests and responses are not documented by Google.\n\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c54e9729-7cbd-4628-b7be-ee072047b3d4",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        760
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 220,
+        "height": 400,
+        "content": "## Get encoded content\n\nHere we retrieve HTML content"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a5b25d20-0d06-4650-b8bc-0d03c97eb416",
+      "name": "Map needed keys",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        780,
+        1420
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b5a11795-2bd1-412f-a215-f7402bece002",
+              "name": "signature",
+              "type": "string",
+              "value": "={{ $json.signature }}"
+            },
+            {
+              "id": "33267283-3ac8-4d65-9a01-c7f154a7d061",
+              "name": "timestamp",
+              "type": "string",
+              "value": "={{ $json.timestamp }}"
+            },
+            {
+              "id": "bff8f19a-30d6-4307-87da-9b98b26cee8b",
+              "name": "base64Str",
+              "type": "string",
+              "value": "={{ $('Limit').item.json.guid }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "116eec84-dbfe-4880-8fc4-d350ff99d4be",
+      "name": "Extract decoding keys",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        1520,
+        1000
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "signature",
+              "attribute": "data-n-a-sg",
+              "cssSelector": "div",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "timestamp",
+              "attribute": "data-n-a-ts",
+              "cssSelector": "div",
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "22825293-d9f8-4fa2-99b4-2150a74b2a12",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1460,
+        760
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 400,
+        "content": "## Decoding Keys\n\nThe HTML content extracted contains the necessary variables for decoding:\n\n+ signature\n+ timestamp\n+ base64string (already in the URL)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "46dce5e2-1c4f-45d8-a849-ebe13d673ef9",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        1180
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 400,
+        "content": "## Clean output\n\nMapping variables for easy utilization"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9dbc9f69-d34a-470e-81af-c3bcc9a92a48",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        980,
+        1180
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 220,
+        "height": 400,
+        "content": "## Preparing Request\n\nDecoding the request requires specific body content. Here, we build it using the decoding keys."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "39a492a7-a099-4ae7-ac17-d3842f0682fe",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        1180
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 220,
+        "height": 400,
+        "content": "## This is decoding step\n\nSending a request to a specific Google decoding URL"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "29d3b1a3-5882-484d-9add-68a746f0a7b8",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1460,
+        1180
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 400,
+        "content": "## Cleaning URL\n\nGoogle adds some unwanted and random characters at the beginning of the URL"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6b2fc671-2a22-4a6d-bcc5-38294981d9fe",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1700,
+        760
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 220,
+        "height": 820,
+        "content": "## OUTPUT\n\nA lot of requests are made before getting clean News URLs.\n\nYou can add an HttpRequest and get News text with jina.ai, extract by using HTML node, or a custom node like https://www.npmjs.com/package/n8n-nodes-webpage-content-extractor\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6c82769b-e784-4a38-b2ed-447da7f1a6f7",
+      "name": "Aggregate results in a single object",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1760,
+        1080
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c4fbad75-5811-4031-bdfe-ee494067ded3",
+  "connections": {
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Get encoded news URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decoded url": {
+      "main": [
+        [
+          {
+            "node": "Aggregate results in a single object",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map needed keys": {
+      "main": [
+        [
+          {
+            "node": "Prepare decoding variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call decoding URL": {
+      "main": [
+        [
+          {
+            "node": "Decoded url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get encoded news URL": {
+      "main": [
+        [
+          {
+            "node": "Extract decoding keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract decoding keys": {
+      "main": [
+        [
+          {
+            "node": "Map needed keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reading Google News RSS": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare decoding variables": {
+      "main": [
+        [
+          {
+            "node": "Call decoding URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Reading Google News RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

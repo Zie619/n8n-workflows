@@ -1,0 +1,267 @@
+{
+  "id": "LF8gz3iz74u45a5i",
+  "meta": {
+    "instanceId": "889f0d7d968f3b02a88433e2529a399907d2ca89e329934b608193beaa2301f8"
+  },
+  "name": "YouTube Videos with AI Summaries on Discord",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "48c87027-7eea-40b9-a73c-4e002b748783",
+      "name": "YouTube Video Trigger",
+      "type": "n8n-nodes-base.rssFeedReadTrigger",
+      "position": [
+        560,
+        220
+      ],
+      "parameters": {
+        "feedUrl": "https://www.youtube.com/feeds/videos.xml?channel_id=UC08Fah8EIryeOZRkjBRohcQ",
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "56166228-b365-4043-b48c-098b4de71f6f",
+      "name": "Retrieve Caption Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        780,
+        220
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/captions",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "videoId",
+              "value": "={{ $json.id.match(/(?:[^:]*:){2}\\s*(.*)/)[1] }}"
+            },
+            {
+              "name": "part",
+              "value": "snippet"
+            }
+          ]
+        },
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "uy3xy1Ks2ATwRGr4",
+          "name": "Creator Magic - YouTube account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "c029ac6f-3071-4045-83f6-2dede0c1f358",
+      "name": "Download Captions",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1220,
+        220
+      ],
+      "parameters": {
+        "url": "=https://www.googleapis.com/youtube/v3/captions/{{ $json.caption.id }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "uy3xy1Ks2ATwRGr4",
+          "name": "Creator Magic - YouTube account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "8b45dc14-f10f-4b50-8ca6-a9d0ccfee4dc",
+      "name": "Caption File Conversion",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1440,
+        220
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "text",
+        "destinationKey": "content"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6527adb4-9087-40eb-b63a-8c4cdf5d0a40",
+      "name": "Caption Summary with ChatGPT",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        1660,
+        220
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-3.5-turbo",
+          "cachedResultName": "GPT-3.5-TURBO"
+        },
+        "options": {},
+        "messages": {
+          "values": [
+            {
+              "content": "=Summarise this transcript into three bullet points to sum up what the video is about and why someone should watch it: {{ $json[\"content\"] }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "QpdCHVaJVRd9NNYl",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "2c83f230-bc37-4efb-9ee9-842bcefa0ef4",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.discord",
+      "position": [
+        2000,
+        220
+      ],
+      "parameters": {
+        "content": "=🌟 New Video Alert! 🌟\n\n**{{ $('YouTube Video Trigger').item.json[\"title\"] }}**\n\n*What’s it about?*\n\n{{ $json[\"message\"][\"content\"] }}\n\n[Watch NOW]({{ $('YouTube Video Trigger').item.json[\"link\"] }}) and remember to share your thoughts!",
+        "options": {},
+        "authentication": "webhook"
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "QQxpAIskycvb8fIE",
+          "name": "Discord Webhook account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "8408887e-1d89-402c-b350-93d5f96f4dea",
+      "name": "Find English Captions",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1000,
+        220
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eaf7dcb5-91cf-4405-917b-38845f0ef78d",
+              "name": "caption",
+              "type": "object",
+              "value": "={{ $jmespath( $json.items, \"[?snippet.language == 'en'] | [0]\" ) }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "71cc0977-1695-4797-9df2-b0a98e41d3de",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        -20
+      ],
+      "parameters": {
+        "width": 448.11859838274916,
+        "height": 417.2722371967648,
+        "content": "### Summarise Your YouTube Videos with AI for Discord\n\n📽️ [Watch the Video Tutorial](https://mrc.fm/ai2d)\n\n* Add your [YouTube channel ID](https://www.youtube.com/account_advanced) to the URL in the first node: `https://www.youtube.com/feeds/videos.xml?channel_id=YOUR_CHANNEL_ID`.\n\n* Ensure authorization with the YouTube channel that you want to download captions from."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e8fc6758-02ef-4b65-8ab5-474bd8e3862a",
+  "connections": {
+    "Download Captions": {
+      "main": [
+        [
+          {
+            "node": "Caption File Conversion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find English Captions": {
+      "main": [
+        [
+          {
+            "node": "Download Captions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Caption Data": {
+      "main": [
+        [
+          {
+            "node": "Find English Captions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube Video Trigger": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Caption Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Caption File Conversion": {
+      "main": [
+        [
+          {
+            "node": "Caption Summary with ChatGPT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Caption Summary with ChatGPT": {
+      "main": [
+        [
+          {
+            "node": "Post to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

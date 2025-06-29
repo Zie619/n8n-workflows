@@ -1,0 +1,474 @@
+{
+  "id": "KWFLpcJytH7qjheD",
+  "meta": {
+    "instanceId": "1e003a7ea4715b6b35e9947791386a7d07edf3b5bf8d4c9b7ee4fdcbec0447d7"
+  },
+  "name": "(Not published) Three-View Orthographic Projection to Dynamic Video Conversion",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "442e12af-531d-4000-9e74-d9bfaa3515ca",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -1960,
+        -160
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "39c46540-7dee-4237-921e-3b6bd9821302",
+      "name": "Generate Kling Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -400,
+        0
+      ],
+      "parameters": {
+        "url": "https://api.piapi.ai/api/v1/task",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n    \"model\": \"kling\",\n    \"task_type\": \"video_generation\",\n    \"input\": {\n        \"version\": \"1.6\",\n        \"mode\": \"pro\",\n        \"image_url\": \"{{ $('Get Image URL of Front Image').item.json.image_url }}\",\n        \"image_tail_url\": \"{{ $json.image_url }}\",\n        \"duration\":5,\n        \"prompt\": \"The character rotates smoothly, stay original facial expression. Apply anticlockwise rotation\"\n    }\n} ",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Basic Params').item.json[\"x-api-key\"] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "cfc726ee-e6f2-4016-a4fe-7123a4520fda",
+      "name": "Get Kling Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -220,
+        0
+      ],
+      "parameters": {
+        "url": "=https://api.piapi.ai/api/v1/task/{{ $json.data.task_id }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "72858adea87ad16865d5b0a24c3d9b9f58a6e7b1a8a8a8a0d6b81a9f3a9812f3"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "90d1cc4f-3d74-4a2a-9b02-3255ec9fc553",
+      "name": "Verify Task Status",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -40,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f36fa981-22e0-46db-af8c-c2ac55242c27",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed"
+            },
+            {
+              "id": "637ea756-1ad9-434c-b6b2-b100ee4c3cad",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "6931c1b2-c4f4-47d6-9ff4-e6019e465c3e",
+      "name": "Get Final Video",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        260,
+        140
+      ],
+      "parameters": {
+        "jsCode": "// Process the entire response\nreturn {\n  video_url: $input.all()[0].json.data.output.video_url,\n  watermark_free_url: $input.all()[0].json.data.output.works[0].video.resource_without_watermark\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "adae02a4-dedc-4415-9409-88193090e2dc",
+      "name": "GPT-4o Generator: Front View",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1560,
+        20
+      ],
+      "parameters": {
+        "url": "https://api.piapi.ai/v1/chat/completions",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n    \"model\": \"gpt-4o-image-preview\",\n    \"messages\": [\n        {\n            \"role\": \"user\",\n            \"content\": [\n                {\n                    \"type\": \"image_url\",\n                    \"image_url\": {\n                        \"url\": \"{{ $json.image_url }}\"\n                    }\n                },\n                {\n                    \"type\": \"text\",\n                    \"text\": \"Capture front view of the image, then split them into two separate images for me.\"\n                }\n            ]\n        }\n    ],\n    \"stream\": true\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json[\"x-api-key\"] }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fsJeCNd9BkJ1CIrt",
+          "name": "Header Auth account 2"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "63320b08-62bc-4faf-a3ff-4069785c41f5",
+      "name": "GPT-4o Generator: Side View",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1000,
+        320
+      ],
+      "parameters": {
+        "url": "https://api.piapi.ai/v1/chat/completions",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n    \"model\": \"gpt-4o-image-preview\",\n    \"messages\": [\n        {\n            \"role\": \"user\",\n            \"content\": [\n                {\n                    \"type\": \"image_url\",\n                    \"image_url\": {\n                        \"url\": \"{{ $('Basic Params').item.json.image_url }}\"\n                    }\n                },\n                {\n                    \"type\": \"text\",\n                    \"text\": \"Generate side view of the image\"\n                }\n            ]\n        }\n    ],\n    \"stream\": true\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Basic Params').item.json[\"x-api-key\"] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "8fd1fb74-a149-4af6-9da5-e0dc3daa91c9",
+      "name": "Get Image URL of Front Image",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1380,
+        20
+      ],
+      "parameters": {
+        "jsCode": "const chunks = $input.first().json.data.split('\\n\\n');\n\nlet imageUrl = null;\n\nfor (let i = chunks.length - 1; i >= 0; i--) {\n    const chunk = chunks[i];\n    \n    if (!chunk.startsWith('data: ')) continue;\n    \n    try {\n        const jsonStr = chunk.substring(6); \n        if (jsonStr.trim() === '[DONE]') continue;\n        \n        const data = JSON.parse(jsonStr);\n        \n\n        if (data.choices && data.choices[0].delta.content) {\n            const content = data.choices[0].delta.content;\n            const urlMatch = content.match(/!\\[.*?\\]\\((https?:\\/\\/[^\\s]+)\\)/);\n            \n            if (urlMatch && urlMatch[1]) {\n                imageUrl = urlMatch[1];\n                break;\n            }\n        }\n    } catch (e) {\n        continue;\n    }\n}\n\nreturn {\n    image_url: imageUrl,\n    finish_reason: imageUrl ? \"success\" : \"not_found\"\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b5b41a20-aba1-4fbb-aaf9-47d18a38a727",
+      "name": "Get Image URL of Side Image",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -800,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const chunks = $input.first().json.data.split('\\n\\n');\n\nlet imageUrl = null;\n\n// 反向遍历 chunks (从最新数据开始检查)\nfor (let i = chunks.length - 1; i >= 0; i--) {\n    const chunk = chunks[i];\n    \n    if (!chunk.startsWith('data: ')) continue;\n    \n    try {\n        const jsonStr = chunk.substring(6); // 去掉 \"data: \" 前缀\n        if (jsonStr.trim() === '[DONE]') continue;\n        \n        const data = JSON.parse(jsonStr);\n        \n        // 检查是否包含图片标记（Markdown 图片语法）\n        if (data.choices && data.choices[0].delta.content) {\n            const content = data.choices[0].delta.content;\n            const urlMatch = content.match(/!\\[.*?\\]\\((https?:\\/\\/[^\\s]+)\\)/);\n            \n            if (urlMatch && urlMatch[1]) {\n                imageUrl = urlMatch[1];\n                break;\n            }\n        }\n    } catch (e) {\n        continue;\n    }\n}\n\nreturn {\n    image_url: imageUrl,\n    finish_reason: imageUrl ? \"success\" : \"not_found\"\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6428385c-19ac-478c-af87-904de1e35b61",
+      "name": "Verify Generation Status of Front View",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -1160,
+        20
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "08a2ebe6-dc95-4b8a-ada1-1173645cc3f4",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.finish_reason }}",
+              "rightValue": "not_found"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "395dbc5c-89e7-4eb7-a726-617250ebd02f",
+      "name": "Verify Generation Status of Side View",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -600,
+        320
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "08a2ebe6-dc95-4b8a-ada1-1173645cc3f4",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.finish_reason }}",
+              "rightValue": "not_found"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "7287b4a9-8309-4984-8328-ecc569d4aa00",
+      "name": "Wait for Video Generation",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -20,
+        240
+      ],
+      "webhookId": "c7b2590d-96a3-4c7c-8821-3023fead254b",
+      "parameters": {
+        "amount": 20
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "9ed98c97-6a73-4f74-9cbd-5e19179aba9d",
+      "name": "Basic Params",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1760,
+        -160
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "{\n  \"x-api-key\":\"\",\n  \"image_url\": \"\"\n}\n"
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "71081f7e-7805-497b-9167-eba0b3a7c0e4",
+  "connections": {
+    "Basic Params": {
+      "main": [
+        [
+          {
+            "node": "GPT-4o Generator: Front View",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Kling Video": {
+      "main": [
+        [
+          {
+            "node": "Verify Task Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Task Status": {
+      "main": [
+        [
+          {
+            "node": "Get Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for Video Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Kling Video": {
+      "main": [
+        [
+          {
+            "node": "Get Kling Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Video Generation": {
+      "main": [
+        [
+          {
+            "node": "Get Kling Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o Generator: Side View": {
+      "main": [
+        [
+          {
+            "node": "Get Image URL of Side Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image URL of Side Image": {
+      "main": [
+        [
+          {
+            "node": "Verify Generation Status of Side View",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o Generator: Front View": {
+      "main": [
+        [
+          {
+            "node": "Get Image URL of Front Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image URL of Front Image": {
+      "main": [
+        [
+          {
+            "node": "Verify Generation Status of Front View",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Basic Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Generation Status of Side View": {
+      "main": [
+        [
+          {
+            "node": "GPT-4o Generator: Side View",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Kling Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Generation Status of Front View": {
+      "main": [
+        [
+          {
+            "node": "GPT-4o Generator: Front View",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GPT-4o Generator: Side View",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

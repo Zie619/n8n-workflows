@@ -1,0 +1,507 @@
+{
+  "nodes": [
+    {
+      "id": "3e2820cb-24a4-491b-8f8b-60f97b0748dc",
+      "name": "Backup Now - Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        520,
+        320
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "bc5588e5-b67a-4713-b8e7-c21227048a2d",
+      "name": "n8n",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        980,
+        520
+      ],
+      "parameters": {
+        "filters": {
+          "tags": "={{ $('Globals').first().json.tags_to_match_for_backup }}"
+        },
+        "requestOptions": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "L3X3qWRmwZRYCpV8",
+          "name": "Source n8n Account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2a5af64d-b5c3-4180-bae5-9efeeaeba99d",
+      "name": "Globals",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        740,
+        400
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "150135fb-c0fb-444b-aeed-eac851af255d",
+              "name": "gitlab_owner",
+              "type": "string",
+              "value": "mygitlabownername"
+            },
+            {
+              "id": "8a9359c0-5a16-482b-8f3a-c8b20fbc13c0",
+              "name": "gitlab_project",
+              "type": "string",
+              "value": "n8n_workflow_backups"
+            },
+            {
+              "id": "00843c18-7d09-4d60-ab70-534ca0791504",
+              "name": "gitlab_workflow_path",
+              "type": "string",
+              "value": "workflow_definitions"
+            },
+            {
+              "id": "8fbcc201-dbff-440b-b440-42e8f1735548",
+              "name": "tags_to_match_for_backup",
+              "type": "string",
+              "value": "gitlab_backup_enabled"
+            },
+            {
+              "id": "e17051bc-d8b3-4cef-bad0-efe38a7be464",
+              "name": "execution_type",
+              "type": "string",
+              "value": "={{ ( $('Schedule Trigger').isExecuted) ? 'Scheduled' : 'Manual' }}"
+            },
+            {
+              "id": "8b90fba9-df11-4e07-a7ae-31405143e831",
+              "name": "execution_time",
+              "type": "string",
+              "value": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "b6b44b4b-e5a7-4ce6-9cff-e7a21679ad32",
+      "name": "Create New File(s)",
+      "type": "n8n-nodes-base.gitlab",
+      "position": [
+        2060,
+        540
+      ],
+      "parameters": {
+        "owner": "={{ $('Globals').first().json.gitlab_owner }}",
+        "branch": "main",
+        "filePath": "={{ $('Globals').first().json.gitlab_workflow_path }}/{{ $('Derive Filename From Workflow Name').item.json.normalized_filename }}",
+        "resource": "file",
+        "repository": "={{ $('Globals').first().json.gitlab_project }}",
+        "fileContent": "={{ JSON.stringify($('n8n').item.json, null, 4) }}",
+        "commitMessage": "=(Initial) {{ $('Globals').first().json.execution_type }} Backup - {{ $('Globals').first().json.execution_time }}."
+      },
+      "credentials": {
+        "gitlabApi": {
+          "id": "Nv1DoplS64rrPZVm",
+          "name": "Target GitLab Account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "167ae6cd-b8dd-4e01-aca4-4888fcaf9958",
+      "name": "Edit Existing File(s)",
+      "type": "n8n-nodes-base.gitlab",
+      "position": [
+        2060,
+        340
+      ],
+      "parameters": {
+        "owner": "={{ $('Globals').first().json.gitlab_owner }}",
+        "branch": "main",
+        "filePath": "={{ $('Globals').first().json.gitlab_workflow_path }}/{{ $('Derive Filename From Workflow Name').item.json.normalized_filename }}",
+        "resource": "file",
+        "operation": "edit",
+        "repository": "={{ $('Globals').first().json.gitlab_project }}",
+        "fileContent": "={{ JSON.stringify($('n8n').item.json, null, 4) }}",
+        "commitMessage": "={{ $('Globals').first().json.execution_type }} Backup - {{ $('Globals').first().json.execution_time }}."
+      },
+      "credentials": {
+        "gitlabApi": {
+          "id": "Nv1DoplS64rrPZVm",
+          "name": "Target GitLab Account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4437388-9143-4c91-841e-c062ab9af3c0",
+      "name": "Derive Filename From Workflow Name",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1160,
+        520
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d2110dc6-1f31-46b3-991e-556b2255d76e",
+              "name": "normalized_filename",
+              "type": "string",
+              "value": "={{ $json.name.replace(/[^a-zA-Z0-9]/g, '') }}.json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "cb0fca8f-dc43-4903-a8e1-5b7acf9157b1",
+      "name": "Fetch Existing File Content",
+      "type": "n8n-nodes-base.gitlab",
+      "position": [
+        1640,
+        340
+      ],
+      "parameters": {
+        "owner": "={{ $('Globals').first().json.gitlab_owner }}",
+        "filePath": "={{ $('Globals').first().json.gitlab_workflow_path }}/{{ $('Derive Filename From Workflow Name').item.json.normalized_filename }}",
+        "resource": "file",
+        "operation": "get",
+        "repository": "={{ $('Globals').first().json.gitlab_project }}",
+        "asBinaryProperty": false,
+        "additionalParameters": {
+          "reference": "main"
+        }
+      },
+      "credentials": {
+        "gitlabApi": {
+          "id": "Nv1DoplS64rrPZVm",
+          "name": "Target GitLab Account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "816843c4-769c-4033-a38e-1c6ef5325e15",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        940,
+        120
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 401,
+        "height": 246,
+        "content": "## Gather Gitlab Info"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "19f3fe4d-acba-4e7b-b92c-ce9024a8f37d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        940,
+        460
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 398,
+        "height": 240,
+        "content": "## Gather n8n Info"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "418bef31-adf6-419b-87f1-faa2581e5766",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1380,
+        280
+      ],
+      "parameters": {
+        "width": 598,
+        "height": 384.41789416257484,
+        "content": "## Decide Whether to Create or Edit or Skip"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f3b98ded-c767-4822-bcf4-25931be03f48",
+      "name": "Skip Unchanged Files",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1820,
+        340
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3298ab8b-9934-4ed7-9c38-03f325dc71e2",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ JSON.stringify($('n8n').item.json, null, 4) }}",
+              "rightValue": "={{ $json.content.base64Decode() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6bbf5146-7129-4ca8-8576-39d5cbe8e0b9",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        220
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 402,
+        "height": 452,
+        "content": "## Start / Trigger & Configure"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0e5d9c9f-40b4-494d-8233-a2b4fea67d76",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        520,
+        520
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 21 * * 6"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "be08176e-3961-43d7-b182-89a4f45805f6",
+      "name": "Fetch List of Existing Files",
+      "type": "n8n-nodes-base.gitlab",
+      "position": [
+        980,
+        180
+      ],
+      "parameters": {
+        "owner": "={{ $('Globals').first().json.gitlab_owner }}",
+        "filePath": "={{ $('Globals').first().json.gitlab_workflow_path }}",
+        "resource": "file",
+        "operation": "list",
+        "returnAll": true,
+        "repository": "={{ $('Globals').item.json.gitlab_project }}",
+        "additionalParameters": {
+          "ref": "main"
+        }
+      },
+      "credentials": {
+        "gitlabApi": {
+          "id": "Nv1DoplS64rrPZVm",
+          "name": "Target GitLab Account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "674cdaa8-f8fe-4f6d-8743-062d3fd1ff95",
+      "name": "Combine Gitlab Existing Files as Single List Item",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1180,
+        180
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "renameField": true,
+              "outputFieldName": "gitlab_existing_filenames",
+              "fieldToAggregate": "name"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "463ae3fb-4d66-497d-81eb-7e55b5945d84",
+      "name": "File Exists in Gitlab?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1440,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "0740c2be-ab9d-4249-af46-0d94f58c318f",
+              "operator": {
+                "type": "array",
+                "operation": "contains",
+                "rightType": "any"
+              },
+              "leftValue": "={{ $('Combine Gitlab Existing Files as Single List Item').first().json.gitlab_existing_filenames }}",
+              "rightValue": "={{ $('Derive Filename From Workflow Name').item.json.normalized_filename }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "n8n": {
+      "main": [
+        [
+          {
+            "node": "Derive Filename From Workflow Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Globals": {
+      "main": [
+        [
+          {
+            "node": "Fetch List of Existing Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Globals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Unchanged Files": {
+      "main": [
+        [
+          {
+            "node": "Edit Existing File(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Exists in Gitlab?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Existing File Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create New File(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup Now - Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Globals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Existing File Content": {
+      "main": [
+        [
+          {
+            "node": "Skip Unchanged Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch List of Existing Files": {
+      "main": [
+        [
+          {
+            "node": "Combine Gitlab Existing Files as Single List Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derive Filename From Workflow Name": {
+      "main": [
+        [
+          {
+            "node": "File Exists in Gitlab?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Gitlab Existing Files as Single List Item": {
+      "main": [
+        [
+          {
+            "node": "n8n",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

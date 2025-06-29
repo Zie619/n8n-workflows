@@ -1,0 +1,640 @@
+{
+  "meta": {
+    "instanceId": "cb484ba7b742928a2048bf8829668bed5b5ad9787579adea888f05980292a4a7"
+  },
+  "nodes": [
+    {
+      "id": "92ffb384-849f-411b-981f-e324190eaae4",
+      "name": "Post on Wordpress",
+      "type": "n8n-nodes-base.wordpress",
+      "position": [
+        1340,
+        700
+      ],
+      "parameters": {
+        "title": "={{ $json.Title }}",
+        "additionalFields": {
+          "status": "draft",
+          "content": "={{ $json['Blog Body'] }}"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b3148c02-8088-4b81-afa8-1d57bef570e5",
+      "name": "Upload Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1840,
+        700
+      ],
+      "parameters": {
+        "url": "=https://effibotics.com/wp-json/wp/v2/media",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "binaryData",
+        "sendHeaders": true,
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-disposition",
+              "value": "=attachment; filename={{ $binary.data.fileName }}.{{ $binary.data.fileExtension }}"
+            },
+            {
+              "name": "content-type",
+              "value": "={{ $binary.data.mimeType }}"
+            }
+          ]
+        },
+        "inputDataFieldName": "data",
+        "nodeCredentialType": "wordpressApi"
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "d81ab003-fb36-4570-ab58-65b9a5db38be",
+      "name": "Set Featured Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2000,
+        700
+      ],
+      "parameters": {
+        "url": "={{ $('Settings').item.json.wordpress_url }}wp-json/wp/v2/posts/{{ $('Post on Wordpress').item.json.id }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "featured_media",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "wordpressApi"
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "176ed2b0-2e27-4c04-a3fb-94842a82d3ab",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1040,
+        700
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "66db867d-e056-4713-8877-14c60775738a",
+              "name": "id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "c2e3724a-1406-48a7-b15c-1cda06dd44e9",
+              "name": "Title",
+              "type": "string",
+              "value": "={{ $json.Title }}"
+            },
+            {
+              "id": "d47d0436-ae61-4c68-a57f-273e77354050",
+              "name": "Keyword",
+              "type": "string",
+              "value": "={{ $json.Keyword }}"
+            },
+            {
+              "id": "34d8bc1f-77f6-496e-a36f-faa06d5cd6dd",
+              "name": "Blog Body",
+              "type": "string",
+              "value": "={{ $json[\"Blog Post\"].replace($json[\"Title\"],'') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "ff8d11c0-a604-4959-8dbd-56a5265a0559",
+      "name": "Get content to post",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        680,
+        700
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "appEanjsKFnMPZZz3",
+          "cachedResultUrl": "https://airtable.com/appEanjsKFnMPZZz3",
+          "cachedResultName": "SEO Doctor"
+        },
+        "limit": 3,
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblkWGFcUJ2WVyL9f",
+          "cachedResultUrl": "https://airtable.com/appEanjsKFnMPZZz3/tblkWGFcUJ2WVyL9f",
+          "cachedResultName": "AI Generated Blog Posts"
+        },
+        "options": {},
+        "operation": "search",
+        "returnAll": false,
+        "filterByFormula": "SEARCH(\"To Post\", {Status})"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "43f99839-2690-4324-8d26-201fc55f7b02",
+      "name": "Filter by existing Blogs",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        860,
+        700
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d31b3381-dc99-41ae-b309-40e270ebf714",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json['Blog Post'] }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "924eeb0a-ee5d-40f1-915c-19e34018c619",
+      "name": "Markdown to HTML",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        1180,
+        700
+      ],
+      "parameters": {
+        "mode": "markdownToHtml",
+        "options": {},
+        "markdown": "={{ $json['Blog Body'] }} {{ $json['Blog Body'] }} {{ $json['Blog Body'] }}",
+        "destinationKey": "Blog Body"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3aed566c-04bc-4164-85d7-1f13a7862f5a",
+      "name": "Get Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1500,
+        700
+      ],
+      "parameters": {
+        "url": "=https://api.pexels.com/v1/search?query= {{ $('Edit Fields').item.json.Keyword }}&per_page=1&width=1200&height=675&format=webp",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "lFlHMbYfTkSZ2HupBHDggMucIq38GQ5QICPstDPVdaHVxn9afY983qnS"
+            },
+            {
+              "name": "content",
+              "value": "= {{ $('Edit Fields').item.json.Keyword }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "2729c11b-0c94-4e05-9d98-80d70eac1c2d",
+      "name": "Download the image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1660,
+        700
+      ],
+      "parameters": {
+        "url": "={{ $json.photos[0].src.landscape }}",
+        "options": {},
+        "responseFormat": "file"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9b31f00c-dad3-403c-953e-21df2cd3af65",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        760,
+        340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 662.5970350404314,
+        "height": 321.75,
+        "content": "## Automating Posting content to WordPress and setting up the featured Image\nThis workflow aims to simplify the process by which we share content on Wordpress sites with n8n from airtable\n\n### Usage\n1. Get the content from AirTable. SInce we have this as a markdown, we will have to convert it to a html format to make it easier to publish and manage on WordPress\n2. Upload the blog post with the content, title and all other relevant information needed for an optimized blog\n3. Once the post is posted, we need to upload the image and set it as a features image for the blogs"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ca838f99-39f7-4641-9293-502a7e0be912",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        520,
+        700
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "7eb92d69-3815-45d3-9da9-63a28b15f661",
+      "name": "Update POST on Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        2180,
+        700
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "appEanjsKFnMPZZz3",
+          "cachedResultUrl": "https://airtable.com/appEanjsKFnMPZZz3",
+          "cachedResultName": "SEO Doctor"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblkWGFcUJ2WVyL9f",
+          "cachedResultUrl": "https://airtable.com/appEanjsKFnMPZZz3/tblkWGFcUJ2WVyL9f",
+          "cachedResultName": "AI Generated Blog Posts"
+        },
+        "columns": {
+          "value": {
+            "id": "={{ $('Edit Fields').item.json.id }}",
+            "Status": "Posted"
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": true,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true
+            },
+            {
+              "id": "Title",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Blog Post",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Blog Post",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Star",
+              "type": "number",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Star",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Intent",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Draft",
+                  "value": "Draft"
+                },
+                {
+                  "name": "First Copy",
+                  "value": "First Copy"
+                },
+                {
+                  "name": "Second Copy",
+                  "value": "Second Copy"
+                },
+                {
+                  "name": "To Post",
+                  "value": "To Post"
+                },
+                {
+                  "name": "Posted",
+                  "value": "Posted"
+                },
+                {
+                  "name": "Review",
+                  "value": "Review"
+                },
+                {
+                  "name": "Tracking",
+                  "value": "Tracking"
+                }
+              ],
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Keyword",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Keyword",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "count",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "count",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Word count",
+              "type": "number",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Word count",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Modified",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Last Modified",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Image",
+              "type": "array",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Image",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Images",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Images",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "All keyword Data and Tracking",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "All keyword Data and Tracking",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Search Volume",
+              "type": "number",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Search Volume",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Frequency",
+              "type": "number",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Frequency",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ]
+        },
+        "options": {},
+        "operation": "update"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "536659ab-ca94-420f-8110-e277676b939a",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        340
+      ],
+      "parameters": {
+        "height": 323,
+        "content": "## SETUP\n1. Create a wordpress application and set up the password\n\n2. Have an airtable with the columns \nKeyword | Title | Blog content\n\n3. The blog content in this canse is a markdown format generated by AI"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Image": {
+      "main": [
+        [
+          {
+            "node": "Download the image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Markdown to HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Media": {
+      "main": [
+        [
+          {
+            "node": "Set Featured Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown to HTML": {
+      "main": [
+        [
+          {
+            "node": "Post on Wordpress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get content to post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post on Wordpress": {
+      "main": [
+        [
+          {
+            "node": "Get Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download the image": {
+      "main": [
+        [
+          {
+            "node": "Upload Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Featured Image": {
+      "main": [
+        [
+          {
+            "node": "Update POST on Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get content to post": {
+      "main": [
+        [
+          {
+            "node": "Filter by existing Blogs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter by existing Blogs": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

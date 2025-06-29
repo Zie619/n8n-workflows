@@ -1,0 +1,168 @@
+{
+  "id": 8,
+  "name": "Get only new RSS with Photo",
+  "nodes": [
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        1050,
+        920
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 5
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "RSS Feed Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        1220,
+        920
+      ],
+      "parameters": {
+        "url": "http://www.theverge.com/rss/full.xml"
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Extract Image1",
+      "type": "n8n-nodes-base.htmlExtract",
+      "position": [
+        1740,
+        920
+      ],
+      "parameters": {
+        "options": {},
+        "dataPropertyName": "=content",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "image",
+              "attribute": "src",
+              "cssSelector": "img",
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Filter RSS Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1390,
+        920
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Title",
+              "value": "={{$node[\"RSS Feed Read\"].json[\"title\"]}}"
+            },
+            {
+              "name": "Subtitle",
+              "value": "={{$json[\"contentSnippet\"]}}"
+            },
+            {
+              "name": "Author",
+              "value": "={{$json[\"creator\"]}}"
+            },
+            {
+              "name": "URL",
+              "value": "={{$node[\"RSS Feed Read\"].json[\"link\"]}}"
+            },
+            {
+              "name": "Date",
+              "value": "={{$node[\"RSS Feed Read\"].json[\"pubDate\"]}}"
+            },
+            {
+              "name": "content",
+              "value": "={{$json[\"content\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Only get new RSS1",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1560,
+        920
+      ],
+      "parameters": {
+        "functionCode": "const staticData = getWorkflowStaticData('global');\nconst newRSSIds = items.map(item => item.json[\"Date\"]);\nconst oldRSSIds = staticData.oldRSSIds; \n\nif (!oldRSSIds) {\n  staticData.oldRSSIds = newRSSIds;\n  return items;\n}\n\n\nconst actualNewRSSIds = newRSSIds.filter((id) => !oldRSSIds.includes(id));\nconst actualNewRSS = items.filter((data) => actualNewRSSIds.includes(data.json['Date']));\nstaticData.oldRSSIds = [...actualNewRSSIds, ...oldRSSIds];\n\nreturn actualNewRSS;\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "RSS Feed Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Feed Read": {
+      "main": [
+        [
+          {
+            "node": "Filter RSS Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image1": {
+      "main": [
+        []
+      ]
+    },
+    "Filter RSS Data": {
+      "main": [
+        [
+          {
+            "node": "Only get new RSS1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only get new RSS1": {
+      "main": [
+        [
+          {
+            "node": "Extract Image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

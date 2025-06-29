@@ -1,0 +1,827 @@
+{
+  "id": "PoiRk5w0xd1ysq4U",
+  "meta": {
+    "instanceId": "b9faf72fe0d7c3be94b3ebff0778790b50b135c336412d28fd4fca2cbbf8d1f5",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "AI Agent to chat with you Search Console Data, using OpenAI and Postgres",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "9ee6710b-19b7-4bfd-ac2d-0fe1e2561f1d",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "position": [
+        1796,
+        220
+      ],
+      "parameters": {
+        "tableName": "insights_chat_histories"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "",
+          "name": "Postgres"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "eb9f07e9-ded1-485c-9bf3-cf223458384a",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1356,
+        240
+      ],
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "maxTokens": 16000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAi"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1d3d6fb7-a171-4590-be42-df7eb0c208ed",
+      "name": "Set fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        940,
+        -20
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9f47b322-e42f-42d7-93eb-a57d22adb849",
+              "name": "chatInput",
+              "type": "string",
+              "value": "={{ $json.body?.chatInput || $json.chatInput  }}"
+            },
+            {
+              "id": "73ec4dd0-e986-4f60-9dca-6aad2f86bdeb",
+              "name": "sessionId",
+              "type": "string",
+              "value": "={{ $json.body?.sessionId || $json.sessionId }}"
+            },
+            {
+              "id": "4b688c46-b60f-4f0a-83d8-e283f2d7055c",
+              "name": "date_message",
+              "type": "string",
+              "value": "={{ $now.format('yyyy-MM-dd') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "92dc5e8b-5140-49be-8713-5749b7e2d46b",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        407.32142857142867,
+        -320
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 347.9910714285712,
+        "height": 516.8973214285712,
+        "content": "## Webhook - ChatInput\n\nThis webhook serves as the endpoint for receiving `ChatInput` data. Ensure that you include:\n- `chatInput` – the content you wish to send (😉)\n- `sessionId` – a unique identifier for the session\n\nIf you're using an interface such as **Open WebUI**, the `sessionId` will be generated automatically."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ca9f3732-9b62-4f44-b970-77d5d470ec76",
+      "name": "Webhook - ChatInput",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        500,
+        -20
+      ],
+      "webhookId": "a6820b65-76cf-402b-a934-0f836dee6ba0",
+      "parameters": {
+        "path": "a6820b65-76cf-402b-a934-0f836dee6ba0/chat",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "authentication": "basicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "",
+          "name": "basic-auth"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9d684873-6dfe-4709-928d-293b187dfb30",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        -320
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 347.9910714285712,
+        "height": 516.8973214285712,
+        "content": "## Set fields\n\nThis node sets three fields:\n- `chatInput`: retrieved from the previous webhook node\n- `sessionId`: retrieved from the previous webhook node\n- `date_message`: formatted within this node. This will be used later to help the AI agent determine the date range for retrieving Search Console data."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8750215a-1e33-4ac8-a6da-95efa8ffed65",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        2600,
+        -20
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "1b879496-5c0f-4bd5-b4cb-18df2662aef2",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1240,
+        -320
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1154.2857142857138,
+        "height": 516.8973214285712,
+        "content": "## AI Agent - Tools Agent\n\nThis AI Agent is configured with a system prompt that instructs it to:\n- On the first user message, **retrieve available Search Console properties** and offer the user the option to **fetch data from these properties**\n- Based on the user’s natural language input, **construct an API call** to the selected Search Console property and retrieve the requested data\n- Present the data in a **markdown-formatted table**\n\nThe AI Agent has a friendly tone and is designed to **confirm the user’s data requirements accurately** before executing any API requests.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c44c6402-9ddd-4a7b-bc5a-b6c3679a3f68",
+      "name": "Call Search Console Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        2196,
+        220
+      ],
+      "parameters": {
+        "name": "SearchConsoleRequestTool",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "PoiRk5w0xd1ysq4U",
+          "cachedResultName": "My workflow 10"
+        },
+        "description": "Call this tool when you need to get the website_list or custom_insights",
+        "jsonSchemaExample": ""
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "b1701a89-c5b3-47fb-99d5-4896a6d5c7a2",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1234,
+        220
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 328.9664285714292,
+        "height": 468.13107142857154,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n### AI Agent Sub-node - OpenAI Chat Model\n\nThis sub-node utilizes the selected **OpenAI Chat Model**. You can replace it with any LLM that **supports tool calling**.\n\n### ⚠️ Choose Your Model\nIn this template, the **default model is `gpt-4o`**, a **costly option**. If you'd like a more **affordable alternative**, select `gpt4-o-mini`, though note that responses may occasionally be of slightly lower quality compared to `gpt-4o`."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cd1a7cec-5845-47b1-a2c8-d3b458a02eb0",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1656,
+        220
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 328.9664285714292,
+        "height": 468.13107142857154,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n### AI Agent Sub-node - Postgres Chat Memory\n\nConnect your **Postgres credentials** and specify a **table name** to store the chat history. In this template, the default table name is `insights_chat_histories`, and the **context window length is set to 5**.\n\n**👋 Tip:** If you don’t have a Postgres database, you can quickly **set one up with [Supabase](https://supabase.com/)**.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "290a07d1-c7ed-434d-9851-2a2dcdd35bdf",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2076,
+        220
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 328.9664285714292,
+        "height": 468.13107142857154,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n### AI Agent Sub-node - Call Search Console Tool\n\nThis **tool is used by the AI Agent** to:\n- Retrieve the **list of accessible properties in Search Console**\n- **Fetch Search Console data** based on the user’s natural language request\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "07805c90-7ba5-44d0-b6eb-5a65efb0f8be",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2480,
+        -320
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 347.9910714285712,
+        "height": 516.8973214285712,
+        "content": "## Respond to Webhook\n\nThis node is used to send a response back to the user.\n\n**👋 Tip:** `intermediateSteps` are configured, allowing you to use raw data fetched from Search Console to **create charts or other visualizations** if desired.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9a927a40-45e4-4fd5-ab3e-b77578469f82",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        400,
+        800
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 370.3910714285712,
+        "height": 492.3973214285712,
+        "content": "## Tool Call Trigger\n\nThis **node is triggered when the AI Agent needs to retrieve the `website_list`** (accessible Search Console properties) or **`custom_insights`** based on user data.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c54a4653-0f09-46b0-bd20-68919b96e154",
+      "name": "Tool calling",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        500,
+        1080
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "cc7303ee-1afa-4859-83e7-3af0e963a0f1",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1300,
+        1080
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "custom_insights",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "a30fe6a6-7d0a-4f14-8492-ae021ddc8ec6",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "leftValue": "={{ $json.request_type }}",
+                    "rightValue": "custom_insights"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "website_list",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "1b7d6039-6474-4a73-b157-584743a9d7f0",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "leftValue": "={{$json.request_type}}",
+                    "rightValue": "website_list"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "6860ff98-4050-4f64-b8c1-a153e3388df0",
+      "name": "Set fields - Consruct API CALL",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        920,
+        1080
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "06373437-8288-4171-9f98-e8a417220dd4",
+              "name": "request_type",
+              "type": "string",
+              "value": "={{ $json.query.parseJson().request_type }}"
+            },
+            {
+              "id": "da45c0c5-05f6-4107-81aa-8c08c972d9bf",
+              "name": "start_date",
+              "type": "string",
+              "value": "={{ $json.query.parseJson().startDate }}"
+            },
+            {
+              "id": "59d55034-c612-43d7-9700-4cacdb630ec2",
+              "name": "end_date",
+              "type": "string",
+              "value": "={{ $json.query.parseJson().endDate }}"
+            },
+            {
+              "id": "4c2478c0-7f96-4d3d-a632-089307dc989e",
+              "name": "dimensions",
+              "type": "string",
+              "value": "={{ $json.query.parseJson().dimensions }}"
+            },
+            {
+              "id": "eceefbf9-44e5-4617-96ea-58aca2a29618",
+              "name": "rowLimit",
+              "type": "number",
+              "value": "={{ $json.query.parseJson().rowLimit }}"
+            },
+            {
+              "id": "4e18386e-8548-4385-b620-43efbb11cd63",
+              "name": "startRow",
+              "type": "number",
+              "value": "={{ $json.query.parseJson().startRow}}"
+            },
+            {
+              "id": "a9323a7b-08b4-4015-b3d7-632bcdf56f4e",
+              "name": "property",
+              "type": "string",
+              "value": "={{ encodeURIComponent($json.query.parseJson().property) }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "0a2dfb28-17ee-477f-b9ea-f1d8e05e3745",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        800
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 370.3910714285712,
+        "height": 492.3973214285712,
+        "content": "## Set Fields - Construct API Call\n\nThis node configures fields based on the JSON sent by the AI agent:\n- The `request_type` field determines the route: `website_list` (to retrieve the list of websites) or `custom_insights` (to get insights from Search Console)\n- Additional fields are set to construct the API call, following the **[Search Console API Documentation](https://developers.google.com/webmaster-tools/v1/searchanalytics/query?hl=en)**\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e6ef5c28-01e4-4a0b-9081-b62ec28be635",
+      "name": "Set fields - Create searchConsoleDataArray",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2180,
+        980
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2cffd36f-72bd-4535-8427-a88028ea0c4c",
+              "name": "searchConsoleData",
+              "type": "array",
+              "value": "={{ $json.rows }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "abc80061-a794-4e1d-a055-bd88ea5c93eb",
+      "name": "Set fields - Create searchConsoleDataArray 2",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2180,
+        1340
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2cffd36f-72bd-4535-8427-a88028ea0c4c",
+              "name": "searchConsoleData",
+              "type": "array",
+              "value": "={{ $json.siteEntry }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "24981eea-980e-4e07-9036-d0042c5b2fbe",
+      "name": "Search Console - Get Custom Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1620,
+        980
+      ],
+      "parameters": {
+        "url": "=https://www.googleapis.com/webmasters/v3/sites/{{ $json.property }}/searchAnalytics/query",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"startDate\": \"{{ $json.start_date }}\",\n  \"endDate\": \"{{ $json.end_date }}\",\n  \"dimensions\": {{ $json.dimensions }},\n  \"rowLimit\": {{ $json.rowLimit }},\n  \"startRow\": 0,\n  \"dataState\":\"all\"\n}",
+        "sendBody": true,
+        "sendQuery": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "",
+          "name": "search-console"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "645ff407-857d-4629-926b-5cfc52cfa8ba",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1520,
+        800
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 370.3910714285712,
+        "height": 364.3185243941325,
+        "content": "## Search Console - Get Custom Insights\n\nThis node **performs the API call to retrieve data from Search Console**.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "15aa66e2-f288-4c86-8dad-47e22aa9104f",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1520,
+        1180
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 370.3910714285712,
+        "height": 334.24982142857124,
+        "content": "## Search Console - Get List of Properties\n\nThis node **performs the API call to retrieve the list of accessible properties from Search Console**.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cd804a52-833a-451a-8e0c-f640210ee2c4",
+      "name": "## Search Console - Get List of Properties",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1620,
+        1340
+      ],
+      "parameters": {
+        "url": "=https://www.googleapis.com/webmasters/v3/sites",
+        "options": {},
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "",
+          "name": "search-console"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "3eac4df1-00ac-4262-b520-3a7e218c7e57",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2040,
+        800
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 370.3910714285712,
+        "height": 725.1298214285712,
+        "content": "## Set Fields - Create `searchConsoleDataArray`\n\nThese nodes **create an array based on the response from the Search Console API**.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "86db5800-a735-4749-a800-63d78908610b",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2520,
+        800
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 370.3910714285712,
+        "height": 722.6464176100125,
+        "content": "## Array Aggregation - Response to AI Agent\n\nThese nodes **aggregate the array from the previous** step and send it back to the AI Agent through the field named output as `response`.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "aefbacc7-8dfc-4655-bc4d-f0498c823711",
+      "name": "Array aggregation - response to AI Agent",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        2640,
+        980
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "response"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e5334c72-981c-4375-ae8e-9a3a0457880b",
+      "name": "Array aggregation - response to AI Agent1",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        2660,
+        1340
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "response"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2e93a798-6c26-4d34-a553-ba01b64ca3fe",
+      "name": "Sticky Note13",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -398.45627799387194,
+        -320
+      ],
+      "parameters": {
+        "width": 735.5589746610085,
+        "height": 1615.4504601771982,
+        "content": "# AI Agent to Chat with Your Search Console Data\n\nThis **AI Agent enables you to interact with your Search Console data** through a **chat interface**. Each node is **documented within the template**, providing sufficient information for setup and usage. You will also need to **configure Search Console OAuth credentials**.\n\nFollow this **[n8n documentation](https://docs.n8n.io/integrations/builtin/credentials/google/oauth-generic/#configure-your-oauth-consent-screen)** to set up the OAuth credentials.\n\n## Important Notes\n\n### Correctly Configure Scopes for Search Console API Calls\n- It’s essential to **configure the scopes correctly** in your Google Search Console API OAuth2 credentials. Incorrect **configuration can cause issues with the refresh token**, requiring frequent reconnections. Below is the configuration I use to **avoid constant re-authentication**:\n![Search Console API oAuth2 config 1](https://i.imgur.com/vVLM7gG.png)\n![Search Console API oAuth2 config 2](https://i.imgur.com/naT1NaX.png)\n\nOf course, you'll need to add your **client_id** and **client_secret** from the **Google Cloud Platform app** you created to access your Search Console data.\n\n### Configure Authentication for the Webhook\n\nSince the **webhook will be publicly accessible**, don’t forget to **set up authentication**. I’ve used **Basic Auth**, but feel free to **choose the method that best meets your security requirements**.\n\n## 🤩💖 Example of awesome things you can do with this AI Agent\n![Example of chat with this AI Agent](https://i.imgur.com/jbfsYvT.png)\n\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fa630aa9-3c60-4b27-9477-aaeb79c7f37d",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1676,
+        -20
+      ],
+      "parameters": {
+        "text": "=user_message :  {{ $json.chatInput }}\ndate_message : {{ $json.date_message }}",
+        "options": {
+          "systemMessage": "=Assist users by asking natural, conversational questions to understand their data needs and building a custom JSON API request to retrieve Search Console data. Handle assumptions internally, confirming them with the user in a friendly way. Avoid technical jargon and never imply that the user is directly building an API request.\n\nPre-Step: Retrieve the Website List\nImportant: Initial Action: Before sending your first message to the user, retrieve the list of connected Search Console properties.\n\nTool Call for Website List:\n\nTool name: SearchConsoleRequestTool\nRequest:\n{\n  \"request_type\": \"website_list\" // Always include `request_type` in the API call.\n}\nUsage: Use this list to personalize your response in the initial interaction.\nStep-by-Step Guide\nStep 1: Initial Interaction and Introduction\nGreeting:\n\n\"Hi there! I’m here to help you gain valuable insights from your Search Console data. Whether you're interested in a specific time frame, performance breakdown by pages, queries, or other dimensions, I've got you covered.\n\nI can help you retrieve data for these websites:\n\nhttps://example1.com\nhttps://example2.com\nhttps://example3.com\nWhich of these properties would you like to analyze?\"\nStep 2: Handling User Response for Property Selection\nAction: When the user selects a property, use the property URL exactly as listed (e.g., \"https://example.com\") when constructing the API call.\n\nStep 3: Understanding the User's Needs\nAcknowledgment and Setting Defaults:\n\nIf the user expresses a general need (e.g., \"I want the last 3 months of page performance\"), acknowledge their request and set reasonable defaults.\n\nExample Response:\n\n\"Great! I'll gather the top 300 queries from the last 3 months for https://example.com. If you'd like more details or adjustments, just let me know.\"\n\nFollow-up Questions:\n\nConfirming Dimensions: If the user doesn’t specify dimensions, ask:\n\n\"For this analysis, I’ll look at page performance. Does that sound good, or would you like to include other details like queries, devices, or other dimensions?\"\n\nNumber of Results: If the user hasn’t specified the number of results, confirm:\n\n\"I can show you the top 100 results. Let me know if you'd like more or fewer!\"\n\nStep 4: Gathering Specific Inputs (If Necessary)\nAction: If the user provides specific needs, capture and confirm them naturally.\n\nExample Response:\n\n\"Perfect, I’ll pull the data for [specified date range], focusing on [specified dimensions]. Anything else you’d like me to include?\"\n\nImplicit Defaults:\n\nDate Range: Assume \"last 3 months\" if not specified.\nRow Limit: Default to 100, adjustable based on user input.\nStep 5: Confirming Input with the User\nAction: Summarize the request to ensure accuracy.\n\nExample Response:\n\n\"Here’s what I’m preparing: data for https://example.com, covering the last 3 months, focusing on the top 100 queries. Let me know if you’d like to adjust anything!\"\n\nStep 6: Constructing the JSON for Custom Insights\nAction: Build the API call based on the conversation.\n\n{\n  \"property\": \"<USER_PROVIDED_PROPERTY_URL>\", // Use the exact property URL.\n  \"request_type\": \"custom_insights\",\n  \"startDate\": \"<ASSUMED_OR_USER_SPECIFIED_START_DATE>\",\n  \"endDate\": \"<ASSUMED_OR_USER_SPECIFIED_END_DATE>\",\n  \"dimensions\": [\"<IMPLIED_OR_USER_SPECIFIED_DIMENSIONS>\"], // Array of one or more: \"page\", \"query\", \"searchAppearance\", \"device\", \"country\"\n  \"rowLimit\": 300 // Default or user-specified limit.\n}\nStep 7: Presenting the Data\nWhen Retrieving Custom Insights:\n\nImportant: Display all retrieved data in an easy-to-read markdown table format.\nStep 8: Error Handling\nAction: Provide clear, user-friendly error messages when necessary.\n\nExample Response:\n\n\"Hmm, there seems to be an issue retrieving the data. Let’s review what we have or try a different approach.\"\n\nAdditional Notes\nProactive Assistance: Offer suggestions based on user interactions, such as adding dimensions or refining details.\nTone: Maintain a friendly and helpful demeanor throughout the conversation.",
+          "returnIntermediateSteps": true
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.6
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "abda3766-7d18-46fb-83e7-c2343ff26385",
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Search Console - Get Custom Insights",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "## Search Console - Get List of Properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool calling": {
+      "main": [
+        [
+          {
+            "node": "Set fields - Consruct API CALL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - ChatInput": {
+      "main": [
+        [
+          {
+            "node": "Set fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Search Console Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set fields - Consruct API CALL": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Console - Get Custom Insights": {
+      "main": [
+        [
+          {
+            "node": "Set fields - Create searchConsoleDataArray",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "## Search Console - Get List of Properties": {
+      "main": [
+        [
+          {
+            "node": "Set fields - Create searchConsoleDataArray 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set fields - Create searchConsoleDataArray": {
+      "main": [
+        [
+          {
+            "node": "Array aggregation - response to AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set fields - Create searchConsoleDataArray 2": {
+      "main": [
+        [
+          {
+            "node": "Array aggregation - response to AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

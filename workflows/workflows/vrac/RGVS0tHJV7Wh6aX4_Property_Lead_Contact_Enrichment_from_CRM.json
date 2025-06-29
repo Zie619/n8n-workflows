@@ -1,0 +1,377 @@
+{
+  "id": "RGVS0tHJV7Wh6aX4",
+  "meta": {
+    "instanceId": "bb9853d4d7d87207561a30bc6fe4ece20b295264f7d27d4a62215de2f3846a56"
+  },
+  "name": "Property Lead Contact Enrichment from CRM",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "518b14de-23b9-4821-930c-8fa55eb4cfb4",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -340,
+        280
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "939df2a3-f6dd-40c9-a01a-460923a332a6",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -340,
+        100
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "3228372f-ac40-4898-8bf5-09a4f37fde85",
+      "name": "Search Properties API",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        320,
+        260
+      ],
+      "parameters": {
+        "url": "https://api.batchdata.com/api/v1/properties/search",
+        "method": "POST",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "0aa1fb95-66c8-4b61-81f5-04b37e5c1185",
+      "name": "Configure Search Parameters",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        40,
+        240
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "search_parameters",
+              "value": "={ \"location\": { \"city\": \"Austin\", \"state\": \"TX\" }, \"propertyType\": \"single_family\", \"value\": { \"min\": 200000, \"max\": 500000 }, \"status\": \"distressed\", \"equity\": { \"min\": 30 }, \"limit\": 50 }"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "052b357b-a374-4e0c-ab98-67e79ed8cf2b",
+      "name": "Filter Property Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        540,
+        260
+      ],
+      "parameters": {
+        "jsCode": "// Process batch property results and filter according to criteria\nconst results = $input.all()[0].json.results || [];\n\n// Filter to find matching properties\nconst filteredProperties = results.filter(property => {\n  // Example filtering criteria - customize as needed\n  // Only include properties where:\n  // 1. Owner doesn't live at the property (absentee)\n  // 2. Property has been owned for 5+ years\n  // 3. No sales in the last 3 years\n  \n  const isAbsentee = property.owner_occupied === false;\n  \n  // Calculate years of ownership if purchase date exists\n  let yearsOwned = 0;\n  if (property.last_sale_date) {\n    const purchaseDate = new Date(property.last_sale_date);\n    const currentDate = new Date();\n    yearsOwned = currentDate.getFullYear() - purchaseDate.getFullYear();\n  }\n  \n  // Check if no recent sales (last 3 years)\n  let noRecentSales = true;\n  if (property.last_sale_date) {\n    const lastSale = new Date(property.last_sale_date);\n    const threeYearsAgo = new Date();\n    threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);\n    noRecentSales = lastSale < threeYearsAgo;\n  }\n  \n  return isAbsentee && yearsOwned >= 5 && noRecentSales;\n});\n\n// Add relevant score to each property\nconst scoredProperties = filteredProperties.map(property => {\n  // Create a simple scoring system from 0-100\n  // This helps prioritize the best leads\n  let score = 50; // Base score\n  \n  // Increase score for properties with more equity\n  if (property.equity_percentage) {\n    score += Math.min(property.equity_percentage / 2, 25);\n  }\n  \n  // Increase score for longer ownership\n  if (property.last_sale_date) {\n    const purchaseDate = new Date(property.last_sale_date);\n    const currentDate = new Date();\n    const yearsOwned = currentDate.getFullYear() - purchaseDate.getFullYear();\n    score += Math.min(yearsOwned, 15);\n  }\n  \n  // Increase score for tax delinquency\n  if (property.tax_delinquent) {\n    score += 10;\n  }\n  \n  return { ...property, lead_score: Math.round(score) };\n});\n\n// Sort by score descending\nscoredProperties.sort((a, b) => b.lead_score - a.lead_score);\n\n// Return the filtered and scored properties\nreturn scoredProperties.map(property => {\n  return {\n    json: property\n  };\n});"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2c183cc1-06a1-4528-82c3-df2585df58eb",
+      "name": "Get Owner Contact Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        760,
+        260
+      ],
+      "parameters": {
+        "url": "https://api.batchdata.com/api/v1/property/skip-trace",
+        "method": "POST",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "2fe0aef9-30d2-4c30-9029-571f3b4c8ca9",
+      "name": "Format Lead Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        960,
+        260
+      ],
+      "parameters": {
+        "jsCode": "// Process and format the property data with owner contact info\nreturn $input.all().map(item => {\n  const property = item.json;\n  const skipTraceData = property.skip_trace_data || {};\n  const ownerInfo = property.owner_info || {};\n  \n  return {\n    json: {\n      // Property Information\n      property_id: property.property_id,\n      address: property.address,\n      city: property.city,\n      state: property.state,\n      zip: property.zip,\n      property_type: property.property_type,\n      beds: property.beds,\n      baths: property.baths,\n      sqft: property.building_sqft,\n      lot_size: property.lot_size,\n      year_built: property.year_built,\n      last_sale_date: property.last_sale_date,\n      last_sale_price: property.last_sale_price,\n      estimated_value: property.estimated_value,\n      estimated_equity: property.estimated_equity,\n      equity_percentage: property.equity_percentage,\n      lead_score: property.lead_score,\n      \n      // Owner Information\n      owner_name: ownerInfo.full_name || `${ownerInfo.first_name || ''} ${ownerInfo.last_name || ''}`.trim(),\n      owner_mailing_address: ownerInfo.mailing_address,\n      owner_mailing_city: ownerInfo.mailing_city,\n      owner_mailing_state: ownerInfo.mailing_state,\n      owner_mailing_zip: ownerInfo.mailing_zip,\n      \n      // Contact Info from Skip Trace\n      email: skipTraceData.email,\n      phone: skipTraceData.phone_number,\n      mobile: skipTraceData.mobile_number,\n      alternate_phone: skipTraceData.alternate_phone,\n      \n      // Additional Details\n      absentee_owner: property.owner_occupied === false ? 'Yes' : 'No',\n      tax_delinquent: property.tax_delinquent ? 'Yes' : 'No',\n      years_owned: property.years_owned,\n      lead_source: 'BatchData Property Search',\n      date_added: new Date().toISOString().split('T')[0]\n    }\n  };\n});"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "013469c2-1e83-44e0-b078-c0b3d052a2c5",
+      "name": "Create Excel Spreadsheet",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "position": [
+        1280,
+        160
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "Property_Leads_{{ $now.format('YYYY-MM-DD') }}.xlsx",
+          "headerRow": true
+        },
+        "operation": "toFile",
+        "fileFormat": "xlsx"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "954c492a-7da2-4902-99ab-318d4ea6e333",
+      "name": "Push to CRM",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        1280,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "additionalFields": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "61bfd72b-8971-4298-8d2a-09baea403956",
+      "name": "Email Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1520,
+        300
+      ],
+      "webhookId": "e9459278-1cd9-47bb-bffd-88380d297217",
+      "parameters": {
+        "options": {},
+        "subject": "Property Lead Report - {{ $now.format('YYYY-MM-DD') }}",
+        "toEmail": "your-email@yourdomain.com",
+        "fromEmail": "no-reply@yourdomain.com"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "a79a0618-ac63-4aaf-8337-b9ccc5940eef",
+      "name": "Summarize Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1280,
+        360
+      ],
+      "parameters": {
+        "jsCode": "// Summarize the results of the property lead search\nconst leads = $input.all();\nconst totalLeads = leads.length;\n\n// Calculate the highest lead score\nlet highestScore = 0;\nif (totalLeads > 0) {\n  highestScore = Math.max(...leads.map(item => item.json.lead_score || 0));\n}\n\n// Return a summary object\nreturn {\n  json: {\n    total_leads: totalLeads,\n    highest_score: highestScore,\n    execution_date: new Date().toISOString(),\n    success: true\n  }\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cf6bbc2b-4892-4612-aee9-7f255f627a67",
+      "name": "Sticky Note - Workflow Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -420,
+        -520
+      ],
+      "parameters": {
+        "width": 800,
+        "height": 280,
+        "content": "# Property Lead Automation Workflow\n\nThis workflow automatically searches for potential real estate leads based on configured criteria, obtains owner contact information through skip tracing, and pushes the leads to your CRM. It can be run manually or scheduled to run daily.\n\n## Steps: Property Search → Filter Results → Skip Trace → Format Data → Export (Excel & CRM)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ff155460-3f4e-44e8-aac7-4b84dff2dceb",
+      "name": "Sticky Note - Triggers",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -420,
+        -160
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 320,
+        "height": 620,
+        "content": "## Workflow Triggers\n\nThis workflow can be triggered in two ways:\n\n1. **Scheduled Trigger** - Runs automatically every day at the specified time\n\n2. **Manual Trigger** - Run the workflow on-demand by clicking Execute"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8c127497-0dc4-428d-a946-14c10b9572cb",
+      "name": "Sticky Note - Property Search",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        -180
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 320,
+        "height": 650,
+        "content": "## Search Configuration\n\nConfigure your property search criteria including:\n\n- Location (city, state, zip)\n- Property type\n- Value range\n- Equity percentage\n- Owner status\n- And more\n\nEdit the 'search_parameters' in the Set node to customize your search criteria."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "20ad7c5e-5d73-4b43-b5b0-6c9eaae18400",
+      "name": "Sticky Note - Data Processing",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        260,
+        -180
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 880,
+        "height": 660,
+        "content": "## Property Data Processing\n\n1. **Search Properties API** - Connect to BatchData to search for properties\n\n2. **Filter Property Results** - Apply additional filtering logic and calculate lead scores based on factors like:\n   - Equity percentage\n   - Years of ownership\n   - Owner occupancy status\n   - Tax delinquency\n   - Recent sales activity\n\n3. **Get Owner Contact Info** - Skip trace each property to find owner contact details\n\n4. **Format Lead Data** - Structure the data for CRM and reporting"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a0254233-a0af-43b2-8258-0820d8fdd49d",
+      "name": "Sticky Note - Output",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1180,
+        -180
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 560,
+        "height": 920,
+        "content": "## Lead Output Options\n\n1. **Create Excel Spreadsheet** - Generates an Excel file with all property leads and details\n\n2. **Push to CRM** - Adds leads to your CRM system (HubSpot in this example, but can be changed to Salesforce, Zoho, etc.)\n\n3. **Email Notification** - Sends a summary email with the Excel file attached\n\n4. **Summarize Results** - Provides a summary of the execution results"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ff401fba-f56d-4d22-b259-d23a4e141a98",
+  "connections": {
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Configure Search Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Create Excel Spreadsheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Push to CRM",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Results": {
+      "main": [
+        [
+          {
+            "node": "Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Properties API": {
+      "main": [
+        [
+          {
+            "node": "Filter Property Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Owner Contact Info": {
+      "main": [
+        [
+          {
+            "node": "Format Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Property Results": {
+      "main": [
+        [
+          {
+            "node": "Get Owner Contact Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Excel Spreadsheet": {
+      "main": [
+        [
+          {
+            "node": "Email Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure Search Parameters": {
+      "main": [
+        [
+          {
+            "node": "Search Properties API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Configure Search Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

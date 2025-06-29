@@ -1,0 +1,316 @@
+{
+  "id": "JIegnKLVXTkkTzfO",
+  "meta": {
+    "instanceId": "bdce9ec27bbe2b742054f01d034b8b468d2e7758edd716403ad5bd4583a8f649",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Daylight Saving Time Notification",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "87b11535-a9ae-49d4-a33f-b895274643e5",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "d1cd9157-9948-43fd-a725-2a82a21a82c6",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        340,
+        -300
+      ],
+      "parameters": {
+        "width": 394,
+        "height": 264,
+        "content": "## How it works\n- check list of timezones\n- check if any timezone switches from/to Daylight Saving Time\n- notify on Slack\n\n## Remember to set up\n- Add timezones to \"Timezones List\"\n- Slack notification channel\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0f4369fc-80b6-4fd6-8533-4aacbf4c9c65",
+      "name": "Timezones List",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return [\n\t{\n      timezone : \"America/New_York\"\n\t},\n\t{\n      timezone : \"Europe/Warsaw\"\n\t},\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3c1e6cd7-3812-4670-a53f-7270e29574f9",
+      "name": "Calculate Zone Date and Time",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4e9f973f-a11f-474b-89ce-dac4a77a7c68",
+              "name": "datetime_zone",
+              "type": "string",
+              "value": "={{ $now.setZone( $json.timezone ) }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "7f49ac42-afcb-4552-84da-180bc65b84b0",
+      "name": "Check If Daylight Saving Time",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        40,
+        280
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4e9f973f-a11f-474b-89ce-dac4a77a7c68",
+              "name": "datetime_zone_dst",
+              "type": "string",
+              "value": "={{ $json.datetime_zone.toDateTime().setZone($json.timezone).isInDST }}"
+            },
+            {
+              "id": "ff13ee6d-c146-4dcb-98c4-6cb9b2474b1d",
+              "name": "datetime_zone_tomorrow_dst",
+              "type": "string",
+              "value": "={{ $json.datetime_zone_tomorrow.toDateTime().setZone($json.timezone).isInDST }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "f3596b52-03af-4a07-be04-a7300fc7b239",
+      "name": "Check If Change Tomorrow",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        240,
+        280
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1f49e05d-d36e-4652-8ad3-b2266d750d94",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.datetime_zone_dst }}",
+              "rightValue": "={{ $json.datetime_zone_tomorrow_dst }}"
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "612e2e06-0283-4acd-8d85-cba16acb7126",
+      "name": "Send Notification On Upcoming Change",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        660,
+        240
+      ],
+      "webhookId": "871515be-56fc-4de7-835b-119d394fea47",
+      "parameters": {
+        "text": "=Tomorrow is Daylight Saving Time change in zone {{ $json.timezone }} - remember to adjust meeting times!",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "otherOptions": {},
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "B0jUtT53pVAEPaQM",
+          "name": "Slack Oauth"
+        }
+      },
+      "typeVersion": 2.3
+    },
+    {
+      "id": "d5e47ff8-d530-47ee-a98d-3a50a7054cb0",
+      "name": "Calculate Tomorrow's Date",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "includeInputFields": true
+        },
+        "duration": 1,
+        "magnitude": "={{ $json.datetime_zone }}",
+        "operation": "addToDate",
+        "outputFieldName": "datetime_zone_tomorrow"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "5ae0aa75-515d-4025-901e-82693f697436",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        0,
+        -160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e233c67c-a79b-4c96-a172-0465021d3911",
+      "name": "Send Email On Upcoming Change",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        660,
+        420
+      ],
+      "webhookId": "40cc0fc1-c135-44fc-b3cb-dfec6fc1ce75",
+      "parameters": {
+        "text": "=Tomorrow is Daylight Saving Time change in zone {{ $json.timezone }} - remember to adjust meeting times!",
+        "options": {},
+        "subject": "DST change tomorrow in {{ $json.timezone }}",
+        "emailFormat": "text"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "tkdzDgcUAt04af3B",
+          "name": "SMTP account"
+        }
+      },
+      "typeVersion": 2.1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7605726a-1a09-4564-b60f-aee3ac0b8c70",
+  "connections": {
+    "Timezones List": {
+      "main": [
+        [
+          {
+            "node": "Calculate Zone Date and Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Timezones List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Change Tomorrow": {
+      "main": [
+        [
+          {
+            "node": "Send Notification On Upcoming Change",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email On Upcoming Change",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Calculate Tomorrow's Date": {
+      "main": [
+        [
+          {
+            "node": "Check If Daylight Saving Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Zone Date and Time": {
+      "main": [
+        [
+          {
+            "node": "Calculate Tomorrow's Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Daylight Saving Time": {
+      "main": [
+        [
+          {
+            "node": "Check If Change Tomorrow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Timezones List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,255 @@
+{
+  "meta": {
+    "instanceId": "2e4938c532d5f4536554a31b1fe1b04df825b7a8238ff0fb3c5eaaa749e140bd"
+  },
+  "nodes": [
+    {
+      "id": "04b7d4d7-6639-4559-9a7a-7eb7b83e16fa",
+      "name": "Generate A-Z Queries",
+      "type": "n8n-nodes-base.code",
+      "notes": "This code adds \n- a blank space\n- and a letter, starting from a, b, c... up to z\nIt processes all the 26 possible letters.\n\nEx :\nn8n a\nn8n b\nn8n c\n...\nn8n z",
+      "position": [
+        180,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const keyword = $input.first().json.chatInput;\nconst alphabet = \"abcdefghijklmnopqrstuvwxyz\".split(\"\");\n\nreturn alphabet.map(letter => ({\n  json: { query: `${keyword} ${letter}` }\n}));"
+      },
+      "notesInFlow": false,
+      "typeVersion": 2
+    },
+    {
+      "id": "0c6ae163-3d08-4a40-aaa9-921f583940df",
+      "name": "Google Autocomplete",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        560,
+        100
+      ],
+      "parameters": {
+        "url": "=https://suggestqueries.google.com/complete/search?client=firefox&hl=en&oe=utf-8&q={{ $json.query }}",
+        "options": {}
+      },
+      "typeVersion": 4
+    },
+    {
+      "id": "21f0aeaa-2d64-497c-a890-6bd84ade624f",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "notes": "The 26 items (one for each alphabet letter) are treated by batches of 10.\nThis setting + the wait time help not to be blocked by Google's API.",
+      "position": [
+        360,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 10
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "6fca90c9-c8f0-4a86-b746-2eedd670404a",
+      "name": "Wait 1s",
+      "type": "n8n-nodes-base.wait",
+      "notes": "This wait time is necessary, otherwise Google API might block the call and make an error.",
+      "position": [
+        920,
+        100
+      ],
+      "webhookId": "844dc802-f7d5-47f0-a389-ad60c4970aa0",
+      "parameters": {
+        "unit": "seconds"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1a1a1a69-736b-4353-9353-bf80b4082f2c",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        740,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const data = JSON.parse($json.data);\nreturn {\n  json: {\n    keywords: data[1]\n  }\n};\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6af6e3e1-85b7-49a7-8589-bf49d34ff429",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        -340
+      ],
+      "parameters": {
+        "width": 400,
+        "height": 320,
+        "content": "## Type a Keyword and Discover What People Search on Google\n\nThis workflow scrapes Google autocomplete results by combining **your keyword** with every letter from **A to Z**.\n\n**Example:**  \nKeyword: `n8n`  \nResults:  \n- n8n agent  \n- n8n automation  \n- n8n api  \n- ...and so on\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "87673f0f-19ef-4bf7-a2bb-6d7e823a4f57",
+      "name": "Get Keyword",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "notes": "You could also get this initial keyword from :\n- a line in a Google Sheet\n- a webhook and a form on a website\n- a messaging app like Telegram or Whatsapp",
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "add903d6-ee86-435a-b876-12b2f6264631",
+      "parameters": {
+        "options": {}
+      },
+      "notesInFlow": false,
+      "typeVersion": 1.1
+    },
+    {
+      "id": "ce6f882e-69dc-41a4-a9bf-b4fd6c55b87f",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        -360
+      ],
+      "parameters": {
+        "width": 480,
+        "height": 240,
+        "content": "## Exporting the Keywords\n\nYou can easily add a node to export the keywords in various ways:\n\n- via a webhook\n- by email\n- as a file (e.g., saved to Google Drive)\n- directly to a website"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2675a52d-1018-4d33-914d-fc46225a3cc5",
+      "name": "Extract Keywords",
+      "type": "n8n-nodes-base.code",
+      "notes": "This code gathers all the keywords in one list.",
+      "position": [
+        560,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "let mergedKeywords = [];\n\nfor (const item of $input.all()) {\n  mergedKeywords.push(...item.json.keywords);\n}\n\nreturn { json: { keywords: mergedKeywords } };\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "95376c0e-43a8-408d-9542-ca9c0c4999c7",
+      "name": "Return Keywords",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "notes": "Use this node",
+      "position": [
+        740,
+        -100
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9355b89b-5366-4bbb-a06b-081ced4c2134",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        280
+      ],
+      "parameters": {
+        "width": 560,
+        "height": 280,
+        "content": "## Adapt the Language\n\nAutocomplete results depend on the selected language.\n\nYou can change the `&hl=en` parameter in the **Google Autocomplete** node.  \nReplace the `\"en\"` part with the language code of your choice.\n\n**Examples:**  \n- `&hl=fr` → French  \n- `&hl=es` → Spanish  \n- `&hl=de` → German\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Wait 1s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1s": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Keyword": {
+      "main": [
+        [
+          {
+            "node": "Generate A-Z Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Extract Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Autocomplete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Keywords": {
+      "main": [
+        [
+          {
+            "node": "Return Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Autocomplete": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate A-Z Queries": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,372 @@
+{
+  "meta": {
+    "instanceId": "03e9d14e9196363fe7191ce21dc0bb17387a6e755dcc9acc4f5904752919dca8"
+  },
+  "nodes": [
+    {
+      "id": "93963e3d-bd30-4a0f-ba56-7896cd19d2ae",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -660,
+        160
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "c459e403-01b8-43dd-8065-1f8dcb77bcc0",
+      "name": "Run Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -660,
+        -40
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "7cabd06a-7898-4789-9671-78f0b6fcac2a",
+      "name": "Get 5 Minute Ago Timestamp",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        -320,
+        40
+      ],
+      "parameters": {
+        "options": {},
+        "duration": 5,
+        "timeUnit": "minutes",
+        "magnitude": "={{ $now.toUTC() }}",
+        "operation": "subtractFromDate",
+        "outputFieldName": "queryDate"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "5f21f279-3608-41bf-8986-47832aa0f1f2",
+      "name": "Get Incidents from ServiceNow",
+      "type": "n8n-nodes-base.serviceNow",
+      "onError": "continueErrorOutput",
+      "position": [
+        -100,
+        40
+      ],
+      "parameters": {
+        "options": {
+          "sysparm_query": "=sys_created_on>={{ $json.queryDate }}",
+          "sysparm_display_value": "true"
+        },
+        "resource": "incident",
+        "operation": "getAll",
+        "authentication": "basicAuth"
+      },
+      "credentials": {
+        "serviceNowBasicApi": {
+          "id": "wjkWiUNQxo5PzTIb",
+          "name": "ServiceNow Basic Auth account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "19fc7c77-e2b0-495d-bb7b-7bc7a7d87805",
+      "name": "Check if New Incidents",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        160,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "09750510-4604-4372-9cdc-d8055adae12a",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.sys_id }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "53e120d8-3022-46c0-8524-2c14f30d2c1a",
+      "name": "Post Error Message if Error with ServiceNow",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        480,
+        760
+      ],
+      "webhookId": "0fba7a73-b273-4d52-863f-9a1b3ff75266",
+      "parameters": {
+        "text": "🚨 Issue connecting to ServiceNow. Please investigate error in n8n. 🚨",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "C086LRRQZQB",
+          "cachedResultName": "incident-notifications"
+        },
+        "otherOptions": {
+          "mrkdwn": true,
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "K04E2FxPZozHux9J",
+          "name": "ServiceNow Bot"
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "0784e71c-208d-4442-b355-3f1f076d9846",
+      "name": "Sort Incidents in Ascending Order",
+      "type": "n8n-nodes-base.sort",
+      "position": [
+        511,
+        -271
+      ],
+      "parameters": {
+        "options": {},
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "number"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8435a455-0ea3-4443-8370-ec2e4c392e2f",
+      "name": "Post Incident Details to Slack Channel",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        731,
+        -271
+      ],
+      "webhookId": "245d019e-7762-4e4a-861e-6181f1dcc7f2",
+      "parameters": {
+        "select": "channel",
+        "blocksUi": "={\n\t\"blocks\": [\n\t\t{\n\t\t\t\"type\": \"header\",\n\t\t\t\"text\": {\n\t\t\t\t\"type\": \"plain_text\",\n\t\t\t\t\"text\": \"ServiceNow Incident Notification\",\n\t\t\t\t\"emoji\": true\n\t\t\t}\n\t\t},\n\t\t{\n\t\t\t\"type\": \"section\",\n\t\t\t\"fields\": [\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*Incident ID:*\\n{{ $('Get Incidents from ServiceNow').item.json.number }}\"\n\t\t\t\t},\n{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*Description:*\\n{{ $('Get Incidents from ServiceNow').item.json.short_description }}\"\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*Severity:*\\n{{ $('Get Incidents from ServiceNow').item.json.severity }}\"\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*Caller:*\\n{{ $('Get Incidents from ServiceNow').item.json.caller_id.display_value }}\"\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*Priority:*\\n{{ $('Get Incidents from ServiceNow').item.json.priority }}\"\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*State:*\\n{{ $('Get Incidents from ServiceNow').item.json.incident_state }}\"\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*Category:*\\n{{ $('Get Incidents from ServiceNow').item.json.category }}\"\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"mrkdwn\",\n\t\t\t\t\t\"text\": \"*Date Opened:*\\n{{ $('Get Incidents from ServiceNow').item.json.opened_at }}\"\n\t\t\t\t}\n\t\t\t]\n\t\t},\n\t\t{\n\t\t\t\"type\": \"actions\",\n\t\t\t\"elements\": [\n\t\t\t\t{\n\t\t\t\t\t\"type\": \"button\",\n\t\t\t\t\t\"text\": {\n\t\t\t\t\t\t\"type\": \"plain_text\",\n\t\t\t\t\t\t\"text\": \"View Incident\",\n\t\t\t\t\t\t\"emoji\": true\n\t\t\t\t\t},\n\t\t\t\t\t\"url\": \"https://dev206761.service-now.com/nav_to.do?uri=incident.do?sys_id={{ $('Get Incidents from ServiceNow').item.json.sys_id }}\",\n\t\t\t\t\t\"action_id\": \"view_incident\"\n\t\t\t\t}\n\t\t\t]\n\t\t}\n\t]\n}",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "C086LRRQZQB",
+          "cachedResultName": "incident-notifications"
+        },
+        "messageType": "block",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "K04E2FxPZozHux9J",
+          "name": "ServiceNow Bot"
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "aa526b18-d259-4304-9faa-4375bee83c50",
+      "name": "No Incidents, Do Nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        500,
+        200
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "2798711d-1788-4126-a576-cdef6c495bd7",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        400,
+        -720
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 543.0448479049971,
+        "height": 635.2493225262418,
+        "content": "![Slack](https://uploads.n8n.io/templates/slack.png)\n## Sorting and Posting Incident Details to Slack\n\nThis section begins with the `Sort Incidents in Ascending Order` node, which organizes the retrieved ServiceNow incidents by their incident number in ascending order. This ensures that incidents are processed and displayed in a logical sequence. The sorted incidents are then passed to the `Post Incident Details to Slack Channel` node, which formats and sends a detailed message to a designated Slack channel. The message includes key information such as the incident ID, description, severity, caller, priority, state, category, and the date the incident was opened. A \"View Incident\" button is also provided, linking directly to the ServiceNow record for quick access. This section ensures clear, organized communication of incident details, enabling efficient team collaboration and resolution."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "499f5f1e-617b-429d-9760-dc264870e269",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -400,
+        -416.5936589599954
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 792.7994376824845,
+        "height": 651.0105345024904,
+        "content": "![Servicenow](https://uploads.n8n.io/templates/servicenow.png)\n## Fetching and Checking New Incidents\n\nThis section begins with the `Get 5 Minute Ago Timestamp` node, which calculates a timestamp exactly 5 minutes prior to the current time. This timestamp is used as a reference point for querying incidents created within the last 5 minutes. The `Get Incidents from ServiceNow` node then fetches all incidents created after the calculated timestamp from the ServiceNow system, ensuring only the most recent incidents are retrieved. Finally, the `Check if New Incidents` node evaluates whether any incidents were returned by checking if the `sys_id` field exists in the response. This logic helps determine the next steps in the workflow, ensuring actions are taken only when new incidents are detected."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c6f1dd80-ed5b-4e29-add1-a38a46338150",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        400,
+        380
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 540.6200460624971,
+        "height": 560.0562505318285,
+        "content": "![Slack](https://uploads.n8n.io/templates/slack.png)\n## Error Notification to Slack\n\nThis section handles error reporting using the `Post Error Message if Error with ServiceNow` node. If the workflow encounters any issues connecting to ServiceNow, this node sends a predefined error message to a specified Slack channel. Usually this is triggered by expired credentials. The message alerts the team to investigate the issue in n8n, ensuring prompt attention and troubleshooting. By proactively notifying the team of connection errors, this section helps maintain the reliability of the workflow and minimizes disruptions in incident monitoring and reporting."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1ea0684a-9d7e-4f47-a7b0-9cb22bb6b934",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -800,
+        -420
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 382.98284329874696,
+        "height": 746.70974187249,
+        "content": "![n8n](https://uploads.n8n.io/templates/n8n.png)\n## Run Every 5 Minutes\n\nThe `Schedule Trigger` node is configured to automatically execute the workflow every 5 minutes. This setup ensures consistent and timely monitoring for new incidents in ServiceNow without requiring manual input. The selected interval strikes a balance between responsiveness and efficient resource usage, making it ideal for real-time incident management workflows."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1a3e7b4c-60ce-449c-9f6a-2a1bc42b748d",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        400,
+        -80
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 540.5949630612389,
+        "height": 442.9500589573929,
+        "content": "![n8n](https://uploads.n8n.io/templates/n8n.png)\n## No New Incidents Found, Do Nothing\n\nIf a ServiceNow system ID is not found in the ServiceNow node output, it will route to this node which effectively ends the process without doing anything. "
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get 5 Minute Ago Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if New Incidents": {
+      "main": [
+        [
+          {
+            "node": "Sort Incidents in Ascending Order",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Incidents, Do Nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get 5 Minute Ago Timestamp": {
+      "main": [
+        [
+          {
+            "node": "Get Incidents from ServiceNow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Incidents from ServiceNow": {
+      "main": [
+        [
+          {
+            "node": "Check if New Incidents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Error Message if Error with ServiceNow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Incidents in Ascending Order": {
+      "main": [
+        [
+          {
+            "node": "Post Incident Details to Slack Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get 5 Minute Ago Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

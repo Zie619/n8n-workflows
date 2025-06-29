@@ -1,0 +1,721 @@
+{
+  "id": "bh3H2b654RSYgIm9",
+  "meta": {
+    "instanceId": "efb474b59b0341d7791932605bd9ff04a6c7ed9941fdd53dc4a2e4b99a6f9439",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Inverview Scheduler",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "cd5664f9-0b6b-491a-a0a0-1d8b3b2f2461",
+      "name": "OpenAI Chat Model2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        320,
+        1480
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ghJTvay8CvwXDsXz",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e8ca4a14-ee58-4be0-838b-5cbf8a802b6e",
+      "name": "Window Buffer Memory2",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        520,
+        1480
+      ],
+      "parameters": {
+        "sessionKey": "={{ $json.sessionId }}",
+        "sessionIdType": "customKey",
+        "contextWindowLength": 10
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "d2957530-acd1-4875-a75b-69b890f08065",
+      "name": "OpenAI Chat Model4",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1220,
+        1440
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ghJTvay8CvwXDsXz",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "897c8189-aaa9-45c7-99c6-95378a7a13f2",
+      "name": "Run Get Availability",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        720,
+        1520
+      ],
+      "parameters": {
+        "name": "get_availability",
+        "source": "parameter",
+        "description": "Call this tool to get my availability",
+        "workflowJson": "{\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"operation\": \"getAll\",\n        \"calendar\": {\n          \"__rl\": true,\n          \"value\": \"rbreen.ynteractive@gmail.com\",\n          \"mode\": \"list\",\n          \"cachedResultName\": \"rbreen.ynteractive@gmail.com\"\n        },\n        \"returnAll\": true,\n        \"options\": {\n          \"fields\": \"\"\n        }\n      },\n      \"type\": \"n8n-nodes-base.googleCalendar\",\n      \"typeVersion\": 1.3,\n      \"position\": [\n        -500,\n        220\n      ],\n      \"id\": \"a1017705-8866-469f-83e0-9f5d5f37af53\",\n      \"name\": \"Check My Calendar\",\n      \"credentials\": {\n        \"googleCalendarOAuth2Api\": {\n          \"id\": \"nc5M45R7LyFadByw\",\n          \"name\": \"Google Calendar account\"\n        }\n      }\n    },\n    {\n      \"parameters\": {\n        \"jsCode\": \"const events = items.map(item => item.json);\\nconst intervalMinutes = 30;\\nconst timeZone = 'America/New_York';\\n\\nfunction formatToEastern(date) {\\n  const tzDate = new Intl.DateTimeFormat('en-US', {\\n    timeZone,\\n    year: 'numeric',\\n    month: '2-digit',\\n    day: '2-digit',\\n    hour: '2-digit',\\n    minute: '2-digit',\\n    second: '2-digit',\\n    hour12: false\\n  }).formatToParts(date).reduce((acc, part) => {\\n    if (part.type !== 'literal') acc[part.type] = part.value;\\n    return acc;\\n  }, {});\\n\\n  const offset = getEasternOffset(date);\\n  return `${tzDate.year}-${tzDate.month}-${tzDate.day}T${tzDate.hour}:${tzDate.minute}:${tzDate.second}${offset}`;\\n}\\n\\nfunction getEasternOffset(date) {\\n  const options = { timeZone, timeZoneName: 'short' };\\n  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);\\n  const tzName = parts.find(p => p.type === 'timeZoneName').value;\\n  return tzName.includes('EDT') ? '-04:00' : '-05:00';\\n}\\n\\nfunction alignToPreviousSlot(date) {\\n  const aligned = new Date(date);\\n  const minutes = aligned.getMinutes();\\n  aligned.setMinutes(minutes < 30 ? 0 : 30, 0, 0);\\n  return aligned;\\n}\\n\\nfunction alignToNextSlot(date) {\\n  const aligned = new Date(date);\\n  const minutes = aligned.getMinutes();\\n  if (minutes > 0 && minutes <= 30) {\\n    aligned.setMinutes(30, 0, 0);\\n  } else if (minutes > 30) {\\n    aligned.setHours(aligned.getHours() + 1);\\n    aligned.setMinutes(0, 0, 0);\\n  } else {\\n    aligned.setMinutes(0, 0, 0);\\n  }\\n  return aligned;\\n}\\n\\nconst splitEventIntoETBlocks = (event) => {\\n  const blocks = [];\\n\\n  let current = alignToPreviousSlot(new Date(event.start.dateTime));\\n  const eventEnd = alignToNextSlot(new Date(event.end.dateTime));\\n\\n  while (current < eventEnd) {\\n    const blockEnd = new Date(current);\\n    blockEnd.setMinutes(current.getMinutes() + intervalMinutes);\\n\\n    blocks.push({\\n      start: formatToEastern(current),\\n      end: formatToEastern(blockEnd)\\n    });\\n\\n    current = blockEnd;\\n  }\\n\\n  return blocks;\\n};\\n\\nlet allBlocks = [];\\nfor (const event of events) {\\n  if (event.start?.dateTime && event.end?.dateTime) {\\n    const blocks = splitEventIntoETBlocks(event);\\n    allBlocks = allBlocks.concat(blocks);\\n  }\\n}\\n\\nreturn allBlocks.map(block => ({ json: block }));\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        -280,\n        240\n      ],\n      \"id\": \"fb9063c2-de6b-4513-8901-d12625f5d772\",\n      \"name\": \"Split Events into 30 min blocks\"\n    },\n    {\n      \"parameters\": {\n        \"assignments\": {\n          \"assignments\": [\n            {\n              \"id\": \"f1270be8-1d11-4086-8bc0-ae53c99507c1\",\n              \"name\": \"start\",\n              \"value\": \"={{ $json.start }}\",\n              \"type\": \"string\"\n            },\n            {\n              \"id\": \"1a5f24ff-7d0c-436d-bb0b-015fc0c85cb7\",\n              \"name\": \"end\",\n              \"value\": \"={{ $json.end }}\",\n              \"type\": \"string\"\n            },\n            {\n              \"id\": \"befe6645-c0c1-40eb-9ba6-eccf2a762247\",\n              \"name\": \"Blocked\",\n              \"value\": \"Blocked\",\n              \"type\": \"string\"\n            }\n          ]\n        },\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.set\",\n      \"typeVersion\": 3.4,\n      \"position\": [\n        -80,\n        240\n      ],\n      \"id\": \"23d8ed50-131f-49ea-9ce8-72a0067fe828\",\n      \"name\": \"Add Blocked Field\"\n    },\n    {\n      \"parameters\": {\n        \"jsCode\": \"const slots = [];\\nconst slotMinutes = 30;\\nconst timeZone = 'America/New_York';\\nconst businessStartHour = 9;\\nconst businessEndHour = 17;\\n\\n// Get offset like -04:00 or -05:00\\nfunction getEasternOffset(date) {\\n  const options = { timeZone, timeZoneName: 'short' };\\n  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);\\n  const tz = parts.find(p => p.type === 'timeZoneName')?.value || 'EST';\\n  return tz.includes('EDT') ? '-04:00' : '-05:00';\\n}\\n\\n// Format Date as ISO with Eastern offset\\nfunction formatToEasternISO(date) {\\n  const formatter = new Intl.DateTimeFormat('en-CA', {\\n    timeZone,\\n    year: 'numeric',\\n    month: '2-digit',\\n    day: '2-digit',\\n    hour: '2-digit',\\n    minute: '2-digit',\\n    second: '2-digit',\\n    hour12: false,\\n  });\\n\\n  const parts = formatter.formatToParts(date).reduce((acc, part) => {\\n    if (part.type !== 'literal') acc[part.type] = part.value;\\n    return acc;\\n  }, {});\\n\\n  const offset = getEasternOffset(date);\\n  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;\\n}\\n\\n// Convert a Date to the hour/minute of its Eastern time\\nfunction getEasternTimeParts(date) {\\n  const formatter = new Intl.DateTimeFormat('en-US', {\\n    timeZone,\\n    hour: '2-digit',\\n    minute: '2-digit',\\n    hour12: false,\\n  });\\n  const [hourStr, minStr] = formatter.format(date).split(':');\\n  return { hour: parseInt(hourStr), minute: parseInt(minStr) };\\n}\\n\\nconst now = new Date();\\nconst endDate = new Date(now);\\nendDate.setDate(now.getDate() + 7);\\n\\n// Set current time to 24 hours in the future\\nconst current = new Date(now);\\ncurrent.setHours(current.getHours() + 24);\\n\\n// Round to the next 30-minute block in Eastern time\\nconst { minute } = getEasternTimeParts(current);\\nif (minute < 30) {\\n  current.setMinutes(30, 0, 0);\\n} else {\\n  current.setHours(current.getHours() + 1);\\n  current.setMinutes(0, 0, 0);\\n}\\n\\n// Generate 30-minute blocks only during business hours & weekdays\\nwhile (current < endDate) {\\n  const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday\\n\\n  // Skip weekends\\n  if (dayOfWeek !== 0 && dayOfWeek !== 6) {\\n    const { hour } = getEasternTimeParts(current);\\n\\n    if (hour >= businessStartHour && hour < businessEndHour) {\\n      const start = new Date(current);\\n      const end = new Date(start);\\n      end.setMinutes(start.getMinutes() + slotMinutes);\\n\\n      slots.push({\\n        start: formatToEasternISO(start),\\n        end: formatToEasternISO(end),\\n      });\\n    }\\n  }\\n\\n  current.setMinutes(current.getMinutes() + slotMinutes);\\n}\\n\\nreturn slots.map(slot => ({ json: slot }));\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        -400,\n        460\n      ],\n      \"id\": \"01597a94-d94b-47e7-9488-adea3abb741c\",\n      \"name\": \"Generate 30 Minute Timeslots\"\n    },\n    {\n      \"parameters\": {\n        \"mode\": \"combine\",\n        \"fieldsToMatchString\": \"start, end\",\n        \"joinMode\": \"enrichInput2\",\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.merge\",\n      \"typeVersion\": 3,\n      \"position\": [\n        180,\n        300\n      ],\n      \"id\": \"2d9f98a1-02ac-4332-a288-635a48ea3ee8\",\n      \"name\": \"Combine My Calendar with All Slots\"\n    },\n    {\n      \"parameters\": {\n        \"conditions\": {\n          \"options\": {\n            \"caseSensitive\": true,\n            \"leftValue\": \"\",\n            \"typeValidation\": \"strict\",\n            \"version\": 2\n          },\n          \"conditions\": [\n            {\n              \"id\": \"af65c6c8-31c7-4f27-a073-cf7f72079882\",\n              \"leftValue\": \"={{ $json.Blocked }}\",\n              \"rightValue\": \"Blocked\",\n              \"operator\": {\n                \"type\": \"string\",\n                \"operation\": \"notEquals\"\n              }\n            }\n          ],\n          \"combinator\": \"and\"\n        },\n        \"options\": {}\n      },\n      \"type\": \"n8n-nodes-base.if\",\n      \"typeVersion\": 2.2,\n      \"position\": [\n        420,\n        280\n      ],\n      \"id\": \"0438b5be-b3c4-4645-9604-303ace7bfead\",\n      \"name\": \"Check if Calendar Blocked\"\n    },\n    {\n      \"parameters\": {\n        \"jsCode\": \"const formatted = items.map(item => {\\n  const start = item.json.start;\\n  const end = item.json.end;\\n  return `${start} - ${end}`;\\n});\\n\\nconst combined = formatted.join(', ');\\n\\nreturn [\\n  {\\n    json: {\\n      availableSlots: combined\\n    }\\n  }\\n];\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        660,\n        300\n      ],\n      \"id\": \"4a6bfde4-7d9f-4837-bc6c-66bf968e782a\",\n      \"name\": \"Return string of all available times\"\n    },\n    {\n      \"parameters\": {\n        \"inputSource\": \"passthrough\"\n      },\n      \"type\": \"n8n-nodes-base.executeWorkflowTrigger\",\n      \"typeVersion\": 1.1,\n      \"position\": [\n        -760,\n        340\n      ],\n      \"id\": \"8bde95cb-7239-4b7d-aca1-0adacf2ea257\",\n      \"name\": \"Get Availability\"\n    }\n  ],\n  \"connections\": {\n    \"Check My Calendar\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Split Events into 30 min blocks\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Split Events into 30 min blocks\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Add Blocked Field\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Add Blocked Field\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Combine My Calendar with All Slots\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Generate 30 Minute Timeslots\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Combine My Calendar with All Slots\",\n            \"type\": \"main\",\n            \"index\": 1\n          }\n        ]\n      ]\n    },\n    \"Combine My Calendar with All Slots\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Check if Calendar Blocked\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Check if Calendar Blocked\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Return string of all available times\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Get Availability\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Check My Calendar\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"Generate 30 Minute Timeslots\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"pinData\": {},\n  \"meta\": {\n    \"instanceId\": \"efb474b59b0341d7791932605bd9ff04a6c7ed9941fdd53dc4a2e4b99a6f9439\"\n  }\n}"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "8892f883-aaae-4616-bb50-bbe0f9dacb23",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1440,
+        1660
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 520,
+        "height": 480,
+        "content": "Check Day Names Tool\n\n\n1. This part of the flow is just a copy of what is embedded in the \"Check Day Names Tool\". It does not run. \n\n2. If you update this part of the flow, copy it with ctrl-c and paste it into another workbook. Add a sub-workflow execution. Set the workflow to accept all data. Copy the flow. Paste the Workflow JSON field in the \"Check Day Names Tool\" tool node\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "234b89da-9003-43d5-842a-4ecf92522b51",
+      "name": "check day names",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        880,
+        1480
+      ],
+      "parameters": {
+        "name": "check_days",
+        "source": "parameter",
+        "workflowJson": "{\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"inputSource\": \"passthrough\"\n      },\n      \"type\": \"n8n-nodes-base.executeWorkflowTrigger\",\n      \"typeVersion\": 1.1,\n      \"position\": [\n        -400,\n        -120\n      ],\n      \"id\": \"dec37e15-3695-4911-91a6-1f97018ab982\",\n      \"name\": \"When Executed by Another Workflow\"\n    },\n    {\n      \"parameters\": {\n        \"jsCode\": \"function getWeekdaysNextTwoWeeks() {\\n  const items = [];\\n  const longDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];\\n\\n  const today = new Date();\\n  const endDate = new Date();\\n  endDate.setDate(today.getDate() + 14); // 2 weeks ahead\\n\\n  const current = new Date(today);\\n\\n  while (current <= endDate) {\\n    const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday\\n\\n    // Only weekdays (Mon–Fri)\\n    if (dayOfWeek >= 1 && dayOfWeek <= 5) {\\n      const dateStr = current.toISOString().split('T')[0]; // YYYY-MM-DD\\n      const output = `${longDayNames[dayOfWeek]} - ${dateStr}`;\\n\\n      items.push({\\n        json: {\\n          day: output\\n        }\\n      });\\n    }\\n\\n    current.setDate(current.getDate() + 1); // Go to next day\\n  }\\n\\n  return items;\\n}\\n\\n// Example usage:\\nreturn getWeekdaysNextTwoWeeks();\\n\"\n      },\n      \"type\": \"n8n-nodes-base.code\",\n      \"typeVersion\": 2,\n      \"position\": [\n        -180,\n        -120\n      ],\n      \"id\": \"cbbe4248-d1cc-48e3-9ea8-67a844f3de29\",\n      \"name\": \"Check Day Names\"\n    }\n  ],\n  \"connections\": {\n    \"When Executed by Another Workflow\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Check Day Names\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"pinData\": {},\n  \"meta\": {\n    \"instanceId\": \"efb474b59b0341d7791932605bd9ff04a6c7ed9941fdd53dc4a2e4b99a6f9439\"\n  }\n}"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "c052c7e4-1587-4c7e-9a8e-043c8571338d",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        1660
+      ],
+      "parameters": {
+        "width": 1200,
+        "height": 500,
+        "content": "Get Availability Execution. \n\n1. This part of the flow is just a copy of what is embedded in the \"Run Get Availability Tool\". It does not run. \n\n2. If you update this part of the flow, copy it with ctrl-c and paste it into another workbook. Add a sub-workflow execution. Set the workflow to accept all data. Copy the flow. Paste the Workflow JSON field in the \"Run Get Availability\" tool node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b7c71153-fbd1-45ac-8dbf-d4beb241daaf",
+      "name": "Convert Output to JSON",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1240,
+        1260
+      ],
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "options": {
+          "systemMessage": "=take in this message and output json"
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "1f902158-5885-46d6-8d7e-26ccf116ed0a",
+      "name": "Interview Scheduler",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        520,
+        1220
+      ],
+      "parameters": {
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "=You are a friendly AI chatbot helping users schedule meetings. Ask for Phone, email, preferred date, and time. Confirm details before booking. Time zone: Eastern.\n\nToday's date is {{ $now }}\n\n1. Use the get_availability tool to find when I am available. it will return comma separated timeslots the interviewer can meet. check the proposed time against the results. Times are in 24 hour clock times in this format.  2025-03-31T09:00:00-04:00\n3. If I am not available, look at get_availability tool again and propose a similar time where I am available\n2. use the check_days tool if the user mentions something like next tuesday so you know what date they are talking about\n3. Once a time is aggreed upon, output json in this format \n2025-03-28T13:00:00-04:00. \n4. once you have the email, phone start and end time, output only the json and nothing else\n\n{\n  \"interview\": {\n    \"email\": \"applicant@example.com\",\n    \"phone\": \"814-882-1293\",\n    \"start_datetime\": \"2025-03-28T10:00:00\",\n    \"end_datetime\": \"2025-03-28T11:00:00\"\n  }\n}\n\n## Rules\n- If the calendar is not available at the time requested, do not double book. Send a new time.\n- Interviews are all 30 minutes long\n- Do not book over another meeting\n- do not give details about what is on the interviewers calendar\n- do not converse with the user about anything else",
+          "returnIntermediateSteps": true
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "ba0fb82e-a280-4392-833e-04f00a47170c",
+      "name": "If Final Output",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        960,
+        1160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e75b6a50-680f-4f5b-8dd3-fc93be1bc7f1",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "start_datetime"
+            },
+            {
+              "id": "cadd4bff-8d53-446c-8ad0-14b3fb9ab335",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "end_datetime"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "c56bcba9-ac39-474b-a186-ceb67fa4008d",
+      "name": "Respond for More Info",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1040,
+        1400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "efd03308-0da1-4797-b899-3d4446eba722",
+      "name": "Parse to JSON",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1400,
+        1500
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"interview\": {\n    \"email\": \"applicant@example.com\",\n    \"phone\": \"814-882-1293\",\n    \"start_datetime\": \"2025-03-28T10:00:00\",\n    \"end_datetime\": \"2025-03-28T11:00:00\"\n  }\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "11abd142-d509-4459-bdf5-861dcf4263bf",
+      "name": "Set Meeting with Google",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        1640,
+        1280
+      ],
+      "parameters": {
+        "end": "={{ $json.output.interview.end_datetime }}",
+        "start": "={{ $json.output.interview.start_datetime }}",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "rbreen.ynteractive@gmail.com",
+          "cachedResultName": "rbreen.ynteractive@gmail.com"
+        },
+        "additionalFields": {
+          "summary": "Interview",
+          "attendees": [
+            "={{ $json.output.interview.email }}"
+          ],
+          "description": "=I will call you at  {{ $json.output.interview.phone }}"
+        }
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "nc5M45R7LyFadByw",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "fef5ba53-4386-4e88-9f28-8a9b5d9c928f",
+      "name": "Final Response to User",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1640,
+        1500
+      ],
+      "parameters": {
+        "jsCode": "const email = $('Convert Output to JSON').first().json.output.interview.email;\nconst phone = $('Convert Output to JSON').first().json.output.interview.phone;\nconst start_datetime = $('Convert Output to JSON').first().json.output.interview.start_datetime;\nconst end_datetime = $('Convert Output to JSON').first().json.output.interview.end_datetime;\n\nlet text = `✅ Interview Confirmed!\\n\\n📧 Email: ${email}\\n📞 Phone: ${phone}\\n🕒 Start: ${start_datetime}\\n🕕 End: ${end_datetime}`;\n\nreturn { text };\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a06664e2-d5d2-40a7-98a5-a3de2d775b7c",
+      "name": "Generate Interview Times",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1620,
+        1920
+      ],
+      "parameters": {
+        "jsCode": "function getWeekdaysNextTwoWeeks() {\n  const items = [];\n  const longDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];\n\n  const today = new Date();\n  const endDate = new Date();\n  endDate.setDate(today.getDate() + 14); // 2 weeks ahead\n\n  const current = new Date(today);\n\n  while (current <= endDate) {\n    const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday\n\n    // Only weekdays (Mon–Fri)\n    if (dayOfWeek >= 1 && dayOfWeek <= 5) {\n      const dateStr = current.toISOString().split('T')[0]; // YYYY-MM-DD\n      const output = `${longDayNames[dayOfWeek]} - ${dateStr}`;\n\n      items.push({\n        json: {\n          day: output\n        }\n      });\n    }\n\n    current.setDate(current.getDate() + 1); // Go to next day\n  }\n\n  return items;\n}\n\n// Example usage:\nreturn getWeekdaysNextTwoWeeks();\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f35d595e-6834-4898-bbcb-b17599d769b4",
+      "name": "Check My Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        420,
+        1820
+      ],
+      "parameters": {
+        "options": {
+          "fields": ""
+        },
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "rbreen.ynteractive@gmail.com",
+          "cachedResultName": "rbreen.ynteractive@gmail.com"
+        },
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "nc5M45R7LyFadByw",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "29e3a097-b6f1-4a54-b943-d9ad9177b03b",
+      "name": "Split Events into 30 min blocks",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        620,
+        1820
+      ],
+      "parameters": {
+        "jsCode": "const events = items.map(item => item.json);\nconst intervalMinutes = 30;\nconst timeZone = 'America/New_York';\n\nfunction formatToEastern(date) {\n  const tzDate = new Intl.DateTimeFormat('en-US', {\n    timeZone,\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    second: '2-digit',\n    hour12: false\n  }).formatToParts(date).reduce((acc, part) => {\n    if (part.type !== 'literal') acc[part.type] = part.value;\n    return acc;\n  }, {});\n\n  const offset = getEasternOffset(date);\n  return `${tzDate.year}-${tzDate.month}-${tzDate.day}T${tzDate.hour}:${tzDate.minute}:${tzDate.second}${offset}`;\n}\n\nfunction getEasternOffset(date) {\n  const options = { timeZone, timeZoneName: 'short' };\n  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);\n  const tzName = parts.find(p => p.type === 'timeZoneName').value;\n  return tzName.includes('EDT') ? '-04:00' : '-05:00';\n}\n\nfunction alignToPreviousSlot(date) {\n  const aligned = new Date(date);\n  const minutes = aligned.getMinutes();\n  aligned.setMinutes(minutes < 30 ? 0 : 30, 0, 0);\n  return aligned;\n}\n\nfunction alignToNextSlot(date) {\n  const aligned = new Date(date);\n  const minutes = aligned.getMinutes();\n  if (minutes > 0 && minutes <= 30) {\n    aligned.setMinutes(30, 0, 0);\n  } else if (minutes > 30) {\n    aligned.setHours(aligned.getHours() + 1);\n    aligned.setMinutes(0, 0, 0);\n  } else {\n    aligned.setMinutes(0, 0, 0);\n  }\n  return aligned;\n}\n\nconst splitEventIntoETBlocks = (event) => {\n  const blocks = [];\n\n  let current = alignToPreviousSlot(new Date(event.start.dateTime));\n  const eventEnd = alignToNextSlot(new Date(event.end.dateTime));\n\n  while (current < eventEnd) {\n    const blockEnd = new Date(current);\n    blockEnd.setMinutes(current.getMinutes() + intervalMinutes);\n\n    blocks.push({\n      start: formatToEastern(current),\n      end: formatToEastern(blockEnd)\n    });\n\n    current = blockEnd;\n  }\n\n  return blocks;\n};\n\nlet allBlocks = [];\nfor (const event of events) {\n  if (event.start?.dateTime && event.end?.dateTime) {\n    const blocks = splitEventIntoETBlocks(event);\n    allBlocks = allBlocks.concat(blocks);\n  }\n}\n\nreturn allBlocks.map(block => ({ json: block }));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f9297e8a-75dd-4f12-b0e1-d3fa372a7631",
+      "name": "Add Blocked Field",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        800,
+        1840
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1270be8-1d11-4086-8bc0-ae53c99507c1",
+              "name": "start",
+              "type": "string",
+              "value": "={{ $json.start }}"
+            },
+            {
+              "id": "1a5f24ff-7d0c-436d-bb0b-015fc0c85cb7",
+              "name": "end",
+              "type": "string",
+              "value": "={{ $json.end }}"
+            },
+            {
+              "id": "befe6645-c0c1-40eb-9ba6-eccf2a762247",
+              "name": "Blocked",
+              "type": "string",
+              "value": "Blocked"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "8ba70f94-e9e6-44aa-b0e7-9a5294634e0e",
+      "name": "Generate 30 Minute Timeslots",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        440,
+        2020
+      ],
+      "parameters": {
+        "jsCode": "const slots = [];\nconst slotMinutes = 30;\nconst timeZone = 'America/New_York';\nconst businessStartHour = 9;\nconst businessEndHour = 17;\n\n// Get offset like -04:00 or -05:00\nfunction getEasternOffset(date) {\n  const options = { timeZone, timeZoneName: 'short' };\n  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);\n  const tz = parts.find(p => p.type === 'timeZoneName')?.value || 'EST';\n  return tz.includes('EDT') ? '-04:00' : '-05:00';\n}\n\n// Format Date as ISO with Eastern offset\nfunction formatToEasternISO(date) {\n  const formatter = new Intl.DateTimeFormat('en-CA', {\n    timeZone,\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    second: '2-digit',\n    hour12: false,\n  });\n\n  const parts = formatter.formatToParts(date).reduce((acc, part) => {\n    if (part.type !== 'literal') acc[part.type] = part.value;\n    return acc;\n  }, {});\n\n  const offset = getEasternOffset(date);\n  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${offset}`;\n}\n\n// Convert a Date to the hour/minute of its Eastern time\nfunction getEasternTimeParts(date) {\n  const formatter = new Intl.DateTimeFormat('en-US', {\n    timeZone,\n    hour: '2-digit',\n    minute: '2-digit',\n    hour12: false,\n  });\n  const [hourStr, minStr] = formatter.format(date).split(':');\n  return { hour: parseInt(hourStr), minute: parseInt(minStr) };\n}\n\nconst now = new Date();\nconst endDate = new Date(now);\nendDate.setDate(now.getDate() + 7);\n\n// Set current time to 24 hours in the future\nconst current = new Date(now);\ncurrent.setHours(current.getHours() + 24);\n\n// Round to the next 30-minute block in Eastern time\nconst { minute } = getEasternTimeParts(current);\nif (minute < 30) {\n  current.setMinutes(30, 0, 0);\n} else {\n  current.setHours(current.getHours() + 1);\n  current.setMinutes(0, 0, 0);\n}\n\n// Generate 30-minute blocks only during business hours & weekdays\nwhile (current < endDate) {\n  const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday\n\n  // Skip weekends\n  if (dayOfWeek !== 0 && dayOfWeek !== 6) {\n    const { hour } = getEasternTimeParts(current);\n\n    if (hour >= businessStartHour && hour < businessEndHour) {\n      const start = new Date(current);\n      const end = new Date(start);\n      end.setMinutes(start.getMinutes() + slotMinutes);\n\n      slots.push({\n        start: formatToEasternISO(start),\n        end: formatToEasternISO(end),\n      });\n    }\n  }\n\n  current.setMinutes(current.getMinutes() + slotMinutes);\n}\n\nreturn slots.map(slot => ({ json: slot }));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3ea13a0a-d496-40b8-9321-6bc3df415191",
+      "name": "Combine My Calendar with All Slots",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        780,
+        2020
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "joinMode": "enrichInput2",
+        "fieldsToMatchString": "start, end"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ad57e0b4-43d0-4991-adc3-e325e2405e93",
+      "name": "Check if Calendar Blocked",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1100,
+        1820
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "af65c6c8-31c7-4f27-a073-cf7f72079882",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.Blocked }}",
+              "rightValue": "Blocked"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "6e427266-1f64-4492-b4c0-30d03d6a20de",
+      "name": "Return string of all available times",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1160,
+        2000
+      ],
+      "parameters": {
+        "jsCode": "const formatted = items.map(item => {\n  const start = item.json.start;\n  const end = item.json.end;\n  return `${start} - ${end}`;\n});\n\nconst combined = formatted.join(', ');\n\nreturn [\n  {\n    json: {\n      availableSlots: combined\n    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3f26c921-2d4c-4e8a-a551-801c2a94086a",
+      "name": "Get Availability",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        220,
+        1920
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6d34f9e2-4c43-4e0b-a54d-2c8076ee6fe0",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -420,
+        1160
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 520,
+        "height": 1000,
+        "content": "How to Use the Interview Scheduler Workflow in n8n\n________________________________________\n✨ Overview\nThis workflow allows candidates to schedule interviews by chatting with an AI assistant. It checks your Google Calendar availability, identifies free 30-minute weekday slots between 9am-5pm EST, and automatically books a meeting once details are confirmed.\n________________________________________\n⚡ Prerequisites\n1.\tOpenAI Account\no\tAPI Key with GPT-4o model access\n2.\tGoogle Account with Calendar Access\no\tYour calendar must be accessible via Google Calendar\n3.\tOAuth2 Credentials for Google Calendar API configured in n8n\n4.\tOpenAI Credentials configured in n8n\n________________________________________\n🔐 API Credentials Setup\nGoogle Calendar OAuth2:\n•\tCreate a project called n8n in google cloud console\n•\tGo to n8n > Credentials\n•\tCreate new Google Calendar OAuth2 API credentials\n•\tAuthorize your Google account (e.g., yourname@gmail.com)\nOpenAI:\n•\tGo to Credentials\n•\tCreate new OpenAI API credentials\n•\tEnter your OpenAI API key and give it a label (e.g., \"My OpenAI Key\")\n________________________________________\n🔧 How to Make It Yours\n✅ Update These Workflow Fields:\n1.\tGoogle Calendar Email\no\tReplace all instances of rbreen.ynteractive@gmail.com with your own Google Calendar email.\no\tThis appears in:\n\tGoogle Calendar Nodes\n\tToolWorkflow JSON for \"Run Get Availability\"\n2.\tGoogle Calendar OAuth2 Credential Name\no\tReplace credential name Google Calendar account with your own credential name.\n3.\tOpenAI Credential Name\no\tReplace OpenAi account with your own OpenAI credential name.\n4.\tWebhook URL / Chat Interface\no\tGo to the Candidate Chat node\no\tCopy the webhook URL\no\tShare this public link with users to start the chatbot\n5.\tSystem Message Instructions (Optional)\no\tYou can tweak the system message in the Interview Scheduler agent node to change tone, questions, or rules.\n6.\tCustom Branding (Optional)\no\tUpdate the title and subtitle in the Candidate Chat node under options\no\tYou can also replace the final message in Final Response to User with your own branding/tone\n________________________________________\n\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "07ef21ee-c02a-4145-a0fb-3ecc260ff585",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        280,
+        1220
+      ],
+      "webhookId": "0c8f9f17-f5f3-4b5d-85e7-071ced0213ae",
+      "parameters": {
+        "public": true,
+        "options": {}
+      },
+      "typeVersion": 1.1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "69e8aa1b-e404-44ed-aedc-7d8480e2383e",
+  "connections": {
+    "Parse to JSON": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Convert Output to JSON",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Final Output": {
+      "main": [
+        [
+          {
+            "node": "Convert Output to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond for More Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check day names": {
+      "ai_tool": [
+        [
+          {
+            "node": "Interview Scheduler",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Availability": {
+      "main": [
+        [
+          {
+            "node": "Check My Calendar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate 30 Minute Timeslots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Blocked Field": {
+      "main": [
+        [
+          {
+            "node": "Combine My Calendar with All Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check My Calendar": {
+      "main": [
+        [
+          {
+            "node": "Split Events into 30 min blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Interview Scheduler",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Convert Output to JSON",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interview Scheduler": {
+      "main": [
+        [
+          {
+            "node": "If Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Get Availability": {
+      "ai_tool": [
+        [
+          {
+            "node": "Interview Scheduler",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond for More Info": {
+      "main": [
+        []
+      ]
+    },
+    "Window Buffer Memory2": {
+      "ai_memory": [
+        [
+          {
+            "node": "Interview Scheduler",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Output to JSON": {
+      "main": [
+        [
+          {
+            "node": "Set Meeting with Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Response to User": {
+      "main": [
+        []
+      ]
+    },
+    "Set Meeting with Google": {
+      "main": [
+        [
+          {
+            "node": "Final Response to User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Calendar Blocked": {
+      "main": [
+        [
+          {
+            "node": "Return string of all available times",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Interview Scheduler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate 30 Minute Timeslots": {
+      "main": [
+        [
+          {
+            "node": "Combine My Calendar with All Slots",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Split Events into 30 min blocks": {
+      "main": [
+        [
+          {
+            "node": "Add Blocked Field",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine My Calendar with All Slots": {
+      "main": [
+        [
+          {
+            "node": "Check if Calendar Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

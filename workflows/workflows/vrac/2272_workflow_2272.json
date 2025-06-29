@@ -1,0 +1,522 @@
+{
+  "meta": {
+    "instanceId": "a2435d996b378e3a6fdef0468d70285e3aa0fbd0004de817bfc80e80afee4e7b"
+  },
+  "nodes": [
+    {
+      "id": "5fa5ccd8-81be-45a2-ac00-7ef28148c0c7",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        700,
+        460
+      ],
+      "parameters": {
+        "width": 1767.817629414989,
+        "height": 470.03830555074103,
+        "content": "## DROPCONTACT 250 BATCH ASYNCHRONOUSLY \n## 1500/HOUR REQUESTS\n**Double click** to edit me. [Guide](https://docs.n8n.io/workflows/sticky-notes/)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9c6826a3-ec94-4ff4-92a6-0ff7fa22349e",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1000,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "first_name"
+            },
+            {
+              "fieldToAggregate": "last_name"
+            },
+            {
+              "fieldToAggregate": "domain"
+            },
+            {
+              "fieldToAggregate": "phantom_linkedin"
+            },
+            {
+              "fieldToAggregate": "full_name"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c0d5b884-de58-42f3-bc50-0c7e6ca5e576",
+      "name": "PROFILES QUERY",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        560,
+        600
+      ],
+      "parameters": {
+        "query": "select first_name, last_name, domain, full_name\nfrom accounts a \nleft join profiles p on a.company_id = p.company_id \nwhere title = 'Bestuurder' and p.email is null and a.domain != ''\nand domain NOT IN ('gmail.com', 'hotmail.com', 'hotmail.be', 'hotmail%','outlook.com','telenet.be', 'live.be', 'skynet.be','SKYNET%', 'yahoo.com' , 'yahoo%', 'msn%', 'hotmail', 'belgacom%') and dropcontact_found is null \nlimit 1000\n",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "pYryZTyzA44MBOiN",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 2.3
+    },
+    {
+      "id": "ddf11e8d-f1db-406c-9c2a-ab5a510fee47",
+      "name": "BULK DROPCONTACT REQUESTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "maxTries": 3,
+      "position": [
+        1360,
+        620
+      ],
+      "parameters": {
+        "url": "https://api.dropcontact.io/batch",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ $json.toJsonString()}}\n",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Access-Token",
+              "value": "apiKey"
+            }
+          ]
+        },
+        "nodeCredentialType": "dropcontactApi"
+      },
+      "credentials": {
+        "dropcontactApi": {
+          "id": "kUzEc345AiEZDjK7",
+          "name": "Dropcontact Willow account"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 600
+    },
+    {
+      "id": "606e2898-eb44-46c2-9576-8e3cc1bd2578",
+      "name": "Loop Over Items2",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        780,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 250
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ace20caa-3c9b-432a-a572-6bad48181347",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "onError": "continueRegularOutput",
+      "position": [
+        1940,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2c581721-a399-4d48-98a1-cee82246c4f4",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "onError": "continueErrorOutput",
+      "maxTries": 2,
+      "position": [
+        2100,
+        600
+      ],
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "profiles",
+          "cachedResultName": "profiles"
+        },
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "columns": {
+          "value": {
+            "email": "={{ $json.email[0].email }}",
+            "phone": "={{ $json.phone }}",
+            "full_name": "={{ $json.custom_fields.full_name }}",
+            "dropcontact_found": "={{ true }}",
+            "email_qualification": "={{ $json.email[0].qualification }}"
+          },
+          "schema": [
+            {
+              "id": "company_id",
+              "type": "number",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "company_id",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "create_date",
+              "type": "dateTime",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "create_date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "phone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "first_name",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "first_name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_name",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "last_name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "start_date_raw",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "start_date_raw",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "full_name",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "full_name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "seniority",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "seniority",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "email",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_qualification",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "email_qualification",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "dropcontact_found",
+              "type": "boolean",
+              "display": true,
+              "required": false,
+              "displayName": "dropcontact_found",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "full_name"
+          ]
+        },
+        "options": {
+          "replaceEmptyStrings": true
+        },
+        "operation": "update"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "pYryZTyzA44MBOiN",
+          "name": "Postgres account"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 2.3,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "7e94c87d-3f83-4fd1-877d-3463dce3cdd1",
+      "name": "BULK DROPCONTACT DOWNLOAD",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueErrorOutput",
+      "position": [
+        1740,
+        620
+      ],
+      "parameters": {
+        "url": "=https://api.dropcontact.io/batch/{{ $json.request_id }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "dropcontactApi"
+      },
+      "credentials": {
+        "dropcontactApi": {
+          "id": "kUzEc345AiEZDjK7",
+          "name": "Dropcontact Willow account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "17aab456-72dc-482d-b5e3-b3dfb3a3b3f7",
+      "name": "Wait2",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1540,
+        620
+      ],
+      "webhookId": "de669d58-95c5-480e-9acc-17c396859fcf",
+      "parameters": {
+        "amount": 600
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "148cec0c-985b-4c82-8835-fff8eacf6e38",
+      "name": "DATA TRANSFORMATION",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1180,
+        620
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "python",
+        "pythonCode": "import json\n\n## Load & access the existing JSON data\nfor item in _input.all():\n  data = item.json \n\n  # Define the output data structure\n  output_data = {\"data\": [], \"siren\": True}\n\n  # Unpack data from the single element list\n  first_names = data[\"first_name\"]\n  last_names = data[\"last_name\"]\n  domain = data[\"domain\"]\n  full_name = data[\"full_name\"]\n\n    # Combine data into a list of dictionaries\n  transformed_data = []\n  for i, (first_name, last_name, domain_name, full_name_value) in enumerate(zip(first_names, last_names, domain, full_name)):\n    transformed_data.append({\n      \"first_name\": first_name,\n      \"last_name\": last_name,\n      \"website\": domain_name,\n      \"custom_fields\": {\n        \"full_name\": full_name_value}\n    })\n\n  output_data[\"data\"] = transformed_data\n\n  return output_data \n\n"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b233abfe-cfae-474a-b86d-29e56e1f3ac7",
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1740,
+        820
+      ],
+      "parameters": {
+        "text": "Dropcontact Credits issue: url ",
+        "user": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "select": "user",
+        "otherOptions": {}
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "d4e90677-89c9-418b-b618-f751b797d395",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        380,
+        600
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "BULK DROPCONTACT DOWNLOAD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "DATA TRANSFORMATION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROFILES QUERY": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "PROFILES QUERY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DATA TRANSFORMATION": {
+      "main": [
+        [
+          {
+            "node": "BULK DROPCONTACT REQUESTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BULK DROPCONTACT DOWNLOAD": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BULK DROPCONTACT REQUESTS": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

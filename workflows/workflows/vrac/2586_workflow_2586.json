@@ -1,0 +1,279 @@
+{
+  "nodes": [
+    {
+      "id": "396bb28b-e40d-4bea-aa80-4abd04db045a",
+      "name": "Friday 8pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        100,
+        120
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                5
+              ],
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "993f0d31-5639-4cea-b2f8-d1a41ecdeb83",
+      "name": "Create Meal Plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1080,
+        120
+      ],
+      "parameters": {
+        "url": "={{ $('Config').first().json.mealieBaseUrl }}/api/households/mealplans",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "jsonBody": "={{ $json }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "oVwF1hVdy3Srvi9P",
+          "name": "Mealie Header Auth"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "ad53512d-7246-49f4-a86b-f258b7c1c47e",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        100,
+        320
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "c0d1d7e0-9411-4e6a-871a-0374b8a9f5db",
+      "name": "Get Recipes",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        640,
+        120
+      ],
+      "parameters": {
+        "url": "={{ $json.mealieBaseUrl }}/api/recipes",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "perPage",
+              "value": "100"
+            },
+            {
+              "name": "categories",
+              "value": "={{ $json.mealieCategoryId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "oVwF1hVdy3Srvi9P",
+          "name": "Mealie Header Auth"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "2f9757fc-77f5-4bda-ae2e-7088ea5c114d",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        380,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cd2665dd-b505-41e4-936d-cfa2de7bd09b",
+              "name": "numberOfRecipes",
+              "type": "number",
+              "value": 5
+            },
+            {
+              "id": "e09da5c5-3f0d-4cd3-909d-e3df2888abde",
+              "name": "offsetPlanDays",
+              "type": "number",
+              "value": 3
+            },
+            {
+              "id": "80e95139-83df-45ae-99a0-fc50d3e9475f",
+              "name": "mealieCategoryId",
+              "type": "string",
+              "value": "6ec172b7-a87d-4877-8fe3-34cecc20f2c5"
+            },
+            {
+              "id": "f511e874-c373-4648-9e49-120367474d6d",
+              "name": "mealieBaseUrl",
+              "type": "string",
+              "value": "http://192.168.1.5:9925"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "fed805ea-0580-444d-8312-a68b25e91bbd",
+      "name": "Generate Random Items",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        860,
+        120
+      ],
+      "parameters": {
+        "jsCode": "const numberOfRecipes = $('Config').first().json.numberOfRecipes;\nconst offsetPlanDays = $('Config').first().json.offsetPlanDays;\nconst items = $input.first().json.items;\n\nlet planFirstDate = new Date();\nplanFirstDate.setDate(planFirstDate.getDate() + offsetPlanDays);\n\nconst recipeList = [];\nconst randomNums = [];\nlet currentItem = 0;\n\nwhile (recipeList.length < numberOfRecipes) {\n  const randomNum = Math.floor(Math.random() * Math.floor(items.length));\n\n  if (!randomNums.includes(randomNum)) {\n    const thisRecipe = items[randomNum];\n\n    const newDate = new Date(planFirstDate);\n    newDate.setDate(planFirstDate.getDate() + currentItem);\n  \n    const planDate = [\n      newDate.getFullYear(),\n      ('0' + (newDate.getMonth() + 1)).slice(-2),\n      ('0' + newDate.getDate()).slice(-2)\n    ].join('-');\n  \n    const planDay = {\n      \"date\": planDate,\n      \"entryType\": \"dinner\",\n      \"recipeId\": thisRecipe.id,\n      \"name\": thisRecipe.name\n    };\n\n    currentItem++;\n    recipeList.push(planDay);\n    randomNums.push(randomNum);\n  }\n}\n\nreturn recipeList;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f440ce9d-cc27-4982-a0bd-b0ce2e5217d9",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        40,
+        -60
+      ],
+      "parameters": {
+        "color": 4,
+        "height": 340,
+        "content": "## Trigger\nSet the trigger to run when you like"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2bac2f08-2969-4f47-9fce-0e7de416cd09",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        280,
+        -60
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 300,
+        "height": 340,
+        "content": "## Update this Config\nSet the base Url of your Mealie instance\nSet number of recipes to generate and number of days to offset the plan (0 will start today).\nGrab a category id from Mealie (or leave blank for all categories)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a2850e39-c25f-4210-8f9e-a657c0c63bf5",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        40,
+        -280
+      ],
+      "parameters": {
+        "width": 540,
+        "height": 220,
+        "content": "## Get started\n* Set up a credential for your Mealie API token\n* Apply the credential to the 2 Http request nodes\n* Set schedule trigger and desired config"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "20d7301c-8946-45c3-8f5f-fbe2fc80cf37",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        580,
+        -60
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 660,
+        "height": 340,
+        "content": "## Workflow logic\n* Get all recipes from Mealie (within category if supplied)\n* Randomly pick out the number set in the config\n* Create dinner meal plans for the upcoming days"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Recipes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Friday 8pm": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recipes": {
+      "main": [
+        [
+          {
+            "node": "Generate Random Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Random Items": {
+      "main": [
+        [
+          {
+            "node": "Create Meal Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Test workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

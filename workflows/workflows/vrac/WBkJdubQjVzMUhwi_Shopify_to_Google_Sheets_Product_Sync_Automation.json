@@ -1,0 +1,896 @@
+{
+  "id": "WBkJdubQjVzMUhwi",
+  "meta": {
+    "instanceId": "dec9665c2881b1ce168445537106c667ef9ec805212b046e3d537c8cf9badb2b"
+  },
+  "name": "Shopify to Google Sheets Product Sync Automation",
+  "tags": [
+    {
+      "id": "lw2o8Nrkj1WPXBN9",
+      "name": "template",
+      "createdAt": "2023-12-20T00:14:27.348Z",
+      "updatedAt": "2023-12-20T00:14:27.348Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "b2a5a0ac-4ce8-4d81-8d7f-01c0e5e35fd7",
+      "name": "Wait1",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1520,
+        380
+      ],
+      "webhookId": "93996a89-7e6c-4f08-9e42-eceb160a7d89",
+      "parameters": {
+        "unit": "seconds",
+        "amount": 10
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "681361ff-0648-46bd-bff2-2f4c4c17624a",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1620,
+        180
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "1836d799-a821-44c0-b1a7-7d9354afccd4",
+      "name": "Shopify get products",
+      "type": "n8n-nodes-base.graphql",
+      "position": [
+        320,
+        200
+      ],
+      "parameters": {
+        "query": "=query getProducts($first: Int = {{ $json.batchsize }}, $after: String = \"{{ $json.endCursor }}\") {\n  products(first: $first, after: $after) {\n    edges {\n      node {\n        title\n        tags\n        description\n        variants(first: 1) {\n          edges {\n            node {\n              price\n            }\n          }\n        }\n      }\n    }\n    pageInfo {\n      hasNextPage\n      endCursor\n    }\n  }\n}\n",
+        "endpoint": "https://test-store.myshopify.com/admin/api/2024-01/graphql.json",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "m0Fan0K6zdS2cpQq",
+          "name": "shopify test store"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "32a79711-c802-44c8-b188-250a782633c0",
+      "name": "Split output",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        760,
+        200
+      ],
+      "parameters": {
+        "language": "python",
+        "pythonCode": "new_output = []\nfor item in _input.all():\n    products = item.json['data']['products']['edges']\n    for product in products:\n        new_item = {\n            \"data\": {\n                \"product\": product['node']\n            }\n        }\n        new_output.append(new_item)\nreturn new_output"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "c7457a0b-9381-4e96-a458-33bf43f2dce1",
+      "name": "Check if there is next page",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1300,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "fd562f28-7126-4f06-8250-6b3a4eb4e481",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.data.products.pageInfo.hasNextPage }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cced491b-b8b5-4109-8bd0-3d51fe0f0b5a",
+      "name": "writing first product details",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -140,
+        380
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "tag": "={{ $json.data.products.edges[0].node.tags }}",
+            "price": "={{ $json.data.products.edges[0].node.variants.edges[0].node.price }}",
+            "title": "={{ $json.data.products.edges[0].node.title }}",
+            "descreption": "={{ $json.data.products.edges[0].node.description }}"
+          },
+          "schema": [
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "descreption",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "descreption",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tag",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "tag",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "price",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "price",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "title"
+          ]
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1YnGJD7AxV1iiQ-LcxOz3MnTLxGNSC6BBh-2Bh3Yitw0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit?usp=drivesdk",
+          "cachedResultName": "template test"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pmrAlq3hgPc4cCvQ",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "a72b4230-d242-4ffa-a388-fb3580e66300",
+      "name": "Set cursor",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1420,
+        740
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "endCursor",
+              "stringValue": "={{ $('Shopify get products').item.json.data.products.pageInfo.endCursor }}"
+            },
+            {
+              "name": "=batchsize",
+              "stringValue": "={{ $('Code').item.json.batchsize }}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "55a6cb5d-96d0-4577-b74f-d718de9d07cb",
+      "name": "writing remaning product info to google sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1020,
+        200
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "tag": "={{ $json.data.product.tags }}",
+            "price": "={{ $json.data.product.variants.edges[0].node.price }}",
+            "title": "={{ $json.data.product.title }}",
+            "descreption": "={{ $json.data.product.description }}"
+          },
+          "schema": [
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "descreption",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "descreption",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tag",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "tag",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "price",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "price",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "title"
+          ]
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1YnGJD7AxV1iiQ-LcxOz3MnTLxGNSC6BBh-2Bh3Yitw0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit#gid=0",
+          "cachedResultName": "template test"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pmrAlq3hgPc4cCvQ",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "a24c4e2a-482f-43d4-8c48-927427a430c0",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -1300,
+        520
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "daysInterval": 0,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "3a9d27fa-0840-4fc1-9b67-aad2f89f479b",
+      "name": "update Curser",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        640,
+        0
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "tracker": "cursor",
+            "endCursor": "={{ $json.data.products.pageInfo.endCursor }}"
+          },
+          "schema": [
+            {
+              "id": "tracker",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "tracker",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "endCursor",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "endCursor",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": true,
+              "required": false,
+              "displayName": "row_number",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "tracker"
+          ]
+        },
+        "options": {},
+        "operation": "update",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 334929034,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit#gid=0",
+          "cachedResultName": "Curser"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1YnGJD7AxV1iiQ-LcxOz3MnTLxGNSC6BBh-2Bh3Yitw0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit#gid=0",
+          "cachedResultName": "Shopify Product Sync test"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pmrAlq3hgPc4cCvQ",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "a7c1f97c-d88f-457d-9213-36300d277f4b",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -540,
+        520
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "32b5f953-ae6c-4c50-ac47-591880738d0f",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.endCursor }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "23f62f9c-ef85-4e25-9d94-83a1d899ecf8",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        100,
+        540
+      ],
+      "parameters": {
+        "jsCode": "let mergedJson = {};\n\ntry {\n    const batch_size = $(\"BatchSize\").all(0, 0);\n    if (batch_size.length > 0 && batch_size[0].json) {\n        Object.assign(mergedJson, batch_size[0].json);\n    }\n} catch (error) {\n    console.log(\"BatchSize data not available\");\n}\n\nlet endCursorFound = false;\ntry {\n    const last_cursor = $(\"LastCursor\").all(0, 0);\n    if (last_cursor.length > 0 && last_cursor[0].json) {\n        Object.assign(mergedJson, last_cursor[0].json);\n        if (last_cursor[0].json.endCursor) {\n            mergedJson.endCursor = last_cursor[0].json.endCursor;\n            endCursorFound = true;\n        }\n    }\n} catch (error) {\n    console.log(\"LastCursor data not available\");\n}\n\nif (!endCursorFound) {\n    try {\n        const shopify_initial = $(\"shopify-initial\").all(0, 0);\n        if (shopify_initial.length > 0 && shopify_initial[0].json && shopify_initial[0].json.data && shopify_initial[0].json.data.products && shopify_initial[0].json.data.products.pageInfo) {\n            mergedJson.endCursor = shopify_initial[0].json.data.products.pageInfo.endCursor;\n        }\n    } catch (error) {\n        console.log(\"Shopify data not available\");\n    }\n}\n\nif (Object.keys(mergedJson).length === 0 || mergedJson.hasOwnProperty('error')) {\n    return [{ json: { error: \"No data available. Ensure relevant nodes have been executed.\" } }];\n}\n\nreturn [{ json: mergedJson }];"
+      },
+      "executeOnce": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "f1262f15-757f-4cc2-9453-fed17ad66b56",
+      "name": "BatchSize",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1080,
+        520
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "batchsize",
+              "type": "numberValue",
+              "numberValue": "100"
+            }
+          ]
+        },
+        "include": "selected",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "e885b0e7-e435-40ae-be21-77fd992c3114",
+      "name": "LastCursor",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -720,
+        520
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 334929034,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit#gid=0",
+          "cachedResultName": "Curser"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1YnGJD7AxV1iiQ-LcxOz3MnTLxGNSC6BBh-2Bh3Yitw0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1I6JnP8ugqmMD5ktJlNB84J1MlSkoCHhAEuCofSa3OSM/edit#gid=0",
+          "cachedResultName": "Shopify Product Sync test"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pmrAlq3hgPc4cCvQ",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ae3cf866-8695-4b63-b631-a6b00e29c7cb",
+      "name": "shopify-initial",
+      "type": "n8n-nodes-base.graphql",
+      "position": [
+        -300,
+        380
+      ],
+      "parameters": {
+        "query": "=query getProducts($first: Int = 1) {\n  products(first: $first) {\n    edges {\n      node {\n        title\n        tags\n        description\n        variants(first: 1) {\n          edges {\n            node {\n              price\n            }\n          }\n        }\n      }\n    }\n    pageInfo {\n      hasNextPage\n      endCursor\n    }\n  }\n}\n",
+        "endpoint": "https://test-store-collection.myshopify.com/admin/api/2024-01/graphql.json",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "m0Fan0K6zdS2cpQq",
+          "name": "shopify test store"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8aab80ca-1a54-4d02-a8e8-37d037a12132",
+      "name": "Check cursor is not empty",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        420,
+        20
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "329a4250-3fe7-4c73-8918-d41f7b38ff5a",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.data.products.pageInfo.endCursor }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9e7c2e36-71f6-4fdf-a3b9-8aa3bf02d09b",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1500,
+        -400
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 352.8896103896103,
+        "height": 295.09740259740255,
+        "content": "This workflow automates the synchronization of product data from a Shopify store to a Google Sheets document, ensuring seamless management and tracking. It retrieves product details such as title, tags, description, and price from Shopify via GraphQL queries. The outcome is a comprehensive list of products neatly organized in Google Sheets for easy access and analysis."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fbf62e09-3598-4f5c-b83a-a8b3e5371afb",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1420,
+        340
+      ],
+      "parameters": {
+        "width": 262.2077922077919,
+        "height": 343.21428571428567,
+        "content": "Schedule Trigger: Sets the timing for the automation to run, ensuring regular updates. Currently set to trigger every day at 7:00 AM"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "47abe6ba-a7de-410e-b634-8ad248ec7155",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1140,
+        360
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 275.1623376623376,
+        "height": 411.6883116883117,
+        "content": "BatchSize: Defines the number of products to fetch from Shopify at a time, optimizing data retrieval. Currently set to 100, but it can be adjusted to a maximum of 250 for a single run"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6415976b-5fa5-4cd4-aa86-58eb9749a878",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -820,
+        260
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 275.16233766233773,
+        "height": 419.0909090909093,
+        "content": "LastCursor: Checks if the last cursor data is already present in Google Sheets to facilitate incremental data fetching. This ensures that the synchronization process does not start from the beginning each time, optimizing efficiency by picking up where it left off"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6a15e240-111e-4c7d-a865-2484a7a6ff0c",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -380,
+        -160
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 450.9740259740258,
+        "height": 705.941558441558,
+        "content": "Shopify-initial: Fetches the initial set of products from the Shopify store to start the synchronization process. This node will only run once if there is no cursor found in the previous node, which retrieves the cursor and the first set of products"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "71640487-d3cf-4ede-8677-093108770720",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -160,
+        560
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 416.49350649350646,
+        "height": 402.4350649350655,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nThis code node merges data from different sources (BatchSize, LastCursor, and Shopify-initial) to ensure the synchronization process starts efficiently and picks up where it left off. It checks for available data and retrieves the last cursor position from Google Sheets to facilitate incremental data fetching."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a13069b8-36f9-4604-895e-55c51ae3be2c",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "width": 304.7727272727272,
+        "height": 330.2597402597403,
+        "content": "\n\n\n\n\n\n\n\n\n\nThe \"Split output\" node acts as a bridge between data retrieval and subsequent processing nodes. Since the Shopify node fetches batches of 100 results at a time, this node splits those batches into individual product entries, ensuring seamless processing and storage of each product's details in subsequent workflow steps"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8c1401ad-e7be-47a9-b01d-3606b9f20bf0",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1400,
+        620
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 388.0519480519479,
+        "height": 367.27272727272714,
+        "content": "Set cursor: Updates the cursor for the next page of products to fetch from Shopify."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a5d3c62c-1bf3-4bc7-9e2b-1b5883b385d1",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -32.17532467532425,
+        20
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 428.7662337662332,
+        "height": 342.79220779220765,
+        "content": "The GraphQL query within this node is crafted to extract essential product details such as title, description, tags, and price. This query can be customized to fetch additional product information as needed for specific synchronization requirements."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c640732c-55b5-4f2e-bb64-106c440b0abc",
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "shopify-initial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Shopify get products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Set cursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BatchSize": {
+      "main": [
+        [
+          {
+            "node": "LastCursor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LastCursor": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set cursor": {
+      "main": [
+        [
+          {
+            "node": "Shopify get products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split output": {
+      "main": [
+        [
+          {
+            "node": "writing remaning product info to google sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "shopify-initial": {
+      "main": [
+        [
+          {
+            "node": "writing first product details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "BatchSize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify get products": {
+      "main": [
+        [
+          {
+            "node": "Split output",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check cursor is not empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check cursor is not empty": {
+      "main": [
+        [
+          {
+            "node": "update Curser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if there is next page": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "writing first product details": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "writing remaning product info to google sheets": {
+      "main": [
+        [
+          {
+            "node": "Check if there is next page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

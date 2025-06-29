@@ -1,0 +1,305 @@
+{
+  "id": "PRQhetYFkuhxntVH",
+  "meta": {
+    "instanceId": "558d88703fb65b2d0e44613bc35916258b0f0bf983c5d4730c00c424b77ca36a",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Matomo Analytics Report",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "fd35d612-09a6-4dd3-836b-53d03b75f344",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        120,
+        360
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "c8169606-3abd-4dd3-bd35-fdc0296fc0e1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        120,
+        160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "760a87e3-ed8f-4b1e-a46b-4ceb635020d4",
+      "name": "Get data from Matomo",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        380,
+        260
+      ],
+      "parameters": {
+        "url": "https://shrewd-lyrebird.pikapod.net/index.php",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "module",
+              "value": "API"
+            },
+            {
+              "name": "method",
+              "value": "Live.getLastVisitsDetails"
+            },
+            {
+              "name": "idSite",
+              "value": "3"
+            },
+            {
+              "name": "period",
+              "value": "range"
+            },
+            {
+              "name": "date",
+              "value": "last30"
+            },
+            {
+              "name": "format",
+              "value": "JSON"
+            },
+            {
+              "name": "segment",
+              "value": "visitCount>3"
+            },
+            {
+              "name": "filter_limit",
+              "value": "100"
+            },
+            {
+              "name": "showColumns",
+              "value": "actionDetails,visitIp,visitorId,visitCount"
+            },
+            {
+              "name": "token_auth",
+              "value": "{insert your auth token}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "f9e9a099-3131-4320-8a86-b9add4e43096",
+      "name": "Parse data from Matomo",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        580,
+        260
+      ],
+      "parameters": {
+        "jsCode": "// Get input data\nconst items = $input.all();\n\n// Format the visitor data into a clear prompt\nconst visitorData = items.map(item => {\n  const visit = item.json;\n  \n  const visitorActions = visit.actionDetails.map(action => \n    `  - Page ${action.pageviewPosition}: ${action.pageTitle}\\n    URL: ${action.url}\\n    Time Spent: ${action.timeSpentPretty}`\n  ).join('\\n');\n\n  return `- Visitor (ID: ${visit.visitorId}):\\n  Visit Count: ${visit.visitCount}\\n${visitorActions}`;\n}).join('\\n\\n');\n\n// Create the prompt\nconst prompt = `Please analyze this visitor data:\\n\\n${visitorData}\\n\\nPlease provide insights on:\\n1. Common visitor paths\\n2. Popular pages\\n3. User engagement patterns\\n4. Recommendations for improvement`;\n\n// Return formatted for LLaMA\nreturn [{\n  json: {\n    messages: [\n      {\n        role: \"user\",\n        content: prompt\n      }\n    ]\n  }\n}];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "387832ee-8397-43f8-bf62-846e4a7a20d0",
+      "name": "Send data to A.I. for analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        760,
+        260
+      ],
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"model\": \"meta-llama/llama-3.1-70b-instruct:free\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are an SEO expert. This is data of visitors who have visited my site more then 3 times and the pages they have visited. Can you give me insights into this data:{{ encodeURIComponent($json.messages[0].content)}}\" \n    }\n  ]\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "WY7UkF14ksPKq3S8",
+          "name": "Header Auth account 2"
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "7ee29949-550e-4f3a-8420-49ca2608bbeb",
+      "name": "Store results in Baserow",
+      "type": "n8n-nodes-base.baserow",
+      "position": [
+        1060,
+        260
+      ],
+      "parameters": {
+        "tableId": 643,
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 6261,
+              "fieldValue": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "fieldId": 6262,
+              "fieldValue": "={{ $json.choices[0].message.content }}"
+            },
+            {
+              "fieldId": 6263,
+              "fieldValue": "Your blog name"
+            }
+          ]
+        },
+        "operation": "create",
+        "databaseId": 121
+      },
+      "credentials": {
+        "baserowApi": {
+          "id": "8w0zXhycIfCAgja3",
+          "name": "Baserow account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "684ca1c9-97c3-4464-8ce6-aa6019db0c04",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        80,
+        -360
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 615,
+        "height": 289,
+        "content": "## Send Matomo analytics to A.I. and save results to baserow\n\nThis workflow will check for visitors who have visited more than 3 times. It will take this week's data and compare it to last week's data and give SEO suggestions.\n\n[Watch youtube tutorial here](https://www.youtube.com/watch?v=hGzdhXyU-o8)\n\n[Get my SEO A.I. agent system here](https://2828633406999.gumroad.com/l/rumjahn)\n\n[💡 You can read more about this workflow here](https://rumjahn.com/how-to-create-an-a-i-agent-to-analyze-matomo-analytics-using-n8n-for-free/)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "29723224-416e-46b4-a498-90888eb9a41b",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        320,
+        -20
+      ],
+      "parameters": {
+        "width": 224.51612903225822,
+        "height": 461.4193548387107,
+        "content": "## Get Matomo Data\n \n1. Enter your Matomo API key at the bottom\n2. Navigate to Administration > Personal > Security > Auth tokens within your Matomo dashboard. Click on Create new token and provide a purpose for reference."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c694c855-c37a-4717-befd-d7a216f99e2d",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        700,
+        -20
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 225.99936321742769,
+        "height": 508.95792207792226,
+        "content": "## Send data to A.I.\n\nFill in your Openrouter A.I. credentials. Use Header Auth.\n- Username: Authorization\n- Password: Bearer {insert your API key}\n\nRemember to add a space after bearer. Also, feel free to modify the prompt to A.1."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fdd12783-0456-4fc7-8030-555f058f2fd2",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        960,
+        -20
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 331.32883116883124,
+        "height": 474.88,
+        "content": "## Send data to Baserow\n\nCreate a table first with the following columns:\n- Date\n- Note\n- Blog\n\nEnter the name of your website under \"Blog\" field."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "21a1d486-5bb8-40b9-9032-6ab22d8baebc",
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get data from Matomo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get data from Matomo": {
+      "main": [
+        [
+          {
+            "node": "Parse data from Matomo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse data from Matomo": {
+      "main": [
+        [
+          {
+            "node": "Send data to A.I. for analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send data to A.I. for analysis": {
+      "main": [
+        [
+          {
+            "node": "Store results in Baserow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get data from Matomo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

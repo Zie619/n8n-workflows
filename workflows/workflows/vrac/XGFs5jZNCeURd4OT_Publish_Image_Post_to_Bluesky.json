@@ -1,0 +1,383 @@
+{
+  "id": "XGFs5jZNCeURd4OT",
+  "meta": {
+    "instanceId": "c5e9c1178f3b42f080c51c81bcfa62e1fbd48abf38103a7a4cd8e15abc64df08",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Publish Image Post to Bluesky",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "afd666fc-8f79-488d-a295-4bfdd6883924",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        35,
+        260
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "d31bfe18-5acc-4f72-80d0-d85111dd62cc",
+      "name": "Create Bluesky Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        435,
+        260
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ $('Define Credentials').item.json.credentials }}",
+        "sendBody": true,
+        "specifyBody": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "514ac077-3c96-41f0-b178-afefe2f9faae",
+      "name": "Download Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1260,
+        260
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "67e77e91-3a53-44c3-a474-2cd3b4977cf2",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1580,
+        260
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map( item => ({\n    alt: \"-\",\n    image: {\n      ...item.json.blob\n    }\n}));"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b8540b04-afe8-4455-8fec-fcab5ffff1ae",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        640,
+        102.39520958083813
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 391.0892880786254,
+        "height": 335.5179928232044,
+        "content": "## Define Your Post Caption Here\nYou can set\n* the text caption of your post (max 300 characters)\n* image URLs (max of 4 images at 1MB each)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2a6e60ef-4042-4648-85bb-143d226aa736",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1100,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "photos"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5c3a6c2f-7b60-4448-9d85-4174e9f5f770",
+      "name": "Post to Bluesky",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1940,
+        260
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/com.atproto.repo.createRecord",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"repo\": \"{{ $('Create Bluesky Session').item.json.did }}\",\n  \"collection\": \"app.bsky.feed.post\",\n  \"record\": {\n      \"$type\": \"app.bsky.feed.post\",\n      \"text\": \"{{ $('Set Caption').item.json['Post Text'].trim()}}\",\n      \"createdAt\": \"{{ $now }}\",\n\"embed\": {\n\"$type\": \"app.bsky.embed.images\",\n\"images\":{{ $('Aggregate').item.json.data.toJsonString() }}\n}\n  }\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Create Bluesky Session').item.json.accessJwt }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "266ef5cb-18df-45b0-b5c4-59782e571d40",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        -2.994011976047659
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 418.7983637184758,
+        "height": 440.36620487216396,
+        "content": "## Set Bluesky Credentials\nYou'll need to set 2 values...\n1. _Identifier_ \nThis is your Bluesky username, e.g. \"username.bsky.social\"\n2. _App Password_\nThis is _not_ your sign-in password, but something created in [your Bluesky account](https://bsky.app/settings/app-passwords)\n\n\nA Bluesky session is then opened for image uploading and posting."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3a7fc037-02f6-4091-bcdc-5b22d43269ef",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1063.9520958083824,
+        160
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 814.7806424732389,
+        "height": 269.1258097879526,
+        "content": "### Handling image attachments\nBluesky doesn't attach images directly to the post, they're first individually uploaded [then embedded in the post](https://docs.bsky.app/docs/tutorials/creating-a-post#images-embeds)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "aa7796b3-9cc7-4219-85af-a9ae3613f891",
+      "name": "Define Credentials",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        235,
+        260
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "{\"credentials\":\n  {\n    \"identifier\": \"username.bsky.social\",\n    \"password\": \"XXXX-YYYY-ZZZZ-XXXX\"\n  }\n}"
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "4bcf77ef-b40e-485e-b444-659f77cf9d69",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1740,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eb2730e5-cad7-47f0-96d2-f2ae1dee6dd5",
+      "name": "Set Images",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        880,
+        260
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "{  \"photos\":[\n    {\n      \"url\":\"https://picsum.photos/800/600?random=234234\"\n    },\n    {\n      \"url\":\"https://picsum.photos/800/600?random=676855\"\n    },\n    {\n      \"url\":\"https://picsum.photos/800/600?random=4564\"\n    },\n    {\n      \"url\":\"https://picsum.photos/800/600?random=12124\"\n    }\n  ]}"
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "0d3a030e-1ac6-420d-a850-d267928f4072",
+      "name": "Post Image to Bluesky",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1420,
+        260
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/com.atproto.repo.uploadBlob",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "binaryData",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Create Bluesky Session').item.json.accessJwt }}"
+            }
+          ]
+        },
+        "inputDataFieldName": "data"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "31124777-ee35-4ceb-b0e7-75f7cef4b481",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        680,
+        -260
+      ],
+      "parameters": {
+        "width": 880.0000000000002,
+        "height": 207.9041916167665,
+        "content": "# Create a new post with images on Bluesky\nThis workflow will \n1. retrieve images from URLs you specify\n2. upload them 1 by 1 as blobs to BlueSky\n3. let you specify the basic text of a post\n3. use your Bluesky credentials to post to your feed"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f8e54515-c9ec-474d-aa2b-fe357cbd4775",
+      "name": "Set Caption",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        688,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6135981d-82d9-47bb-9eb5-ce9a4220f108",
+              "name": "Caption Text",
+              "type": "string",
+              "value": "Here is the amazing content of my post, max of 300 characters!"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "86d8df08-3f73-40a5-9c5b-d2ebda3f3b13",
+  "connections": {
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Post to Bluesky",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Download Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Images": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Caption": {
+      "main": [
+        [
+          {
+            "node": "Set Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Images": {
+      "main": [
+        [
+          {
+            "node": "Post Image to Bluesky",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Credentials": {
+      "main": [
+        [
+          {
+            "node": "Create Bluesky Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Image to Bluesky": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Bluesky Session": {
+      "main": [
+        [
+          {
+            "node": "Set Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Define Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

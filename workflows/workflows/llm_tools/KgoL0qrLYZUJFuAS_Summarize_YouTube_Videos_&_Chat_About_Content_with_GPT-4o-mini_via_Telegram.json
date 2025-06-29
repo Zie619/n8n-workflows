@@ -1,0 +1,594 @@
+{
+  "id": "KgoL0qrLYZUJFuAS",
+  "meta": {
+    "instanceId": "53cd73f110e7e1f0aa170e039c302b8f2a1790f1200f176610cac2d761dfa4b7"
+  },
+  "name": "Summarize YouTube Videos & Chat About Content with GPT-4o-mini via Telegram",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "a9cb4358-f9ec-4d81-9422-f1b7133f1f2a",
+      "name": "Split Transcript into Segments",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        800,
+        680
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "transcript"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "03650773-fd85-4ecb-a218-0d18e2f88e68",
+      "name": "Extract YouTube URL from Input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        580,
+        220
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ee42e4c-3cee-4934-97e7-64c96b5691ed",
+              "name": "youtubeUrl",
+              "type": "string",
+              "value": "={{ $json.chatInput || $json.query.url}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9b55683c-6b04-44e6-8af2-ef69a50e783a",
+      "name": "Extract Video ID from URL",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        580,
+        460
+      ],
+      "parameters": {
+        "language": "python",
+        "pythonCode": "# Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor item in _input.all():\n  item.json.myNewField = 1\nreturn _input.all()"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "8552bb5d-c857-4a4e-b97b-7482b5e97244",
+      "name": "gpt-4o-mini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1280,
+        960
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ZjnhmdYT28d52ebY",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5cea6925-cbf7-47a4-9a26-45f42f91c074",
+      "name": "Generate Summary with GPT-4o-mini",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1260,
+        760
+      ],
+      "parameters": {
+        "text": "=Please analyze the given text and create a structured summary following these guidelines:\n\n1. *General Summary*:\n   - Provide a concise overview of the main topic or purpose of the text in one paragraph.\n   - Focus on the essence of the content without excessive detail.\n\n2. *Key Moments*:\n   - List the most important points, events, or concepts from the text.\n   - Use bullet points for clarity.\n   - Keep each point short and focused.\n   - Highlight key terms using HTML bold tags (<b>term</b>).\n\n3. *Instructions (if applicable)*:\n   - If the text is a tutorial or instructional, list the steps in a clear order.\n   - Use numbered points for steps.\n   - If not applicable, state: \"This text does not contain instructions.\"\n\n4. *Format requirements*:\n   - Use markdown for headers (e.g., ## General Summary) and bullet points.\n   - Use HTML bold tags (<b>term</b>) for emphasis instead of markdown bold.\n   - Do not use tables; use simple text for lists or comparisons (e.g., \"Element: opis\").\n   - Ensure the message is simple and displays correctly in the Telegram app, avoiding unsupported features like nested lists or tables.\n\nHere is the text: {{ $json.concatenated_text }}",
+        "promptType": "define"
+      },
+      "typeVersion": 1.4
+    },
+    {
+      "id": "cba394e4-3ae3-4506-a1d9-7b8ffbdf5d93",
+      "name": "Concatenate Transcript Segments",
+      "type": "n8n-nodes-base.summarize",
+      "position": [
+        1000,
+        680
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "field": "text",
+              "separateBy": " ",
+              "aggregation": "concatenate"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c4b266bd-ab23-4823-8f2c-f12704bad58f",
+      "name": "Trigger on Telegram Message",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        360,
+        100
+      ],
+      "webhookId": "da4bfbb8-d077-4ea1-8d2d-08d408002213",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "57f22922-29fd-402e-b5c3-79cb133209cd",
+      "name": "Extract YouTube Transcript",
+      "type": "n8n-nodes-youtube-transcription-kasha.youtubeTranscripter",
+      "position": [
+        580,
+        680
+      ],
+      "parameters": {
+        "videoId": "={{ $json.videoId}}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "196453ad-8a63-4fbc-9dc3-37a1ee611857",
+      "name": "Send Summary via Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1660,
+        760
+      ],
+      "webhookId": "7159b4c8-984a-4c86-aa32-84e55d406745",
+      "parameters": {
+        "text": "={{ $json.text }}\n\n\n{{ $('Extract YouTube URL from Input').item.json.youtubeUrl}}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "MR8ATMwMsj9Ux1De",
+          "name": "YoutubeTranscriptChat"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "7754143b-9449-427c-9e04-e91434c4bc74",
+      "name": "Receive YouTube URL via Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        360,
+        320
+      ],
+      "webhookId": "8f0beaaf-b2c3-4148-8006-3b73fa146f60",
+      "parameters": {
+        "path": "8f0beaaf-b2c3-4148-8006-3b73fa146f60",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e9aaec56-2458-49a4-989e-eb4af03441b9",
+      "name": "Send Response to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1860,
+        760
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "bac178f2-be91-4f28-a024-d7dbef11c442",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        240,
+        1040
+      ],
+      "webhookId": "254daa2a-41b8-49f7-8781-52c7e573de70",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "MR8ATMwMsj9Ux1De",
+          "name": "YoutubeTranscriptChat"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "128b8e7a-9b56-4d98-a270-9f627f188b8b",
+      "name": "Retrieve Transcript from Google Docs",
+      "type": "n8n-nodes-base.googleDocs",
+      "position": [
+        1280,
+        520
+      ],
+      "parameters": {
+        "operation": "get",
+        "documentURL": "1-NdqfoVWfG1gpjltzJthw_MZeyAlGF3d3gYiIOBLbPk"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "N5fN0xR3iI0aCpms",
+          "name": "Google Docs account 2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d4377188-fac7-4d48-8ef4-747f9dd39cf0",
+      "name": "Update Transcript in Google Docs",
+      "type": "n8n-nodes-base.googleDocs",
+      "position": [
+        1480,
+        520
+      ],
+      "parameters": {
+        "actionsUi": {
+          "actionFields": [
+            {
+              "text": "={{ $json.content }}",
+              "action": "replaceAll",
+              "replaceText": "={{ $('Concatenate Transcript Segments').item.json.concatenated_text }}"
+            }
+          ]
+        },
+        "operation": "update",
+        "documentURL": "={{ $json.documentId }}"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "N5fN0xR3iI0aCpms",
+          "name": "Google Docs account 2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "25504013-f1e0-4556-a318-dbc482bde4fa",
+      "name": "Handle User Questions via AI",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        440,
+        1040
+      ],
+      "parameters": {
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "You are a tool for answering user questions about a YouTube video based on its transcript, which is available in a Google Docs document. Always check the transcript content before responding and ensure your answers are consistent with it."
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "562ce57d-600e-4bb2-a5a2-e6d005f840bd",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        380,
+        1220
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ZjnhmdYT28d52ebY",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "39ba9c74-a5c1-455e-b51b-9d36bce76635",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        540,
+        1260
+      ],
+      "parameters": {
+        "sessionKey": "={{ $json.message.text }}",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "1983dc09-f74f-4863-8b2c-9069bc6d64d9",
+      "name": "Google Docs2",
+      "type": "n8n-nodes-base.googleDocsTool",
+      "position": [
+        660,
+        1280
+      ],
+      "parameters": {
+        "operation": "get",
+        "documentURL": "1-NdqfoVWfG1gpjltzJthw_MZeyAlGF3d3gYiIOBLbPk"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "N5fN0xR3iI0aCpms",
+          "name": "Google Docs account 2"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4dfcba99-98e5-49e4-b8bd-31fb841a0985",
+      "name": "Send AI Response via Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        840,
+        1040
+      ],
+      "webhookId": "63608fd8-27e6-4b87-8021-95f7441b7ca1",
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "MR8ATMwMsj9Ux1De",
+          "name": "YoutubeTranscriptChat"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "29c22c9f-cca2-459f-8ef0-577c6e1ddd93",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 540,
+        "height": 500,
+        "content": "## Get a video URL\nGet video url via webhook or message\n\nFor this I recommend using a shortcut \nif you are using apple. \nThis allows you to share a video\ndirectly to n8n via webhook\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7a987035-42cc-4b52-b4e3-f75194173a58",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1200,
+        360
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 540,
+        "height": 360,
+        "content": "## Load memory \nUploading the transcript about the memory in google docs so you can then ask questions about the film"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2c7446b3-d7bf-4d0c-9b07-87e6ffaea0da",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        40,
+        900
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 1020,
+        "height": 600,
+        "content": "## Ask AI about video"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "0b743433-f1cf-4a8c-9c4e-4b7778d6391a",
+  "connections": {
+    "gpt-4o-mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Summary with GPT-4o-mini",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Docs2": {
+      "ai_tool": [
+        [
+          {
+            "node": "Handle User Questions via AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Handle User Questions via AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Handle User Questions via AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Video ID from URL": {
+      "main": [
+        [
+          {
+            "node": "Extract YouTube Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Summary via Telegram": {
+      "main": [
+        [
+          {
+            "node": "Send Response to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract YouTube Transcript": {
+      "main": [
+        [
+          {
+            "node": "Split Transcript into Segments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger on Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Extract YouTube URL from Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle User Questions via AI": {
+      "main": [
+        [
+          {
+            "node": "Send AI Response via Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract YouTube URL from Input": {
+      "main": [
+        [
+          {
+            "node": "Extract Video ID from URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Transcript into Segments": {
+      "main": [
+        [
+          {
+            "node": "Concatenate Transcript Segments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concatenate Transcript Segments": {
+      "main": [
+        [
+          {
+            "node": "Generate Summary with GPT-4o-mini",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Retrieve Transcript from Google Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive YouTube URL via Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract YouTube URL from Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Summary with GPT-4o-mini": {
+      "main": [
+        [
+          {
+            "node": "Send Summary via Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Transcript from Google Docs": {
+      "main": [
+        [
+          {
+            "node": "Update Transcript in Google Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

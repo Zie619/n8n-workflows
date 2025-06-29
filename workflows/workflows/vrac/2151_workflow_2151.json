@@ -1,0 +1,414 @@
+{
+  "nodes": [
+    {
+      "id": "2c3549c1-99c1-4255-a02d-2f454e6ced5e",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        560,
+        340
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "3380272e-5631-44aa-b7da-5e23e0966978",
+      "name": "Get all workflows with tag",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        780,
+        340
+      ],
+      "parameters": {
+        "filters": {
+          "tags": "sync-to-notion"
+        }
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "230",
+          "name": "n8n admin account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d702f13e-8e93-4142-87c7-49fbb6031e19",
+      "name": "Set fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1000,
+        340
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1744510d-7ed7-46d8-acd3-f975ab73f298",
+              "name": "active",
+              "type": "boolean",
+              "value": "={{ $json.active }}"
+            },
+            {
+              "id": "7e76f5dc-0c32-4b26-a289-975155b80112",
+              "name": "url",
+              "type": "string",
+              "value": "={{ $vars.instance_url }}workflow/{{ $json.id }}"
+            },
+            {
+              "id": "a7b069bf-8090-4dca-a432-f4fd7aa84e6f",
+              "name": "errorWorkflow",
+              "type": "boolean",
+              "value": "={{ !!$json.settings?.errorWorkflow }}"
+            },
+            {
+              "id": "0bff7a9b-0860-4552-b0f6-5fc279fc75d6",
+              "name": "name",
+              "type": "string",
+              "value": "={{ $json.name }}"
+            },
+            {
+              "id": "3065ee2f-d1bb-42b7-b341-7bb38b0f6720",
+              "name": "updatedAt",
+              "type": "string",
+              "value": "={{ $json.updatedAt }}"
+            },
+            {
+              "id": "ea9d39e4-50ca-4c79-b6ab-8b22cafd0257",
+              "name": "createdAt",
+              "type": "string",
+              "value": "={{ $json.createdAt }}"
+            },
+            {
+              "id": "265d66cd-1796-40eb-ae5b-dca8d1a91871",
+              "name": "envId",
+              "type": "string",
+              "value": "=internal-{{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "4527dc91-bad5-4214-b210-ea8f89504fbf",
+      "name": "Get notion page with workflow id",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1220,
+        340
+      ],
+      "parameters": {
+        "url": "https://api.notion.com/v1/databases/fa25c53eac9a416eab3961b2f5c0c647/query",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n    \"filter\": { \"and\": [\n    {\n        \"property\": \"env id\",\n        \"rich_text\": { \"contains\": \"{{ $json.envId }}\" }\n    }]\n}\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "1exvaAn7wzyBgkXZ",
+          "name": "Nik's Notion Cred"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "ced49644-b18f-4984-8dfd-199d88e3ded7",
+      "name": "Map fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1440,
+        340
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "49092f3a-7f42-4067-b8ea-1073ef1d1bb8",
+              "name": "input",
+              "type": "object",
+              "value": "={{ $('Set fields').item.json }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "b890dacf-2ac2-4802-b96a-5097119d35ee",
+      "name": "if newly added workflow",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1660,
+        340
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "88337d36-8cf6-4cd5-bec1-5123cf612934",
+              "operator": {
+                "type": "array",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.results }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "86edfe55-9a88-49ed-82de-df0c44a65d53",
+      "name": "Add to Notion",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1920,
+        240
+      ],
+      "parameters": {
+        "title": "={{ $json.input.name }}",
+        "options": {},
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "fa25c53e-ac9a-416e-ab39-61b2f5c0c647",
+          "cachedResultUrl": "https://www.notion.so/fa25c53eac9a416eab3961b2f5c0c647",
+          "cachedResultName": "Workflows maintained"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "env id|rich_text",
+              "textContent": "={{ $json.input.envId }}"
+            },
+            {
+              "key": "URL (dev)|url",
+              "urlValue": "={{ $json.input.url }}"
+            },
+            {
+              "key": "isActive (dev)|checkbox",
+              "checkboxValue": "={{ $json.input.active }}"
+            },
+            {
+              "key": "Workflow created at|date",
+              "date": "={{ $json.input.createdAt }}"
+            },
+            {
+              "key": "Workflow updatded at|date",
+              "date": "={{ $json.input.updatedAt }}"
+            },
+            {
+              "key": "Error workflow setup|checkbox",
+              "checkboxValue": "={{ $json.input.errorWorkflow }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "1exvaAn7wzyBgkXZ",
+          "name": "Nik's Notion Cred"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "9d547270-37dd-41ee-98b7-13001c954ffa",
+      "name": "Update in Notion",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1920,
+        440
+      ],
+      "parameters": {
+        "pageId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $json.results[0].url }}"
+        },
+        "options": {},
+        "resource": "databasePage",
+        "operation": "update",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "isActive (dev)|checkbox",
+              "checkboxValue": "={{ $json.input.active }}"
+            },
+            {
+              "key": "Name|title",
+              "title": "={{ $json.input.name }}"
+            },
+            {
+              "key": "URL (dev)|url",
+              "urlValue": "={{ $json.input.url }}"
+            },
+            {
+              "key": "isActive (dev)|checkbox",
+              "checkboxValue": "={{ $json.input.active }}"
+            },
+            {
+              "key": "Workflow updatded at|date",
+              "date": "={{ $json.input.updatedAt }}"
+            },
+            {
+              "key": "Error workflow setup|checkbox",
+              "checkboxValue": "={{ false }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "1exvaAn7wzyBgkXZ",
+          "name": "Nik's Notion Cred"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "9e4d88f6-aff8-48f1-9470-8b18aae7b83a",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        100
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 445.6145160912248,
+        "height": 193.68880276091272,
+        "content": "### 👨‍🎤 Setup\n1. Add your n8n api creds\n2. Add your notion creds\n3. create notion database with fields `env id` as `text`, `isActive (dev)` as `boolean`, `URL (dev)` as `url`, `Workflow created at` as `date`, `Workflow updated at` as `date`, `Error workflow setup` as `boolean`\n4. Add tag `sync-to-notion` to some workflows"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c212f6ec-22e3-41cf-b1a5-03f261715444",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1000,
+        540
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 368.0997057335963,
+        "height": 80,
+        "content": "### 👆 Set instance url instead of `{{ $vars.instance_url }}` (or set the env variable if you have that feature)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Map fields": {
+      "main": [
+        [
+          {
+            "node": "if newly added workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set fields": {
+      "main": [
+        [
+          {
+            "node": "Get notion page with workflow id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Get all workflows with tag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if newly added workflow": {
+      "main": [
+        [
+          {
+            "node": "Add to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update in Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all workflows with tag": {
+      "main": [
+        [
+          {
+            "node": "Set fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get notion page with workflow id": {
+      "main": [
+        [
+          {
+            "node": "Map fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,922 @@
+{
+  "meta": {
+    "instanceId": "03e9d14e9196363fe7191ce21dc0bb17387a6e755dcc9acc4f5904752919dca8"
+  },
+  "nodes": [
+    {
+      "id": "f97d8638-b081-4b09-9a83-265f8f99d2dc",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        460,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "2df27d6b-b89b-4af0-bdbf-4bc1e0dfc95a",
+      "name": "Global Variables",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        780,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6a8a0cbf-bf3e-4702-956e-a35966d8b9c5",
+              "name": "base_url",
+              "type": "string",
+              "value": "https://qualysapi.qg3.apps.qualys.com"
+            },
+            {
+              "id": "fa441581-e50e-4766-adb1-e791b3031aac",
+              "name": "newtimestamp",
+              "type": "string",
+              "value": "={{ $now.toUTC().toString() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "f280aaec-10e1-4d4f-9233-75130f7e2601",
+      "name": "Fetch Reports from Qualys",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1180,
+        460
+      ],
+      "parameters": {
+        "": "",
+        "url": "={{ $json.base_url }}/api/2.0/fo/report",
+        "method": "GET",
+        "options": {},
+        "sendBody": false,
+        "sendQuery": true,
+        "curlImport": "",
+        "infoMessage": "",
+        "sendHeaders": false,
+        "specifyQuery": "keypair",
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "list"
+            },
+            {
+              "name": "state",
+              "value": "Finished"
+            }
+          ]
+        },
+        "httpVariantWarning": "",
+        "nodeCredentialType": "qualysApi",
+        "provideSslCertificates": false
+      },
+      "credentials": {
+        "qualysApi": {
+          "id": "KdkmNjVYkDUzHAvw",
+          "name": "Qualys account"
+        }
+      },
+      "typeVersion": 4.2,
+      "extendsCredential": "qualysApi"
+    },
+    {
+      "id": "481066cc-8ac2-4382-9203-33b78f76af77",
+      "name": "Remove Already Processed Reports",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1700,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "10408e4e-fa76-4e35-bb23-5c34f698f4b4",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              },
+              "leftValue": "={{ $json.LAUNCH_DATETIME }}",
+              "rightValue": "={{ $('Get Last Timestamp').item.json[\"timestamp\"] || $today.minus({year: 50}).toUTC() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4dfdb8c9-ab22-48a4-ada0-d1edd30b9460",
+      "name": "Any Reports to Process?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1880,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "0d2bcbb2-e2b8-476e-8090-2ad350dd58d2",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.ID }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "94e678e8-669f-47ee-9530-4652ff11b99f",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        2120,
+        520
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "28dc3495-5af2-4b31-ac20-a3c7ee11f19f",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        2380,
+        540
+      ],
+      "webhookId": "9b6f1b01-42f9-4f51-b0f5-47262da9c9ca",
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "06e5daf2-334a-430e-8dbf-c8feeb20d015",
+      "name": "Update Timestamp",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        2380,
+        380
+      ],
+      "parameters": {
+        "operation": "update",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "n9Vh6tvRs0Y2y7V9",
+          "cachedResultName": "Timestamp Storage Qualys (#n9Vh6tvRs0Y2y7V9)"
+        },
+        "requestOptions": {},
+        "workflowObject": "={\n  \"name\": \"Timestamp Storage\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"assignments\": {\n          \"assignments\": [\n            {\n              \"id\": \"9ff52fe4-011e-4460-a8c5-a38bff47966a\",\n              \"name\": \"timestamp\",\n              \"value\": \"{{ $('Global Variables').item.json[\"newtimestamp\"] }}\",\n              \"type\": \"string\"\n            }\n          ]\n        },\n        \"includeOtherFields\": true,\n        \"options\": {}\n      },\n      \"id\": \"8903e1d5-e9cd-4694-94d8-502ecbe58ebe\",\n      \"name\": \"Set Timestamp\",\n      \"type\": \"n8n-nodes-base.set\",\n      \"typeVersion\": 3.3,\n      \"position\": [\n        1020,\n        220\n      ]\n    },\n    {\n      \"parameters\": {},\n      \"id\": \"ca615aab-24e4-4f25-81ad-3e697426c236\",\n      \"name\": \"Execute Workflow Trigger\",\n      \"type\": \"n8n-nodes-base.executeWorkflowTrigger\",\n      \"typeVersion\": 1,\n      \"position\": [\n        800,\n        220\n      ]\n    }\n  ],\n  \"connections\": {\n    \"Execute Workflow Trigger\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Set Timestamp\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {\n   \n  },\n  \"staticData\": null\n}\n"
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "61",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "387c0d2a-09e0-4227-8910-f0a30106787a",
+      "name": "Get Last Timestamp",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        980,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "workflowId": "n9Vh6tvRs0Y2y7V9"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6c0d8608-da13-4fa1-a612-aa43ac607af6",
+      "name": "XML",
+      "type": "n8n-nodes-base.xml",
+      "position": [
+        1340,
+        460
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "511d290e-5cad-4d34-b54c-de45b11dab45",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1520,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "REPORT_LIST_OUTPUT.RESPONSE.REPORT_LIST.REPORT"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "45f7c06b-63c0-4bae-b301-33633e751a61",
+      "name": "Create Case",
+      "type": "n8n-nodes-base.theHiveProject",
+      "position": [
+        2640,
+        540
+      ],
+      "parameters": {
+        "resource": "case",
+        "caseFields": {
+          "value": {
+            "tlp": 2,
+            "flag": false,
+            "tags": "Qualys Scan",
+            "title": "={{ $json.TITLE }}",
+            "description": "=- **ID:** {{ $json[\"ID\"] }}\n- **Type:** {{ $json[\"TYPE\"] }}\n- **User Login:** {{ $json[\"USER_LOGIN\"] }}\n- **Launch Datetime:** {{ $json[\"LAUNCH_DATETIME\"] }}\n- **Output Format:** {{ $json[\"OUTPUT_FORMAT\"] }}\n- **Size:** {{ $json[\"OUTPUT_FORMAT\"] }}\n- **Status:** {{ $json[\"STATUS\"][\"STATE\"] }}\n- **Expiration Datetime:** {{ $json[\"EXPIRATION_DATETIME\"] }}\n"
+          },
+          "schema": [
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": true,
+              "displayName": "Title",
+              "defaultMatch": false
+            },
+            {
+              "id": "description",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": true,
+              "displayName": "Description",
+              "defaultMatch": false
+            },
+            {
+              "id": "severity",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Low",
+                  "value": 1
+                },
+                {
+                  "name": "Medium",
+                  "value": 2
+                },
+                {
+                  "name": "High",
+                  "value": 3
+                },
+                {
+                  "name": "Critical",
+                  "value": 4
+                }
+              ],
+              "removed": true,
+              "required": false,
+              "displayName": "Severity (Severity of information)",
+              "defaultMatch": false
+            },
+            {
+              "id": "startDate",
+              "type": "dateTime",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Start Date",
+              "defaultMatch": false
+            },
+            {
+              "id": "endDate",
+              "type": "dateTime",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "End Date",
+              "defaultMatch": false
+            },
+            {
+              "id": "tags",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Tags",
+              "defaultMatch": false
+            },
+            {
+              "id": "flag",
+              "type": "boolean",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Flag",
+              "defaultMatch": false
+            },
+            {
+              "id": "tlp",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": false,
+              "required": false,
+              "displayName": "TLP (Confidentiality of information)",
+              "defaultMatch": false
+            },
+            {
+              "id": "pap",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "White",
+                  "value": 0
+                },
+                {
+                  "name": "Green",
+                  "value": 1
+                },
+                {
+                  "name": "Amber",
+                  "value": 2
+                },
+                {
+                  "name": "Red",
+                  "value": 3
+                }
+              ],
+              "removed": true,
+              "required": false,
+              "displayName": "PAP (Level of exposure of information)",
+              "defaultMatch": false
+            },
+            {
+              "id": "summary",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Summary",
+              "defaultMatch": false
+            },
+            {
+              "id": "status",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Duplicated",
+                  "value": "Duplicated",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "FalsePositive",
+                  "value": "FalsePositive",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "Indeterminate",
+                  "value": "Indeterminate",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "InProgress",
+                  "value": "InProgress",
+                  "description": "Stage: InProgress"
+                },
+                {
+                  "name": "New",
+                  "value": "New",
+                  "description": "Stage: New"
+                },
+                {
+                  "name": "Other",
+                  "value": "Other",
+                  "description": "Stage: Closed"
+                },
+                {
+                  "name": "TruePositive",
+                  "value": "TruePositive",
+                  "description": "Stage: Closed"
+                }
+              ],
+              "removed": true,
+              "required": false,
+              "displayName": "Status",
+              "defaultMatch": false
+            },
+            {
+              "id": "assignee",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Angel",
+                  "value": "angel@n8n.io"
+                },
+                {
+                  "name": "John Smith",
+                  "value": "john@n8n.io"
+                }
+              ],
+              "removed": true,
+              "required": false,
+              "displayName": "Assignee",
+              "defaultMatch": false
+            },
+            {
+              "id": "caseTemplate",
+              "type": "options",
+              "display": true,
+              "options": [],
+              "removed": true,
+              "required": false,
+              "displayName": "Case Template",
+              "defaultMatch": false
+            },
+            {
+              "id": "tasks",
+              "type": "array",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Tasks",
+              "defaultMatch": false
+            },
+            {
+              "id": "sharingParameters",
+              "type": "array",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Sharing Parameters",
+              "defaultMatch": false
+            },
+            {
+              "id": "observableRule",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "Observable Rule",
+              "defaultMatch": false
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": []
+        }
+      },
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "6O5aPdkMaQmc8I9B",
+          "name": "The Hive 5 account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b38d3176-2c87-4460-b22c-e08ccae93e44",
+      "name": "Download Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3060,
+        540
+      ],
+      "parameters": {
+        "": "",
+        "url": "={{ $('Global Variables').item.json.base_url }}/api/2.0/fo/report/",
+        "method": "GET",
+        "options": {},
+        "sendBody": false,
+        "sendQuery": true,
+        "curlImport": "",
+        "infoMessage": "",
+        "sendHeaders": false,
+        "specifyQuery": "keypair",
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "fetch"
+            },
+            {
+              "name": "id",
+              "value": "={{ $('Loop Over Items').item.json.ID }}"
+            }
+          ]
+        },
+        "httpVariantWarning": "",
+        "nodeCredentialType": "qualysApi",
+        "provideSslCertificates": false
+      },
+      "credentials": {
+        "qualysApi": {
+          "id": "KdkmNjVYkDUzHAvw",
+          "name": "Qualys account"
+        }
+      },
+      "typeVersion": 4.2,
+      "extendsCredential": "qualysApi"
+    },
+    {
+      "id": "9b005b38-be40-4f36-954e-ef829b894436",
+      "name": "Add Report As Attachment",
+      "type": "n8n-nodes-base.theHiveProject",
+      "position": [
+        3420,
+        540
+      ],
+      "parameters": {
+        "caseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Case').item.json._id }}"
+        },
+        "options": {},
+        "resource": "case",
+        "operation": "addAttachment",
+        "attachmentsUi": {
+          "values": [
+            {}
+          ]
+        }
+      },
+      "credentials": {
+        "theHiveProjectApi": {
+          "id": "6O5aPdkMaQmc8I9B",
+          "name": "The Hive 5 account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8a1fda04-2028-41a0-95db-3aa958fc7446",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        460,
+        560
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "25f91441-f95a-4da8-9d62-acecc22b6789",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2920,
+        164.82441481723265
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 361.5043838490178,
+        "height": 550.0452010151306,
+        "content": "![Qualys](https://uploads.n8n.io/templates/qualys.png)\nCreate a new case in TheHive\nIn this section, we create a new case in TheHive as a container for our PDF report. The case must be created first to have a case ID to use to upload the file as an attachment. \n\nEach new report generates a case in TheHive, ensuring that the report is properly attached to the created case for better tracking and organization.\n\nFor more information about this endpoint, visit the [API quick reference](https://cdn2.qualys.com/docs/qualys-api-quick-reference.pdf)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3f84b5c8-4f1c-4dc9-a9ce-8f8936bfbf98",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1140,
+        20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 318.2931356227883,
+        "height": 698.5851033452675,
+        "content": "![Qualys](https://uploads.n8n.io/templates/qualys.png)\n## Fetch reports from Qualys\nFor more information about this endpoint, visit the [API quick reference](https://cdn2.qualys.com/docs/qualys-api-quick-reference.pdf). The results of the api call are converted from XML to JSON."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a3843690-484f-4ff4-b47b-1b8fc76e93de",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        320,
+        20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 400.5192406950739,
+        "height": 694.6109995985548,
+        "content": "![scheduled](https://uploads.n8n.io/templates/scheduled.png)\n## Run every hour\nThe first time the workflow runs, no timestamp will exist in the subworkflow, so it will query all the Qualys scans to generate reports for all of them. Otherwise it will check only for newer scans. \n\nThis schedule allows for an organization to create a running export of their reports and store them somewhere operational both for historical purposes and for tracking and accountability purposes. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "21c4c9ae-203d-480e-8459-c36726d57d92",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        720,
+        20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 400.5192406950739,
+        "height": 696.1026552732698,
+        "content": "![n8n](https://uploads.n8n.io/templates/n8n.png)\n## Set time Stamp\nTo ensure we do not duplicate data in TheHive, we set a timestamp like a bookmark for every time we run this workflow. We then use the previous timestamp if available to only get the newest scan results from Qualys. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ef250f59-304d-4710-80e8-e8e81e4a4f68",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1460,
+        20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1067.9843739266996,
+        "height": 696.1026552732698,
+        "content": "![n8n](https://uploads.n8n.io/templates/n8n.png)\n## Split out all reports to ensure they are all processed. \nWhen we get the response from Qualys, multiple reports are embedded in the JSON, so we use the split out node to process all the reports at once. Before the reports can be saved however, they must go through a filter, checking the time of creation against the time stamp at the beginning. Any that are newer than the timestamp are copied to TheHive.\nA wait node is added for a second to ensure that there are no rate request issues when querying TheHive.\nThe timestamp node updates the value in the subworkflow that stores the timestamp value. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3dff5dc9-95a6-48f5-aee7-d839a385578f",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2540,
+        160.4112877153152
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 361.5043838490178,
+        "height": 554.458328117048,
+        "content": "![TheHive](https://uploads.n8n.io/templates/thehive.png)\n## Create a new case in TheHive\nIn this section, we create a new case in TheHive as a container for our PDF report. The case must be created first to have a case ID to use to upload the file as an attachment. Each new report generates a case in TheHive, ensuring that the report is properly attached to the created case for better tracking and organization."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5509f907-e2bb-4045-864e-283d3da5d5ce",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3300,
+        200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 361.5043838490178,
+        "height": 514.8696158323633,
+        "content": "![TheHive](https://uploads.n8n.io/templates/thehive.png)\nHere we attach the PDF file as an attachment to the Case in TheHive. \n\nThis step automates the attachment of the downloaded report to the created case, ensuring all relevant information is consolidated in one place.\n\n "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d0a7d953-91de-448b-adfb-72d8c52b9efe",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -340,
+        20
+      ],
+      "parameters": {
+        "width": 646.7396383244529,
+        "height": 1327.6335333503064,
+        "content": "![n8n](https://uploads.n8n.io/templates/n8n.png)\n\n# Automate Report Generation with n8n & Qualys\n\n## Introducing the Save Qualys Reports to TheHive Workflow—a robust solution designed to automate the retrieval and storage of Qualys reports in TheHive.\n\nThis workflow fetches reports from Qualys, filters out already processed reports, and creates cases in TheHive for the new reports. It runs every hour to ensure continuous monitoring and up-to-date vulnerability management, making it ideal for Security Operations Centers (SOCs).\n\n**How It Works:**\n\n- **Set Global Variables:** Initializes necessary global variables like `base_url` and `newtimestamp`. This step ensures that the workflow operates with the correct configuration and up-to-date timestamps. Ensure to change the `Global Variables` to match your environment. \n  \n- **Fetch Reports from Qualys:** Sends a GET request to the Qualys API to retrieve finished reports. Automating this step ensures timely updates and consistent data retrieval.\n  \n- **Convert XML to JSON:** Converts the XML response to JSON format for easier data manipulation. This transformation simplifies further processing and integration into TheHive.\n  \n- **Filter Reports:** Checks if the reports have already been processed using their creation timestamps. This filtering ensures that only new reports are handled, avoiding duplicates.\n  \n- **Process Each Report:** Loops through the list of new reports, ensuring each is processed individually. This step-by-step handling prevents issues related to bulk processing and improves reliability.\n  \n- **Create Case in TheHive:** Generates a new case in TheHive for each report, serving as a container for the report data. Automating case creation improves efficiency and ensures that all relevant data is captured.\n  \n- **Download and Attach Report:** Downloads the report from Qualys and attaches it to the respective case in TheHive. This automation ensures that all data is properly archived and easily accessible for review.\n\n\n**Get Started:**\n\n- Ensure your [Qualys](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/?utm_source=n8n_app&utm_medium=node_settings_modal-credential_link&utm_campaign=n8n-creds-base.qualysApi) and [TheHive](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.thehiveproject/?utm_source=n8n_app&utm_medium=node_settings_modal-credential_link&utm_campaign=n8n-nodes-base.theHiveProject) integrations are properly set up.\n- Customize the workflow to fit your specific vulnerability management needs.\n\n\n**Need Help?**\n\n- Join the discussion on our Forum or check out resources on Discord!\n\n\nDeploy this workflow to streamline your vulnerability management process, improve response times, and enhance the efficiency of your security operations."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "XML": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Create Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Remove Already Processed Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Case": {
+      "main": [
+        [
+          {
+            "node": "Download Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Report": {
+      "main": [
+        [
+          {
+            "node": "Add Report As Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Update Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Global Variables": {
+      "main": [
+        [
+          {
+            "node": "Get Last Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Global Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Last Timestamp": {
+      "main": [
+        [
+          {
+            "node": "Fetch Reports from Qualys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Reports to Process?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Report As Attachment": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Reports from Qualys": {
+      "main": [
+        [
+          {
+            "node": "XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Test workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Global Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Already Processed Reports": {
+      "main": [
+        [
+          {
+            "node": "Any Reports to Process?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

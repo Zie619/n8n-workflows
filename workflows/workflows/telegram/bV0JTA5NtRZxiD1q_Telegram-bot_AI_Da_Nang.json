@@ -1,0 +1,678 @@
+{
+  "id": "bV0JTA5NtRZxiD1q",
+  "meta": {
+    "instanceId": "98bf0d6aef1dd8b7a752798121440fb171bf7686b95727fd617f43452393daa3",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Telegram-bot AI Da Nang",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "ae5f9ca6-6bba-4fe8-b955-6c615d8a522f",
+      "name": "SendTyping",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -1780,
+        -260
+      ],
+      "webhookId": "26ea953e-93d9-463e-ad90-95ea8ccb449f",
+      "parameters": {
+        "chatId": "={{ $('telegramInput').item.json.message.chat.id }}",
+        "operation": "sendChatAction"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "V3EtQBeqEvnOtl9p",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "244e7be3-2caa-46f7-8628-d063a3b84c12",
+      "name": "SetResponse",
+      "type": "n8n-nodes-base.set",
+      "notes": "Assemble response etc.",
+      "position": [
+        40,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fba8dc48-1484-4aae-8922-06fcae398f05",
+              "name": "responseMessage",
+              "type": "string",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "id": "df8243e6-6a24-4bad-8807-63d75c828150",
+              "name": "",
+              "type": "string",
+              "value": ""
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "192aa194-f131-4ba3-8842-7c88da1a6129",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1260,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6714203d-04b3-4a3c-9183-09cddcffdfe8",
+              "name": "scheduleURL",
+              "type": "string",
+              "value": "https://docs.google.com/spreadsheets/d/1BJFS9feEy94_WgIgzWZttBwzjp09siOw1xuUgq4yuI4"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "1c52cdf5-da32-4c76-a294-5ec2109dbf39",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -980,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1BJFS9feEy94_WgIgzWZttBwzjp09siOw1xuUgq4yuI4/edit#gid=0",
+          "cachedResultName": "Schedule"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $json.scheduleURL }}"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "XeXufn5uZvHp3lcX",
+          "name": "Google Sheets account 2"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "eff88417-4ce6-4809-8693-dc63e00fff20",
+      "name": "ScheduleToMarkdown",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -800,
+        -420
+      ],
+      "parameters": {
+        "jsCode": "// Get all rows from the input (each item has a \"json\" property)\nconst rows = items.map(item => item.json);\n\n// If no data, return an appropriate message\nif (rows.length === 0) {\n  return [{ json: { markdown: \"No data available.\" } }];\n}\n\n// Use the keys from the first row as the header columns\nconst headers = Object.keys(rows[0]);\n\n// Build the markdown table string\nlet markdown = \"\";\n\n// Create the header row\nmarkdown += `| ${headers.join(\" | \")} |\\n`;\n\n// Create the separator row (using dashes for markdown)\nmarkdown += `| ${headers.map(() => '---').join(\" | \")} |\\n`;\n\n// Add each data row to the table\nrows.forEach(row => {\n  // Ensure we output something for missing values\n  const rowValues = headers.map(header => row[header] !== undefined ? row[header] : '');\n  markdown += `| ${rowValues.join(\" | \")} |\\n`;\n});\n\nconst result = { 'binary': {}, 'json': {} };\n\n// Convert the markdown string to a binary buffer\nconst binaryData = Buffer.from(markdown, 'utf8');\n/*\n// Attach the binary data to the first item under a binary property named 'data'\nresult.binary = {\n  data: {\n    data: binaryData,\n    mimeType: 'text/markdown',\n  }\n};\n*/\n// Optionally, also return the markdown string in the json property if needed\nresult.json.markdown = markdown;\n\nreturn result;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "04fab70c-493a-4c5d-adfb-0d9e8a5b7382",
+      "name": "ScheduleBot",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -480,
+        -420
+      ],
+      "parameters": {
+        "text": "={{ $('Settings').first().json.inputMessage }}",
+        "options": {
+          "systemMessage": "=You are a helpful assistant that helps members of a meetup group with scheduling their meetups and answering questions about them.\n\nThe current version of the schedule in tabular format is the following:\n\n {{ $json.markdown }}\n\n"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "be29d3ec-8211-4f23-82f2-83a1aa3aad5b",
+      "name": "n8nChatSettings",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1580,
+        -520
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1ecb3515-c1a2-4d69-adec-5b4d74e32056",
+              "name": "inputMessage",
+              "type": "string",
+              "value": "={{ $json.chatInput }}"
+            },
+            {
+              "id": "424b9697-94cb-4c38-953c-992436832684",
+              "name": "chatId",
+              "type": "string",
+              "value": "={{ $json.sessionId }}"
+            },
+            {
+              "id": "e23988e2-7c3d-4e38-9d5d-0c4b0c94d127",
+              "name": "mode",
+              "type": "string",
+              "value": "n8n"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "b7078c59-b6e6-4002-831f-96e56278ab61",
+      "name": "telegramChatSettings",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1580,
+        -260
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1ecb3515-c1a2-4d69-adec-5b4d74e32056",
+              "name": "inputMessage",
+              "type": "string",
+              "value": "={{ $('telegramInput').item.json.message.text }}"
+            },
+            {
+              "id": "424b9697-94cb-4c38-953c-992436832684",
+              "name": "chatId",
+              "type": "string",
+              "value": "={{ $('telegramInput').item.json.message.chat.id }}"
+            },
+            {
+              "id": "e23988e2-7c3d-4e38-9d5d-0c4b0c94d127",
+              "name": "mode",
+              "type": "string",
+              "value": "telegram"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "1ba6ad37-f1e5-440d-bf10-569038c27bce",
+      "name": "telegramInput",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -1960,
+        -260
+      ],
+      "webhookId": "f56e8e22-975e-4f9a-a6f9-253ebc63668d",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "V3EtQBeqEvnOtl9p",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "56a52e8a-714f-4e7a-8a13-e915e9dc29c4",
+      "name": "n8nInput",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -1960,
+        -520
+      ],
+      "webhookId": "f4ab7d4a-5cdd-425a-bbbb-e3bb94719266",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "961f67f0-bd44-4e7f-9f2f-c2f02f3176ce",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        220,
+        -420
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "n8n mode",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Settings').first().json.mode }}",
+                    "rightValue": "n8n"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "telegram mode",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "e7d6a994-48e3-44bb-b662-862d9bf9c53b",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $('Settings').first().json.mode }}",
+                    "rightValue": "telegram"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "57056425-37ba-417d-9a2d-977a81d378ab",
+      "name": "telegramResponse",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        500,
+        -280
+      ],
+      "webhookId": "ff71ba7e-affa-4952-90a5-6bb7f37a5598",
+      "parameters": {
+        "text": "={{ $json.responseMessage }}",
+        "chatId": "={{ $('Settings').first().json.chatId }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "V3EtQBeqEvnOtl9p",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "2962a77f-5727-43be-93fb-b0751b63c6ac",
+      "name": "n8nResponse",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        500,
+        -520
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "0932484f-707b-412b-b9cb-431a8ae64447",
+      "name": "LLM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "position": [
+        -600,
+        -220
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "bs7tPtvgDTJNGAFJ",
+          "name": "OpenRouter account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "65948d2c-71b2-4df0-97db-ed216ed7c691",
+      "name": "Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        -500,
+        -220
+      ],
+      "parameters": {
+        "sessionKey": "={{ $('Settings').first().json.chatId }}",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "50566274-cf7c-496f-a166-b45eb3114da3",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2000,
+        -600
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 620,
+        "height": 240,
+        "content": "## Chat input triggered inside n8n\nUsed for testing and debugging"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9dc636fb-cc86-4236-8eb9-952a4ab0ef68",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2000,
+        -340
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 620,
+        "height": 240,
+        "content": "## Chat input triggered by Telegram\nUsed for live chat within Telegram"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0429d589-3e80-4b26-96a0-01554899a3e7",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        420,
+        -340
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 360,
+        "height": 240,
+        "content": "## Chat response to Telegram"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9eeccee0-c6a0-40c6-9b7d-1f672bf0fdb9",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        420,
+        -600
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 360,
+        "height": 240,
+        "content": "## Chat response inside n8n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "acb8e550-be94-41b7-904a-641b3b87e928",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        -600
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 440,
+        "height": 500,
+        "content": "## Prepare response\nDecide to which chat the response will go."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "42ce6eac-165b-463d-822e-355aff030525",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -620,
+        -600
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 560,
+        "height": 500,
+        "content": "## AI Processing\nChat input → Chat output"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "33c45fcc-3aa5-4cd3-b393-e1723560dfeb",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1040,
+        -600
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 400,
+        "height": 500,
+        "content": "## Retrieve Data\nGet schedule from Google Spreadsheet and convert it to a Markdown-Table as context for the LLM"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6e1017e3-bf9d-4056-a64f-c94476bd1f43",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1360,
+        -600
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 300,
+        "height": 500,
+        "content": "## Normalize input\nTransfer the chat data into a unified set of variables"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9078c996-e932-40c0-882e-1eb261ca1535",
+  "connections": {
+    "LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ScheduleBot",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "ScheduleBot",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "n8nResponse",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "telegramResponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "ScheduleToMarkdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8nInput": {
+      "main": [
+        [
+          {
+            "node": "n8nChatSettings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendTyping": {
+      "main": [
+        [
+          {
+            "node": "telegramChatSettings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ScheduleBot": {
+      "main": [
+        [
+          {
+            "node": "SetResponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SetResponse": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "telegramInput": {
+      "main": [
+        [
+          {
+            "node": "SendTyping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8nChatSettings": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "telegramResponse": {
+      "main": [
+        []
+      ]
+    },
+    "ScheduleToMarkdown": {
+      "main": [
+        [
+          {
+            "node": "ScheduleBot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "telegramChatSettings": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

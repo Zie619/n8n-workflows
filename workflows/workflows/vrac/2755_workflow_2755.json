@@ -1,0 +1,522 @@
+{
+  "meta": {
+    "instanceId": "95b3ab5a70ab1c8c1906357a367f1b236ef12a1409406fd992f60255f0f95f85"
+  },
+  "nodes": [
+    {
+      "id": "f13c4b60-5b5f-474b-b79b-45c4fb9cc067",
+      "name": "Subscribe contact in KlickTipp",
+      "type": "n8n-nodes-klicktipp.klicktipp",
+      "notes": "Adds the contact to KlickTipp using the transformed webinar registration data.",
+      "position": [
+        -800,
+        600
+      ],
+      "parameters": {
+        "email": "={{ $('New webinar booking via JotForm').item.json.Email }}",
+        "fields": {
+          "dataFields": [
+            {
+              "fieldId": "fieldFirstName",
+              "fieldValue": "={{ $('New webinar booking via JotForm').item.json.Name.first }}"
+            },
+            {
+              "fieldId": "fieldLastName",
+              "fieldValue": "={{ $('New webinar booking via JotForm').item.json.Name.last }}"
+            },
+            {
+              "fieldId": "fieldBirthday",
+              "fieldValue": "={{ $json.birthday }}"
+            },
+            {
+              "fieldId": "field214129",
+              "fieldValue": "={{ $json.linkdein_url }}"
+            },
+            {
+              "fieldId": "field214128",
+              "fieldValue": "={{ $json.work_experience_in_years }}"
+            },
+            {
+              "fieldId": "field214132",
+              "fieldValue": "={{ $json['webinar_start_date&time'] }}"
+            },
+            {
+              "fieldId": "field214125",
+              "fieldValue": "={{ $('New webinar booking via JotForm').item.json['Bitte lassen Sie uns wissen, wenn Sie vor dem Webinar Fragen/Hinweise an unsere Referenten haben.'] }}"
+            },
+            {
+              "fieldId": "field214431",
+              "fieldValue": "={{ $('New webinar booking via JotForm').item.json['Webinar Auswahl:'] }}"
+            },
+            {
+              "fieldId": "field214432",
+              "fieldValue": "={{ $('New webinar booking via JotForm').item.json['In welchem Intervall möchtest Du erinnert werden?'] }}"
+            }
+          ]
+        },
+        "listId": "358895",
+        "resource": "subscriber",
+        "operation": "subscribe",
+        "smsNumber": "={{ $json.mobile_number }}"
+      },
+      "credentials": {
+        "klickTippApi": {
+          "id": "K9JyBdCM4SZc1cXl",
+          "name": "DEMO KlickTipp account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "7aa2b991-782d-4171-ac30-131c2062e17c",
+      "name": "Convert and set webinar data",
+      "type": "n8n-nodes-base.set",
+      "notes": "This node formats the data received from the Jotform submission, ensuring it is correctly formatted for further processing at the KlickTipp API endpoint.",
+      "position": [
+        -1020,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1263cb6-654a-4d07-9073-c015b720e6b7",
+              "name": "mobile_number",
+              "type": "string",
+              "value": "={{ \n// Converts a phone number to numeric-only format with international code prefixed by \"00\"\n$json.Mobilrufnummer.full\n    .replace(/^\\+/, '00')   // Replace leading \"+\" with \"00\"\n    .replace(/[^0-9]/g, '') // Remove non-numeric characters\n}}"
+            },
+            {
+              "id": "b09cc146-e614-478a-8f33-324d813e0120",
+              "name": "birthday",
+              "type": "string",
+              "value": "={{ \n// Converts a date to a UNIX timestamp (in seconds)\nMath.floor(\n    new Date(\n      $json.Geburtstag.year + '-' + \n      $json.Geburtstag.month + '-' + \n      $json.Geburtstag.day + 'T00:00:00'\n    ).getTime() / 1000\n  )\n}}"
+            },
+            {
+              "id": "cecd4621-b31b-43d0-9076-08f0bde83f5b",
+              "name": "linkdein_url",
+              "type": "string",
+              "value": "={{ \n// Validates if the URL matches the correct format; returns it if valid, else a default fallback URL\n/^https?:\\/\\/[^\\s$.?#].[^\\s]*$/.test($json['LinkedIn Profil Link/URL (ACHTUNG keine Formatprüfung bei Eingabe)']) \n    ? $json['LinkedIn Profil Link/URL (ACHTUNG keine Formatprüfung bei Eingabe)'] \n    : 'https://www.URLnichtImPassendenFormat.de' \n}}"
+            },
+            {
+              "id": "1c455eb9-0750-4d69-9dab-390847a3d582",
+              "name": "work_experience_in_years",
+              "type": "string",
+              "value": "={{\n// Multiplies the decimalnumber value by 100\n$json['Berufserfahrung in Jahren'] * 100 }}"
+            },
+            {
+              "id": "f8e5ecc7-1549-409f-a6d5-e5beb773baef",
+              "name": "webinar_start_date&time",
+              "type": "string",
+              "value": "={{ \n  (() => {\n    // Input format example: '2025-01-31 13:00'\n    const rawDate = $json['Termin Auswahl:']; \n\n    // Ensure the raw date is provided and in the expected format\n    if (!rawDate || typeof rawDate !== 'string') return ''; // Return empty string if invalid\n\n    // Split the date and time into components\n    const [datePart, timePart] = rawDate.split(' '); // Example: ['2025-01-31', '13:00']\n    if (!datePart || !timePart) return ''; // Return empty string if date or time is missing\n\n    // Validate the date format (YYYY-MM-DD)\n    const [year, month, day] = datePart.split('-'); // Split year, month, day\n    if (!year || !month || !day || year.length !== 4 || month.length !== 2 || day.length !== 2) return ''; // Validate format\n\n    // Combine into ISO 8601 format (YYYY-MM-DDTHH:mm) with Germany's local timezone offset\n    const isoDateTime = `${year}-${month}-${day}T${timePart}:00+01:00`;\n\n    // Create a Date object in Germany's timezone\n    const localDate = new Date(isoDateTime);\n\n    // Convert the local time to a UTC UNIX timestamp in seconds\n    return Math.floor(localDate.getTime() / 1000); \n  })()\n}}"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "2dade6bf-6b65-45db-9a33-9faca1860924",
+      "name": "New webinar booking via JotForm",
+      "type": "n8n-nodes-base.jotFormTrigger",
+      "notes": "Triggers the workflow when a new form submission is received on JotForm.",
+      "position": [
+        -1260,
+        600
+      ],
+      "webhookId": "a8dd1d6b-dc1c-4293-84dd-59ee063c1fbd",
+      "parameters": {
+        "form": "250054687472360"
+      },
+      "credentials": {
+        "jotFormApi": {
+          "id": "71GlBAECuZVP7vMO",
+          "name": "Ricardo's JotForm account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "d796b45c-64c8-4d6b-b267-9b828ef24345",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -660,
+        940
+      ],
+      "parameters": {
+        "width": 839.0148942368631,
+        "height": 1288.9426551387483,
+        "content": "### Introduction\nThis workflow streamlines the process of handling webinar registrations submitted via JotForm. It ensures the data is correctly formatted and seamlessly integrates with KlickTipp. Input data is validated and transformed to meet KlickTipp’s API requirements, including formatting phone numbers, converting dates, and validating URLs.\n\n### Benefits\n- **Efficient lead generation**: Contacts from forms are automatically imported into KlickTipp and can be used immediately, saving time and increasing the conversion rate.\n- **Automated processes**: Experts can start workflows directly, such as welcome emails or course admissions, reducing administrative effort.\n- **Error-free data management**: The template ensures precise data mapping, avoids manual corrections, and reinforces a professional appearance.\n\n### Key Feature\n- **JotForm Trigger**: Captures new form submissions, including participant details and webinar preferences.\n- **Data Processing**: Standardizes and validates input fields:\n  - Converts phone numbers to numeric-only format with international prefixes.\n  - Transforms dates into UNIX timestamps.\n  - Validates LinkedIn URLs and applies fallback URLs if validation fails.\n  - Scales numerical fields, such as work experience, for specific use cases.\n- **Subscriber Management in KlickTipp**: Adds or updates participants as subscribers in KlickTipp. Includes custom field mappings and tags, such as:\n  - Personal information: Name, email, phone number.\n  - Webinar details: Chosen webinar, start date/time.\n  - Preferences: Reminder intervals, questions for presenters.\n  - Contact segmentation: Creates new tags based on form submission if necessary and adds these dynamic tags as well as fixed tags to contacts.\n\n- **Error Handling**: Validates critical fields like phone numbers, URLs, and dates to prevent incorrect data submissions.\n\n#### Setup Instructions\n1. Set up the JotForm and KlickTipp nodes in your n8n instance.\n2. Authenticate your JotForm and KlickTipp accounts.\n3. Create the necessary custom fields to match the data structure\n4. Verify and customize field assignments in the workflow to align with your specific form and subscriber list setup.\n![Source example](https://mail.cdndata.io/user/images/kt1073234/share_link_jotform_fields.png#full-width)\n\n### Testing and Deployment:\n1. Test the workflow by filling the form on JotForm.\n2. Verify data updates in KlickTipp.\n\n- **Customization**: Update field mappings within the KlickTipp nodes to align with your account setup. This ensures accurate data syncing."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "81832238-a21c-4d2f-b8f2-6a0050370884",
+      "name": "Define Array of tags from Jotform",
+      "type": "n8n-nodes-base.set",
+      "notes": "This node defines tags based on the form submission, such as the webinar selection, date, and reminder interval, and saves them as an array for further processing.",
+      "position": [
+        -500,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "814576c1-ba16-4546-9815-2b7dec324f94",
+              "name": "tags",
+              "type": "array",
+              "value": "={{ [\n//Every line represents one of the dynamic values that are received from the form submission in order to create an array/list of tags. If you want to add another variable, keep in mind to add a comma at the end of the last line and only then to add your parameter at the end of this list.\n  $('New webinar booking via JotForm').item.json['Webinar Auswahl:'], \n  $('New webinar booking via JotForm').item.json['Termin Auswahl:'], \n  $('New webinar booking via JotForm').item.json['In welchem Intervall möchtest Du erinnert werden?']\n] }}"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "99beae4f-ab6e-4975-a6b8-baade0279f24",
+      "name": "Split Out Jotform tags",
+      "type": "n8n-nodes-base.splitOut",
+      "notes": "In this node we split the created array again into items so we can merge them with the existing tags we request from KlickTipp.",
+      "position": [
+        -320,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "tags"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "283d964b-3a37-4ac9-9562-26af43ef32d5",
+      "name": "Tag contact directly in KlickTipp",
+      "type": "n8n-nodes-klicktipp.klicktipp",
+      "notes": "Applies existing tags to a subscriber in KlickTipp. This enables the use of specific signatures, sign out automations as well as the automation of emails and campaigns or other automations.",
+      "position": [
+        840,
+        500
+      ],
+      "parameters": {
+        "email": "={{ $('New webinar booking via JotForm').item.json.Email }}",
+        "tagId": "={{$json.tag_ids}}",
+        "resource": "contact-tagging"
+      },
+      "credentials": {
+        "klickTippApi": {
+          "id": "K9JyBdCM4SZc1cXl",
+          "name": "DEMO KlickTipp account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "412ea807-11bb-47a1-ae60-168396bbfb3a",
+      "name": "Tag creation check",
+      "type": "n8n-nodes-base.if",
+      "notes": "This node checks the result of the tag comparison and branches the workflow accordingly in order to directly tag the contact or to create the tag first and to then follow through with the tagging.",
+      "position": [
+        140,
+        580
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d9567816-9236-434d-b46e-e47f4d36f289",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.exist }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.2
+    },
+    {
+      "id": "50478814-aab3-4ec8-94e4-59ff8e30e632",
+      "name": "Aggregate tags to add to contact",
+      "type": "n8n-nodes-base.aggregate",
+      "notes": "This node aggregates all IDs of the existing tags to a list.",
+      "position": [
+        640,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "renameField": true,
+              "outputFieldName": "tag_ids",
+              "fieldToAggregate": "tag_id"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "feeb10fa-3eff-4c60-8d2c-77d0da3becf8",
+      "name": "Create the tag in KlickTipp",
+      "type": "n8n-nodes-klicktipp.klicktipp",
+      "notes": "Creates a new tag in KlickTipp if it does not already exist.",
+      "position": [
+        440,
+        700
+      ],
+      "parameters": {
+        "name": "={{ $json.name }}",
+        "operation": "create"
+      },
+      "credentials": {
+        "klickTippApi": {
+          "id": "K9JyBdCM4SZc1cXl",
+          "name": "DEMO KlickTipp account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "bf19001c-5369-4d40-ba94-f9d919222455",
+      "name": "Aggregate array of created tags",
+      "type": "n8n-nodes-base.aggregate",
+      "notes": "This node aggregates all IDs of the newly created tags to a list.",
+      "position": [
+        640,
+        700
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "renameField": true,
+              "outputFieldName": "tag_ids",
+              "fieldToAggregate": "id"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "eb4c28a3-30d2-42fb-986c-14b31497611c",
+      "name": "Tag contact KlickTipp after trag creation",
+      "type": "n8n-nodes-klicktipp.klicktipp",
+      "notes": "Associates a specific tag with a subscriber in KlickTipp using their email address. This enables the use of specific signatures, signout automations as well as the automation of emails and campaigns or other automations.",
+      "position": [
+        840,
+        700
+      ],
+      "parameters": {
+        "email": "={{ $('New webinar booking via JotForm').item.json.Email }}",
+        "tagId": "={{$json.tag_ids}}",
+        "resource": "contact-tagging"
+      },
+      "credentials": {
+        "klickTippApi": {
+          "id": "K9JyBdCM4SZc1cXl",
+          "name": "DEMO KlickTipp account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "5df24c47-f8d9-4f34-8257-00f06ede36ad",
+      "name": "Get list of all existing tags",
+      "type": "n8n-nodes-klicktipp.klicktipp",
+      "notes": "This node fetches all tags that already exist in KlickTipp.",
+      "position": [
+        -500,
+        700
+      ],
+      "parameters": {},
+      "credentials": {
+        "klickTippApi": {
+          "id": "K9JyBdCM4SZc1cXl",
+          "name": "DEMO KlickTipp account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "7c2b8718-6f79-4a6a-afb4-3c429882fd98",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "notes": "This node merges the tags which are fetched via the form with the existing tags we requested in order to identify if new tags need to be created.",
+      "position": [
+        -80,
+        580
+      ],
+      "parameters": {
+        "mode": "combineBySql",
+        "query": "SELECT \n    input1.tags AS name,  -- Extracts the tag name from input1\n    IF(input2.value IS NOT NULL, true, false) AS exist, -- Checks if the tag exists in input2 (returns true if found, false otherwise)\n    input2.id AS tag_id  -- Retrieves the ID of the tag from input2 if it exists, otherwise returns NULL\nFROM \n    input1\nLEFT JOIN \n    input2 \nON \n    input1.tags = input2.value  -- Matches tags from input1 with values in input2"
+      },
+      "notesInFlow": true,
+      "typeVersion": 3
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Tag creation check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tag creation check": {
+      "main": [
+        [
+          {
+            "node": "Aggregate tags to add to contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create the tag in KlickTipp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Jotform tags": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create the tag in KlickTipp": {
+      "main": [
+        [
+          {
+            "node": "Aggregate array of created tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert and set webinar data": {
+      "main": [
+        [
+          {
+            "node": "Subscribe contact in KlickTipp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get list of all existing tags": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Subscribe contact in KlickTipp": {
+      "main": [
+        [
+          {
+            "node": "Get list of all existing tags",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Define Array of tags from Jotform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate array of created tags": {
+      "main": [
+        [
+          {
+            "node": "Tag contact KlickTipp after trag creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New webinar booking via JotForm": {
+      "main": [
+        [
+          {
+            "node": "Convert and set webinar data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate tags to add to contact": {
+      "main": [
+        [
+          {
+            "node": "Tag contact directly in KlickTipp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Array of tags from Jotform": {
+      "main": [
+        [
+          {
+            "node": "Split Out Jotform tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

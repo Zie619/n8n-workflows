@@ -1,0 +1,780 @@
+{
+  "id": "ZDL9028SnyCxS5tf",
+  "meta": {
+    "instanceId": "15c09ee9508dd818e298e675375571ba4b871bbb8c420fd01ac9ed7c58622669"
+  },
+  "name": "Bitrix24 Task Form Widget Application Workflow example with Webhook Integration",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "cb30a147-2965-4b45-8974-12fea1eac96d",
+      "name": "Bitrix24 Handler",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -800,
+        -40
+      ],
+      "webhookId": "c3ae607d-41f0-42bc-b669-c2c77936d443",
+      "parameters": {
+        "path": "bitrix24/widgethandler.php",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "08a11f9e-cc9a-430f-8ba1-70985504a10d",
+      "name": "Extract Credentials",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -600,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "030f8f90-2669-4c20-9eab-c572c4b7c70c",
+              "name": "CLIENT_ID",
+              "type": "string",
+              "value": "=local.67b8a796e92127.82791242"
+            },
+            {
+              "id": "de9bbb7a-b782-4540-b259-527625db8490",
+              "name": "CLIENT_SECRET",
+              "type": "string",
+              "value": "=BylHzv4eBw2JuDm7QXOP0C25qzEwf7ATGh79JeOn1iY5lmIRC2"
+            },
+            {
+              "id": "69bbcb1f-ba6e-42eb-be8a-ee0707ce997d",
+              "name": "domain",
+              "type": "string",
+              "value": "={{$json.query.DOMAIN || $json.body.domain}}"
+            },
+            {
+              "id": "dc1b0515-f06a-4731-b0dc-912a8d04e56b",
+              "name": "access_token",
+              "type": "string",
+              "value": "={{$json.body.AUTH_ID || $json.body.access_token}}"
+            },
+            {
+              "id": "86b7aff7-1e25-4b12-a366-23cf34e5a405",
+              "name": "refresh_token",
+              "type": "string",
+              "value": "={{$json.body.REFRESH_ID || $json.body.refresh_token}}"
+            },
+            {
+              "id": "a1e55fc3-7d29-4f7d-b1a9-c458d2b10e33",
+              "name": "application_token",
+              "type": "string",
+              "value": "={{$json.query.APP_SID || $json.body.APP_SID}}"
+            },
+            {
+              "id": "ba921f15-28ac-4c0e-89a1-8da755c70892",
+              "name": "expires_in",
+              "type": "string",
+              "value": "={{$json.body.AUTH_EXPIRES || 3600}}"
+            },
+            {
+              "id": "dbca2de9-55aa-4642-b671-22a195631657",
+              "name": "=client_endpoint",
+              "type": "string",
+              "value": "=https://{{ $json.query.DOMAIN }}/rest/"
+            },
+            {
+              "id": "1a53f9e3-bfc3-4ea5-88db-514ae1e1253c",
+              "name": "settingsFilePath",
+              "type": "string",
+              "value": "/data/files/hotline_files/"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "c025c87d-8015-4323-ac60-191cabc8b5e0",
+      "name": "Check Event Type",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -400,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "// PHP szerinti ellenőrzés: $_REQUEST['event'] == 'ONAPPINSTALL' vagy $_REQUEST['PLACEMENT'] == 'DEFAULT'\nconst items = $input.all();\nconst requestData = items[0].json;\n\nlet isInstallation = false;\nlet isInstallationFinished = false;\n\nif (requestData.body && requestData.body.event === 'ONAPPINSTALL') {\n  isInstallation = true;\n} else if (requestData.body && requestData.body.PLACEMENT === 'DEFAULT') {\n  isInstallation = true;\n  if (requestData.body && requestData.body.PLACEMENT_OPTIONS) {\n  po = JSON.parse(requestData.body.PLACEMENT_OPTIONS);\n  if (po.install_finished === 'Y') {\n    isInstallationFinished = true\n  }  \n} \n} \nreturn {\n  json: {\n    ...requestData,\n    isInstallation: isInstallation,\n    isInstallationFinished : isInstallationFinished \n  }\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "7ba4765a-6c58-4d67-b3ae-5598474916c5",
+      "name": "Is Installation?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -200,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "da73d0ba-6eeb-405e-89fe-9d041fd2e0cd",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "leftValue": "={{$json.isInstallation}}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "8e429e18-392c-4123-969a-f9086d12709d",
+      "name": "Register Placement",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        220,
+        -400
+      ],
+      "parameters": {
+        "url": "=https://{{$json.domain}}/rest/placement.bind?auth={{$json.access_token}}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "PLACEMENT",
+              "value": "TASK_VIEW_TAB"
+            },
+            {
+              "name": "HANDLER",
+              "value": "={{$json.webhookUrl}}"
+            },
+            {
+              "name": "TITLE",
+              "value": "My App"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e5d87f1e-1580-433f-990f-624e64fb80d2",
+      "name": "Process Settings",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        480,
+        60
+      ],
+      "parameters": {
+        "functionCode": "// Process settings from file\nconst items = $input.all();\nlet settingsData = {};\n\ntry {\n  // Try to parse the file content\n  settingsData = items[0].json.data;\n  \n  // Extract task ID from PLACEMENT_OPTIONS if available\n  let taskId = null;\n  const placementOptions = items[0].json.body.PLACEMENT_OPTIONS;\n  \n  if (placementOptions) {\n    try {\n      const options = JSON.parse(placementOptions);\n      taskId = options.taskId;\n    } catch (e) {\n      // Ignore parse errors\n    }\n  }\n  \n  return {\n    json: {\n      ...settingsData,\n      taskId: taskId,\n      success: true,\n      originalRequest: items[0].json\n    }\n  };\n} catch (error) {\n  console.log (\"ERROR: \" + error)\n  // Return error if file doesn't exist or is invalid\n  return {\n    json: {\n      error: 'No valid settings found',\n      success: false,\n      originalRequest: items[0].json\n    }\n  };\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c7384217-38be-4184-b60f-a99c6b762406",
+      "name": "Installation Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1020,
+        -380
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        },
+        "respondWith": "text",
+        "responseBody": "=<head>\n    <script src=\"//api.bitrix24.com/api/v1/\"></script>\n    <script>\n        BX24.init(function(){\n            BX24.installFinish();\n        });\n    </script>\n</head>\n<body>\n    installation has been finished\n</body>"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "47c89107-6e6f-4255-94e6-776c2309de50",
+      "name": "Has Valid Settings?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        660,
+        60
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "71e52c3d-c95c-4ecf-8dce-dbad5c9db29f",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "leftValue": "={{$json.success}}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "220b32af-d886-4315-808e-825834eb440e",
+      "name": "Get Task Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        920,
+        -40
+      ],
+      "parameters": {
+        "url": "=https://{{ $json.originalRequest.query.DOMAIN }}/rest/tasks.task.get?auth={{ $json.originalRequest.access_token }}",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ $json.originalRequest.body.PLACEMENT_OPTIONS }}",
+        "sendBody": true,
+        "specifyBody": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e25fb425-28f2-4e48-85b2-8917d4a7497d",
+      "name": "Format Task Data",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1100,
+        -40
+      ],
+      "parameters": {
+        "functionCode": "// Format Task Data for display\nconst items = $input.all();\nlet taskData = {};\n\ntry {\n  taskData = items[0].json.result.task;\n} catch (error) {\n  return {\n    json: {\n      taskHtml: '<div class=\"alert alert-danger\">Error loading task data</div>'\n    }\n  };\n}\n\n// Create HTML table from task data\nlet tableHtml = '<table class=\"table table-striped\">\\n';\n\nfor (const [field, value] of Object.entries(taskData)) {\n  let displayValue = '';\n  \n  if (Array.isArray(value)) {\n    displayValue = value.join(', ');\n  } else if (value !== null && value !== undefined) {\n    displayValue = value.toString();\n  }\n  \n  tableHtml += `  <tr>\\n    <td>${field}</td>\\n    <td>${displayValue}</td>\\n  </tr>\\n`;\n}\n\ntableHtml += '</table>';\n\nreturn {\n  json: {\n    taskHtml: tableHtml\n  }\n};"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a9d4ca61-d9e0-4a57-9807-40dc18625ce2",
+      "name": "Task View Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1280,
+        -40
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        },
+        "respondWith": "text",
+        "responseBody": "=<html>\n<head>\n\t<meta charset=\"utf-8\">\n\t<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\n\t<!-- Latest compiled and minified CSS -->\n\t<link rel=\"stylesheet\" href=\"css/app.css\">\n\t<script\n\t\tsrc=\"https://code.jquery.com/jquery-3.6.0.js\"\n\t\tintegrity=\"sha256-H+K7U5CnXl1h5ywQfKtSj8PCmoN9aaq30gDh27Xc0jk=\"\n\t\tcrossorigin=\"anonymous\"></script>\n\n\t<title>Task View</title>\n</head>\n<body class=\"container-fluid\">\n{{$json.taskHtml}}\n</body>\n</html>"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "5bbbf72e-d743-450a-9534-a2a6c569f73d",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        940,
+        160
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        },
+        "respondWith": "text",
+        "responseBody": "=<html>\n<head>\n\t<meta charset=\"utf-8\">\n\t<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\t<title>Error</title>\n</head>\n<body>\n\t<div class=\"alert alert-danger\">\n\t\tSettings not found or access token expired. Please reinstall the application.\n\t</div>\n</body>\n</html>"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "8fbaed6d-e9d8-4dbd-805f-a9e2a3e791c5",
+      "name": "Save Installation Settings",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        620,
+        -240
+      ],
+      "parameters": {
+        "options": {
+          "append": false
+        },
+        "fileName": "={{ $('Set Settings Data').item.json.settingsFilePath }}/widget-app-settings.json",
+        "operation": "write"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "38c01b85-cf8c-4df8-b226-cd199cdee1f2",
+      "name": "Set Settings Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        220,
+        -240
+      ],
+      "parameters": {
+        "include": "selected",
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ad1b12be-7b21-42cb-b8b5-3f141dd6040a",
+              "name": "data",
+              "type": "object",
+              "value": "={\n  \"access_token\": \"{{$json.access_token}}\",\n  \"refresh_token\": \"{{$json.refresh_token}}\",\n  \"domain\": \"{{$json.domain}}\",\n  \"expires_in\": \"{{$json.expires_in}}\",\n  \"application_token\": \"{{$json.application_token}}\",\n  \"client_endpoint\": \"https://{{$json.domain}}/rest/\",\n  \"C_REST_CLIENT_ID\": \"app.644f4956606e88.45725320\",\n  \"C_REST_CLIENT_SECRET\": \"lUb7WU81Wc4UVCWBJBh0xX5sKYWM4nKmsJl0m4vWb2XR6ByRGF\",\n  \"updated_at\": \"{{$now}}\"\n}"
+            }
+          ]
+        },
+        "includeFields": "settingsFilePath",
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "490779aa-5c6b-49cb-960d-d710a848eb60",
+      "name": "Create Settings File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        400,
+        -240
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "={{ $json.settingsFilePath }}/widget-app-settings.json"
+        },
+        "operation": "toJson"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "902671fc-9286-467b-9060-7326ee14b41a",
+      "name": "Read Installation Settings",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        -40,
+        140
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "={{ $json.settingsFilePath }}/widget-app-settings.json"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8d38c6be-c3ed-493a-8600-a9adf5acff55",
+      "name": "If Installation finished",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -20,
+        -180
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3c09735b-94df-4307-aadd-23080bdac02b",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.isInstallationFinished }}",
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "0047bf02-13d9-4ba6-abcd-a557b9ba3fbf",
+      "name": "Installation finished Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        220,
+        -580
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        },
+        "respondWith": "text",
+        "responseBody": "=<head>\n</head>\n<body>\n    installation has been fully finished...\n</body>"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "8a060ae1-801f-469f-8087-26aee15486e3",
+      "name": "Merge Installation info",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        780,
+        -380
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combineBy": "combineAll"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "b5dbdd6f-b81b-4457-8f04-75a951903755",
+      "name": "Extract Installation Settings",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        140,
+        140
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "fromJson"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b20494d5-409c-47a0-9cba-ef5798a0d7cb",
+      "name": "Merge request data with installation settings",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combineBy": "combineAll"
+      },
+      "typeVersion": 3
+    }
+  ],
+  "active": true,
+  "pinData": {
+    "Bitrix24 Handler": [
+      {
+        "json": {
+          "body": {
+            "status": "L",
+            "AUTH_ID": "e393b96700763c9900668809000000b6e0e30725387b1a3ae59c6fafa9ee42e7a25d5e",
+            "PLACEMENT": "TASK_VIEW_TAB",
+            "member_id": "19acdffbcfadf692f61b677d3d824490",
+            "REFRESH_ID": "d312e16700763c9900668809000000b6e0e307f6a903a54b17e22adcad3eb5d2063806",
+            "AUTH_EXPIRES": "3600",
+            "PLACEMENT_OPTIONS": "{\"taskId\":\"10184\"}"
+          },
+          "query": {
+            "LANG": "en",
+            "DOMAIN": "hgap.bitrix24.eu",
+            "APP_SID": "f1be8a08b159e4113606b5f6bfc8d210",
+            "PROTOCOL": "1"
+          },
+          "params": {},
+          "headers": {
+            "host": "orpheus-dev.h-gap.hu",
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "origin": "https://hgap.bitrix24.eu",
+            "referer": "https://hgap.bitrix24.eu/",
+            "priority": "u=0, i",
+            "sec-ch-ua": "\"Not(A:Brand\";v=\"99\", \"Google Chrome\";v=\"133\", \"Chromium\";v=\"133\"",
+            "x-real-ip": "85.66.162.255",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+            "content-type": "application/x-www-form-urlencoded",
+            "cache-control": "max-age=0",
+            "content-length": "305",
+            "sec-fetch-dest": "iframe",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "cross-site",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7",
+            "x-forwarded-for": "85.66.162.255",
+            "sec-ch-ua-mobile": "?0",
+            "x-forwarded-proto": "https",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "x-forwarded-scheme": "https",
+            "sec-fetch-storage-access": "active",
+            "upgrade-insecure-requests": "1"
+          },
+          "webhookUrl": "https://orpheus-dev.h-gap.hu/webhook/bitrix24/widgethandler.php",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "72d7eac7-03cb-4792-8f6f-d190631e34f9",
+  "connections": {
+    "Get Task Data": {
+      "main": [
+        [
+          {
+            "node": "Format Task Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bitrix24 Handler": {
+      "main": [
+        [
+          {
+            "node": "Extract Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Event Type": {
+      "main": [
+        [
+          {
+            "node": "Is Installation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Task Data": {
+      "main": [
+        [
+          {
+            "node": "Task View Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Installation?": {
+      "main": [
+        [
+          {
+            "node": "If Installation finished",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Installation Settings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge request data with installation settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Settings": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Settings?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Settings Data": {
+      "main": [
+        [
+          {
+            "node": "Create Settings File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Register Placement": {
+      "main": [
+        [
+          {
+            "node": "Merge Installation info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Credentials": {
+      "main": [
+        [
+          {
+            "node": "Check Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Settings?": {
+      "main": [
+        [
+          {
+            "node": "Get Task Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Settings File": {
+      "main": [
+        [
+          {
+            "node": "Save Installation Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Installation info": {
+      "main": [
+        [
+          {
+            "node": "Installation Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Installation finished": {
+      "main": [
+        [
+          {
+            "node": "Installation finished Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Register Placement",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Settings Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Installation Settings": {
+      "main": [
+        [
+          {
+            "node": "Extract Installation Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Installation Settings": {
+      "main": [
+        [
+          {
+            "node": "Merge Installation info",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Extract Installation Settings": {
+      "main": [
+        [
+          {
+            "node": "Merge request data with installation settings",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge request data with installation settings": {
+      "main": [
+        [
+          {
+            "node": "Process Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
