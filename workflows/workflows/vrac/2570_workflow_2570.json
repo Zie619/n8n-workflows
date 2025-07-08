@@ -1,0 +1,557 @@
+{
+  "nodes": [
+    {
+      "id": "6aa059e4-e78f-4bbd-a707-994a39840f97",
+      "name": "Create Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -520,
+        240
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/com.atproto.server.createSession",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "identifier",
+              "value": "youruser.bsky.social"
+            },
+            {
+              "name": "password",
+              "value": "your-app-passord-here"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.1
+    },
+    {
+      "id": "143e37b0-de79-4329-99a2-51484c9609a8",
+      "name": "List followers",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -280,
+        240
+      ],
+      "parameters": {
+        "url": "https://bsky.social/xrpc/app.bsky.graph.getFollowers",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "cursor",
+                    "value": "={{ $response.body.cursor }}"
+                  }
+                ]
+              },
+              "maxRequests": 2,
+              "requestInterval": 250,
+              "limitPagesFetched": true
+            }
+          }
+        },
+        "sendQuery": true,
+        "sendHeaders": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "actor",
+              "value": "={{ $json.did }}"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $item(\"0\").$node[\"Create Session\"].json[\"accessJwt\"] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "f1436a63-a23f-4082-9209-12c21a26ad91",
+      "name": "Convert to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        100,
+        620
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "followers-basuracero.json"
+        },
+        "operation": "toJson"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "f8beea47-6f36-4dfb-b2e7-bf94adb63e66",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        100,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "fromJson"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "41658372-3054-4909-850b-3bffd1b1b79c",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        520,
+        240
+      ],
+      "parameters": {
+        "options": {
+          "destinationFieldName": "did"
+        },
+        "fieldToSplitOut": "newDids"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c94aa8e9-06db-4b24-a20a-5615b7129023",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        740,
+        240
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "4d1c6a2f-3acd-4783-96d4-693ced06fd97",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -100,
+        620
+      ],
+      "webhookId": "b1608475-db84-4f23-acd6-d003f5094afd",
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "e4125cb8-8eb5-4cf0-b00d-e7ce4ec8236e",
+      "name": "Find new followers",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        280,
+        240
+      ],
+      "parameters": {
+        "jsCode": "// Datos de entrada\nconst listFollowers = $('List followers').all()[0].json.followers;\nconst extractFromFile = $('Extract from File').all()[0].json.data[0].followers;\n\n// Verificar que tenemos acceso a los datos\nconsole.log('listFollowers length:', Array.isArray(listFollowers) ? listFollowers.length : 'no es array');\nconsole.log('extractFromFile length:', Array.isArray(extractFromFile) ? extractFromFile.length : 'no es array');\n\n// Mostrar algunos ejemplos de cada lista\nconsole.log('Ejemplo de listFollowers:', listFollowers?.slice(0, 2));\nconsole.log('Ejemplo de extractFromFile:', extractFromFile?.slice(0, 2));\n\n// Crear conjunto de DIDs del archivo extraído\nconst existingDids = new Set(extractFromFile?.map(item => item.did) || []);\nconsole.log('DIDs existentes:', Array.from(existingDids).slice(0, 5));\n\n// Filtrar listFollowers\nconst newFollowers = listFollowers?.filter(follower => !existingDids.has(follower.did)) || [];\n\nreturn {\n  json: {\n    debug: {\n      listFollowersCount: listFollowers?.length || 0,\n      extractFromFileCount: extractFromFile?.length || 0,\n      existingDidsCount: existingDids.size,\n      newFollowersCount: newFollowers.length\n    },\n    newFollowers,\n    newDids: newFollowers.map(follower => follower.did),\n    count: newFollowers.length\n  }\n}"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a28accb5-ee47-431f-83e4-376425e9899e",
+      "name": "Read followers from file",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        -80,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "=followers-{{ $('Create Session').item.json.handle }}.json"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "aa2ab5e1-eb6f-4657-9a9a-66417ffa421e",
+      "name": "Save followers to file",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        280,
+        620
+      ],
+      "parameters": {
+        "options": {
+          "append": false
+        },
+        "fileName": "=followers-{{ $('Create Session').item.json.handle }}.json",
+        "operation": "write"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9a4fb5e5-f2f6-4aa1-846e-8d6460ad7765",
+      "name": "Define welcome message",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        980,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "afe7fe9b-3bd4-4429-afe9-81e5fe934e07",
+              "name": "text",
+              "type": "string",
+              "value": "Hello, thanks for your follow. You can read more about my over my site:"
+            },
+            {
+              "id": "97590cd1-9d85-442b-baa3-bad849ff9be0",
+              "name": "link",
+              "type": "string",
+              "value": "https://yoursite.com"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "594ce66f-acbd-4c31-806c-382aa9a98ed0",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        920,
+        160
+      ],
+      "parameters": {
+        "width": 230,
+        "height": 266,
+        "content": "### 2. Define your welcome message and link here"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c24a7971-11a7-4164-9f2d-78335264f250",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        220,
+        460
+      ],
+      "parameters": {
+        "width": 231,
+        "height": 338,
+        "content": "### 3. **Important** \n\nYou need to manually run \"Save followers to file\" once before the first time so you populate your list of existing followers"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c6e766cf-a118-4db0-8e3c-32662c40737b",
+      "name": "Send message",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1360,
+        260
+      ],
+      "parameters": {
+        "url": "={{ $item(\"0\").$node[\"Create Session\"].json.didDoc.service[0].serviceEndpoint }}/xrpc/chat.bsky.convo.sendMessage",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"convoId\" : \"{{ $json.convo.id }}\",\n  \"message\" : {\n    \"text\" : \"{{ $('Define welcome message').item.json.text }}\\n\\n{{ $('Define welcome message').item.json.link }}\",\n    \"facets\" : [\n     {\n      \"index\" : {\n        \"byteStart\": {{ $('Define welcome message').item.json.text.length }},\n        \"byteEnd\": {{ $('Define welcome message').item.json.text.length + 3 + $('Define welcome message').item.json.link.length}}\n      },\n      \"features\": [\n          {\n            \"$type\": \"app.bsky.richtext.facet#link\",\n            \"uri\": \"{{ $('Define welcome message').item.json.link }}\"\n          }\n        ]\n      }\n    ]\n  }\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $item(\"0\").$node[\"Create Session\"].json[\"accessJwt\"] }}"
+            },
+            {
+              "name": "Atproto-Proxy",
+              "value": "did:web:api.bsky.chat#bsky_chat"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "33aa7e0c-58fe-4527-a94e-49bec0e06325",
+      "name": "Get conversation ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1200,
+        260
+      ],
+      "parameters": {
+        "url": "={{ $item(\"0\").$node[\"Create Session\"].json.didDoc.service[0].serviceEndpoint }}/xrpc/chat.bsky.convo.getConvoForMembers",
+        "options": {},
+        "sendQuery": true,
+        "sendHeaders": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "members",
+              "value": "={{ $('Split Out').item.json.did }}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $item(\"0\").$node[\"Create Session\"].json[\"accessJwt\"] }}"
+            },
+            {
+              "name": "Atproto-Proxy",
+              "value": "did:web:api.bsky.chat#bsky_chat"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "066f1d0d-319a-4676-9c0a-5b00d206ffd2",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        -100
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 479,
+        "height": 307,
+        "content": "## Send a welcome private message to your new BlueSky followers\n\nThis flow will save your current followers in a file and check for new ones on the next execution, sending them the Defined message an link as a private message.\n\nOnce messages are sent, the new list of followers will be saved into the file.\n\n**Important: Follow the yellow notes in order before enabling the full flow for the first time**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a61e301e-a0ca-48e9-9a46-05975662aa90",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -560,
+        40
+      ],
+      "parameters": {
+        "width": 181,
+        "height": 364,
+        "content": "### 1. Define your Bluesky user and app password first\n\nThe App password should have access to private messages"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1b1dcd74-7a71-49e4-99e8-c079b692aca5",
+      "name": "Each 60 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -720,
+        240
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 60
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "6acf153c-cdc6-42c1-85f9-2692c8777eef",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        520,
+        620
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Session": {
+      "main": [
+        [
+          {
+            "node": "List followers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List followers": {
+      "main": [
+        [
+          {
+            "node": "Read followers from file",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Save followers to file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Each 60 minutes": {
+      "main": [
+        [
+          {
+            "node": "Create Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Define welcome message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Find new followers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find new followers": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get conversation ID": {
+      "main": [
+        [
+          {
+            "node": "Send message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define welcome message": {
+      "main": [
+        [
+          {
+            "node": "Get conversation ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save followers to file": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read followers from file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

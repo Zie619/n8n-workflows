@@ -1,0 +1,286 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "94fc73af-a35d-4d5c-a192-6190d2a731ff",
+      "name": "Keep only UserId and email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1200,
+        260
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "ZendeskUserId",
+              "value": "={{ $json[\"id\"] }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "ZendeskEmail",
+              "value": "={{ $json[\"email\"] }}"
+            },
+            {
+              "name": "ZendeskPhone",
+              "value": "={{ $json[\"phone\"]  }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6decc852-d5b9-40c4-b51e-832283637027",
+      "name": "User exists in Zendesk",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1660,
+        140
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json[\"ZendeskUserId\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "70fa2ad7-c43c-4d22-ba6d-89495f8b5794",
+      "name": "Add Zendesk contact Id to Shopify data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1420,
+        140
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "email",
+        "propertyName2": "ZendeskEmail"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "346d3e04-433c-4b43-868f-729d3ee67ee2",
+      "name": "On customer updated",
+      "type": "n8n-nodes-base.shopifyTrigger",
+      "position": [
+        740,
+        120
+      ],
+      "webhookId": "a0d5e8ea-3f53-496e-a41b-cb022f715b43",
+      "parameters": {
+        "topic": "customers/update"
+      },
+      "credentials": {
+        "shopifyApi": {
+          "id": "10",
+          "name": "Shopify account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a2ff1fa3-d67a-4abb-94ae-f22cad7de359",
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2160,
+        180
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "41418930-0898-4602-88a3-cf4238f32890",
+      "name": "Contact data is modified",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1940,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"phone\"] }}",
+              "value2": "={{ $json[\"ZendeskPhone\"] }}",
+              "operation": "notEqual"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ee1791fb-eaa0-4829-af3b-e72d7b3e80d5",
+      "name": "Create contact in Zendesk",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        1940,
+        240
+      ],
+      "parameters": {
+        "name": "={{ $json[\"first_name\"] }} {{ $json[\"last_name\"] }}",
+        "resource": "user",
+        "additionalFields": {
+          "email": "={{ $json[\"email\"] }}",
+          "phone": "={{ $json[\"phone\"] ?? ' ' }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "67dc85c6-39af-43cc-951e-bcfd31b73e46",
+      "name": "Update contact in Zendesk",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        2160,
+        -20
+      ],
+      "parameters": {
+        "id": "={{ $json[\"ZendeskUserId\"] }}",
+        "resource": "user",
+        "operation": "update",
+        "updateFields": {
+          "phone": "={{ $json[\"phone\"] ?? 0}}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9ab30a51-e599-4361-b170-b18b9d4021cb",
+      "name": "Search contact by email adress",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        1000,
+        260
+      ],
+      "parameters": {
+        "limit": 1,
+        "filters": {
+          "query": "={{ $json[\"email\"] }}"
+        },
+        "resource": "user",
+        "operation": "search"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "On customer updated": {
+      "main": [
+        [
+          {
+            "node": "Add Zendesk contact Id to Shopify data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search contact by email adress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User exists in Zendesk": {
+      "main": [
+        [
+          {
+            "node": "Contact data is modified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create contact in Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact data is modified": {
+      "main": [
+        [
+          {
+            "node": "Update contact in Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only UserId and email": {
+      "main": [
+        [
+          {
+            "node": "Add Zendesk contact Id to Shopify data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Search contact by email adress": {
+      "main": [
+        [
+          {
+            "node": "Keep only UserId and email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Zendesk contact Id to Shopify data": {
+      "main": [
+        [
+          {
+            "node": "User exists in Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

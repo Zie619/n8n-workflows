@@ -1,0 +1,665 @@
+{
+  "meta": {
+    "instanceId": "7858a8e25b8fc4dae485c1ef345e6fe74effb1f5060433ef500b4c186c965c18"
+  },
+  "nodes": [
+    {
+      "id": "49ab7596-665e-4a0f-bb8b-9dc04525ce88",
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2340,
+        1440
+      ],
+      "parameters": {
+        "message": "={{ $json.html }}",
+        "options": {},
+        "subject": "Podcast Review"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1MUdv1HbrQUFABiZ",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "40aa23f4-69d6-46e5-84a2-b46a64a3f0af",
+      "name": "TaddyTopDaily",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1620,
+        820
+      ],
+      "parameters": {
+        "url": "https://api.taddy.org/",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=query {   getTopChartsByGenres(          limitPerPage:10,     filterByCountry:UNITED_STATES_OF_AMERICA,     taddyType:PODCASTEPISODE,      genres:PODCASTSERIES_{{ $json.genre }}){     topChartsId      podcastEpisodes{       uuid       name audioUrl      podcastSeries{         uuid         name       }     }   } }"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-USER-ID"
+            },
+            {
+              "name": "X-API-KEY"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "42eea23b-b09c-49ee-af5b-12abb3960390",
+      "name": "Genre",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1420,
+        820
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e995cd5b-b91c-4a9d-8215-44d7dfe3f52f",
+              "name": "genre",
+              "type": "string",
+              "value": "TECHNOLOGY"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "da256fbf-ed7b-4a26-9fa8-33d1c2b717a5",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1840,
+        820
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data.getTopChartsByGenres.podcastEpisodes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "069ab68c-dcd6-406f-8e7f-2597f62a04f5",
+      "name": "Whisper Transcribe Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1880,
+        1120
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "whisper-1"
+            },
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "nodeCredentialType": "openAiApi"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "tTOOlpAaNT3QoKbQ",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ffa67b8d-8601-4e1d-8f72-b6266e6b3327",
+      "name": "Final Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2320,
+        1120
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "={\n\"podcast\": \"{{ $('TaddyTopDaily').item.json.data.getTopChartsByGenres.podcastEpisodes[$itemIndex].podcastSeries.name }}\",\n\"name\": \"{{ $('TaddyTopDaily').item.json.data.getTopChartsByGenres.podcastEpisodes[$itemIndex].name.replace(/\\\"/g,'\\\"') }}\",\n \"url\":\"{{ $('TaddyTopDaily').item.json.data.getTopChartsByGenres.podcastEpisodes[$itemIndex].audioUrl.replace(/\"/g,'') }}\",\n\"summary\":\"{{ $json.message.content.replace(/\\\\/g, '\\\\\\\\').replace(/\"/g, '\\\\\"').replace(/\\n/g, '<br/>').replace(/\\r/g, '\\\\r').replace(/\\t/g, '\\\\t') }}\"\n  \n}\n"
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "88cd1fa5-07ae-4dcd-b4f8-85cbf7c98d73",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1900,
+        1440
+      ],
+      "parameters": {
+        "jsCode": "return [{fields:$input.all().map(x=>x.json)}]"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4c2c80d1-750f-42f1-a0f1-343dec325b0f",
+      "name": "HTML",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        2120,
+        1440
+      ],
+      "parameters": {
+        "html": "<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\" />\n</head>\n<body>\n  <table>\n    <tr> \n      {{ ['Podcast', 'Episode', 'Summary'].map(propname=>'<td><h4>'+propname+'</h4></td>').join('')  }}\n    </tr>\n    {{ $json.fields.map(ep=>{ return `<tr><td>${ep.podcast}</td><td><a href=\"${ep.url}\">${ep.name}</a></td><td>${ep.summary}</td><td></td></tr>`} ) }}\n  </table>\n</body>\n</html>\n\n<style>\ntr { \n     border: 1px solid #000;    \n     padding: 8px;   \n }\n.container {\n  background-color: #ffffff;\n  text-align: center;\n  padding: 16px;\n  border-radius: 8px;\n}\n\nh1 {\n  color: #ff6d5a;\n  font-size: 24px;\n  font-weight: bold;\n  padding: 8px;\n}\n\nh2 {\n  color: #909399;\n  font-size: 18px;\n  font-weight: bold;\n  padding: 8px;\n}\n</style>\n"
+      },
+      "executeOnce": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "f1d13556-2c3a-48e5-84a1-5b82f338c6ba",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        340,
+        760
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 547.952991050529,
+        "height": 683.5200847858991,
+        "content": "## Daily Podcast Summary\n### This workflow will summarize the content in the day's top podcasts for a certain genre, then send you the podcasts with summaries by email\n\n## Setup:\n 1. Create a free API key on Taddy here: https://taddy.org/signup/developers\n 2. Input your user number and API key into the `TaddyTopDaily` node in the header parameters X-USER-ID and X-API-KEY respectively.\n 3. Create access credentials for your Gmail as described here: https://developers.google.com/workspace/guides/create-credentials. Use the credentials from your *client_secret.json* in the `Gmail` node.\n 4. In the `Genre` node, set the genre of podcasts you want a summary for. Valid values are: TECHNOLOGY, NEWS, ARTS, COMEDY, SPORTS, FICTION, etc. Look at api.taddy.org for the full list (they will be displayed in the help docs as PODCASTSERIES_TECHNOLOGY, PODCASTSERIES_NEWS, etc.)\n 5. Enter your email address in the `Gmail` node.\n 6. Change the schedule time for sending email from `Schedule` to whichever time you want to receive the email.\n \n\n## Test:\n- Link a `Test Workflow` node in place of the `Schedule` node.\n- Hit Test Workflow.\n- Check your email for the results."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5aee7279-349e-47cd-99dc-7a32677b5a20",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1820,
+        1060
+      ],
+      "parameters": {
+        "width": 651.4454343326669,
+        "height": 252.64899257060446,
+        "content": "### Whisper transcribes and Open AI summarizes the podcast"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f8b4a203-b27f-4a11-90ef-a7e1561219f5",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1100,
+        760
+      ],
+      "parameters": {
+        "width": 1189.7320416038633,
+        "height": 249.2202456997519,
+        "content": "### Get daily list of top podcasts (according to Apple charts) and download audio, then crop for OpenAI"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7045c9c8-5509-4dc0-b167-ddd4d6c90c22",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1825,
+        1384
+      ],
+      "parameters": {
+        "width": 645.0210885124873,
+        "height": 227.94126205257731,
+        "content": "### Finally, send the email!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8dc9583b-cec3-4ac0-a74a-329f6c3b4801",
+      "name": "Summarize Podcast",
+      "type": "n8n-nodes-base.openAi",
+      "position": [
+        2140,
+        1120
+      ],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "prompt": {
+          "messages": [
+            {
+              "content": "=Summarize the major points of the following podcast: {{ $json.text }}. Start your answer by saying 'This episode focuses on', 'This episode is about', etc. Contain your answer to 3-4 paragraphs max, and focus on only key information. "
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 500
+        },
+        "resource": "chat",
+        "requestOptions": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "tTOOlpAaNT3QoKbQ",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e8d122f1-29f9-41ca-9c6b-b72269686fd6",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        1220,
+        820
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "67bc7a5b-8d0a-4de4-918d-410551dad4d7",
+      "name": "Request Audio Crop",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1000,
+        1220
+      ],
+      "parameters": {
+        "url": "https://api.products.aspose.app/audio/cutter/api/cutter",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "1",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "convertOption",
+              "value": "{\"startTime\":\"00:08:00\",\"endTime\":\"00:24:00\",\"audioFormat\":\"mp3\"}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "*/*("
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "Origin",
+              "value": "https://products.aspose.app"
+            },
+            {
+              "name": "Referer",
+              "value": "https://products.aspose.app"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "empty"
+            },
+            {
+              "name": "Sec-Fetch-Mode",
+              "value": "cors"
+            },
+            {
+              "name": "Sec-Fetch-Site",
+              "value": "same-site"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "0dc62507-3fea-45d7-a0dc-e92fb8e2600f",
+      "name": "Get Download Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1200,
+        1220
+      ],
+      "parameters": {
+        "url": "=https://api.products.aspose.app/audio/cutter/api/cutter/HandleStatus?fileRequestId={{ $('Request Audio Crop').item.json.Data.FileRequestId }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json, text/javascript, */*; q=0.01"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "Origin",
+              "value": "https://products.aspose.app"
+            },
+            {
+              "name": "Referer",
+              "value": "https://products.aspose.app"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "empty"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "cors"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "same-site"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "8aa65189-2a4b-4ac4-9915-45ccd679a5da",
+      "name": "Download Cut MP3",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1660,
+        1140
+      ],
+      "parameters": {
+        "url": "={{ $json.Data.DownloadLink }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "4e7318df-dbaa-4d9f-858d-4455ead763c1",
+      "name": "Download Podcast",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2060,
+        820
+      ],
+      "parameters": {
+        "url": "={{ $json.audioUrl }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "ab4601c6-7387-4f2f-a2f3-4256f88c0b3e",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1600,
+        1360
+      ],
+      "webhookId": "bc28bc57-d9ea-430e-88db-78d088a058cb",
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "a0b300b9-aaad-48f1-8319-a03700e0d298",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        920,
+        1100
+      ],
+      "parameters": {
+        "width": 898.7483569555845,
+        "height": 387.3779915472271,
+        "content": "### Crop the podcast down before analysis"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "34ca89fe-4ed1-491f-b3b9-32e97040959b",
+      "name": "If Downloads Ready",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1380,
+        1180
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "49440938-0cb3-41c8-bcab-b7ad96973f77",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $input.all().map(x=>x.json.Data.DownloadLink).reduce((accumulator, currentValue) => accumulator && currentValue, true)\n}}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      },
+      "typeVersion": 2.1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Get Download Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Genre": {
+      "main": [
+        [
+          {
+            "node": "TaddyTopDaily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Genre",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Download Podcast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Data": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TaddyTopDaily": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Cut MP3": {
+      "main": [
+        [
+          {
+            "node": "Whisper Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Podcast": {
+      "main": [
+        [
+          {
+            "node": "Request Audio Crop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Download Link": {
+      "main": [
+        [
+          {
+            "node": "If Downloads Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Podcast": {
+      "main": [
+        [
+          {
+            "node": "Final Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Downloads Ready": {
+      "main": [
+        [
+          {
+            "node": "Download Cut MP3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Audio Crop": {
+      "main": [
+        [
+          {
+            "node": "Get Download Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whisper Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Summarize Podcast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

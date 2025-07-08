@@ -1,0 +1,370 @@
+{
+  "nodes": [
+    {
+      "id": "d49ee203-5bd1-45c0-859d-f1b248bfdf71",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        280,
+        40
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 424.4907862645661,
+        "height": 154.7766688696994,
+        "content": "### 👨‍🎤 Setup\n1. Add Todoist creds\n2. Create a `template` list to copy from in Todoist. Add days and due times on each task as necessary.\n3. Set the projects to copy from and to write to in each **Todoist** node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e69dd4e2-7ff6-4613-a1c9-ac1f3da37955",
+      "name": "Get all tasks from template project",
+      "type": "n8n-nodes-base.todoist",
+      "position": [
+        860,
+        420
+      ],
+      "parameters": {
+        "filters": {
+          "projectId": "2299363018"
+        },
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "todoistApi": {
+          "id": "1",
+          "name": "Todoist account"
+        }
+      },
+      "executeOnce": true,
+      "retryOnFail": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "fa907d45-3822-4549-9f84-8385bb4183cc",
+      "name": "Parse task details",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1080,
+        420
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = {};\n\nitem.description = $input.item.json.description;\nitem.content = $input.item.json.content;\n\nconst parts = item.description.split(';').map((v) => v.trim());\nparts.forEach((v) => {\n  const tag = v.split(':');\n  if (tag && tag.length === 2) {\n    item[tag[0]] = tag[1].trim();\n  }\n});\n\nif (item.due) {\n  item.due = parseTimeString(item.due);\n}\n\nreturn item;\n\nfunction parseTimeString(timeString) {\n    const regex = /^(\\d{1,2})(\\.)?(\\d{2})?([ap]m)$/i;\n    const match = timeString.match(regex);\n    \n    if (!match) {\n        throw new Error(\"Invalid time format\");\n    }\n\n    let hours = parseInt(match[1], 10);\n    let minutes = match[3] ? parseInt(match[3], 10) : 0;\n    const period = match[4].toLowerCase();\n\n    if (hours === 12) {\n        hours = period === 'am' ? 0 : 12;\n    } else {\n        hours = period === 'pm' ? hours + 12 : hours;\n    }\n\n    // Check if minutes are valid\n    if (minutes < 0 || minutes >= 60) {\n        throw new Error(\"Invalid minutes\");\n    }\n\n    const now = DateTime.now().set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });\n    return now.toUTC();\n}\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4989bac6-0741-4cdc-bc9c-e7800f9b3019",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1140,
+        600
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 351.4230769230764,
+        "height": 222.50000000000006,
+        "content": "### 👆 This adds due dates to tasks from description.. \n### For example in the description of a task\n`days:mon,tues; due:8am`\n### So that it will create a task every Monday and Tuesday that's due at 8am ⏰"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "accc330b-1b67-4181-8735-94b0debc8d70",
+      "name": "Keep tasks that match today",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1300,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.days }}",
+              "value2": "={{ ['sun', 'mon', 'tues', 'wed', 'thurs', 'fri', 'sat', 'sun'][new Date().getDay()] }}",
+              "operation": "contains"
+            },
+            {
+              "value1": "={{ $json.days }}",
+              "value2": "={{ ['sun', 'mon', 'tues', 'wed', 'thurs', 'fri', 'sat', 'sun'][new Date().getDay()] }}",
+              "operation": "contains"
+            }
+          ]
+        },
+        "combineConditions": "OR"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "dbe1fc24-1833-493b-b444-de21a4b3c3c5",
+      "name": "Every day at 5:10am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        620,
+        420
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 5,
+              "triggerAtMinute": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "b4737822-89aa-4ca0-bd9b-c5f9a16360c0",
+      "name": "Every day at 5am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        400,
+        220
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 5,
+              "triggerAtMinute": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2a9adc4b-552b-47a9-a32c-54d8d4bfb669",
+      "name": "Get all tasks from Inbox",
+      "type": "n8n-nodes-base.todoist",
+      "position": [
+        620,
+        220
+      ],
+      "parameters": {
+        "filters": {
+          "projectId": "938017196"
+        },
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "todoistApi": {
+          "id": "1",
+          "name": "Todoist account"
+        }
+      },
+      "executeOnce": false,
+      "retryOnFail": true,
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "d4794543-3002-4663-8979-360eb437fb4e",
+      "name": "If list not empty",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        840,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"id\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "297fcbcb-efe3-4965-b836-34e78a3b452d",
+      "name": "if it has daily label",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1080,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ ($json[\"labels\"] || []).includes('daily') }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0365a865-f03b-4afc-a535-4e3892fc3add",
+      "name": "Delete task",
+      "type": "n8n-nodes-base.todoist",
+      "position": [
+        1280,
+        220
+      ],
+      "parameters": {
+        "taskId": "={{ $json[\"id\"] }}",
+        "operation": "delete"
+      },
+      "credentials": {
+        "todoistApi": {
+          "id": "1",
+          "name": "Todoist account"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "b14a8ecc-ee07-4a33-ab4b-122c98694c60",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1740,
+        440
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 256.14371825927645,
+        "height": 100,
+        "content": "### 👈🏽 Every new task has `daily` label that gets deleted in the other flow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d951f461-685e-4507-b010-bce2be0e3709",
+      "name": "Create new task in Inbox",
+      "type": "n8n-nodes-base.todoist",
+      "position": [
+        1520,
+        420
+      ],
+      "parameters": {
+        "labels": [
+          "daily"
+        ],
+        "content": "={{ $json.content }}",
+        "options": {
+          "description": "={{ $json.description }}",
+          "dueDateTime": "={{ $json.due }}"
+        },
+        "project": {
+          "__rl": true,
+          "mode": "list",
+          "value": "938017196",
+          "cachedResultName": "Inbox"
+        }
+      },
+      "credentials": {
+        "todoistApi": {
+          "id": "1",
+          "name": "Todoist account"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 2,
+      "alwaysOutputData": false
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every day at 5am": {
+      "main": [
+        [
+          {
+            "node": "Get all tasks from Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If list not empty": {
+      "main": [
+        [
+          {
+            "node": "if it has daily label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse task details": {
+      "main": [
+        [
+          {
+            "node": "Keep tasks that match today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every day at 5:10am": {
+      "main": [
+        [
+          {
+            "node": "Get all tasks from template project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if it has daily label": {
+      "main": [
+        [
+          {
+            "node": "Delete task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all tasks from Inbox": {
+      "main": [
+        [
+          {
+            "node": "If list not empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep tasks that match today": {
+      "main": [
+        [
+          {
+            "node": "Create new task in Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all tasks from template project": {
+      "main": [
+        [
+          {
+            "node": "Parse task details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

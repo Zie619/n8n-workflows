@@ -1,0 +1,428 @@
+{
+  "nodes": [
+    {
+      "name": "Receive Slash Command",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        240,
+        100
+      ],
+      "webhookId": "3c0d3820-5896-41c5-83bf-1cd5e956c32c",
+      "parameters": {
+        "path": "3c0d3820-5896-41c5-83bf-1cd5e956c32c",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        680,
+        200
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 403
+        },
+        "respondWith": "noData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        680,
+        0
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "operation",
+              "value": "={{$json[\"body\"][\"text\"].split(\" \")[0].toLowerCase()}}"
+            },
+            {
+              "name": "email",
+              "value": "={{$json[\"body\"][\"text\"].split(\" \")[1].toLowerCase()}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Read Command",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "delete"
+            }
+          ]
+        },
+        "value1": "={{$json[\"operation\"]}}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Wrong Command Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1120,
+        100
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "{\n  \"text\": \"Sorry, I didn't understand your command. You can request data deletion like so: `/gdpr delete <email>`.\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Acknowledge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1340,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "{\n  \"text\": \"On it!\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Empty Email?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1120,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"email\"]}}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Missing Email Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1340,
+        -200
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "{\n  \"text\": \"It looks like the user email address is missing. You can request data deletion like so: `/gdpr delete <email>`.\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Valid Token?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        460,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"body\"][\"token\"]}}",
+              "value2": "foo"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Paddle Data Deletion",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        1560,
+        0
+      ],
+      "parameters": {
+        "workflowId": "1231"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Customer.io Data Deletion",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        1780,
+        0
+      ],
+      "parameters": {
+        "workflowId": "1237"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Zendesk Data Deletion",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        2000,
+        0
+      ],
+      "parameters": {
+        "workflowId": "1240"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        1780,
+        200
+      ],
+      "parameters": {
+        "table": "Log",
+        "options": {},
+        "operation": "append",
+        "application": "app3wAXUUwalhapFV"
+      },
+      "credentials": {
+        "airtableApi": {
+          "id": "12",
+          "name": "mutedjam@n8n.io"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Prepare Log Entry",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1340,
+        200
+      ],
+      "parameters": {
+        "functionCode": "let deletion_nodes = [\n  'Paddle Data Deletion',\n  'Customer.io Data Deletion',\n  'Zendesk Data Deletion'\n]\n\nconst deletion_results = deletion_nodes.map(node_name => $items(node_name)[0].json);\nconst deletion_success = deletion_results.filter(json => json.success == true).length == deletion_nodes.length;\n\nreturn [{\n  json: {\n    Result: deletion_success ? 'Done' : 'Error',\n    Notes: deletion_results.map(json => json.service + ': ' + json.message).join('\\n'),\n    Processed: new Date().toISOString()\n  }\n}];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Crypto",
+      "type": "n8n-nodes-base.crypto",
+      "position": [
+        1560,
+        200
+      ],
+      "parameters": {
+        "type": "SHA256",
+        "value": "={{$node[\"Set\"].json[\"email\"]}}",
+        "dataPropertyName": "Email Hash"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Respond to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2000,
+        200
+      ],
+      "parameters": {
+        "url": "={{$node[\"Receive Slash Command\"].json[\"body\"][\"response_url\"]}}",
+        "options": {},
+        "requestMethod": "POST",
+        "responseFormat": "string",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "text",
+              "value": "=GDPR data deletion process finished.\nStatus: {{$node[\"Prepare Log Entry\"].json[\"Result\"] == \"Done\" ? \":white_check_mark: OK\" : \":x: Error\"}}\nLog: <https://airtable.com/app3wAXUUwalhapFV/tbljkxW55l2Gq7Fzq/viwOJdJM1taITEaPr/{{$node[\"Airtable\"].json[\"id\"]}}?blocks=hide|View in Airtable>"
+            },
+            {
+              "name": "delete_original",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Read Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crypto": {
+      "main": [
+        [
+          {
+            "node": "Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable": {
+      "main": [
+        [
+          {
+            "node": "Respond to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge": {
+      "main": [
+        [
+          {
+            "node": "Paddle Data Deletion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Empty Email?": {
+      "main": [
+        [
+          {
+            "node": "Missing Email Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Acknowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Command": {
+      "main": [
+        [
+          {
+            "node": "Empty Email?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        null,
+        null,
+        [
+          {
+            "node": "Wrong Command Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Token?": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Log Entry": {
+      "main": [
+        [
+          {
+            "node": "Crypto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Paddle Data Deletion": {
+      "main": [
+        [
+          {
+            "node": "Customer.io Data Deletion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Slash Command": {
+      "main": [
+        [
+          {
+            "node": "Valid Token?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zendesk Data Deletion": {
+      "main": [
+        [
+          {
+            "node": "Prepare Log Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer.io Data Deletion": {
+      "main": [
+        [
+          {
+            "node": "Zendesk Data Deletion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

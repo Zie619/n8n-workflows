@@ -1,0 +1,284 @@
+{
+  "nodes": [
+    {
+      "name": "RSS Feed Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        420,
+        -20
+      ],
+      "parameters": {
+        "url": "={{$node[\"SplitInBatches\"].json[\"url\"]}}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "SplitInBatches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        200,
+        -20
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 1
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        -240,
+        -20
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "only get new RSS",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        640,
+        -20
+      ],
+      "parameters": {
+        "functionCode": "const staticData = getWorkflowStaticData('global');\nconst newRSSIds = items.map(item => item.json[\"isoDate\"]);\nconst oldRSSIds = staticData.oldRSSIds; \n\nif (!oldRSSIds) {\n  staticData.oldRSSIds = newRSSIds;\n  return items;\n}\n\n\nconst actualNewRSSIds = newRSSIds.filter((id) => !oldRSSIds.includes(id));\nconst actualNewRSS = items.filter((data) => actualNewRSSIds.includes(data.json['isoDate']));\nstaticData.oldRSSIds = [...actualNewRSSIds, ...oldRSSIds];\n\nreturn actualNewRSS;\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Telegram_IT",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1220,
+        460
+      ],
+      "parameters": {
+        "text": "={{$json[\"title\"]}}\n{{$json[\"link\"]}}",
+        "chatId": "TelegramID",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2",
+          "name": "IT_RSS"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Telegram_Security",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1220,
+        220
+      ],
+      "parameters": {
+        "text": "={{$json[\"title\"]}}\n{{$json[\"link\"]}}",
+        "chatId": "TelegramID",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "4",
+          "name": "Security_RSS"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "RSS Source",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -20,
+        -20
+      ],
+      "parameters": {
+        "functionCode": "return [\n  {\n    json: {\n      url: 'https://feeds.feedburner.com/UnikosHardware',\n    }\n  },\n  {\n    json: {\n      url: 'http://www.ithome.com.tw/rss.php',\n    }\n  },\n  {\n    json: {\n      url: 'http://feeds.feedburner.com/playpc',\n    }\n  },\n  {\n    json: {\n      url: 'https://lab.ocf.tw/feed/',\n    }\n  },\n  {\n    json: {\n      url: 'https://techcommunity.microsoft.com/plugins/custom/microsoft/o365/custom-blog-rss?tid=3754543230341459569&board=microsoft_365blog',\n    }\n  }\n];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Telegram_M365",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1220,
+        -40
+      ],
+      "parameters": {
+        "text": "={{$json[\"title\"]}}\n{{$json[\"link\"]}}",
+        "chatId": "TelegramID",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "5",
+          "name": "M365_RSS"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF-2",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        880,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"title\"]}}",
+              "value2": "資安|資訊安全|安全|外洩|監控|威脅|漏洞|封鎖|修補|攻擊|入侵|個資|隱私|私密|騙|社交工程|釣魚|駭|Security|security|Secure|secure",
+              "operation": "regex"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF-1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        880,
+        -20
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"link\"]}}",
+              "value2": "techcommunity.microsoft.com",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Clear Function",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -20,
+        -180
+      ],
+      "parameters": {
+        "functionCode": "// Get the global workflow static data\nconst staticData = getWorkflowStaticData('global');\n// Update its data\nstaticData.oldRSSIds = new Date().getTime();\n// Delete data\ndelete staticData.oldRSSIds;\n\nreturn [\n  {\n    json: {}\n  }\n]"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "RSS Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF-1": {
+      "main": [
+        [
+          {
+            "node": "Telegram_M365",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF-2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF-2": {
+      "main": [
+        [
+          {
+            "node": "Telegram_Security",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram_IT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Source": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Feed Read": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "only get new RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches": {
+      "main": [
+        [
+          {
+            "node": "RSS Feed Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "only get new RSS": {
+      "main": [
+        [
+          {
+            "node": "IF-1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,243 @@
+{
+  "id": "heyKyETy1uK0xoX4",
+  "meta": {
+    "instanceId": "d00caf92aa0876c596905aea78b35fa33a722cc8e479133822c17064d15c2c1d",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Optimize Prompt",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "a58be0f5-d11d-4bec-bd8c-0c3a7325b22b",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -1880,
+        820
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "67fe408f-e889-4eeb-9e48-f60a579c69f0",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -1600,
+        720
+      ],
+      "parameters": {
+        "text": "={{ $json.query }}",
+        "options": {
+          "systemMessage": "Given the user's initial prompt below, please enhance it. Start with a clear, precise instruction at the beginning. Include specific details about the desired context, outcome, length, format, and style. Provide examples of the desired output format, if applicable. Use appropriate leading words or phrases to guide the desired output, especially for code generation. Avoid any vague or imprecise language. Rather than only stating what not to do, provide guidance on what should be done instead. Ensure the revised prompt remains true to the user's original intent. Do not provide examples of desired prompt format, only describe it. Format your response in markdown."
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "8a041b31-1873-4559-96d0-35d313bffbbd",
+      "name": "Telegram3",
+      "type": "n8n-nodes-base.telegram",
+      "onError": "continueErrorOutput",
+      "position": [
+        -1000,
+        820
+      ],
+      "webhookId": "4f57022f-14cf-4c3e-b810-ae9395bf3d04",
+      "parameters": {
+        "text": "={{ $json.text }}",
+        "chatId": "={{ $('When Executed by Another Workflow').item.json.chat_id }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "Vh36aBswWhClYxBM",
+          "name": "Telegram account 2"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "5161b177-0663-41c5-b778-ac14756f699c",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -1680,
+        860
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "vIXW5likFrTSZUgz",
+          "name": "Litellm-account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "d5f36955-74a0-4a9a-b49d-0230d6ee35bf",
+      "name": "Split into chunks1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1180,
+        820
+      ],
+      "parameters": {
+        "jsCode": "// Get the entire output of the previous node\nlet text = $input.all() || '';\n\n// Convert the output to a string if it's not already\nif (typeof text !== 'string') {\n  text = JSON.stringify(text, null, 2); // Pretty-print JSON objects\n}\n\n// Replace multiple newlines (\\n\\n+) with a single newline (\\n)\ntext = text.replace(/\\n{2,}/g, '\\n');\n\nconst maxLength = 3072; // Telegram message character limit\nconst messages = [];\n\n// Add an optional header for the first chunk\nconst header = `# Optimized prompt\\n\\n`;\nlet currentText = header + text;\n\n// Split the output into chunks of maxLength without splitting words\nwhile (currentText.length > 0) {\n  let chunk = currentText.slice(0, maxLength);\n\n  // Ensure we don't split in the middle of a word\n  if (chunk.length === maxLength && currentText[maxLength] !== ' ') {\n    const lastSpaceIndex = chunk.lastIndexOf(' ');\n    if (lastSpaceIndex > -1) {\n      chunk = chunk.slice(0, lastSpaceIndex);\n    }\n  }\n\n  messages.push(chunk.trim()); // Trim extra whitespace for cleaner output\n  currentText = currentText.slice(chunk.length).trim(); // Remove the chunk from the remaining text\n}\n\n// Return the split messages in Markdown format\nreturn messages.map((chunk) => ({ json: { text: `\\`\\`\\`markdown\\n${chunk}\\n\\`\\`\\`` } }));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b22f3481-caeb-4506-8fe0-c7e2597772b9",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "disabled": true,
+      "position": [
+        -2120,
+        600
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 389,
+        "height": 381,
+        "content": "## Trigger\n\n- Trigger can be anything. For this example the trigger is a call from another workflow and a received Telegram message. \n\n- Note that this workflow can be integrated in the middle of another larger workflow."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2bf7ebcc-2d34-4c56-b9de-c930ccb4f30f",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "disabled": true,
+      "position": [
+        -1720,
+        600
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 489,
+        "height": 381,
+        "content": "# Inference / Optimization\n- Incoming trigger is processed by a LLM with a specific system prompt set aimed at improving the input prompt."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ccc5f97e-6215-41fc-9633-f57857743282",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        -1340,
+        860
+      ],
+      "parameters": {},
+      "typeVersion": 1.3
+    },
+    {
+      "id": "3bfb31b6-add3-4d5b-989e-df88d69e07e8",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "disabled": true,
+      "position": [
+        -1220,
+        600
+      ],
+      "parameters": {
+        "width": 349,
+        "height": 381,
+        "content": "# Improved prompt:\n\n- Send as a response\n\n- Use as input for next nodes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a36fdc9d-d000-4120-99e8-53d49edec74a",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "disabled": true,
+      "position": [
+        -2120,
+        1000
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1249,
+        "height": 541,
+        "content": "# Workflow Documentation\n\n## Description:\nThis workflow is designed to optimize prompts by enhancing user inputs for clarity and specificity using AI. The workflow takes a user-provided prompt as input and uses a Natural Language Processing (NLP) model to refine and improve the prompt. The optimized prompt is then sent back to the user, ready for use in further workflows or processes.\n\n## Setup:\n1. This workflow is suitable for users who want to improve their prompts for better communication and understanding in their workflows.\n2. The workflow utilizes an AI Agent powered by an OpenAI Chat Model to enhance user prompts.\n3. A Telegram node is used to deliver the optimized prompt back to the user.\n4. Ensure you have the necessary credentials set up for Telegram and OpenAI accounts.\n5. Customize the workflow's settings, such as the AI model used for prompt optimization, to suit your requirements.\n6. Activate the workflow once all configurations are set to start optimizing prompts efficiently.\n\n## Expected Outcomes:\n- Users can provide vague or imprecise prompts as input to the workflow.\n- The AI Agent will refine and optimize the prompt, adding clarity and specific details.\n- The optimized prompt will be delivered back to the user via Telegram for further use in workflows or processes.\n\nFor more detailed instructions and guidelines on using this workflow, refer to the detailed setup guide above."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "05beb500-d266-45e7-8f5a-ad3a8c9a72e1",
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Split into chunks1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split into chunks1": {
+      "main": [
+        [
+          {
+            "node": "Telegram3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

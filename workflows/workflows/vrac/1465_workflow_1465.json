@@ -1,0 +1,393 @@
+{
+  "meta": {
+    "instanceId": "8c8c5237b8e37b006a7adce87f4369350c58e41f3ca9de16196d3197f69eabcd"
+  },
+  "nodes": [
+    {
+      "id": "6f869392-1501-49b9-be86-4b767f7ec597",
+      "name": "Previous Month",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        360,
+        420
+      ],
+      "parameters": {
+        "value": "={{Date()}}",
+        "action": "calculate",
+        "options": {},
+        "duration": 1,
+        "timeUnit": "months",
+        "operation": "subtract"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1446eb44-bd1e-4dad-9ecc-c2a1e8cb2ca6",
+      "name": "1st of Every month at 8am",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        180,
+        420
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 8,
+              "mode": "everyMonth"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a044ac76-49d9-4046-b008-2b4adf6512b1",
+      "name": "Check Summary for Illness or Holiday",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        760,
+        420
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "Holiday",
+              "operation": "contains"
+            },
+            {
+              "output": 1,
+              "value2": "Illness",
+              "operation": "contains"
+            }
+          ]
+        },
+        "value1": "={{$json[\"summary\"]}}",
+        "dataType": "string"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6b40beab-7938-4aaa-a8a8-7a1e364dc2de",
+      "name": "Holiday",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        980,
+        220
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "b069f3ce-66d1-4f64-946b-f9fda27db46b",
+      "name": "Illness",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        980,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "5725626b-2bfd-47a0-947e-efd28f0c29fe",
+      "name": "Filter Holiday Days",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1180,
+        220
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Name",
+              "value": "={{$json[\"description\"].split(\",\")[0]}}"
+            },
+            {
+              "name": "Days",
+              "value": "={{(new Date($json[\"end\"][\"date\"]).getTime() - new Date($json[\"start\"][\"date\"]).getTime()) / (1000 * 3600 * 24)}}"
+            },
+            {
+              "name": "Type",
+              "value": "Holiday"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3114eb4f-a5be-452c-9729-b94d2904eb4b",
+      "name": "Filter Illness Days",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1180,
+        400
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Name",
+              "value": "={{$json[\"description\"].split(\",\")[0]}}"
+            },
+            {
+              "name": "Days",
+              "value": "={{(new Date($json[\"end\"][\"date\"]).getTime() - new Date($json[\"start\"][\"date\"]).getTime()) / (1000 * 3600 * 24)}}"
+            },
+            {
+              "name": "Type",
+              "value": "Illness"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "04617849-c162-4af5-9634-ab8ffd925625",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1620,
+        320
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "daf227d9-938d-4110-9a47-5bf8bb661586",
+      "name": "Get previous months events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        560,
+        420
+      ],
+      "parameters": {
+        "options": {
+          "timeMax": "={{new Date().toISOString()}}",
+          "timeMin": "={{$json[\"data\"]}}"
+        },
+        "calendar": "[Select Cal]",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "50",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "19ec862a-e71a-49f9-b799-26f73a410553",
+      "name": "Send email to payroll",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1980,
+        320
+      ],
+      "parameters": {
+        "text": "={{$json[\"message\"]}}",
+        "options": {},
+        "subject": "Absences from last month",
+        "toEmail": "payroll-team@mydomain.tld",
+        "fromEmail": "n8n@mydomain.tld"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "16",
+          "name": "mailtrap"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5805b2e1-e723-4803-a7e0-8df5fd4cf84d",
+      "name": "Combine Holiday Counts",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1380,
+        220
+      ],
+      "parameters": {
+        "jsCode": "let names = $input.all().map(e => e.json.Name);\nlet unique_names = [...new Set(names)];\nlet results = [];\n\nfor (thisName of unique_names) {\n  let result = {\n    \"Name\": thisName,\n    \"Days\": 0,\n    \"Type\": \"Holiday\"\n  }\n\n  for (matching_item of $input.all().filter(e => e.json.Name === thisName)) {\n    result.Days += parseInt(matching_item.json.Days);\n  }\n  \n  results.push(result);\n}\n\nreturn results.map(e => { return {json: e} });"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c30345ae-1a19-4453-a67b-eda71cb7326e",
+      "name": "Combine Illness Counts",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1380,
+        400
+      ],
+      "parameters": {
+        "jsCode": "let names = $input.all().map(e => e.json.Name);\nlet unique_names = [...new Set(names)];\nlet results = [];\n\nfor (thisName of unique_names) {\n  let result = {\n    \"Name\": thisName,\n    \"Days\": 0,\n    \"Type\": \"Illness\"\n  }\n\n  for (matching_item of $input.all().filter(e => e.json.Name === thisName)) {\n    result.Days += parseInt(matching_item.json.Days);\n  }\n  \n  results.push(result);\n}\n\nreturn results.map(e => { return {json: e} });"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7bac2604-ca55-4300-a7a5-38fc96830ba6",
+      "name": "Build the message to send",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1800,
+        320
+      ],
+      "parameters": {
+        "jsCode": "let illnessMessage = \"\";\nlet holidayMessage = \"\";\nlet message = \"Here is a breakdown of absences for the last month.\\n\\n\";\n\n// Loop the input items\nfor (item of $input.all()) {\n  if (item.json.Type == \"Holiday\") {\n    holidayMessage += item.json.Name + \" had \" + item.json.Days + \" days\\n\";\n  }\n  if (item.json.Type == \"Illness\") {\n    illnessMessage += item.json.Name + \" had \" + item.json.Days + \" days\\n\";\n  }\n}\n\nif (holidayMessage != \"\") {\n  message += \"Holiday Events\\n\";\n  message += holidayMessage + \"\\n\";\n} else {\n  message += \"No Holiday Events\\n\";\n}\n\nif (illnessMessage != \"\") {\n  message += \"Illness Events\\n\";\n  message += illnessMessage;\n} else {\n  message += \"No Illness Events\\n\";\n}\n\n// Return our message\nreturn [{json: {message}}];"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Build the message to send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Holiday": {
+      "main": [
+        [
+          {
+            "node": "Filter Holiday Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Illness": {
+      "main": [
+        [
+          {
+            "node": "Filter Illness Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Previous Month": {
+      "main": [
+        [
+          {
+            "node": "Get previous months events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Holiday Days": {
+      "main": [
+        [
+          {
+            "node": "Combine Holiday Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Illness Days": {
+      "main": [
+        [
+          {
+            "node": "Combine Illness Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Holiday Counts": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Illness Counts": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "1st of Every month at 8am": {
+      "main": [
+        [
+          {
+            "node": "Previous Month",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build the message to send": {
+      "main": [
+        [
+          {
+            "node": "Send email to payroll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get previous months events": {
+      "main": [
+        [
+          {
+            "node": "Check Summary for Illness or Holiday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Summary for Illness or Holiday": {
+      "main": [
+        [
+          {
+            "node": "Holiday",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Illness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

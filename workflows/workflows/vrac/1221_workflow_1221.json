@@ -1,0 +1,132 @@
+{
+  "nodes": [
+    {
+      "name": "Calendly Trigger",
+      "type": "n8n-nodes-base.calendlyTrigger",
+      "position": [
+        -600,
+        1700
+      ],
+      "webhookId": "f3436daa-42cd-4ac9-93ff-750a9cc28165",
+      "parameters": {
+        "events": [
+          "invitee.created"
+        ]
+      },
+      "credentials": {
+        "calendlyApi": "calendly_api"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Pipedrive",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        -400,
+        1600
+      ],
+      "parameters": {
+        "type": "call",
+        "subject": "={{$json[\"payload\"][\"event_type\"][\"name\"]}} with {{$json[\"payload\"][\"invitee\"][\"name\"]}} on {{$json[\"payload\"][\"event\"][\"invitee_start_time\"]}}",
+        "resource": "activity",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "pipedriveApi": "pipedriveapi"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Date & Time",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        -400,
+        1800
+      ],
+      "parameters": {
+        "value": "={{$json[\"payload\"][\"event\"][\"end_time\"]}}",
+        "action": "calculate",
+        "options": {},
+        "duration": 15,
+        "timeUnit": "minutes",
+        "dataPropertyName": "feedback_time"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        0,
+        1800
+      ],
+      "parameters": {
+        "text": "={{$json[\"payload\"][\"event\"][\"assigned_to\"][0]}}, today you had a {{$json[\"payload\"][\"event_type\"][\"name\"]}} {{$json[\"payload\"][\"event_type\"][\"kind\"]}} meeting with {{$json[\"payload\"][\"invitee\"][\"name\"]}}. Please write your notes from the call here [link] and mark this message with ✅ when you're done.",
+        "channel": "salesteam",
+        "blocksUi": {
+          "blocksValues": []
+        },
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": "slack_nodeqa"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -200,
+        1800
+      ],
+      "webhookId": "05c224b9-6ca7-40e7-97cb-bc1ddc3b55af",
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{$json[\"feedback_time\"]}}"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pipedrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

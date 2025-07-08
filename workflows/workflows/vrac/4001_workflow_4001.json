@@ -1,0 +1,606 @@
+{
+  "meta": {
+    "instanceId": "02e782574ebb30fbddb2c3fd832c946466d718819d25f6fe4b920124ff3fc2c1",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "13f8de57-7247-4be1-8fc4-dddc1a7d677e",
+      "name": "Scheduled Start: Daily Churn Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        160,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "8f52666a-7247-4058-a775-2be80e3b4c0e",
+      "name": "Fetch Customer Data from Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "returnFirstMatch": false
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 1698897552,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k/edit#gid=1698897552",
+          "cachedResultName": "Customer Data"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k/edit?usp=drivesdk",
+          "cachedResultName": "Medium Post Automation"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VV5AyFvgYkc4TfC7",
+          "name": "Onur Drive "
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "37951981-3c3d-4434-8782-51e9129f0bbc",
+      "name": "Filter High Churn Risk & No Campaign Customers",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        760,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9b78accc-0926-4537-8ce9-70206dd45525",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.predicted_churn_score.toNumber() }}",
+              "rightValue": 0.7
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4152752b-3ba3-4af0-aec8-aba9fc0424d9",
+      "name": "Check if Eligible Customers Found",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1140,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "2b03f228-f10c-43c1-90f8-a2ef397d2e0b",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.isEmpty() }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "c1164b8f-4497-4763-bb42-7187e9f2f4d2",
+      "name": "Process Each Eligible Customer",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1640,
+        -320
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "8896a776-ed5b-431a-908b-663fa8475c77",
+      "name": "Generate Win-Back Offer",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        2100,
+        -300
+      ],
+      "parameters": {
+        "text": "=",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=\n**You are an AI assistant designed to analyze customer data and determine a win-back offer based on specific churn prediction scores and preferences.**\n\n**Input:** You will receive customer data as a JSON object.\n\n**Task:** Analyze the fields `'predicted_churn_score': {{ $json.predicted_churn_score }}` and `'preferred_categories': \"{{ $json.preferred_categories }}\"` in the input JSON. Apply the following rules to determine the appropriate offer details:\n\n**Rules:**\n\n1. If `predicted_churn_score` is greater than or equal to 0.7 and less than or equal to 0.8:\n\n   * Offer Type: `INFORMATIONAL`\n   * Offer Value: `0`\n   * Offer Title: `Special Advantage on Books Just for You`\n   * Offer Details: Create a message encouraging the customer to explore new products in their preferred categories. To make it more specific, select *one* of the preferred categories and include a *typical product type* from that category.\n     Example: `\"Exciting new [product type, e.g., novels] just arrived in your favorite [Preferred Category Name] category! Check out what's new in your other favorite categories too: [List of Other Preferred Categories]!\"`\n\n2. If `predicted_churn_score` is greater than 0.8 and less than or equal to 0.9:\n\n   * Offer Type: `BONUS_POINTS`\n   * Offer Value: `200`\n   * Offer Title: `Special Advantage on Books Just for You`\n   * Offer Details: Create a message offering 200 bonus points for purchases made specifically in the \"Books\" category.\n     Example: `\"Earn 200 bonus points on your next purchase in the Books category!\"`\n\n3. If `predicted_churn_score` is greater than 0.9 and less than or equal to 1.0:\n\n   * Offer Type: `DISCOUNT_PERCENTAGE`\n   * Offer Value: `20`\n   * Offer Title: `Special Advantage on Books Just for You`\n   * Offer Details: Create a message offering a 20% discount on a future purchase specifically in the \"Books\" category.\n     Example: `\"Enjoy a 20% discount on your next purchase in the Books category!\"`\n\n**Output:** Generate a JSON object that includes the determined offer details. The OUTPUT MUST STRICTLY FOLLOW THE STRUCTURE BELOW and INCLUDE ONLY THE JSON OBJECT. Do not add any other text or explanation.\n\n**Output Structure:**\n\n{\n  \"customer_id\": string, // Customer ID from the input data\n  \"action_taken\": \"SENT_WINBACK_OFFER\", // Action taken: win-back offer sent (constant in this example)\n  \"offer_type\": string, // Offer type: INFORMATIONAL, BONUS_POINTS, or DISCOUNT_PERCENTAGE\n  \"offer_value\": number, // Offer value: 0 (informational), 200 (points), or 20 (discount)\n  \"offer_title\": string, // Message title\n  \"offer_details\": string, // Message in Turkish, created based on rules and preferred categories\n  \"communication_channel\": \"email\", // Communication channel (constant in this example)\n  \"timestamp\": string // Current timestamp in ISO 8601 format (e.g., \"YYYY-MM-DDTHH:mm:ssZ\"). Note: In an actual n8n workflow, you may prefer to add the real timestamp using a separate node or expression after the LLM node.\n}\n\n"
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "b89954e9-7689-47e6-bf15-3089f3863ca9",
+      "name": "(LLM Model for Offer Generation)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        2060,
+        -120
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-2.0-pro-exp"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BhQsoi2WTmDm0fQ4",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ee485123-32be-447b-80f3-303e3a046207",
+      "name": "(Parse Offer JSON)",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        2260,
+        -100
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"customer_id\": \"CUST_001\",\n  \"action_taken\": \"SENT_WINBACK_OFFER\",\n  \"offer_type\": \"BONUS_POINTS\",\n  \"offer_value\": 200,\n  \"offer_title\": \"Huge Offer!\",\n  \"offer_details\": \"Get 200 bonus points when you shop in the Kitap category!\",\n  \"communication_channel\": \"email\",\n  \"timestamp\": \"2024-06-08T09:05:00Z\"\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "005890c2-f77d-4d0d-add2-496642464a9f",
+      "name": "Log Sent Offer in System Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2640,
+        -220
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "date": "={{ $json.output.timestamp }}",
+            "system_log": "={{ $json.output.action_taken }}",
+            "customer_id": "={{ $json.output.customer_id }}"
+          },
+          "schema": [
+            {
+              "id": "system_log",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "system_log",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_id",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "customer_id",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "system_log"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 157558698,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k/edit#gid=157558698",
+          "cachedResultName": "SYSTEM_LOG"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k/edit?usp=drivesdk",
+          "cachedResultName": "OnurPolat05 N8N  Db"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VV5AyFvgYkc4TfC7",
+          "name": "Onur Drive "
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "98295978-21f1-420f-8e9c-4014d53ffb16",
+      "name": "Send Win-Back Offer via Email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2880,
+        -120
+      ],
+      "webhookId": "3067948c-c6f7-4c77-a91f-fcdb2e0c8095",
+      "parameters": {
+        "sendTo": "={{ $('Process Each Eligible Customer').item.json.user_mail }}",
+        "message": "={{ $json.output.offer_details }}",
+        "options": {},
+        "subject": "={{ $json.output.offer_title }}",
+        "emailType": "text"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "epBpgOmwmYErJ4pe",
+          "name": "Onur Account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "13095156-a54f-432f-8d10-209ddc30680a",
+      "name": "Set 'Not Found' Status",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1620,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e42f6e99-487d-4942-a133-879d62b28fe5",
+              "name": "system_log",
+              "type": "string",
+              "value": "NOT_FOUND"
+            },
+            {
+              "id": "4fe0abc3-e685-4ece-bee2-1ae4f6d3ca92",
+              "name": "date",
+              "type": "string",
+              "value": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "1f823726-6483-40c1-b184-eac87886ded5",
+      "name": "Log 'Not Found' in System Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1940,
+        300
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "date": "={{ $json.date }}",
+            "system_log": "={{ $json.system_log }}"
+          },
+          "schema": [
+            {
+              "id": "system_log",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "system_log",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "system_log"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 157558698,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k/edit#gid=157558698",
+          "cachedResultName": "SYSTEM_LOG"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1hG2NMi-4fMa7D5qGonCN8bsYVya4L2TOB_8mI4XK-9k/edit?usp=drivesdk",
+          "cachedResultName": "OnurPolat05 N8N  Db"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VV5AyFvgYkc4TfC7",
+          "name": "Onur Drive "
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "c6828c9c-c39f-40b5-9197-1435915d3682",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        -340
+      ],
+      "parameters": {
+        "width": 380,
+        "height": 300,
+        "content": "# 00. Daily Start & Fetch Customer Data\n\n**Purpose:** Automatically triggers the workflow **once daily** based on the schedule set in the first node. It then fetches all customer data from the specified Google Sheet ('Customer Data' sheet) to identify potential churn risks for the day."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "71d3f596-1413-4e97-81eb-ec701f15938d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1560,
+        540
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 540,
+        "height": 300,
+        "content": "# 03. Handle No Eligible Customers\n\n**Purpose:** This path executes if the initial filter finds *no* customers meeting the win-back criteria during the daily check.\n1.  **Set Status:** Sets a variable indicating no eligible customers were found (`system_log = NOT_FOUND`).\n2.  **Log Status:** Records this 'NOT_FOUND' status along with the current timestamp in the 'SYSTEM_LOG' Google Sheet. This helps track when the daily workflow ran but had no one to process."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0f076e97-7cf0-48b6-8808-db0f1863409e",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        760,
+        -360
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 460,
+        "height": 280,
+        "content": "# 01. Filter & Branch\n\n**Purpose:** Filters the fetched customer data to identify those meeting specific win-back criteria:\n1.  `predicted_churn_score` is greater than 0.7.\n2.  No previous campaign date exists (`created_campaign_date` is empty - *Note: Verify this field's purpose or adjust logic if needed*).\nThen, it checks if any customers passed the filter. The workflow branches based on whether eligible customers were found."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d3493f09-7eba-4625-98db-83cf649dbbcf",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1700,
+        -760
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 600,
+        "height": 360,
+        "content": "# 02. Generate & Send Win-Back Offer (Loop)\n\n**Purpose:** Processes each eligible customer found in the previous step individually within a loop.\n1.  **Generate Offer (Gemini):** Uses Google Gemini to create a personalized win-back offer (Informational, Bonus Points, or Discount) based on the customer's `predicted_churn_score` and `preferred_categories`. Outputs offer details in JSON format.\n2.  **Log Sent Offer:** Records the successful generation and intent to send the offer (action_taken, timestamp, customer_id) in the 'SYSTEM_LOG' Google Sheet.\n3.  **Send Email (Gmail):** Sends the generated offer details (`offer_title` and `offer_details`) via email to the customer's `user_mail`.\nThe loop continues until all eligible customers are processed."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2fc53a15-2bdd-48f5-9a74-44a2e028e7e0",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -360,
+        -120
+      ],
+      "parameters": {
+        "width": 400,
+        "height": 380,
+        "content": "# Example Customer Data\n\n\n{\n    \"customer_id\": \"CUST_001\",\n    \"last_purchase_date\": \"2024-01-10T10:00:00Z\",\n    \"purchase_frequency_days\": 90,\n    \"user_mail\":\"example@mail.com\",\n    \"days_since_last_purchase\": 110,\n    \"total_spent_usd\": 55.0,\n    \"preferred_categories\": [\"Kitap\", \"Ofis Malzemeleri\"],\n    \"predicted_churn_score\": 0.85,\n    \"profile_tags\": [\"inactive_long_time\", \"low_spender\"],\n    \"timestamp\": \"2024-06-08T09:00:00Z\"\n}\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "(Parse Offer JSON)": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generate Win-Back Offer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set 'Not Found' Status": {
+      "main": [
+        [
+          {
+            "node": "Log 'Not Found' in System Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Win-Back Offer": {
+      "main": [
+        [
+          {
+            "node": "Log Sent Offer in System Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Sent Offer in System Log": {
+      "main": [
+        [
+          {
+            "node": "Send Win-Back Offer via Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Win-Back Offer via Email": {
+      "main": [
+        [
+          {
+            "node": "Process Each Eligible Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Customer Data from Sheet": {
+      "main": [
+        [
+          {
+            "node": "Filter High Churn Risk & No Campaign Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Each Eligible Customer": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Generate Win-Back Offer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "(LLM Model for Offer Generation)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Win-Back Offer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Eligible Customers Found": {
+      "main": [
+        [
+          {
+            "node": "Process Each Eligible Customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set 'Not Found' Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduled Start: Daily Churn Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch Customer Data from Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter High Churn Risk & No Campaign Customers": {
+      "main": [
+        [
+          {
+            "node": "Check if Eligible Customers Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

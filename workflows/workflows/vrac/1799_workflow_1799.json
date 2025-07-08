@@ -1,0 +1,308 @@
+{
+  "nodes": [
+    {
+      "id": "35c4aa9f-7535-4315-9174-fe97afc6de2e",
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "ed1f4f78-733f-4dd5-9785-969c9ec0d637",
+      "name": "Get overview page",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "url": "https://www.ardaudiothek.de/sendung/kalk-und-welk/10777871/",
+        "options": {},
+        "responseFormat": "string"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "28333c78-aa8f-401a-8033-2007a5e6991c",
+      "name": "Extract links",
+      "type": "n8n-nodes-base.htmlExtract",
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "extractionValues": {
+          "values": [
+            {
+              "key": "links",
+              "attribute": "href",
+              "cssSelector": "a[href*=\"/episode/\"]",
+              "returnArray": true,
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "58840494-4208-49ce-b82a-d7cf8abd3b29",
+      "name": "Remove duplicate links",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "operation": "removeDuplicates"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "17efb905-b947-4538-ab34-d50bf7fdbd75",
+      "name": "Split out lists",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "options": {
+          "destinationFieldName": "link"
+        },
+        "fieldToSplitOut": "links"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "59a69e64-ebba-42cb-b8d0-8dd73f0ae962",
+      "name": "Get episode page",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "url": "=https://www.ardaudiothek.de{{ $json[\"link\"] }}",
+        "options": {},
+        "responseFormat": "string"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "68749bff-1499-4ef5-aefd-c4b6233d0fa7",
+      "name": "Extract script",
+      "type": "n8n-nodes-base.htmlExtract",
+      "position": [
+        1560,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "extractionValues": {
+          "values": [
+            {
+              "key": "script",
+              "cssSelector": "script:nth-of-type(2)",
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "158e7b18-f58d-453f-80f8-97e65f0b1fde",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "data",
+              "value": "={{ JSON.parse($json.script) }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a613c52e-395b-4d88-ab7d-b1cf2b664b43",
+      "name": "Define feed items",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        2000,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const escapeHTML = str => str.replace(/[&<>'\"]/g, \n  tag => ({\n      '&': '&amp;',\n      '<': '&lt;',\n      '>': '&gt;',\n      \"'\": '&#39;',\n      '\"': '&quot;'\n    }[tag]));\n\nlet feedItems = [];\nfor (item of items) {\n  feedItems.push(`<item>\n  <title>${escapeHTML(item.json.data.name)}</title>\n  <enclosure url=\"${item.json.data.associatedMedia.contentUrl}\" length=\"${item.json.data.timeRequired * 20 * 1000}\" type=\"${item.json.data.encodingFormat}\"/>\n  <guid isPermaLink=\"false\">${item.json.data.identifier}</guid>\n  <pubDate>${DateTime.fromISO(item.json.data.datePublished).toRFC2822()}</pubDate>\n  <description>${escapeHTML(item.json.data.description)}</description>\n</item>`);\n}\n\nreturn [{\n  data: `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rss version=\"2.0\" xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">\n  <channel>\n    <title>${escapeHTML(items[0].json.data.partOfSeries.name)}</title>\n    <description>${escapeHTML(items[0].json.data.partOfSeries.about)}</description>\n    <itunes:image href=\"${escapeHTML(items[0].json.data.image)}\" />\n    <language>${items[0].json.data.inLanguage}</language>\n    <itunes:category text=\"Comedy\" />\n    <itunes:explicit>no</itunes:explicit>\n    <link>${items[0].json.data.partOfSeries.url}</link>\n    <copyright>© ${$now.toFormat('yyyy')} ${escapeHTML(items[0].json.data.productionCompany)}</copyright>\n    <itunes:author>${escapeHTML(items[0].json.data.productionCompany)}</itunes:author>\n    ${feedItems.join('\\n')}\n  </channel>\n</rss>\n`\n}];\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cbdc367d-a685-4f0b-a9f3-0aedc2c8b3c1",
+      "name": "Feed",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        240,
+        100
+      ],
+      "webhookId": "3fbd94de-2fb3-4b32-a46e-c237865479b9",
+      "parameters": {
+        "path": "3fbd94de-2fb3-4b32-a46e-c237865479b9.rss",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0dfb02cc-1944-4542-b5c5-9e0b198e143d",
+      "name": "Serve feed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        2220,
+        300
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/rss+xml"
+              }
+            ]
+          }
+        },
+        "respondWith": "text",
+        "responseBody": "={{ $json[\"data\"] }}"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Feed": {
+      "main": [
+        [
+          {
+            "node": "Get overview page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Define feed items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract links": {
+      "main": [
+        [
+          {
+            "node": "Split out lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract script": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out lists": {
+      "main": [
+        [
+          {
+            "node": "Remove duplicate links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get episode page": {
+      "main": [
+        [
+          {
+            "node": "Extract script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define feed items": {
+      "main": [
+        [
+          {
+            "node": "Serve feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get overview page": {
+      "main": [
+        [
+          {
+            "node": "Extract links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Get overview page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove duplicate links": {
+      "main": [
+        [
+          {
+            "node": "Get episode page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

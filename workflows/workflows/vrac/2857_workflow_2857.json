@@ -1,0 +1,555 @@
+{
+  "meta": {
+    "instanceId": "37c9b6d3ee04c3e15f526d799209783b3fa8da2950c0e8241dc8ad516d7eb4df"
+  },
+  "nodes": [
+    {
+      "id": "ba9d786a-0698-4306-adba-40c928c1a340",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        840,
+        1100
+      ],
+      "parameters": {
+        "width": 718.7339166606896,
+        "height": 141.09832891056485,
+        "content": "## Independent \"Async\" Process\nThis could be anything that eventually triggers another workflow and passes through something (e.g. resumeUrl) that identifies the original workflow execution that needs to be joined.\nFor instance, this could be a Telegram conversation where the trigger is watching for a message containing a \"reply\" to something that was originally sent out via Telegram."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d90e6fa4-2f88-4446-8522-e3ae7b1334d2",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        400,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "a76364e9-ef28-4ad8-88a3-68ac23fed0c1",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1100,
+        400
+      ],
+      "webhookId": "253803de-f2d4-4519-8014-62d0ef80b988",
+      "parameters": {
+        "resume": "webhook",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "fa83bc05-ee83-4150-ac5e-68e6b14e37d2",
+      "name": "HTTP Request - Initiate Independent Process",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        860,
+        400
+      ],
+      "parameters": {
+        "url": "=http://127.0.0.1:5678/webhook/{{ $('Set Primary Execution Context').first().json.simulatedExternalProcessWorkflowId }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "resumeUrlForWaitingExecution",
+              "value": "={{ $execution.resumeUrl }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "a2aad4e1-e305-43cb-9e59-21c92ae351b1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        780,
+        280
+      ],
+      "parameters": {
+        "width": 593,
+        "height": 107,
+        "content": "## Only One Item Will Work\nIf the previous steps could result in multiple initiations via the `Secondary Trigger` below, **only the first one** will resume the workflow.  Others will be rejected."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4065389a-8af6-440d-94d6-1a2261e75818",
+      "name": "HTTP Request - Resume Other Workflow Execution",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1100,
+        780
+      ],
+      "parameters": {
+        "url": "={{ $json.body.resumeUrlForWaitingExecution.replace($env.WEBHOOK_URL, 'http://127.0.0.1:5678') }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jokeFromIndependentProcess",
+              "value": "={{ $('Receive Input from External, Independent Process').first().json.body.joke }}"
+            },
+            {
+              "name": "setupFromIndependentProcess",
+              "value": "={{ $('Receive Input from External, Independent Process').first().json.body.setup }}"
+            },
+            {
+              "name": "deliveryFromIndependentProcess",
+              "value": "={{ $('Receive Input from External, Independent Process').first().json.body.delivery }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "d0ef28a5-7a4f-4c60-8070-1da0016f9bb6",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        600
+      ],
+      "parameters": {
+        "width": 590,
+        "height": 179,
+        "content": "## Secondary Trigger From Independent Process\nWhen something runs the workflow through this trigger, it is a completely separate execution.  By passing through the resumeUrl from the **Primary Execution**, it is possible to join back into it via the \"webhook callback\" to the `Wait` node.\n* Note: This trigger could be anything that would support input including the `resumeUrl`, not just a webhook.  The `Webhook` node is just used to demonstrate a separate trigger."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f0c82308-166f-44e4-84c0-65c2f5d65bf5",
+      "name": "This Node Can Access Primary and Secondary",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1340,
+        520
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "91dfddea-5498-41dc-a423-830bb67638cc",
+              "name": "somethingFromPrimaryExecution",
+              "type": "string",
+              "value": "={{ $('Set Primary Execution Context').first().json.someContextItem }}"
+            },
+            {
+              "id": "beb6454f-3148-44a1-a681-4691f5fc6c06",
+              "name": "somethingFromSecondaryExecution",
+              "type": "string",
+              "value": "={{ $('Wait').item.json.body.jokeFromIndependentProcess }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a0b6fd7d-fc69-47c9-bc17-14a57c4eb628",
+      "name": "Set Primary Execution Context",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        620,
+        400
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4e85d854-9326-4045-9636-facd38d681f1",
+              "name": "someContextItem",
+              "type": "string",
+              "value": "this value is only available / in-scope from the primary execution's previous-nodes"
+            },
+            {
+              "id": "0c1f5a1b-b087-4414-b558-3e4ff809e9ab",
+              "name": "simulatedExternalProcessWorkflowId",
+              "type": "string",
+              "value": "21cea9f6-d55f-4c47-b6a2-158cce1811cd"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "e4d59b9a-536b-42c6-901e-afb4e4897efd",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        280
+      ],
+      "parameters": {
+        "width": 357.8809516773294,
+        "height": 80,
+        "content": "## Primary Trigger/Execution\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a7370b71-3c0e-4bff-b786-0b353938bcfe",
+      "name": "Receive Input from External, Independent Process",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        420,
+        780
+      ],
+      "webhookId": "3064395b-378c-4755-9634-ce40cc4733a6",
+      "parameters": {
+        "path": "3064395b-378c-4755-9634-ce40cc4733a6",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "8f1ef649-f5df-498c-9aa4-a1dc00613cef",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        391
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 218,
+        "height": 557,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nThese are the nodes that combine the `Secondary` execution back to the `Primary` execution via the `resumeUrl`."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "dacae6ab-9039-4b80-af59-21ca9c958bc0",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        211.1677791891891
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 1415.7138930630392,
+        "height": 792.7070677927813,
+        "content": "# Main Workflow - Keep these together in the same workflow instance"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "442f3d39-5a1b-4534-95a2-7c47ce150bb1",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        1040
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 1410.9085229279067,
+        "height": 411.48103707206576,
+        "content": "# Simulated External Independent Process\nCut/Paste these nodes into a separate workflow instance\nThen activate the trigger\nThen activate the workflow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d9b3d85f-b2f6-48f4-9bfc-3e134e2d4f20",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        580,
+        360
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 180.88095167732934,
+        "height": 217,
+        "content": "## Update Me"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "38738f2c-d478-4cba-95be-a52536843bcd",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        420
+      ],
+      "parameters": {
+        "color": 3,
+        "height": 306.5674498803857,
+        "content": "## Execute This Node to Test"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "de9913e4-ea3f-4378-a851-7d7925679bd6",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        480,
+        1260
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "e84ad080-9239-44ee-bc73-d16496813241",
+      "name": "Simulate Event that Hits the 2nd Trigger/Flow",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1360,
+        1260
+      ],
+      "parameters": {
+        "url": "=http://127.0.0.1:5678/webhook/{{ $('Demo \"Trigger\" Callback Setup').first().json.triggerTargetWorkflowId }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "resumeUrlForWaitingExecution",
+              "value": "={{ $('Webhook').item.json.body.resumeUrlForWaitingExecution }}"
+            },
+            {
+              "name": "joke",
+              "value": "={{ $('HTTP Request - Get A Random Joke').item.json.joke }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "4fb07c03-1df0-4703-9d26-22cff17137bf",
+      "name": "Simulate some Consumed Service Time",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1140,
+        1260
+      ],
+      "webhookId": "d055185f-2515-4f30-824d-5d0fa346c3bc",
+      "parameters": {
+        "amount": 2
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "66f3cf0a-62dc-4c85-a832-143f45280dd5",
+      "name": "HTTP Request - Get A Random Joke",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        920,
+        1260
+      ],
+      "parameters": {
+        "url": "https://v2.jokeapi.dev/joke/Programming",
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "blacklistFlags",
+              "value": "nsfw,religious,political,racist,sexist,explicit"
+            },
+            {
+              "name": "type",
+              "value": "single"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "873a6d02-6393-4354-b7fe-c9c1f2e84339",
+      "name": "Demo \"Trigger\" Callback Setup",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        700,
+        1260
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c6cfe1c1-257b-4785-8ae9-8945e3c7bcd9",
+              "name": "triggerTargetWorkflowId",
+              "type": "string",
+              "value": "3064395b-378c-4755-9634-ce40cc4733a6"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a8eafdc2-e4b0-42b1-b0aa-7e3cb3972b4b",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "disabled": true,
+      "position": [
+        280,
+        1260
+      ],
+      "webhookId": "21cea9f6-d55f-4c47-b6a2-158cce1811cd",
+      "parameters": {
+        "path": "21cea9f6-d55f-4c47-b6a2-158cce1811cd",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "77282136-69ec-4f23-b222-30817498b47d",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        662,
+        1220
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 171,
+        "height": 217,
+        "content": "## Update Me"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "This Node Can Access Primary and Secondary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Demo \"Trigger\" Callback Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demo \"Trigger\" Callback Setup": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Get A Random Joke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Primary Execution Context": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Initiate Independent Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Get A Random Joke": {
+      "main": [
+        [
+          {
+            "node": "Simulate some Consumed Service Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Primary Execution Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate some Consumed Service Time": {
+      "main": [
+        [
+          {
+            "node": "Simulate Event that Hits the 2nd Trigger/Flow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Initiate Independent Process": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Input from External, Independent Process": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Resume Other Workflow Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

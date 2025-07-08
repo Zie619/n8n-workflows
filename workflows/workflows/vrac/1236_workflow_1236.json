@@ -1,0 +1,314 @@
+{
+  "nodes": [
+    {
+      "name": "Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        1650,
+        300
+      ],
+      "parameters": {
+        "table": "Pokemon",
+        "operation": "list",
+        "additionalOptions": {}
+      },
+      "credentials": {
+        "airtableApi": "Airtable Credentials @n8n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Redis",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        600,
+        600
+      ],
+      "parameters": {
+        "key": "={{$json[\"apiKey\"]}}",
+        "ttl": 3600,
+        "expire": true,
+        "operation": "incr"
+      },
+      "credentials": {
+        "redis": "Redis Cloud Credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Redis1",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        1200,
+        450
+      ],
+      "parameters": {
+        "key": "={{$json[\"apiKey\"]}}",
+        "operation": "incr"
+      },
+      "credentials": {
+        "redis": "Redis Cloud Credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1600,
+        550
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "message",
+              "value": "You exceeded your limit"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Webhook1",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        200,
+        600
+      ],
+      "webhookId": "a3167ed7-98d2-422c-bfe2-e3ba599d19f1",
+      "parameters": {
+        "path": "a3167ed7-98d2-422c-bfe2-e3ba599d19f1",
+        "options": {},
+        "responseMode": "lastNode",
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": "Credential Example"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Function",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1900,
+        300
+      ],
+      "parameters": {
+        "functionCode": " const limit = `Limit consumed: `+ $node['Redis1'].json[$node[\"Set2\"].json[\"apiKey\"]];\n return [\n  {\n    json: {\n      message:limit,\n      body: items.map(item => {\n        const name= item.json.fields.name\n        const url= item.json.fields.url\n        return {name,url}\n      })\n    }\n  }\n]\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        400,
+        600
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "apiKey",
+              "value": "={{$json[\"headers\"][\"x-api-key\"] +'-'+ new Date().getHours() +'-'+ new Date().getMinutes()}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set2",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1000,
+        450
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "apiKey",
+              "value": "={{$node['Webhook1'].json[\"headers\"][\"x-api-key\"] +'-'+ new Date().getHours()}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set3",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1000,
+        700
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "message",
+              "value": "You exceeded your limit"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Per hour",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1400,
+        450
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[$node[\"Set2\"].json[\"apiKey\"]]}}",
+              "value2": 60
+            }
+          ],
+          "string": []
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Per minute",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        800,
+        600
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[$node[\"Set\"].json[\"apiKey\"]]}}",
+              "value2": 10,
+              "operation": "smallerEqual"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set2": {
+      "main": [
+        [
+          {
+            "node": "Redis1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis": {
+      "main": [
+        [
+          {
+            "node": "Per minute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis1": {
+      "main": [
+        [
+          {
+            "node": "Per hour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable": {
+      "main": [
+        [
+          {
+            "node": "Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Per hour": {
+      "main": [
+        [
+          {
+            "node": "Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Per minute": {
+      "main": [
+        [
+          {
+            "node": "Set2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

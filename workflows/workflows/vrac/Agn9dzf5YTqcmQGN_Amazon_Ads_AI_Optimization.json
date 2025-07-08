@@ -1,0 +1,620 @@
+{
+  "id": "Agn9dzf5YTqcmQGN",
+  "meta": {
+    "instanceId": "8029058e18ae4ed6081000c1270d96039ad05959052aa2034dd96a215849bcf7",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Amazon Ads AI Optimization",
+  "tags": [
+    {
+      "id": "vjZ7QzTW2i7StzqX",
+      "name": "AI Flow",
+      "createdAt": "2025-04-10T00:32:55.235Z",
+      "updatedAt": "2025-04-10T00:32:55.235Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "0286c917-d771-4835-a5f8-71f79a5e59e8",
+      "name": "List Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        -100,
+        -800
+      ],
+      "parameters": {
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "",
+            "cachedResultUrl": "",
+            "cachedResultName": "<choose report folder>"
+          }
+        },
+        "options": {},
+        "resource": "fileFolder",
+        "searchMethod": "query"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "UPKjIF2z8RkkmP21",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "7d9b0c0a-86ee-4aae-8d73-66f409b0a57f",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1620,
+        -540
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "qszlkCg3ypMJEWvt",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "d3d58b0a-3107-4525-92a8-d54332e9a8a5",
+      "name": "is XLSX",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        540,
+        -800
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "820b48a1-676d-400b-894f-3b3a5203eca7",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": ".xlsx"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "884e4a08-3b19-4485-aba7-c69887607b82",
+      "name": "Get File",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        100,
+        -800
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "binaryPropertyName": "data",
+          "googleFileConversion": {
+            "conversion": {}
+          }
+        },
+        "operation": "download"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "UPKjIF2z8RkkmP21",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "c72fde38-de38-4734-a7e8-aa70e8638cad",
+      "name": "Merge XLSX and CSV",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1200,
+        -800
+      ],
+      "parameters": {},
+      "typeVersion": 3.1
+    },
+    {
+      "id": "cd23e23c-9bb7-4b8d-90ab-8917783cf1ab",
+      "name": "Format Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1420,
+        -800
+      ],
+      "parameters": {
+        "jsCode": "const result = {};\n\nfor (const item of items) {\n  const fileName = item.json.fileName || item.json.name || 'unknown_file';\n  const baseName = fileName\n    .split('.')[0]\n    .replace(/\\s+/g, '_')\n    .toLowerCase()\n    .replace(/\\s*\\(\\d+\\)$/, '')\n    .replace(/_+$/, '')\n    .trim();\n\n  // regex → result key\n  const map = [\n    { key: 'search_terms', regex: /search_term/ },\n    { key: 'campaigns',    regex: /campaign/     },\n    { key: 'targeting',    regex: /targeting/   },\n    { key: 'placement',    regex: /placement/   },\n    { key: 'budgets',      regex: /budget/      },\n  ];\n\n  const entry = map.find(m => m.regex.test(baseName));\n  const mappedKey = entry ? entry.key : null;\n\n  console.log('fileName:', fileName);\n  console.log('baseName:', baseName);\n  console.log('mappedKey:', mappedKey);\n\n  if (!mappedKey) {\n    throw new Error(`${fileName} → ${baseName} → Unrecognized file name structure`);\n  }\n  result[mappedKey] = result[mappedKey] || [];\n  result[mappedKey].push(item.json);\n}\n\nreturn [{ json: result }];\n\n\n\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "02172577-d867-45a4-96ea-eb105169deff",
+      "name": "Set fileName",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        320,
+        -800
+      ],
+      "parameters": {
+        "options": {
+          "dotNotation": true,
+          "ignoreConversionErrors": false
+        },
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a467fabb-d7d0-482d-8a6a-afcd97cc0d8c",
+              "name": "fileName",
+              "type": "string",
+              "value": "={{ $json.name }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "31db008f-20e4-4fe3-a9d0-1815b3802690",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -140,
+        -1040
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 180,
+        "height": 200,
+        "content": "## Change\nChoose the \"folder\" in the filter options to the folder containing your Ad reports\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0ba8c273-8369-4009-9b93-b0fb243a3c85",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1640,
+        -1000
+      ],
+      "parameters": {
+        "width": 260,
+        "content": "## AI Analysis\nUses GPT-4o to process the bundled reports and generate optimization instructions.\nPasses system instructions and cleaned data as input."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "451bb016-1766-4688-aafc-75937e0d5c3f",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -660,
+        -580
+      ],
+      "parameters": {
+        "width": 540,
+        "height": 700,
+        "content": "## Amazon Ads Report Scheduling Instructions\nTo run this workflow, schedule the following Sponsored Products reports in the Amazon Ads Console:\n\nUse \"Detailed\" for:\n\nSearch Term Report → Sponsored_Products_Search_Term_Detailed_L30\n\nTargeting Report → Sponsored_Products_Targeting_Detailed_L30\n\nUse \"Summary\" for:\n\nCampaign Report → Sponsored_Products_Campaign_L30\n\nPlacement Report → Sponsored_Products_Placement_L30\n\nBudget Report → Sponsored_Products_Budget_L30\n\nShared settings for all reports:\n\nDate Range: Last 30 Days\n\nFrequency: Daily\n\nFormat: .xlsx or .csv\n\nDelivery: Email + Console Download\n\nMake sure filenames match expectations so the workflow can route them correctly."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a671a4f1-05b0-4d7c-9cc1-8c2838593e34",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -60,
+        -580
+      ],
+      "parameters": {
+        "width": 400,
+        "height": 520,
+        "content": "## Report Delivery\n\nHow to get reports into Google Drive\n\nUse one of the following:\n\n📥 Manual Upload – Download emailed reports and move them to your Drive folder\n\n🤖 Automation – Use n8n to watch Gmail for no-reply@amazon.com, extract attachments, and upload to Drive\n\n💻 Drive Sync Folder – Use a local folder synced to Google Drive with rules for report types\n\nReports must match expected filenames so the flow can identify and classify them."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "63a7f391-2bc7-41f9-a53f-e742950c60bf",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        360,
+        -580
+      ],
+      "parameters": {
+        "width": 360,
+        "height": 520,
+        "content": "## Upgrade! 🚀\n\nApply for an Amazon Advertising API developer account to unlock full automation:\n\nGenerate reports programmatically via the Reports API\n\nFetch report files directly into n8n using HTTP or custom nodes\n\nEliminate email + Drive dependency entirely\n\n🔗 https://advertising.amazon.com/API/docs/en-us/\n\nOnce approved, you can schedule report generation and download all required data securely and automatically.\n**Double click** to edit me. [Guide](https://docs.n8n.io/workflows/sticky-notes/)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e5a24705-0ad5-4629-b183-d279bdca8b29",
+      "name": "Preserve File Name",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        980,
+        -900
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d6883fe9-d04f-4c86-bc9a-f4dd526afca2",
+              "name": "fileName",
+              "type": "string",
+              "value": "={{ $('is XLSX').item.json.fileName }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "3c315a0c-a89e-490a-9a82-e3d96d2b94c7",
+      "name": "Email Optimizations",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2016,
+        -800
+      ],
+      "webhookId": "b9d7c1a9-a1a3-4b97-97c9-a272f0e97127",
+      "parameters": {
+        "sendTo": "={{ $('Email Options').first().json.send_to }}",
+        "message": "={{\n  (() => {\n   let raw = $node[\"AI Analyze\"].json[\"text\"];\n\n    // 🔧 Remove triple backticks and optional \"json\" tag\n    raw = raw.replace(/^```json\\s*/i, \"\").replace(/```$/, \"\").trim();\n\n    let data;\n\n    try {\n      data = JSON.parse(raw);\n    } catch (err) {\n      return `<p><strong>❌ Failed to parse AI output.</strong><br>${err.message}</p>`;\n    }\n\n    let msg = \"<h2>Amazon Ads Optimization Instructions</h2>\";\n\n    // Optional Summary Totals\n    const totalSpend = (data.campaign_adjustments || []).reduce((sum, c) => sum + (c.projected_daily_spend_usd || 0), 0);\n    const totalSales = (data.campaign_adjustments || []).reduce((sum, c) => sum + (c.projected_daily_sales_usd || 0), 0);\n    msg += `<p><strong>Total Budget Increase Recommended:</strong><br>`;\n    msg += `Estimated daily spend: <strong>$${totalSpend.toFixed(2)}</strong><br>`;\n    msg += `Estimated daily sales: <strong>$${totalSales.toFixed(2)}</strong></p>`;\n\n    // Campaign Adjustments\n    msg += \"<h3>Campaign Adjustments:</h3><ul>\";\n    (data.campaign_adjustments || []).forEach(c => {\n      msg += `<li><strong>${c.campaign_name}</strong><ul>`;\n      if (c.default_bid_multiplier !== undefined) {\n        const percent = Math.round((1 - c.default_bid_multiplier) * 100);\n        msg += `<li>Default bid × ${c.default_bid_multiplier} (<em>–${percent}%</em>)</li>`;\n      }\n      if (c.bid_adjustments) {\n        msg += \"<li>Bid adjustments:<ul>\";\n        msg += `<li>Top of Search: ${c.bid_adjustments.top_of_search ?? 0}%</li>`;\n        msg += `<li>Rest of Search: ${c.bid_adjustments.rest_of_search ?? 0}%</li>`;\n        msg += `<li>Product pages: ${c.bid_adjustments.product_pages ?? 0}%</li>`;\n        msg += \"</ul></li>\";\n      }\n      if (c.budget_change?.action !== \"none\") {\n        msg += `<li>Budget: ${c.budget_change.action} by ${c.budget_change.percent}%</li>`;\n      }\n      if (c.projected_daily_spend_usd && c.projected_daily_sales_usd) {\n        msg += `<li>Est. daily spend: $${c.projected_daily_spend_usd.toFixed(2)}</li>`;\n        msg += `<li>Est. daily sales: $${c.projected_daily_sales_usd.toFixed(2)}</li>`;\n        if (c.estimated_acos_percent !== undefined) {\n          msg += `<li>ACoS: ${c.estimated_acos_percent}%</li>`;\n        }\n        if (c.estimated_roas_multiple !== undefined) {\n          const color = c.estimated_roas_multiple < 1.0 ? 'red' : 'green';\n          msg += `<li>ROAS: <span style=\"color:${color}\">${c.estimated_roas_multiple.toFixed(2)}x</span></li>`;\n        }\n      }\n      msg += \"</ul></li>\";\n    });\n    msg += \"</ul>\";\n\n    // Keyword Recommendations\n    if ((data.keyword_recommendations?.add_exact?.length || 0) > 0 ||\n        (data.keyword_recommendations?.negative?.length || 0) > 0) {\n      msg += \"<h3>Keyword Recommendations:</h3><ul>\";\n      (data.keyword_recommendations.add_exact || []).forEach(k => {\n        msg += `<li>Add exact: \"<strong>${k.term}</strong>\" in <em>${k.campaign_name} / ${k.ad_group_name}</em> at <strong>$${k.suggested_bid}</strong></li>`;\n      });\n      (data.keyword_recommendations.negative || []).forEach(n => {\n        if (typeof n === 'string') {\n          msg += `<li>Negative: \"<strong>${n}</strong>\"</li>`;\n        } else {\n          msg += `<li>Negative: \"<strong>${n.term}</strong>\" in <em>${n.campaign_name || 'Unspecified Campaign'}</em></li>`;\n        }\n      });\n      msg += \"</ul>\";\n    }\n\n    // Targeting Recommendations\n    if ((data.targeting_recommendations || []).length > 0) {\n      msg += \"<h3>Targeting Recommendations:</h3><ul>\";\n      data.targeting_recommendations.forEach(t => {\n        const valueText = t.value ? ` by ${t.value}` : \"\";\n        msg += `<li>${t.target} in <em>${t.campaign_name} / ${t.ad_group_name}</em>: <strong>${t.action}</strong>${valueText}</li>`;\n      });\n      msg += \"</ul>\";\n    }\n\n    return msg;\n  })()\n}}\n",
+        "options": {},
+        "subject": "={{ $('Email Options').first().json.subject }}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6m7O3IpXy4mCRogW",
+          "name": "Brian Gmail"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "f4fc0a70-2df9-4b7b-b60c-856b1b74ead7",
+      "name": "Extract XLSX Data",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        760,
+        -900
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "xlsx"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d0618a5b-1995-474d-a969-38e856b1b91a",
+      "name": "Extract CSV Data",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        760,
+        -700
+      ],
+      "parameters": {
+        "options": {},
+        "binaryPropertyName": "=data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "67f9d0a2-2f34-416a-bc11-ef776e6e4ab3",
+      "name": "Preserve CSV File Name",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        980,
+        -700
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d6883fe9-d04f-4c86-bc9a-f4dd526afca2",
+              "name": "fileName",
+              "type": "string",
+              "value": "={{ $('is XLSX').item.json.fileName }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "818205c9-0fe9-4fe6-8556-657f087ba7b9",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -500,
+        -800
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "1612753d-0b7f-4ae5-9ec0-8ad39f1003b1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -580,
+        -1040
+      ],
+      "parameters": {
+        "width": 220,
+        "content": "## Trigger\nYou may replace this with a scheduled event or poll the folder for changes."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "158da856-b682-4f98-afcc-4fa12b978db0",
+      "name": "Email Options",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -300,
+        -800
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60c2189a-2ca3-43ac-bffc-371bbc3c123b",
+              "name": "send_to",
+              "type": "string",
+              "value": "<enter send to email address>"
+            },
+            {
+              "id": "c6f588b3-b8b9-4a83-817b-a68de36d2570",
+              "name": "subject",
+              "type": "string",
+              "value": "<enter the email subject for report emails>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "4f1f251e-5cfb-468d-9531-9c2ba2c875f6",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        -1040
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 160,
+        "content": "## Change!\nEdit these email options."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ca2f4a7c-5aa9-4f6a-bc04-aedce5e0aaed",
+      "name": "AI Analyze",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1640,
+        -800
+      ],
+      "parameters": {
+        "text": "={{JSON.stringify($json)}}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an Amazon Ads Optimization Assistant. You will receive five structured datasets from Sponsored Products reports:\n- search_terms\n- campaigns\n- targeting\n- placement\n- budgets\n\nYour goal is to generate precise performance recommendations for bid strategy, targeting, and budget scaling.\n\n---\n\n1. Campaign Adjustments:\nFor each campaign, return:\n- campaign_name (string)\n- default_bid_multiplier (float, optional — only if bid should change)\n- bid_adjustments: { top_of_search, rest_of_search, product_pages } (percentages)\n- budget_change: { action: increase | decrease | none, percent: float }\n- projected_daily_spend_usd (float)\n- projected_daily_sales_usd (float)\n- estimated_acos_percent (float)\n- estimated_roas_multiple (float)\n\nBase projections on historical 30-day data. If a budget increase is recommended, scale projected spend and sales proportionally. Return NaN only if data is insufficient.\n\n---\n\n2. Keyword Recommendations:\nRecommend at least 5 exact-match keywords to add. Each must include:\n- term\n- campaign_name\n- ad_group_name\n- suggested_bid (USD)\n\nAlso return at least 3 negative keywords:\n- { term: \"...\", campaign_name?: \"...\" }\n\nDo not return keyword recommendations that lack campaign and ad group names.\n\n---\n\n3. Targeting Recommendations:\nRecommend at least 3 targets to pause or increase bids. Return:\n- target (ASIN, keyword, or match group)\n- campaign_name\n- ad_group_name\n- action: \"pause\" or \"increase_bid\"\n- value: float (if increasing bid)\n\n---\n\nRespond ONLY with a JSON object in this exact format. Do NOT include backticks, code blocks, or explanations:\n\n{\n  \"campaign_adjustments\": [...],\n  \"keyword_recommendations\": {\n    \"add_exact\": [...],\n    \"negative\": [...]\n  },\n  \"targeting_recommendations\": [...]\n}\n\n"
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.6
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "286aae2a-f8df-489d-9f03-89d0b50b1800",
+  "connections": {
+    "is XLSX": {
+      "main": [
+        [
+          {
+            "node": "Extract XLSX Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract CSV Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File": {
+      "main": [
+        [
+          {
+            "node": "Set fileName",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analyze": {
+      "main": [
+        [
+          {
+            "node": "Email Optimizations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Files": {
+      "main": [
+        [
+          {
+            "node": "Get File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data": {
+      "main": [
+        [
+          {
+            "node": "AI Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set fileName": {
+      "main": [
+        [
+          {
+            "node": "is XLSX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Options": {
+      "main": [
+        [
+          {
+            "node": "List Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract CSV Data": {
+      "main": [
+        [
+          {
+            "node": "Preserve CSV File Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract XLSX Data": {
+      "main": [
+        [
+          {
+            "node": "Preserve File Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Analyze",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge XLSX and CSV": {
+      "main": [
+        [
+          {
+            "node": "Format Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preserve File Name": {
+      "main": [
+        [
+          {
+            "node": "Merge XLSX and CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preserve CSV File Name": {
+      "main": [
+        [
+          {
+            "node": "Merge XLSX and CSV",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Email Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

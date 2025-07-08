@@ -1,0 +1,228 @@
+{
+  "meta": {
+    "instanceId": "04ab549d8bbb435ec33b81e4e29965c46cf6f0f9e7afe631018b5e34c8eead58"
+  },
+  "nodes": [
+    {
+      "id": "9fdbfdc1-67f3-4c8b-861c-9e5840b002ec",
+      "name": "Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        780,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.fastmail.com/jmap/session",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BWkbkxgDD4hkRCvs",
+          "name": "Fastmail Masked E-Mail Addresses"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "215d96fa-6bda-4e8c-884a-eb9a8db0838f",
+      "name": "create random masked email",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "https://api.fastmail.com/.well-known/jmap\n\nhttps://api.fastmail.com/jmap/session",
+      "position": [
+        1280,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.fastmail.com/jmap/api/",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"using\": [\n    \"urn:ietf:params:jmap:core\",\n    \"https://www.fastmail.com/dev/maskedemail\"\n  ],\n  \"methodCalls\": [\n    [\n      \"MaskedEmail/set\",\n      {\n        \"accountId\": \"{{ $('Session').item.json.primaryAccounts['https://www.fastmail.com/dev/maskedemail'] }}\",\n        \"create\": {\n          \"maskedEmailId1\": {\n            \"description\": \"{{ $json.description }}\",\n            \"state\": \"{{ $json.state }}\"\n          }\n        }\n      },\n      \"c1\"\n    ]\n  ]\n}\n",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "BWkbkxgDD4hkRCvs",
+          "name": "Fastmail Masked E-Mail Addresses"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "237f6596-f8df-4c21-a2fa-44e935a72d56",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1800,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "text",
+        "responseBody": "={{ $json }}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6699eb83-a41e-44bc-b332-77e407fb3542",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        480
+      ],
+      "parameters": {
+        "width": 1654.8203324571532,
+        "height": 471.75430470511367,
+        "content": "### Template Description\nThis n8n workflow template allows you to create a masked email address using the Fastmail API, triggered by a webhook. This is especially useful for generating disposable email addresses for privacy-conscious users or for testing purposes.\n\n#### Workflow Details:\n1. **Webhook Trigger**: The workflow is initiated by sending a POST request to a specific webhook. You can include `state` and `description` in your request body to customize the masked email's state and description.\n2. **Session Retrieval**: The workflow makes an HTTP request to the Fastmail API to retrieve session information. It uses this data to authenticate further requests.\n3. **Create Masked Email**: Using the retrieved session data, the workflow sends a POST request to Fastmail's JMAP API to create a masked email. It uses the provided state and description from the webhook payload.\n4. **Prepare Output**: Once the masked email is successfully created, the workflow extracts the email address and attaches the description for further processing.\n5. **Respond to Webhook**: Finally, the workflow responds to the original POST request with the newly created masked email and its description.\n\n#### Requirements:\n- **Fastmail API Access**: You will need valid API credentials for Fastmail configured with HTTP Header Authentication.\n- **Authorization Setup**: Optionally set up authorization if your webhook is exposed to the internet to prevent misuse.\n- **Custom Webhook Request**: Use a tool like `curl` or create a shortcut on macOS/iOS to send the POST request to the webhook with the necessary JSON payload, like so:\n  \n  ```bash\n  curl -X POST -H 'Content-Type: application/json' https://your-n8n-instance/webhook/87f9abd1-2c9b-4d1f-8c7f-2261f4698c3c -d '{\"state\": \"pending\", \"description\": \"my mega fancy masked email\"}'\n  ```\n\nThis template simplifies the process of integrating masked email functionality into your projects or workflows and can be extended for various use cases."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0c5d6d5a-ad0f-451e-9075-1009c8bf7212",
+      "name": "get fields for creation",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "870bb03d-c672-49d6-9652-5a0233b16eb2",
+              "name": "state",
+              "type": "string",
+              "value": "={{ $('Webhook').item.json.body.state ?? \"pending\" }}"
+            },
+            {
+              "id": "ac9b45a0-885f-48b2-b0ec-e38c79080045",
+              "name": "description",
+              "type": "string",
+              "value": "={{ $('Webhook').item.json.body.description ?? \"Test via N8n\" }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "be7ba978-00d7-4fb1-9e1b-e3f83285e6fb",
+      "name": "prepare output",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "19a09822-7ae0-4884-9192-c6e5bc3393a8",
+              "name": "email",
+              "type": "string",
+              "value": "={{ $json.methodResponses[0][1].created.maskedEmailId1.email }}"
+            },
+            {
+              "id": "ae8a1fe4-3010-4db8-aa88-f6074cae3006",
+              "name": "desciption",
+              "type": "string",
+              "value": "={{ $('get fields for creation').item.json.description }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "dd014889-81eb-4a94-886e-4fe084c504ff",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        540,
+        300
+      ],
+      "webhookId": "87f9abd1-2c9b-4d1f-8c7f-2261f4698c3c",
+      "parameters": {
+        "path": "createMaskedEmail",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Session": {
+      "main": [
+        [
+          {
+            "node": "get fields for creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get fields for creation": {
+      "main": [
+        [
+          {
+            "node": "create random masked email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create random masked email": {
+      "main": [
+        [
+          {
+            "node": "prepare output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

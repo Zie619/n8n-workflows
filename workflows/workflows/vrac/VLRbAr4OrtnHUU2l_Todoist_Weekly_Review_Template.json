@@ -1,0 +1,178 @@
+{
+  "id": "VLRbAr4OrtnHUU2l",
+  "name": "Todoist Weekly Review Template",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "45351dbb-6c0c-4442-a350-35d966a26fa1",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        0,
+        180
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "9644a07e-0b97-4b48-846c-821f620128cc",
+      "name": "Get completed tasks via Todoist API",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "url": "https://api.todoist.com/sync/v9/completed/get_all",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "since",
+              "value": "={{ $now.minus(7, 'days') }}"
+            },
+            {
+              "name": "until",
+              "value": "={{ $now }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "todoistApi"
+      },
+      "credentials": {
+        "todoistApi": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "94f40824-43ff-45ae-adfd-b18a5903cba1",
+      "name": "Optional: Ignore specific projects",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// maintain this array with ignored Todoist project_id's\n// empty \"[]\" it when you don't want to ignore any\nconst ignoredProjects = ['2335544024'];\n\n// Remove ignored projects\nconst items = $input.all()[0].json.items;\nvar newItems = [];\nfor(j = 0; j < items.length; j++) {\n  if(!ignoredProjects.includes(items[j].project_id)) {\n    newItems.push(items[j]);\n  }\n}\n\nreturn newItems;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "c50b00d6-4e9c-43e5-b6b8-ee0caac78c68",
+      "name": "Format the email body",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Group items by day\nconst grouped = items.reduce((acc, item) => {\n  const date = new Date(item.json.completed_at).toISOString().split('T')[0];\n  acc[date] = acc[date] || [];\n  acc[date].push(item.json.content);\n  return acc;\n}, {});\n\n// Format the grouped data into an HTML string for the email\nlet emailBody = \"<h1>Completed Items</h1>\";\nfor (const [date, contents] of Object.entries(grouped)) {\n  emailBody += `<h2>${date}</h2><ul>`;\n  contents.forEach(content => {\n    emailBody += `<li>${content}</li>`;\n  });\n  emailBody += `</ul>`;\n}\n\nreturn [{ json: { emailBody } }];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "42b38a9b-2dbc-46f5-895c-f8597eb48bf1",
+      "name": "Every Friday afternoon",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                5
+              ],
+              "triggerAtHour": 15
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "adece42d-d84a-41c8-8269-35ba08879e52",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        860,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "subject": "Todoist Weekly Review",
+        "emailFormat": "={{ $('Format the email body').item.json.emailBody }}"
+      },
+      "typeVersion": 2.1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fcf19ca1-c2bc-4832-8cfe-184424484f60",
+  "connections": {
+    "Format the email body": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Friday afternoon": {
+      "main": [
+        [
+          {
+            "node": "Get completed tasks via Todoist API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get completed tasks via Todoist API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optional: Ignore specific projects": {
+      "main": [
+        [
+          {
+            "node": "Format the email body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get completed tasks via Todoist API": {
+      "main": [
+        [
+          {
+            "node": "Optional: Ignore specific projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,414 @@
+{
+  "meta": {
+    "instanceId": "cb484ba7b742928a2048bf8829668bed5b5ad9787579adea888f05980292a4a7"
+  },
+  "nodes": [
+    {
+      "id": "fe775b06-0264-49ea-af29-16289fee1100",
+      "name": "Get events page",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -660,
+        1160
+      ],
+      "parameters": {
+        "url": "={{ $json.location }}/this-month?page={{ $runIndex+1}}",
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "c55554f4-f06c-4084-b9c2-454cf290682b",
+      "name": "Last page?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        0,
+        1160
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $items().length }}",
+              "value2": "=50"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3d750b8a-4288-45ac-af2d-24fc6b7126ec",
+      "name": "Get all events from the page",
+      "type": "n8n-nodes-base.htmlExtract",
+      "position": [
+        -440,
+        1160
+      ],
+      "parameters": {
+        "options": {
+          "trimValues": true
+        },
+        "extractionValues": {
+          "values": [
+            {
+              "key": "events",
+              "cssSelector": "li.event-listings-element",
+              "returnArray": true,
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "84b570d5-60ad-4cb1-9428-1cc3372954cb",
+      "name": "Get each event data",
+      "type": "n8n-nodes-base.htmlExtract",
+      "position": [
+        420,
+        1140
+      ],
+      "parameters": {
+        "options": {},
+        "dataPropertyName": "events",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "date",
+              "attribute": "datetime",
+              "cssSelector": "time",
+              "returnArray": true,
+              "returnValue": "attribute"
+            },
+            {
+              "key": "artist",
+              "cssSelector": "p.artists strong"
+            },
+            {
+              "key": "support",
+              "cssSelector": "p.artists span.support"
+            },
+            {
+              "key": "location",
+              "cssSelector": "p.location"
+            },
+            {
+              "key": "eventLink",
+              "attribute": "href",
+              "cssSelector": "a.event-link",
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "783555d1-1c9c-4bda-8969-0ac46dced10e",
+      "name": "Limit to one",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        420,
+        1300
+      ],
+      "parameters": {
+        "operation": "limit"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fdd1c66b-5e20-4c2d-8c01-38555621ec84",
+      "name": "Wait 3s",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        220,
+        1300
+      ],
+      "webhookId": "617f8c35-66e5-4fca-b974-cf9fc4130d68",
+      "parameters": {
+        "unit": "seconds",
+        "amount": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "49b5b5c7-9645-42cb-89ec-bb9972c8b379",
+      "name": "Split events",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        -220,
+        1160
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "events"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "30b06dc8-d896-4684-9c79-3d845f1041ac",
+      "name": "Collect all results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        1140
+      ],
+      "parameters": {
+        "jsCode": "let results = [],\n  i = 0;\n\ndo {\n  try {\n    results = results.concat($items('Split events', 0, i));\n  } catch (error) {\n    return results;\n  }\n  i++;\n} while(true);"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ea9444ad-06a3-4567-9638-ce8ef8bfff23",
+      "name": "🤖 Each month",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -1220,
+        1160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "73f7295d-c0f7-42b6-8784-3198538e6e48",
+      "name": "Setup location and email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -880,
+        1160
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "location"
+            },
+            {
+              "name": "email"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a3529743-a7fd-4056-80a9-63b0dac259d6",
+      "name": "💄 Lick the stamp",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        620,
+        1140
+      ],
+      "parameters": {
+        "jsCode": "const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' ];\n\nlet html = `<table style=\"width: 100%\">`;\nfor (const item of $input.all()) {\n  const eventDate = new Date(item.json.date[0]);\n  \n   html += `\n    <tr>\n      <td style=\"width: 60px; background-color: #2e2e32; font-family: sans-serif\">\n        <a href=\"https://www.songkick.com${item.json.eventLink}\" style=\"color: #dcdfe6; text-decoration: none\">\n          <p style=\"font-weight: bold; text-align: center; margin: 5px 0 0; padding: 0 0.5em\">${monthNames[eventDate.getMonth()]}</p>\n          <p style=\"font-weight: bold; font-size: 1.5em; text-align: center; margin: 0 0 2px\">${eventDate.getDate()}</p>\n        </a>\n      </td>\n      <td style=\"background-color: #f2f4f8; font-family: sans-serif; padding: 0.3em 0.5em\">\n        <a href=\"https://www.songkick.com${item.json.eventLink}\" style=\"color: #555555; text-decoration: none\">\n        <div>\n          <p style=\"font-size: 1.2em; margin: 0\"><b>${item.json.artist}</b>`\n\n  if (item.json.support) {\n    html = html + `<span style=\"color: #7d7d87; margin:0\"> + ${item.json.support}</span>`;\n  }\n  \n  html += `\n          </p><p style=\"color: #7d7d87; margin: 0\">${item.json.location.split(',')[0].replace(/(\\r\\n|\\n|\\r)/gm, \"\")}</p>\n        </div>\n        </a>\n      </td>\n  </tr>\n   `\n}\nhtml += '</table>';\n\nreturn { \n  \"html\": html,\n  \"total\": $input.all().length \n};\n//$input.all();"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a8f0e1cf-e8b5-402f-9336-4c623980a315",
+      "name": "✉️ Send it",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        820,
+        1140
+      ],
+      "parameters": {
+        "sendTo": "={{ $('Setup location and email').params[\"values\"][\"string\"][1][\"value\"] }}",
+        "message": "={{ $json[\"html\"] }}",
+        "options": {
+          "senderName": "=Monthly event newsletter"
+        },
+        "subject": "=📫 This month: {{$json[\"total\"]}} events!"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e23fd2fc-baf3-4494-ae4a-ddb51f45ff3c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -940,
+        1080
+      ],
+      "parameters": {
+        "color": 7,
+        "height": 230.21423635107112,
+        "content": "### Setup your location link and receiver email(s) here"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "58300fe9-e3b3-452f-b13b-a9296cf05a71",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        1060
+      ],
+      "parameters": {
+        "color": 3,
+        "height": 230.21423635107112,
+        "content": "###  Don't forget to connect a GMail account to this node!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "663147c1-1af0-49f3-9671-3d1d66e7a6f0",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        720
+      ],
+      "parameters": {
+        "color": 4,
+        "content": "## Don't forget to activate the workflow here ☝️"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait 3s": {
+      "main": [
+        [
+          {
+            "node": "Limit to one",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Last page?": {
+      "main": [
+        [
+          {
+            "node": "Collect all results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 3s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to one": {
+      "main": [
+        [
+          {
+            "node": "Setup location and email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split events": {
+      "main": [
+        [
+          {
+            "node": "Last page?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get events page": {
+      "main": [
+        [
+          {
+            "node": "Get all events from the page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 Each month": {
+      "main": [
+        [
+          {
+            "node": "Setup location and email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect all results": {
+      "main": [
+        [
+          {
+            "node": "Get each event data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get each event data": {
+      "main": [
+        [
+          {
+            "node": "💄 Lick the stamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💄 Lick the stamp": {
+      "main": [
+        [
+          {
+            "node": "✉️ Send it",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup location and email": {
+      "main": [
+        [
+          {
+            "node": "Get events page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all events from the page": {
+      "main": [
+        [
+          {
+            "node": "Split events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

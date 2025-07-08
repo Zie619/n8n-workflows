@@ -1,0 +1,403 @@
+{
+  "id": "kbJb4VMD3SZlcS2u",
+  "meta": {
+    "instanceId": "a5283507e1917a33cc3ae615b2e7d5ad2c1e50955e6f831272ddd5ab816f3fb6",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "CoinMarketCap_Exchange_and_Community_Agent_Tool",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -160,
+        340
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId"
+            },
+            {
+              "name": "message"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "3609967c-f7c4-4be5-8cf5-1213dcf8cd39",
+      "name": "CoinMarketCap Exchange and Community Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        300,
+        340
+      ],
+      "parameters": {
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "You are a **digital asset intelligence agent** designed to provide deep insights into the cryptocurrency ecosystem by querying CoinMarketCap's API. You support data retrieval across exchanges, community sentiment, and index tracking.\n\n---\n\n### 🛠️ Available Tools & Capabilities\n\n#### 1. 🔍 **Exchange Map**\n- **Purpose:** Retrieve a list of all registered cryptocurrency exchanges.\n- **Endpoint:** `https://pro-api.coinmarketcap.com/v1/exchange/map`\n- **Query Parameters:** \n  - `slug` (recommended starting point)\n  - `listing_status`, `start`, `limit`, `crypto_id`\n- **Returns:** Exchange ID, name, slug — essential for identifying exchanges.\n- **Usage:** Use first to acquire the `id` needed by other tools.\n\n---\n\n#### 2. 🧾 **Exchange Info**\n- **Purpose:** Obtain metadata for a specific exchange.\n- **Endpoint:** `https://pro-api.coinmarketcap.com/v1/exchange/info`\n- **Required Parameter:** `id` (from Exchange Map)\n- **Returns:** Description, launch year, country, website/Twitter links, and status.\n\n---\n\n#### 3. 💰 **Exchange Assets**\n- **Purpose:** View on-chain token holdings of an exchange.\n- **Endpoint:** `https://pro-api.coinmarketcap.com/v1/exchange/assets`\n- **Required Parameter:** `id` (from Exchange Map)\n- **Returns:** Token balances, wallet addresses, blockchain platform, and USD value.\n\n---\n\n#### 4. 📈 **CMC 100 Index**\n- **Purpose:** Get the latest CoinMarketCap 100 Index data.\n- **Endpoint:** `https://pro-api.coinmarketcap.com/v3/index/cmc100-latest`\n- **Returns:** Constituents of the index and their weights.\n\n---\n\n#### 5. 😱 **Fear and Greed Index (Latest)**\n- **Purpose:** Access current crypto market sentiment.\n- **Endpoint:** `https://pro-api.coinmarketcap.com/v3/fear-and-greed/latest`\n- **Returns:** Sentiment index score and classification (e.g., Fear, Greed).\n\n---\n\n### ⚠️ Error Trap: API Response Overload\nIf the API response returns **too much data** and exceeds the GPT model's token limit:\n- Notify the user with the message:  \n  **\"⚠️ The requested data exceeds the processing capacity of this model. Please refine your query by limiting results or filtering data.\"**\n- Suggest parameters like `limit`, `start`, or using a specific `id` or `slug` to reduce data size.\n\n---\n\nKeep responses structured, insightful, and performant. Always validate if required parameters are available before invoking a tool. Prioritize `Exchange Map` for ID resolution before calling `Exchange Info` or `Exchange Assets`.\n\n"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "811480ce-f2c9-4400-b585-1a3609b5bef0",
+      "name": "Exchange and Community Agent Brain",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        -320,
+        620
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "yUizd8t0sD5wMYVG",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "007b07fd-2abe-4bdd-80ef-8883e0cbfcec",
+      "name": "Exchange and Community Agent Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        -140,
+        620
+      ],
+      "parameters": {},
+      "typeVersion": 1.3
+    },
+    {
+      "id": "669566d0-3dc5-413e-a8b5-80cf4aeaa54d",
+      "name": "Exchange Map",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        60,
+        620
+      ],
+      "parameters": {
+        "url": "https://pro-api.coinmarketcap.com/v1/exchange/map",
+        "sendQuery": true,
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "slug"
+            }
+          ]
+        },
+        "toolDescription": "Get a map of all crypto exchanges with CoinMarketCap ID, name, and slug.\n\n1st query with only the slug only, if error then try others.",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "OKXROn8aWkgAOvvV",
+          "name": "CoinMarketCap Standard"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "03b3e44f-a740-414c-a011-de4d571b7968",
+      "name": "Exchange Info",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        280,
+        620
+      ],
+      "parameters": {
+        "url": "https://pro-api.coinmarketcap.com/v1/exchange/info",
+        "sendQuery": true,
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "id"
+            }
+          ]
+        },
+        "toolDescription": "Get metadata for a crypto exchange including description, launch date, country, and links.",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "OKXROn8aWkgAOvvV",
+          "name": "CoinMarketCap Standard"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "65c2b8ab-7d6d-415e-a436-0a9c14af2457",
+      "name": "CMC 100 Index",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        740,
+        620
+      ],
+      "parameters": {
+        "url": "https://pro-api.coinmarketcap.com/v3/index/cmc100-latest",
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "toolDescription": "Returns the latest CoinMarketCap 100 Index value, including constituents and their weights.",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "OKXROn8aWkgAOvvV",
+          "name": "CoinMarketCap Standard"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "51a94f35-4405-4e53-9fa5-91911759802d",
+      "name": "Fear and Greed Latest",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        980,
+        620
+      ],
+      "parameters": {
+        "url": "https://pro-api.coinmarketcap.com/v3/fear-and-greed/latest",
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "toolDescription": "Returns the latest value from the CMC Crypto Fear and Greed Index.",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "OKXROn8aWkgAOvvV",
+          "name": "CoinMarketCap Standard"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "26240549-9b41-4b6a-bf24-d61c8ee155ca",
+      "name": "Exchange Assets",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "position": [
+        520,
+        620
+      ],
+      "parameters": {
+        "url": "https://pro-api.coinmarketcap.com/v1/exchange/assets",
+        "sendQuery": true,
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "id"
+            }
+          ]
+        },
+        "toolDescription": "Returns token holdings of a specific exchange including wallet addresses, platform, balance, and USD value.",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Accept"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "OKXROn8aWkgAOvvV",
+          "name": "CoinMarketCap Standard"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "22b5608c-467e-41ff-81d9-559d110b872d",
+      "name": "Exchange & Community Guide",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1520,
+        -680
+      ],
+      "parameters": {
+        "width": 1200,
+        "height": 720,
+        "content": "# 🧠 CoinMarketCap_Exchange_and_Community_Agent_Tool Guide\n\nThis agent handles **exchange-level** data, **community sentiment**, and **index insights** using CoinMarketCap API endpoints.\n\n## 🔌 Supported Tools\n1. `/v1/exchange/map` – Get exchange ID, name, and slug\n2. `/v1/exchange/info` – Metadata: launch date, social, location\n3. `/v1/exchange/assets` – Token holdings of exchange\n4. `/v3/index/cmc100-latest` – CoinMarketCap 100 Index info\n5. `/v3/fear-and-greed/latest` – Sentiment index (0–100)\n\n## 🧠 Agent Components:\n- **🧠 Brain**: GPT-4o Mini\n- **💾 Memory**: Conversation state handler\n- **⚙️ Tools**: 5 direct API endpoints\n\n## 🧩 Trigger Parameters:\n- `message` – Main query prompt\n- `sessionId` – Contextual memory key\n\n## 🔑 Notes:\n- Use `Exchange Map` to get valid `id` before calling `Exchange Info` or `Assets`\n- Fear & Greed index returns daily updated data points\n- Index tools return structured component weights"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "dd38cd37-bff7-4200-94e4-a7f2a0f3b979",
+      "name": "Usage & Examples",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        -680
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 840,
+        "height": 920,
+        "content": "## 📌 Usage Instructions\n\n### ✅ Step 1: Provide Inputs\nUse `slug` for exchanges or `id` for metadata/assets. \n\n### ✅ Step 2: Trigger from Supervisor Agent\nThe main workflow will send `message` and `sessionId`.\n\n### ✅ Step 3: Results Output\nReturns JSON with insights on exchanges or index data.\n\n---\n\n## 🔍 Example Prompts\n\n### 1️⃣ Show latest Fear & Greed score\n```plaintext\nGET /v3/fear-and-greed/latest\n```\n\n### 2️⃣ Get Binance exchange token holdings\n```plaintext\n1. GET /v1/exchange/map?slug=binance\n2. Use ID to query /v1/exchange/assets?id=...\n```\n\n### 3️⃣ What coins make up the CMC 100 Index?\n```plaintext\nGET /v3/index/cmc100-latest\n```\n\n### 4️⃣ Show info on Coinbase\n```plaintext\n1. /v1/exchange/map?slug=coinbase\n2. /v1/exchange/info?id=...\n```"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ce0e7093-9fe0-4b9c-8cf5-50cdfef45d94",
+      "name": "Errors & Licensing",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1020,
+        -680
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 640,
+        "height": 500,
+        "content": "## ⚠️ Error Handling Tips\n\n| Error Code | Meaning |\n|------------|---------|\n| `400` | Bad Request – missing/invalid param |\n| `401` | Unauthorized – check API key |\n| `429` | Rate Limit Exceeded |\n| `500` | CoinMarketCap server error |\n\n### ⚠️ Large Response Warning\nIf result data exceeds memory limits:\n- Prompt: _“⚠️ Data too large, refine query with limit or filters.”_\n\n---\n\n**Need Help?**  \n🌐 Connect on LinkedIn:  \n🔗 [http://linkedin.com/in/donjayamahajr](http://linkedin.com/in/donjayamahajr)\n\n© 2025 Treasurium Capital Limited Company. All rights reserved.\nThis AI workflow architecture, including logic, design, and prompt structures, is the intellectual property of Treasurium Capital Limited Company. Unauthorized reproduction, redistribution, or resale is prohibited under U.S. copyright law. Licensed use only."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "faf44acc-2d07-4185-877c-b57f9c8c88bb",
+  "connections": {
+    "Exchange Map": {
+      "ai_tool": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMC 100 Index": {
+      "ai_tool": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exchange Info": {
+      "ai_tool": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exchange Assets": {
+      "ai_tool": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fear and Greed Latest": {
+      "ai_tool": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exchange and Community Agent Brain": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exchange and Community Agent Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "CoinMarketCap Exchange and Community Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

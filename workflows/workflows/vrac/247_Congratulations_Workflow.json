@@ -1,0 +1,211 @@
+{
+  "id": "247",
+  "name": "Congratulations Workflow",
+  "nodes": [
+    {
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        200,
+        400
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 8
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Congratulations Calendar",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        400,
+        400
+      ],
+      "parameters": {
+        "range": "A:E",
+        "options": {
+          "valueRenderMode": "FORMATTED_VALUE"
+        },
+        "sheetId": "",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Any Event Today?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        600,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Congratulations Calendar\"].json[\"Date\"]}}",
+              "value2": "={{(new Date).getDate()}}/{{(new Date).getMonth()+1}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Do Nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        800,
+        550
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Congratulations Messages",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1000,
+        550
+      ],
+      "parameters": {
+        "range": "Congratulations Messages!A:B",
+        "options": {},
+        "sheetId": "",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge Data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1200,
+        400
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "Event Name",
+        "propertyName2": "Event Name"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Personalize Message",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1400,
+        400
+      ],
+      "parameters": {
+        "functionCode": "const newItems = [];\n\nfor (let i=0;i<items.length;i++) {\n  wishes_array = items[i].json.Congratulations.split(',');\n  greeting = wishes_array.shift();\n  \n  new_wish = greeting + ' ' + items[i].json['First Name'] + ',' + wishes_array.join(',');\n  newItems.push({json: {Wishes: new_wish, \"Phone Number\": items[i].json['Phone Number']}});\n}\n\nreturn newItems;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "position": [
+        1600,
+        400
+      ],
+      "parameters": {
+        "to": "={{$node[\"Personalize Message\"].json[\"Phone Number\"]}}",
+        "from": "",
+        "message": "={{$node[\"Personalize Message\"].json[\"Wishes\"]}}"
+      },
+      "credentials": {
+        "twilioApi": "Twilio Programmable SMS"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "settings": {},
+  "connections": {
+    "Merge Data": {
+      "main": [
+        [
+          {
+            "node": "Personalize Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Congratulations Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Event Today?": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Do Nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Personalize Message": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Congratulations Calendar": {
+      "main": [
+        [
+          {
+            "node": "Any Event Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Congratulations Messages": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  }
+}

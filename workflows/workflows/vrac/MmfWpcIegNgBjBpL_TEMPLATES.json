@@ -1,0 +1,395 @@
+{
+  "id": "MmfWpcIegNgBjBpL",
+  "meta": {
+    "instanceId": "da824ad45fda1b156c8390a3c35cdfbb10059e671c074c19429dac59c5ae98f6"
+  },
+  "name": "TEMPLATES",
+  "tags": [
+    {
+      "id": "uKg1PU2D27Vsr8ud",
+      "name": "MONDAY",
+      "createdAt": "2023-12-05T07:54:13.266Z",
+      "updatedAt": "2023-12-05T07:54:13.266Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "de488298-e4f3-4b06-aef3-5d5d795382e9",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        120,
+        560
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "7e8c25dc-7ccd-44b5-a4b1-33def99fc811",
+      "name": "PULL SUBITEMS",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        640,
+        460
+      ],
+      "parameters": {
+        "jsCode": "//Search for \"Subitems\" column\nconst columnName = \"Subitems\"\nfunction getColumnValue(item, columnId) {\n    const column = item.column_values.find(column => column.column.title === columnId);\n    if (column) {\n          return column\n    } else {\n        return null;\n    }\n}\nconst columnValue = getColumnValue($input.last().json, columnName);\nreturn JSON.parse(columnValue.value);\n\n//ALT OPTION - direct access by column_values[0]\n//var ids = $input.last().json['column_values'][0]['value'];\n//return JSON.parse(ids)"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "82464748-cf9a-4792-8790-f07c06c1525d",
+      "name": "SPLIT SUBITEMS",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        840,
+        460
+      ],
+      "parameters": {
+        "include": "selectedOtherFields",
+        "options": {},
+        "fieldToSplitOut": "linkedPulseIds",
+        "fieldsToInclude": "linkedPulseIds[0].linkedPulseId"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "96a780da-be73-41c8-bf53-b2a05061a340",
+      "name": "GET EACH SUBITEM",
+      "type": "n8n-nodes-base.mondayCom",
+      "position": [
+        1020,
+        460
+      ],
+      "parameters": {
+        "itemId": "=\n{{ $json.linkedPulseIds.linkedPulseId }}",
+        "resource": "boardItem",
+        "operation": "get"
+      },
+      "credentials": {
+        "mondayComApi": {
+          "id": "5nd48DKapWBLcUBx",
+          "name": "Monday.com account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "5993e15a-1a1b-436e-b994-bf3acee16da0",
+      "name": "MONDAY UPLOAD",
+      "type": "n8n-nodes-base.httpRequest",
+      "disabled": true,
+      "position": [
+        1020,
+        600
+      ],
+      "parameters": {
+        "url": "https://api.monday.com/v2/file",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=mutation add_file($file: File!) {add_file_to_column (item_id:{{ $input.last().json[\"id\"] }} , column_id:\"file\" file: $file) {id}}"
+            },
+            {
+              "name": "map",
+              "value": "{\"image\":\"variables.file\"}"
+            },
+            {
+              "name": "image",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "nodeCredentialType": "mondayComOAuth2Api"
+      },
+      "credentials": {
+        "mondayComOAuth2Api": {
+          "id": "C9hcle0ZoGsxR1ds",
+          "name": "Monday.com account 2"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.1
+    },
+    {
+      "id": "06099adf-7f2f-4c32-84b8-e2458e39f95c",
+      "name": "Convert to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        640,
+        660
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "toJson"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "397c5d7b-76e4-4a0e-bd39-31c10571d68a",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        840,
+        600
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combinationMode": "mergeByPosition"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "a7bcc413-8d7e-4941-a81a-7a99fe14b01d",
+      "name": "PULL LINKEDPULSE",
+      "type": "n8n-nodes-base.mondayCom",
+      "position": [
+        1200,
+        320
+      ],
+      "parameters": {
+        "itemId": "=\n{{ $json.linkedPulse.linkedPulseId }}",
+        "resource": "boardItem",
+        "operation": "get"
+      },
+      "credentials": {
+        "mondayComApi": {
+          "id": "5nd48DKapWBLcUBx",
+          "name": "Monday.com account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "a4d2e3a7-05a9-434a-a4e5-d6ed3d538091",
+      "name": "GET ITEM",
+      "type": "n8n-nodes-base.mondayCom",
+      "position": [
+        340,
+        560
+      ],
+      "parameters": {
+        "itemId": "5775061188",
+        "resource": "boardItem",
+        "operation": "get"
+      },
+      "credentials": {
+        "mondayComApi": {
+          "id": "5nd48DKapWBLcUBx",
+          "name": "Monday.com account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "5ce40a46-1513-498a-9e92-8dd96e508f34",
+      "name": "GET LINKEDPULSES",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        840,
+        320
+      ],
+      "parameters": {
+        "jsCode": "data = $input.last().json.value\nconst linkedPulseID = JSON.parse(data).linkedPulseIds\nreturn { \"linkedPulse\": linkedPulseID}\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "22e3ec96-4e83-42fa-aa25-ce0d7445df15",
+      "name": "GET BOARD RELATION",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        640,
+        320
+      ],
+      "parameters": {
+        "jsCode": "const columnName = \"Additional Contacts\"\n\nfunction getColumnValue(item, columnId) {\n    const column = item.column_values.find(column => column.column.title === columnId);\n    if (column) {\n          return column\n    } else {\n        return null;\n    }\n}\n\nconst columnValue = getColumnValue($input.last().json, columnName);\nreturn (columnValue)"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e55be301-0a6a-43a6-8a07-becc39e0a254",
+      "name": "COLUMN BY NAME",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        640,
+        40
+      ],
+      "parameters": {
+        "jsCode": "const columnName = \"Zoom Date\"\n\nfunction getColumnValue(item, columnId) {\n    const column = item.column_values.find(column => column.column.title === columnId);\n    if (column) {\n          return column\n    } else {\n        return null;\n    }\n}\n\nconst columnValue = getColumnValue($input.last().json, columnName);\nreturn (columnValue)"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "463966c2-27e2-429c-8f8b-b3c279592f0d",
+      "name": "COLUMN BY ID",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        640,
+        180
+      ],
+      "parameters": {
+        "jsCode": "const columnId = \"person\"\n\nfunction getColumnValue(item, columnId) {\n    const column = item.column_values.find(column => column.id === columnId);\n    if (column) {\n          return column\n    } else {\n        return null;\n    }\n}\n\nconst columnValue = getColumnValue($input.last().json, columnId);\nreturn (columnValue)"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "33b0aeff-18aa-4ee9-97b3-7c3a44cf96fc",
+      "name": "SPLIT LINKED PULSES",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1020,
+        320
+      ],
+      "parameters": {
+        "include": "=",
+        "options": {},
+        "fieldToSplitOut": "linkedPulse"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "91cd2823-4b1c-4e94-9205-9a765846b789",
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "MONDAY UPLOAD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET ITEM": {
+      "main": [
+        [
+          {
+            "node": "GET BOARD RELATION",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PULL SUBITEMS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "COLUMN BY NAME",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "COLUMN BY ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PULL SUBITEMS": {
+      "main": [
+        [
+          {
+            "node": "SPLIT SUBITEMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SPLIT SUBITEMS": {
+      "main": [
+        [
+          {
+            "node": "GET EACH SUBITEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "GET LINKEDPULSES": {
+      "main": [
+        [
+          {
+            "node": "SPLIT LINKED PULSES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET BOARD RELATION": {
+      "main": [
+        [
+          {
+            "node": "GET LINKEDPULSES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SPLIT LINKED PULSES": {
+      "main": [
+        [
+          {
+            "node": "PULL LINKEDPULSE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Test workflow\"": {
+      "main": [
+        [
+          {
+            "node": "GET ITEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

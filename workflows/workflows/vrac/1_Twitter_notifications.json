@@ -1,0 +1,177 @@
+{
+  "id": "1",
+  "name": "Twitter notifications",
+  "nodes": [
+    {
+      "name": "Twitter",
+      "type": "n8n-nodes-base.twitter",
+      "position": [
+        610,
+        260
+      ],
+      "parameters": {
+        "operation": "search",
+        "searchText": "n8n_io",
+        "additionalFields": {
+          "resultType": "recent"
+        }
+      },
+      "credentials": {
+        "twitterOAuth1Api": "Twitter"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        410,
+        260
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Function",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        940,
+        260
+      ],
+      "parameters": {
+        "functionCode": "const new_items = [];\nconst data = this.getWorkflowStaticData('node');\n\ndata.ids = data.ids || [];\n\nfor (var i=0; i<items.length; i++) {\n  if (data.ids.includes(items[i].json.id)) {\n    break;\n  } else {\n    new_items.push({json: {id: items[i].json.id, url: items[i].json.url, tweet: items[i].json.tweet, username: items[i].json.username, photo: items[i].json.photo, name: items[i].json.name, color: items[i].json.color}});\n  }\n}\n\ndata.ids = items.map(item => item.json.id)\nreturn new_items;\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        780,
+        260
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "id",
+              "value": "={{$node[\"Twitter\"].json[\"id\"]}}"
+            }
+          ],
+          "string": [
+            {
+              "name": "url",
+              "value": "=https://twitter.com/{{$node[\"Twitter\"].json[\"user\"][\"screen_name\"]}}/status/{{$node[\"Twitter\"].json[\"id_str\"]}}"
+            },
+            {
+              "name": "tweet",
+              "value": "={{$node[\"Twitter\"].json[\"text\"]}}"
+            },
+            {
+              "name": "username",
+              "value": "={{$node[\"Twitter\"].json[\"user\"][\"screen_name\"]}}"
+            },
+            {
+              "name": "photo",
+              "value": "={{$node[\"Twitter\"].json[\"user\"][\"profile_image_url_https\"]}}"
+            },
+            {
+              "name": "name",
+              "value": "={{$node[\"Twitter\"].json[\"user\"][\"name\"]}}"
+            },
+            {
+              "name": "color",
+              "value": "={{$node[\"Twitter\"].json[\"user\"][\"profile_link_color\"]}}"
+            }
+          ]
+        },
+        "options": {
+          "dotNotation": true
+        },
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Mattermost",
+      "type": "n8n-nodes-base.mattermost",
+      "position": [
+        1110,
+        260
+      ],
+      "parameters": {
+        "message": "={{$node[\"Function\"].json[\"url\"]}}",
+        "channelId": "c81pcft85byeipbp3nptbmicah",
+        "attachments": [
+          {
+            "text": "={{$node[\"Function\"].json[\"tweet\"]}}",
+            "color": "=#{{$node[\"Function\"].json[\"color\"]}}",
+            "author_icon": "={{$node[\"Function\"].json[\"photo\"]}}",
+            "author_link": "=https://twitter.com/{{$node[\"Function\"].json[\"username\"]}}",
+            "author_name": "={{$node[\"Function\"].json[\"name\"]}} ({{$node[\"Function\"].json[\"username\"]}})"
+          }
+        ],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "mattermostApi": "Mattermost"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "settings": {},
+  "connections": {
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Twitter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twitter": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function": {
+      "main": [
+        [
+          {
+            "node": "Mattermost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

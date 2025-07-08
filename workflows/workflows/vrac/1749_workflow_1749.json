@@ -1,0 +1,294 @@
+{
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        400,
+        520
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1500,
+        360
+      ],
+      "parameters": {
+        "width": 780,
+        "height": 360,
+        "content": "## 2. Wait for an external event\nUse this operation when an external step is needed in order to continue with the rest of the workflow.\nFor example - a workflow sends a purchase approval link to the merchant (using Gmail, Slack etc..) and waits for the merchant to click on it before continuing with the rest of the steps.\n\nIn this example, the `Customer Messenger` node mimics the email or messaging node.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        200,
+        380
+      ],
+      "parameters": {
+        "width": 300,
+        "height": 120,
+        "content": "### Click the `Execute Workflow` button and double click on the nodes to see the input and output items."
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Create approval URL",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1540,
+        520
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "URL",
+              "value": "={{$resumeWebhookUrl}}?name=nathan"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Wait for external approval",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1940,
+        520
+      ],
+      "webhookId": "0bcafff8-9fc1-4415-95b1-00746bb1304d",
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Rest of the workflow placeholder",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2140,
+        520
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Customer Datastore",
+      "type": "n8n-nodes-base.n8nTrainingCustomerDatastore",
+      "position": [
+        580,
+        520
+      ],
+      "parameters": {
+        "operation": "getAllPeople",
+        "returnAll": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "SplitInBatches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        760,
+        520
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 1
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        360
+      ],
+      "parameters": {
+        "width": 900,
+        "height": 360,
+        "content": "## 1. Rate Limiting \nSometimes you need to slow down how often you are contacting a service.\n\nIn this example, `Customer Datastore` node simulates the big batches of requests coming at once, the `SplitInBatches` node handles each one individually in a loop, and the `Wait` node creates a 2 second delay between each message to a customer."
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Wait for time interval",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        920,
+        520
+      ],
+      "webhookId": "2b72e9d7-75b7-4ef5-87e7-2bfdfdbaa20f",
+      "parameters": {
+        "unit": "seconds",
+        "amount": 2
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "If - Are we Finished?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1280,
+        520
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"SplitInBatches\"].context[\"noItemsLeft\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Customer Messenger - Send URL to merchant",
+      "type": "n8n-nodes-base.n8nTrainingCustomerMessenger",
+      "position": [
+        1740,
+        520
+      ],
+      "parameters": {
+        "message": "={{$json[\"URL\"]}}",
+        "customerId": "1"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Customer Messenger - Send message to client",
+      "type": "n8n-nodes-base.n8nTrainingCustomerMessenger",
+      "position": [
+        1100,
+        520
+      ],
+      "parameters": {
+        "message": "=\nHi {{$node[\"Customer Datastore\"].json[\"name\"]}}\nThis message was sent at {{$now.toLocaleString(DateTime.TIME_WITH_SECONDS)}}",
+        "customerId": "={{$node[\"Customer Datastore\"].json[\"id\"]}}"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "SplitInBatches": {
+      "main": [
+        [
+          {
+            "node": "Wait for time interval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Datastore": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create approval URL": {
+      "main": [
+        [
+          {
+            "node": "Customer Messenger - Send URL to merchant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If - Are we Finished?": {
+      "main": [
+        [
+          {
+            "node": "Create approval URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Customer Datastore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for time interval": {
+      "main": [
+        [
+          {
+            "node": "Customer Messenger - Send message to client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for external approval": {
+      "main": [
+        [
+          {
+            "node": "Rest of the workflow placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Messenger - Send URL to merchant": {
+      "main": [
+        [
+          {
+            "node": "Wait for external approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Messenger - Send message to client": {
+      "main": [
+        [
+          {
+            "node": "If - Are we Finished?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

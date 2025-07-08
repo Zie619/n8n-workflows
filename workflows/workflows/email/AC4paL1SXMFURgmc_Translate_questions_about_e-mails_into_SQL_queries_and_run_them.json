@@ -1,0 +1,847 @@
+{
+  "id": "AC4paL1SXMFURgmc",
+  "meta": {
+    "instanceId": "8a3ba313628b26e4e4cf0504ff23322f235d6b433d92e59bcf8762764730ed80",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Translate questions about e-mails into SQL queries and run them",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "dd63600a-6bee-43cd-a1d2-87aae2089ed4",
+      "name": "Add table name to output",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        840,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "764176d6-3c89-404d-9c71-301e8a406a68",
+              "name": "table",
+              "type": "string",
+              "value": "={{ $('List all tables in a database').item.json.table_name ?? 'emails_metadata'}}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "1bf02b6d-e8e4-4b1b-8ee2-c91a8c390a21",
+      "name": "Convert data to binary",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        1040,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "toJson"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "cf930fa2-03bd-46fa-af4d-df282262f965",
+      "name": "Save file locally",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        1220,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "fileName": "=/files/pgsql-{{ $workflow.id }}.json",
+        "operation": "write"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "48bc8812-7e1b-4d08-8610-884e00069f3c",
+      "name": "Extract data from file",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        920,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "fromJson"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0d6a0a55-a7cb-4471-ba80-a336324d2939",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        260,
+        520
+      ],
+      "webhookId": "c308dec7-655c-4b79-832e-991bd8ea891f",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "8f39276c-4ce7-4b27-b022-231607a9cfb3",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        -60
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 1505,
+        "height": 486,
+        "content": "## This can run manually\nThis section:\n* loads a list of all tables from the database\n* extracts the database schema for each table and adds the table name\n* converts the schema into a binary JSON format\n* saves the schema  file locally"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4fb5174f-a3ed-413f-98f7-41b0b46b62ae",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        260,
+        160
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "cf6e9426-18ca-4d6e-bff2-d517ae7b4c1e",
+      "name": "Combine schema data and chat input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1140,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "42abd24e-419a-47d6-bc8b-7146dd0b8314",
+              "name": "sessionId",
+              "type": "string",
+              "value": "={{ $('Chat Trigger').isExecuted && $('Chat Trigger').first().json.sessionId }}"
+            },
+            {
+              "id": "39244192-a1a6-42fe-bc75-a6fba1f264df",
+              "name": "action",
+              "type": "string",
+              "value": "={{ $('Chat Trigger').isExecuted && $('Chat Trigger').first().json.action }}"
+            },
+            {
+              "id": "f78c57d9-df13-43c7-89a7-5387e528107e",
+              "name": "chatinput",
+              "type": "string",
+              "value": "={{ $('WorkflowTrigger').isExecuted ? $('WorkflowTrigger').first().json.natural_language_query: $('Chat Trigger').first().json.chatInput }}"
+            },
+            {
+              "id": "e42b39eb-dfbd-48d9-94ed-d658bdd41454",
+              "name": "schema",
+              "type": "string",
+              "value": "={{ $json.data }}"
+            }
+          ]
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "6a960e03-ea13-4090-8ef8-9b294963fa63",
+      "name": "Load the schema from the local file",
+      "type": "n8n-nodes-base.readWriteFile",
+      "onError": "continueRegularOutput",
+      "maxTries": 2,
+      "position": [
+        480,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "=/files/pgsql-{{ $workflow.id }}.json"
+      },
+      "retryOnFail": false,
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0bad6e46-e8ed-4ba6-a7d9-2d69fd11227b",
+      "name": "Extract SQL query",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1740,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ebbe194a-4b8b-44c9-ac19-03cf69d353bf",
+              "name": "query",
+              "type": "string",
+              "value": "={{ ($json.output.match(/SELECT[^;]*/i) || [])[0] || \"\" }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "2aa91c40-8648-4fba-899d-5599866122e3",
+      "name": "Check if query exists",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2400,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "2963d04d-9d79-49f9-b52a-dc8732aca781",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.query }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "24b59747-7f9b-473c-9d31-660e17867986",
+      "name": "Format query results",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2840,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f944d21f-6aac-4842-8926-4108d6cad4bf",
+              "name": "sqloutput",
+              "type": "string",
+              "value": "={{ Object.keys($jmespath($input.all(),'[].json')[0]).join(' | ') }} \n{{ ($jmespath($input.all(),'[].json')).map(obj => Object.values(obj).join(' | ')).join('\\n') }}"
+            }
+          ]
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a25acba2-74c5-4af6-a1e4-46cfd1364b44",
+      "name": "Combine query result and chat answer",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        3060,
+        540
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {
+          "includeUnpaired": true
+        },
+        "combineBy": "combineByPosition"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "a1cde4a1-7b47-4aa2-bd2c-a7090bfb0bb2",
+      "name": "List all columns in a table",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        640,
+        160
+      ],
+      "parameters": {
+        "query": "SELECT\n  column_name, \n  udt_name as data_type, \n  CASE WHEN data_type = 'ARRAY' THEN TRUE ELSE FALSE END AS is_array,\n  is_nullable \nFROM INFORMATION_SCHEMA.COLUMNS where table_name = '{{ $json.table_name }}'",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {},
+      "typeVersion": 2.6
+    },
+    {
+      "id": "cf167b64-007d-469a-bb3e-1144fe435a17",
+      "name": "List all tables in a database",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        460,
+        160
+      ],
+      "parameters": {
+        "query": "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_schema='public'",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {},
+      "typeVersion": 2.6
+    },
+    {
+      "id": "6f6fd892-d779-41d4-ac19-1d5630674f67",
+      "name": "Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "position": [
+        1440,
+        840
+      ],
+      "parameters": {
+        "model": "phi4-mini:latest",
+        "options": {}
+      },
+      "credentials": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "6cb76f04-3183-4bce-aa15-0724205d0ab3",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "onError": "continueRegularOutput",
+      "position": [
+        2620,
+        460
+      ],
+      "parameters": {
+        "query": "{{ $json.query }}",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {},
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "9c2a4d74-c2e6-4fac-a00d-2a84a5150027",
+      "name": "Add trailing semicolon",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2180,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "15622b82-a226-4f54-9c0e-3f30b2c0cf4b",
+              "name": "query",
+              "type": "string",
+              "value": "={{ $json.query }};"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "7725f9c3-9c5d-41d6-b4d1-fc444122ae2f",
+      "name": "Check for trailing semicolon",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1960,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "94bd2686-21e7-44aa-b6a8-be5a17bd0242",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.query }}",
+              "rightValue": ""
+            },
+            {
+              "id": "f22c8914-62f3-4f15-be6f-dd23de5a099a",
+              "operator": {
+                "type": "string",
+                "operation": "notEndsWith"
+              },
+              "leftValue": "={{ $json.query }}",
+              "rightValue": ";"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "c7dd1e14-a8f6-4222-a12a-802928b10f56",
+      "name": "WorkflowTrigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        260,
+        720
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "natural_language_query"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "f658fbba-54e3-40f5-9217-a0c8730b1ff4",
+      "name": "If ran manually",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1420,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "c761a475-43ac-483b-827c-0eb69dfebc9a",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $('When clicking \"Test workflow\"').isExecuted }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "67810482-afb7-47b0-ba0d-8b79a140e890",
+      "name": "If file exists or already retried generating it",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        700,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "28000886-13f4-4628-b1c0-afaaf596ec56",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $input.item.binary }}",
+              "rightValue": ""
+            },
+            {
+              "id": "ddcd8702-8774-4075-a2d0-6d99cf0cb2c2",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $('If ran manually').isExecuted }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "38121ff4-b0d2-4274-92bf-be346b71c1e9",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        440
+      ],
+      "parameters": {
+        "width": 720,
+        "height": 540,
+        "content": "## This is triggered by chat or as a sub-workflow\nNatural language requests can be asked, and a SQL query as well as its results will be returned."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "05dce292-4d93-4b0d-87e1-09e8b1dab70a",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1360,
+        620
+      ],
+      "parameters": {
+        "text": "=You have access to a database containing all my personal email and documents.\n\nToday's date is {{ $now.toLocaleString() }}\n\nThe database schema is:\n```\n{{ $json.schema }}\n```\n\nGenerate a SQL query that will:\n```\n{{ $json.chatinput }}\n```\n\nIMPORTANT: \n1. ONLY use column names that exist in the schema above\n2. NEVER invent columns or assume JSON fields that aren't listed\n3. The only metadata fields are emails_metadata.id and emails_metadata.thread_id\n4. Use operators appropriate for each data type:\n   - Text fields → ILIKE '%term%'\n   - Date fields → Date comparisons (>,<,BETWEEN)\n   - Array fields → @>, ANY(), IS NOT NULL\n5. Output ONLY the raw SQL statement ending with a semicolon\n6. The database cannot contain emails from the future",
+        "options": {
+          "systemMessage": "=You are an expert SQL query generator that creates precise PostgreSQL queries based on natural language requests. You must strictly adhere to the provided database schema and NEVER invent columns that don't exist.\n\nCRITICAL SCHEMA ADHERENCE RULES:\n\n1. ONLY use columns explicitly listed in the schema\n2. The metadata fields are strictly limited to:\n   - emails_metadata.id\n   - emails_metadata.thread_id\n3. NEVER invent fields like \"priority\", \"category\", or any metadata attributes not in the schema\n4. NEVER use JSON operators (->>, @>) unless the schema shows JSONB columns\n\nDATA TYPE HANDLING:\n\n1. TEXT/VARCHAR FIELDS:\n   - Use ILIKE '%term%' for case-insensitive pattern matching\n   - Example: WHERE email_subject ILIKE '%meeting%'\n\n2. TIMESTAMP/DATE FIELDS:\n   - NEVER use LIKE/ILIKE on date fields\n   - \"yesterday\" → date > CURRENT_DATE - INTERVAL '1 day' AND date < CURRENT_DATE\n   - \"last week\" → date > CURRENT_DATE - INTERVAL '7 days'\n   - Example: WHERE date > CURRENT_DATE - INTERVAL '3 days'\n\n3. ARRAY FIELDS:\n   - Use @> for checking if array contains elements\n   - Example: WHERE attachments IS NOT NULL\n\n4. BOOLEAN LOGIC:\n   - Always use parentheses to clarify operator precedence\n   - Example: WHERE (email_subject ILIKE '%report%' OR email_text ILIKE '%report%') AND date > '2023-01-01'\n\nQUERY CONSTRUCTION GUIDELINES:\n- Start with \"SELECT * FROM\" unless specific fields are requested\n- Use ORDER BY date DESC for recency when appropriate\n- Apply LIMIT only when specifically requested or implied by quantity terms\n- End all statements with semicolons\n- Output only the raw SQL without explanations or code blocks\n- Mind the difference between emails _about_ future dates references, and emails _received_ in specific date references. The database cannot contain emails from the future.\n\nEXAMPLE QUERIES:\n1. \"recent emails about projects from Sarah with attachments\"\n   SELECT * FROM emails_metadata \n   WHERE (email_subject ILIKE '%project%' OR email_text ILIKE '%project%')\n   AND email_from ILIKE '%sarah%' \n   AND attachments IS NOT NULL\n   ORDER BY date DESC;\n\n2. \"emails received yesterday\"\n   SELECT * FROM emails_metadata \n   WHERE date > CURRENT_DATE - INTERVAL '1 day' AND date < CURRENT_DATE;\n\n3. \"one email about budget\"\n   SELECT * FROM emails_metadata \n   WHERE (email_subject ILIKE '%budget%' OR email_text ILIKE '%budget%')\n   LIMIT 1;\n\n4. \"Find emails about interviews scheduled from April 28 to May 4\"\n   SELECT * FROM emails_metadata\n   WHERE (email_subject ILIKE '%interview%' OR email_text ILIKE '%interview%');\n\n5. \"Find emails from April about interviews\"\n   SELECT * FROM emails_metadata \n   WHERE (email_subject ILIKE '%interview%' OR email_text ILIKE '%interview%') AND date BETWEEN '2025-04-01' AND '2025-04-30';\n\n6. \"emails in thread 123\"\n   SELECT * FROM emails_metadata \n   WHERE thread_id = '123';\n\n7. \"what's my latest email?\"\n   SELECT * FROM emails_metadata\n   ORDER BY date DESC LIMIT 1;\n"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "6961fed9-4dcf-4a7f-97eb-bbf9e66dff3e",
+      "name": "Format empty output",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2620,
+        760
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa55e186-1535-4923-aee4-e088ca69575b",
+              "name": "query",
+              "type": "string",
+              "value": "={{ $json.query ?? '' }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "8138aed4-e38d-4c3c-9850-a200bd4d762e",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1320,
+        440
+      ],
+      "parameters": {
+        "width": 340,
+        "height": 540,
+        "content": "## Quite the prompt 😅\nSome refined prompt engineering work here.\n\nIt may or may not been done aided by Kagi's Assistant and Claude 3.7 Sonnet 👀"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c4e0962f-2c7f-4d14-af37-df491db2ebd0",
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Extract SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Format query results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Load the schema from the local file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If ran manually": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Load the schema from the local file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WorkflowTrigger": {
+      "main": [
+        [
+          {
+            "node": "Load the schema from the local file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract SQL query": {
+      "main": [
+        [
+          {
+            "node": "Check for trailing semicolon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save file locally": {
+      "main": [
+        [
+          {
+            "node": "If ran manually",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format query results": {
+      "main": [
+        [
+          {
+            "node": "Combine query result and chat answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if query exists": {
+      "main": [
+        [
+          {
+            "node": "Combine query result and chat answer",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format empty output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add trailing semicolon": {
+      "main": [
+        [
+          {
+            "node": "Check if query exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert data to binary": {
+      "main": [
+        [
+          {
+            "node": "Save file locally",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract data from file": {
+      "main": [
+        [
+          {
+            "node": "Combine schema data and chat input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add table name to output": {
+      "main": [
+        [
+          {
+            "node": "Convert data to binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List all columns in a table": {
+      "main": [
+        [
+          {
+            "node": "Add table name to output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for trailing semicolon": {
+      "main": [
+        [
+          {
+            "node": "Add trailing semicolon",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check if query exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List all tables in a database": {
+      "main": [
+        [
+          {
+            "node": "List all columns in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Test workflow\"": {
+      "main": [
+        [
+          {
+            "node": "List all tables in a database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine schema data and chat input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load the schema from the local file": {
+      "main": [
+        [
+          {
+            "node": "If file exists or already retried generating it",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Combine query result and chat answer": {
+      "main": [
+        []
+      ]
+    },
+    "If file exists or already retried generating it": {
+      "main": [
+        [
+          {
+            "node": "Extract data from file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "List all tables in a database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

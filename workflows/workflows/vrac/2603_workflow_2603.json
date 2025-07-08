@@ -1,0 +1,1175 @@
+{
+  "meta": {
+    "instanceId": "408f9fb9940c3cb18ffdef0e0150fe342d6e655c3a9fac21f0f644e8bedabcd9"
+  },
+  "nodes": [
+    {
+      "id": "266ebce9-540d-4fd8-95c2-2799f0eff8d9",
+      "name": "Get Base Schema",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        420,
+        160
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.BaseId }}"
+        },
+        "resource": "base",
+        "operation": "getSchema"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Und0frCQ6SNVX3VV",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "1c33d0db-6eac-4638-8b5e-867ec52abd11",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        80,
+        160
+      ],
+      "webhookId": "a6daabfe-5507-4ac1-9345-45a59ba67630",
+      "parameters": {
+        "options": {
+          "path": "airtable-n8n-form",
+          "ignoreBots": true
+        },
+        "formTitle": "Airtable to n8n Form",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "dropdown",
+              "fieldLabel": "BaseId",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "appfP15Xd0aVZR9xV"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldType": "dropdown",
+              "fieldLabel": "TableId",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "tblBuJjQmTZL0MI8U"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "formDescription": "This workflow creates an n8n form for an Airtable base."
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "fef7c4f2-0153-4321-a0a4-700b84f27a0b",
+      "name": "Filter Unsupported FieldTypes",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1220,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "72309d3f-cd52-4bfa-8b29-df0795e38d7f",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.fieldType }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "b62f82bd-781b-4b41-83a1-57423e639c5e",
+      "name": "Combine Fields",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1400,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b38ef15c-0098-47d9-964e-50466f4cd7fa",
+      "name": "Render Form",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        1800,
+        160
+      ],
+      "webhookId": "86e5d6db-20ee-4df5-b37a-38ac85e16b7d",
+      "parameters": {
+        "options": {},
+        "defineForm": "json",
+        "jsonOutput": "={{ $json.data }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "00bb7ad8-0457-4c38-a430-d9a1cd41d5fe",
+      "name": "Files To List",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3160,
+        160
+      ],
+      "parameters": {
+        "jsCode": "let results = [];\n\nconst fileInputs = $('Combine Fields').first().json.data.filter(item => item.fieldType === 'file');\n\nif (!fileInputs.length) return [];\n\nconst { json, binary } = $('Render Form').first();\n\nfor (fileInput of fileInputs) {\n  const binaryKeys = Object.keys(binary).filter(key => key.startsWith(fileInput.fieldLabel));\n  for (key of binaryKeys) {\n    results.push({\n      json: { fieldLabel: fileInput.fieldLabel },\n      binary: {\n          data: binary[key],\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "5f570811-ace9-489b-8889-d9686fe398f7",
+      "name": "Fields to List",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        780,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "fields"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e3d222de-9673-4529-8a7c-8a16071b3ac9",
+      "name": "Covert to n8n Form Fields",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1040,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function createField (\n  label = '',\n  type = '',\n  options = {},\n) {\n  return {\n    fieldLabel: label,\n    fieldType: type,\n    formatDate: options.formatDate,\n    fieldOptions: options.choices ?  { values: options.choices } : undefined,\n    requiredField: options.isRequired || true,\n    placeholder: options.placeholder,\n    multiselect: options.isMultipleSelect,\n    multipleFiles: options.isMultipleFiles,\n    acceptFileTypes: options.acceptFileType,\n  }\n};\n\n\nconst { type, name, options } = $input.item.json;\nlet field = null;\n\nswitch (type) {\n  case 'singleLineText':\n  case 'phoneNumber':\n  case 'url': {\n    field = createField(name, 'text');\n    break;\n  }\n  case 'multilineText': {\n    field = createField(name, 'textarea');\n    break;\n  }\n  case 'number': {\n    field = createField(name, 'number');\n    break;\n  }\n  case 'email': {\n    field = createField(name, 'email');\n    break;\n  }\n  case 'dateTime': {\n    field = createField(name, 'date', {\n      formatDate: `yyyy-MM-dd HH:mm`\n    });\n    break;\n  }\n  case 'singleSelect':\n  case 'multipleSelects': {\n    field = createField(name, 'dropdown', {\n      choices: options.choices.map(choice => ({ option: choice.name })),\n      isMultipleSelect: type === 'multipleSelects'\n    });\n    break;\n  }\n  case 'checkbox': {\n    field = createField(name, 'dropdown', {\n      choices: [{ 'option': name }],\n      isMultipleSelect: true\n    });\n    break;\n  }\n  case 'multipleAttachments': {\n    field = createField(name, 'file', {\n      isMultipleFiles: true,\n    });\n    break;\n  }\n  default:\n}\n\nreturn { json: field || {} }"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f88924ed-288a-4790-a092-67bf74866217",
+      "name": "Filter Table",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        600,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d74b2ca6-da27-4f84-9e2c-6c1353921df9",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "={{ $('On form submission').item.json.TableId }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "262eca82-3488-4a2d-9fc2-fe137253f72c",
+      "name": "Baserow List Fields",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        420,
+        460
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/fields/table/{{ $json.TableId }}/",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bRnXiQiL9kogLPl3",
+          "name": "Baserow.io"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "933b8ee7-ec8f-4cca-af29-fb7eab8f581a",
+      "name": "Covert to n8n Form Fields1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1040,
+        460
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function createField (\n  label = '',\n  type = '',\n  options = {},\n) {\n  return {\n    fieldLabel: label,\n    fieldType: type,\n    formatDate: options.formatDate,\n    fieldOptions: options.choices ?  { values: options.choices } : undefined,\n    requiredField: options.isRequired || true,\n    placeholder: options.placeholder,\n    multiselect: options.isMultipleSelect,\n    multipleFiles: options.isMultipleFiles,\n    acceptFileTypes: options.acceptFileType,\n  }\n};\n\n\nconst { type, name, select_options } = $input.item.json;\nlet field = null;\n\nswitch (type) {\n  case 'text':\n  case 'phone_number':\n  case 'url': {\n    field = createField(name, 'text');\n    break;\n  }\n  case 'long_text': {\n    field = createField(name, 'textarea');\n    break;\n  }\n  case 'number': {\n    field = createField(name, 'number');\n    break;\n  }\n  case 'email': {\n    field = createField(name, 'email');\n    break;\n  }\n  case 'date': {\n    field = createField(name, 'date', {\n      formatDate: `yyyy-MM-dd HH:mm`\n    });\n    break;\n  }\n  case 'single_select':\n  case 'multiple_select': {\n    field = createField(name, 'dropdown', {\n      choices: select_options.map(choice => ({\n        option: choice.value\n      })),\n      isMultipleSelect: type === 'multiple_select'\n    });\n    break;\n  }\n  case 'boolean': {\n    field = createField(name, 'dropdown', {\n      choices: [{ 'option': name }],\n      isMultipleSelect: true\n    });\n    break;\n  }\n  case 'file': {\n    field = createField(name, 'file', {\n      isMultipleFiles: true,\n    });\n    break;\n  }\n  default:\n}\n\nreturn { json: field || {} }"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "74dc5acf-0dc9-4898-bff4-3fe27f04fbc8",
+      "name": "Combine Fields1",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1400,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "73eccae5-377e-4a8e-91ed-2f24f47eca71",
+      "name": "Filter Unsupported FieldTypes1",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1220,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "72309d3f-cd52-4bfa-8b29-df0795e38d7f",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.fieldType }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "702354ad-a138-46b7-93c3-7bb431164c12",
+      "name": "Render Form1",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        1800,
+        460
+      ],
+      "webhookId": "86e5d6db-20ee-4df5-b37a-38ac85e16b7d",
+      "parameters": {
+        "options": {},
+        "defineForm": "json",
+        "jsonOutput": "={{ $json.data }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "158eee94-5ca9-432f-8020-3195eec243ee",
+      "name": "Baserow Create Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2460,
+        460
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/rows/table/{{ $('On form submission1').first().json.TableId }}/?user_field_names=true",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{ $json.toJsonString() }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bRnXiQiL9kogLPl3",
+          "name": "Baserow.io"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "405030ad-af35-48ce-a1b5-61a7c8dfeb05",
+      "name": "On form submission1",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        80,
+        460
+      ],
+      "webhookId": "8ef4e5d9-5d92-4a3d-8d44-adf35a4bde3a",
+      "parameters": {
+        "options": {
+          "path": "baserow-n8n-form"
+        },
+        "formTitle": "Baserow to n8n Form",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "dropdown",
+              "fieldLabel": "TableId",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "401709"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "formDescription": "This workflow creates an n8n form for a Baserow table."
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "940e2015-cdfe-4fb9-841b-a25ef5903097",
+      "name": "Files To List1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2800,
+        460
+      ],
+      "parameters": {
+        "jsCode": "let results = [];\n\nconst fileInputs = $('Combine Fields1').first().json.data.filter(item => item.fieldType === 'file');\n\nif (!fileInputs.length) return [];\n\nconst { json, binary } = $('Render Form1').first();\n\nfor (fileInput of fileInputs) {\n  const binaryKeys = Object.keys(binary).filter(key => key.startsWith(fileInput.fieldLabel));\n  for (key of binaryKeys) {\n    results.push({\n      json: { fieldLabel: fileInput.fieldLabel },\n      binary: {\n          data: binary[key],\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "dd18a5ff-230a-4b94-ab6f-a258fbf034e0",
+      "name": "Baserow Upload File",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2980,
+        460
+      ],
+      "parameters": {
+        "url": "https://api.baserow.io/api/user-files/upload-file/",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bRnXiQiL9kogLPl3",
+          "name": "Baserow.io"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5679a086-d80d-4d55-89e4-1bea1626f561",
+      "name": "Baserow Update Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3340,
+        460
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/rows/table/{{ $('On form submission1').first().json.TableId }}/{{ $('Baserow Create Row').first().json.id }}/?user_field_names=true",
+        "method": "PATCH",
+        "options": {
+          "lowercaseHeaders": false
+        },
+        "jsonBody": "={{ $json.data.toJsonString() }}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bRnXiQiL9kogLPl3",
+          "name": "Baserow.io"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "3a3a2074-5d7d-4f42-bc52-8255f86483c5",
+      "name": "Group By FieldName",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3160,
+        460
+      ],
+      "parameters": {
+        "jsCode": "const pairs = $input.all().map((item, idx) => ({\n  field: $('Files To List1').itemMatching(idx).json.fieldLabel,\n  file: item.json,\n}));\n\nconst groups = {};\npairs.forEach(pair => {\n  if (!groups[pair.field]) groups[pair.field] = [];\n  groups[pair.field].push({\n    name: pair.file.name,\n    visible_name: pair.file.original_name\n  });\n});\n\nreturn { json: { data: groups } };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "79480b76-6bc9-4786-9c67-3d0a2c36b8bd",
+      "name": "Update Airtable Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3340,
+        160
+      ],
+      "parameters": {
+        "url": "=https://content.airtable.com/v0/{{ $('On form submission').first().json.BaseId }}/{{ $('Airtable Create Record').first().json.id }}/{{ $json.fieldLabel }}/uploadAttachment",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contentType",
+              "value": "={{ $binary.data.mimeType }}"
+            },
+            {
+              "name": "filename",
+              "value": "={{ $binary.data.fileName }}"
+            },
+            {
+              "name": "file",
+              "value": "={{ $input.item.binary.data.data }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "airtableTokenApi"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Und0frCQ6SNVX3VV",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "94d20c33-d589-43db-aef2-afe3d4a3efcf",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -540,
+        -200
+      ],
+      "parameters": {
+        "width": 446.4999999999999,
+        "height": 834.0643999999993,
+        "content": "## Try It Out!\n### This template is an example of how you could replace Airtable or Baserow forms with n8n forms. Though debateable whether this is actually useful, it is a cool demo of how someone would approach this if it every became a problem.\n\n## How it works\n* A form trigger is used to dynamically select a database/table from which to build the n8n form from.\n* the table's schema is imported into the workflow and using the code node, is converted into the n8n form fields schema.\n* This let's us dynamically build the fields in our n8n form when we choose to define the form using the JSON option.\n* Once the n8n form submits, we convert the values back into our table's API schema so that we can create a new row.\n* Note any files/attachments fields are removed as they need to be handled separately.\n* Files are processed separately as they may first need to be stored. Once complete, the reference is saved into the newly created row.\n\n\n**Check out the example Airtable here** - [https://airtable.com/appfP15Xd0aVZR9xV/shrGFgXLyQ4Jg58SU](https://airtable.com/appfP15Xd0aVZR9xV/shrGFgXLyQ4Jg58SU)\n\n\n⭐️ [**New to Airtable? Sign up here!**](https://airtable.com/invite/r/cKzxFYVc)\n\n## How to use\n* The n8n form is autogenerated which means you only need provide access to the table. Using this approach, this template can be reused for any number of Airtable and/or Baserow tables.\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Hacking!\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bf89ec64-0524-428a-b087-a563311b02d7",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        338,
+        -20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 600.75,
+        "height": 675.625,
+        "content": "## 1. Get Table Schema\n\n**Airtable** schema returns all tables with extra metadata whereas **Baserow** has a dedicated list fields endpoint for each table. This means for **Airtable**, we need to filter out the table we want and split out its fields array."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c2b77c23-b2d4-46b1-8d59-8f8d950cfc70",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        967.5,
+        -20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 616.40625,
+        "height": 677.1875,
+        "content": "## 2. Convert To N8N Form Schema\n\nBoth products contain similar schema with only different field labels. This makes it quite simple to convert either to n8n's forms. JSON schema."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1cb13171-5682-41e4-8976-1f3f6f5d2cf5",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1600,
+        -20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 483.015625,
+        "height": 677.1875,
+        "content": "## 3. Render as N8N Form\n\nDid you know you can build forms dynamically from JSON? Well, you can! This flexibility makes working with n8n forms strategic because you can conditionally exclude fields which may not apply to the user or the context."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e2603a0c-0c0d-4702-998f-f1e3c2e9955b",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2100,
+        -20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 602.265625,
+        "height": 677.1875,
+        "content": "## 4. Create New Row\n\nBoth **Airtable** and **Baserow** accept field labels as body param keys when using their API however, files and attachments are handled separately. Here we omit any file fields "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "42a4b3e1-2b18-4f19-a803-b6ff9ea8133b",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2720,
+        -20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 824.3125,
+        "height": 677.1875,
+        "content": "## 5. Upload Files & Attachments\n\n**Baserow** requires a 2 step process where the file is first uploaded and the returning reference is used to update the row. **Airtable** API allows upload and update of the row in one operation. The **Airtable** upload API also seems to work in an append fashion - each call adds to the attachments array - but **Baserow** uses replace approach meaning you need to upload the files in one go."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "356e3852-2268-41d0-ad83-e44d62cb6675",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        20,
+        20
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 264.0997209302325,
+        "height": 99.50571162790695,
+        "content": "### AirTable Example\n### 🚨 Change your Base ID and Table ID here!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1e93967b-792d-4608-b7d3-eec5f84c2c8b",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        20,
+        620
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 259.5844837209301,
+        "height": 80,
+        "content": "### BaseRow Example\n### 🚨 Change your TableId here!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "84cf486e-15a5-4bb2-b62f-885056254944",
+      "name": "Prep Data for Insert1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2240,
+        460
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const schema = $('Baserow List Fields').all().map(input => input.json);\nconst data = $input.item.json;\n\n// 1. filter out file inputs\nconst fileKeys = schema.filter(item => item.type === 'file').map(item => item.name);\n\nconst filteredData = Object.keys(data)\n  .filter(key => !fileKeys.includes(key))\n  .reduce((acc,key) => ({\n    ...acc,\n    [key]: data[key]\n  }), {});\n\n// 2. typecast for boolean\nconst booleanKeys = schema.filter(item => item.type === 'boolean').map(item => item.name);\n\nbooleanKeys.forEach(key => {\n  if (filteredData[key] !== undefined) filteredData[key] = Boolean(filteredData[key]);\n});\n\nreturn { json: filteredData }\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "68fd3129-7bfd-4d73-80b0-f5af51161dc2",
+      "name": "Prep Data for Insert",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2240,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const schema = $('Fields to List').all().map(input => input.json);\nconst data = $input.item.json;\n\n// 1. filter out file inputs\nconst fileKeys = schema.filter(item => item.type === 'multipleAttachments').map(item => item.name);\n\nconst filteredData = schema\n  .filter(field => !fileKeys.includes(field.name))\n  .reduce((acc,field) => ({\n    ...acc,\n    [field.name]: data[field.name]\n  }), {});\n\n// 2. typecast for boolean\nconst booleanKeys = schema.filter(item => item.type === 'checkbox').map(item => item.name);\n\nbooleanKeys.forEach(key => {\n  if (filteredData[key] !== undefined) filteredData[key] = Boolean(filteredData[key]);\n});\n\nreturn { json: filteredData }\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "1a9fe02f-9100-453e-97d5-789d6c0f74dc",
+      "name": "Airtable Create Record",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        2460,
+        160
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('On form submission').first().json.BaseId }}"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('On form submission').first().json.TableId }}"
+        },
+        "columns": {
+          "value": {
+            "Name": "={{ $json.Name }}",
+            "Email": "={{ $json.Email }}",
+            "Notes": "={{ $json.Notes }}",
+            "Mobile": "={{ $json.Mobile }}",
+            "Status": "={{ $json.Status }}",
+            "Website": "={{ $json.Website }}",
+            "Categories": "={{ $json.Categories }}",
+            "Is Special?": "={{ $json[\"Is Special?\"].isNotEmpty() }}",
+            "Target Date": "={{ $now.toISO() }}",
+            "Retry Attempts": "={{ $json[\"Retry Attempts\"] }}"
+          },
+          "schema": [
+            {
+              "id": "Name",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Notes",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Todo",
+                  "value": "Todo"
+                },
+                {
+                  "name": "In progress",
+                  "value": "In progress"
+                },
+                {
+                  "name": "Done",
+                  "value": "Done"
+                }
+              ],
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Categories",
+              "type": "array",
+              "display": true,
+              "options": [
+                {
+                  "name": "Finance",
+                  "value": "Finance"
+                },
+                {
+                  "name": "Agriculture",
+                  "value": "Agriculture"
+                },
+                {
+                  "name": "Business Management",
+                  "value": "Business Management"
+                },
+                {
+                  "name": "Arts & Culture",
+                  "value": "Arts & Culture"
+                }
+              ],
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Categories",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Is Special?",
+              "type": "boolean",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Is Special?",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Target Date",
+              "type": "dateTime",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Target Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Mobile",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Mobile",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Email",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Website",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Retry Attempts",
+              "type": "number",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Retry Attempts",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Attachments",
+              "type": "array",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Attachments",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": []
+        },
+        "options": {},
+        "operation": "create"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Und0frCQ6SNVX3VV",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "9e92dcf9-43ca-49df-8e53-8cfaea94ed96",
+      "name": "Show Completion!",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        3680,
+        460
+      ],
+      "webhookId": "ebf678ed-c9eb-4365-afd1-bfebe03955c6",
+      "parameters": {
+        "options": {},
+        "operation": "completion",
+        "completionTitle": "Submission Complete!",
+        "completionMessage": "Thanks for completing the form."
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "5dc56f6b-e218-45de-8875-542d9ff0cec3",
+      "name": "Show Completion!1",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        3680,
+        160
+      ],
+      "webhookId": "ebf678ed-c9eb-4365-afd1-bfebe03955c6",
+      "parameters": {
+        "options": {},
+        "operation": "completion",
+        "completionTitle": "Submission Complete!",
+        "completionMessage": "Thanks for completing the form."
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Render Form": {
+      "main": [
+        [
+          {
+            "node": "Prep Data for Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Table": {
+      "main": [
+        [
+          {
+            "node": "Fields to List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Form1": {
+      "main": [
+        [
+          {
+            "node": "Prep Data for Insert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Files To List": {
+      "main": [
+        [
+          {
+            "node": "Update Airtable Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Fields": {
+      "main": [
+        [
+          {
+            "node": "Render Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fields to List": {
+      "main": [
+        [
+          {
+            "node": "Covert to n8n Form Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Files To List1": {
+      "main": [
+        [
+          {
+            "node": "Baserow Upload File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Fields1": {
+      "main": [
+        [
+          {
+            "node": "Render Form1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Base Schema": {
+      "main": [
+        [
+          {
+            "node": "Filter Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow Create Row": {
+      "main": [
+        [
+          {
+            "node": "Files To List1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow Update Row": {
+      "main": [
+        [
+          {
+            "node": "Show Completion!",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group By FieldName": {
+      "main": [
+        [
+          {
+            "node": "Baserow Update Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Get Base Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow List Fields": {
+      "main": [
+        [
+          {
+            "node": "Covert to n8n Form Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow Upload File": {
+      "main": [
+        [
+          {
+            "node": "Group By FieldName",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission1": {
+      "main": [
+        [
+          {
+            "node": "Baserow List Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Airtable Row": {
+      "main": [
+        [
+          {
+            "node": "Show Completion!1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Data for Insert": {
+      "main": [
+        [
+          {
+            "node": "Airtable Create Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Data for Insert1": {
+      "main": [
+        [
+          {
+            "node": "Baserow Create Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable Create Record": {
+      "main": [
+        [
+          {
+            "node": "Files To List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Covert to n8n Form Fields": {
+      "main": [
+        [
+          {
+            "node": "Filter Unsupported FieldTypes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Covert to n8n Form Fields1": {
+      "main": [
+        [
+          {
+            "node": "Filter Unsupported FieldTypes1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unsupported FieldTypes": {
+      "main": [
+        [
+          {
+            "node": "Combine Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unsupported FieldTypes1": {
+      "main": [
+        [
+          {
+            "node": "Combine Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

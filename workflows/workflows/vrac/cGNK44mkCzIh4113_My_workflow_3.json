@@ -1,0 +1,1012 @@
+{
+  "id": "cGNK44mkCzIh4113",
+  "meta": {
+    "instanceId": "44c282b5a828cd0d7dda8a13c9168fe32406aaef7e8faa5a847408311387e400"
+  },
+  "name": "My workflow 3",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "4db348cf-bd5a-408e-b212-d75b792460b4",
+      "name": "On form submission4",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        -1720,
+        20
+      ],
+      "webhookId": "34a4ae98-8eb8-486b-8d7e-dd5fdde15cd5",
+      "parameters": {
+        "options": {},
+        "formTitle": "form which gets multiple files",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "file",
+              "fieldLabel": "file1",
+              "requiredField": true
+            },
+            {
+              "fieldType": "file",
+              "fieldLabel": "file2"
+            },
+            {
+              "fieldLabel": "provide your mail Id",
+              "requiredField": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "6a1f197f-310e-4eb1-926f-60cfbae60a49",
+      "name": "Loop Over Items1",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -380,
+        20
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "7eb210e4-687c-4e9d-b2e7-50d0b85da8dc",
+      "name": "If2",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        700,
+        100
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1edbcd59-130d-4053-9db3-cb8dec068fe0",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "e76b9523-3f87-4ad3-87df-1e4e93ead090",
+      "name": "Aggregate1",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "markdown"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "21234dcf-52dc-4ae0-975e-36a1a18ed456",
+      "name": "Google Gemini Chat Model5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        1060,
+        180
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "52fcaca7-c49d-4004-96a3-0094ed0e510f",
+      "name": "split the binary item",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1000,
+        20
+      ],
+      "parameters": {
+        "jsCode": "// Get the input data\nconst items = $input.all()\n\n// Initialize an array to hold the split items\nconst splitItems = [];\n\n// Iterate over each item\nitems.forEach(item => {\n  // Check if the item has binary data\n  if (item.binary) {\n    // Iterate over each binary field\n    for (const [key, value] of Object.entries(item.binary)) {\n      // Create a new item for each binary file\n      splitItems.push({\n        json: {},\n        binary: {\n          data: value\n        }\n      });\n    }\n  }\n});\n\n// Return the split items\nreturn splitItems;"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "4660eef4-de62-4b13-9f51-05000b1afa33",
+      "name": "Parsing the document",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        260,
+        100
+      ],
+      "parameters": {
+        "url": "https://api.cloud.llamaindex.ai/api/parsing/upload",
+        "method": "POST",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "=data"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer $secret token"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "07e76215-b9d4-4adb-b8f3-f8c8615abb56",
+      "name": "Check the parsing status",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "url": "=https://api.cloud.llamaindex.ai/api/parsing/job/{{ $json.id }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer $secret token"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "3909a632-7002-4d60-a53b-3f73e4958c27",
+      "name": "Provide the markdown",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1180,
+        400
+      ],
+      "parameters": {
+        "url": "=https://api.cloud.llamaindex.ai/api/parsing/job/{{ $json.id }}/result/markdown",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer $secret token"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "89c25b95-8bc6-4bb5-82d2-1f870416c4af",
+      "name": "Google Gemini Chat Model6",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        1600,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8ddf6e94-6da0-4ef9-a6dc-0db8967914a6",
+      "name": "Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        2140,
+        0
+      ],
+      "parameters": {
+        "mode": "markdownToHtml",
+        "options": {},
+        "markdown": "={{ $json.output }}",
+        "destinationKey": "html"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "59c33f95-6f8f-4992-8421-dc3a0b668861",
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        4540,
+        0
+      ],
+      "webhookId": "35fdc2a2-b8f8-4217-be0b-66ed98a548f1",
+      "parameters": {
+        "sendTo": "={{ $('On form submission4').item.json['provide your mail Id'] }}",
+        "message": "=Hi user,\nThe below document contains the detailed analysis of the provided document.\n\nYou can also use the below link to interact with the assistant regarding your doubts on the analysis\nhttps://pavithranvh28.app.n8n.cloud/webhook/8c5c9e83-f595-4e4b-b45c-544a9a0840c4/chat\n\n\n",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        },
+        "subject": "Analysis of the documents provided",
+        "emailType": "text"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "b9bb8338-d52e-4f5b-bd2f-d517851b6014",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3200,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.first().json.html;\n\n// Ensure items is an array\nconst htmlArray = Array.isArray(items) ? items : [items];\n\nfunction htmlToFormattedText(html) {\n    // Replace heading tags (h1-h6) with bold text\n    html = html.replace(/<h[1-6]>(.*?)<\\/h[1-6]>/gi, \"\\n**$1**\\n\");\n\n    // Replace paragraph tags with spacing\n    html = html.replace(/<p>(.*?)<\\/p>/gi, \"\\n$1\\n\");\n\n    // Replace line breaks with newline characters\n    html = html.replace(/<br\\s*\\/?>/gi, \"\\n\");\n\n    // Remove all other HTML tags\n    html = html.replace(/<[^>]+>/g, \"\").trim();\n\n    // Remove extra newlines\n    return html.replace(/\\n{2,}/g, \"\\n\").trim();\n}\n\nconst updatedItems = htmlArray.map((item) => {\n    const htmlContent = item?.json?.html || item;\n    const textContent = htmlToFormattedText(htmlContent);\n    return { textContent };\n});\n\nreturn updatedItems;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e8176d99-3625-47a5-8989-80fdce053ba7",
+      "name": "Convert to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        3840,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "toText",
+        "sourceProperty": "textContent"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "9fb1a6a0-c49f-48f5-93bc-f0c6e9b8a138",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2600,
+        460
+      ],
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant.\nObjective:\nThe agent must process the input content to enhance readability, apply structured formatting, and bold necessary text elements while preserving the original meaning.\n\nProcessing Rules:\nApply Text Formatting:\n\nConvert any text enclosed with * (asterisks) into bold.\nStructurize the Content:\n\nOrganize the content using clear section headers.\nSeparate sections with line breaks for readability.\nEnsure proper indentation and bullet point usage for clarity.\nMaintain Clarity & Coherence:\n\nReformat the text without changing the core meaning.\nRemove redundancy while ensuring key details remain intact.\nText File Compatibility:\n\nResponse NEEDS TO BE A TEXT FILE"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "9995921a-ca41-40c5-9159-350908ca8213",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        2780,
+        740
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bd281ef9-bc33-4b3a-9d3f-41d00521b14e",
+      "name": "Information Extractor",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "position": [
+        2820,
+        880
+      ],
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "options": {
+          "systemPromptTemplate": "You are an expert extraction algorithm.\nOnly extract relevant information from the text.\nIf you do not know the value of an attribute asked to extract, you may omit the attribute's value."
+        },
+        "attributes": {
+          "attributes": [
+            {
+              "name": "Project Overview",
+              "description": "overview of the content extracted"
+            },
+            {
+              "name": "System and prerequisites",
+              "description": "=which contains the information about the system and the prerequisites needed"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2f1c4efb-6885-48c9-b2a6-a13d2e9b4f66",
+      "name": "Google Gemini Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        3140,
+        1100
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b7a0276a-d253-43a8-a7f3-fb3b83599d7f",
+      "name": "Convert to File4",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        1840,
+        740
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "toText",
+        "sourceProperty": "output"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "7441e1ff-1966-4535-abaa-ee565db787de",
+      "name": "Pinecone Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "position": [
+        2080,
+        980
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {},
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "list",
+          "value": "samuraichamploo",
+          "cachedResultName": "samuraichamploo"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "82d9d9fb-6f8c-4c86-9287-d5e7e73f58a7",
+      "name": "Embeddings Mistral Cloud",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsMistralCloud",
+      "position": [
+        2140,
+        1200
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3a3332f7-3fda-4898-999e-c5020c0ea02e",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        2240,
+        1280
+      ],
+      "parameters": {
+        "options": {},
+        "dataType": "binary"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4a625913-5c98-4075-9022-058e863af326",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "position": [
+        2320,
+        1460
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5e38e72b-390f-433f-a638-522537bf1369",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -1820,
+        660
+      ],
+      "webhookId": "8c5c9e83-f595-4e4b-b45c-544a9a0840c4",
+      "parameters": {
+        "public": true,
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "77ea1fd6-73a9-42f6-835f-b945ce7fd294",
+      "name": "Question and Answer Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainRetrievalQa",
+      "position": [
+        -1400,
+        680
+      ],
+      "parameters": {
+        "options": {
+          "systemPromptTemplate": "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question.\nIf you don't know the answer, just say that you don't know, don't try to make up an answer.\n----------------\nContext: {context}"
+        }
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "d71b0efe-7e27-44f8-beb4-370c02ef1d5f",
+      "name": "Google Gemini Chat Model2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        -1380,
+        1020
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eb967c9d-415f-4992-bacd-517b7dddd6bf",
+      "name": "Vector Store Retriever",
+      "type": "@n8n/n8n-nodes-langchain.retrieverVectorStore",
+      "position": [
+        -1220,
+        900
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "690eacb5-1d47-430b-8914-4c474833be0b",
+      "name": "Pinecone Vector Store1",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "position": [
+        -900,
+        1060
+      ],
+      "parameters": {
+        "options": {},
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "list",
+          "value": "samuraichamploo",
+          "cachedResultName": "samuraichamploo"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6d289625-ca46-49d7-8ee2-5996dc645ebe",
+      "name": "Embeddings Mistral Cloud1",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsMistralCloud",
+      "position": [
+        -780,
+        1460
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "dcc8bb20-e5f3-428e-93be-dc4081e1463c",
+      "name": "AI Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -460,
+        680
+      ],
+      "parameters": {
+        "text": "={{ $json.response }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant.rephrase the prompt provided and Provide ONLY the response in a text format"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "777b4e63-7a0a-42fa-9069-83ab006e19a9",
+      "name": "Google Gemini Chat Model3",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        -400,
+        980
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f5d69ecd-9cdc-4bef-a8ae-7477dfc3f7c7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1900,
+        440
+      ],
+      "parameters": {
+        "width": 360,
+        "content": "## I'm a note \nThe below workflow is a chatbot workflow which will be triggered when a user types his/her prompt related to document the user provided for analysis on the chatbot link which was ent to the user via mail."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7140d564-a636-4937-b2c6-811b48dde851",
+      "name": "Translator Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1060,
+        0
+      ],
+      "parameters": {
+        "text": "={{ $('Aggregate1').item.json.markdown }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant. Kindly check the prompt fed and  find the language of the  prompt you receive  and if the prompt is in other language except english translate it and provide that as a response and also ATTACH THE REMAINING PROMPT WHICH IS IN ENGLISH WITH THE RESPONSE"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "496d49f1-5b7f-48ab-b759-2facd8fade8d",
+      "name": "Analyzer Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1420,
+        0
+      ],
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "options": {
+          "systemMessage": "=You are a helpful assistant. \n1️⃣ Comprehensive Prompt Analysis\n\nCarefully examine the entire prompt provided by the user.\nEnsure all details are considered before formulating a response.\n2️⃣ Interactive and Clear Breakdown\n\nStructure the response in a well-organized manner with clear topic separation.\nPresent insights in a way that enhances understanding and usability.\n3️⃣ Duplicate Check and Handling\n\nIdentify and highlight any repeated information within the prompt.\nIf duplicates exist, consolidate the relevant details to avoid redundancy.\n4️⃣ Reliable and Actionable Resolutions\n\nProvide resolutions that are dependable and practical.\nEnsure the solutions align with the context and user’s intent.\nWhere applicable, offer alternative approaches for flexibility.\nAlso make sure not to add too much of star or hash to indicate the difference"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "4218f320-c580-41ae-91ca-134bd2cc8128",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2880,
+        640
+      ],
+      "parameters": {
+        "content": "## I'm a note \nThese two subflows are for trial purpose"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bc0a3e52-1259-4651-bbe4-9ba727d8e46a",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1420,
+        700
+      ],
+      "parameters": {
+        "content": "## I'm a note \nThis subflow is responsible for storing the translated as well as the analyzed contents into the vector database to feed as a knowledge to the chatbot"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7c6e0b7c-dfbb-45e5-bc16-038ff6175cdc",
+  "connections": {
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Provide the markdown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check the parsing status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        []
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Translator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyzer Agent": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Convert to File4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File4": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Parsing the document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Translator Agent": {
+      "main": [
+        [
+          {
+            "node": "Analyzer Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Convert to File4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission4": {
+      "main": [
+        [
+          {
+            "node": "split the binary item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsing the document": {
+      "main": [
+        [
+          {
+            "node": "Check the parsing status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Provide the markdown": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split the binary item": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store1": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Vector Store Retriever",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Store Retriever": {
+      "ai_retriever": [
+        [
+          {
+            "node": "Question and Answer Chain",
+            "type": "ai_retriever",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the parsing status": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Mistral Cloud": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Mistral Cloud1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Question and Answer Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Translator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model6": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyzer Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question and Answer Chain": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Question and Answer Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

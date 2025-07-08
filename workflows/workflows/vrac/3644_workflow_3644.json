@@ -1,0 +1,589 @@
+{
+  "meta": {
+    "instanceId": "="
+  },
+  "nodes": [
+    {
+      "id": "4dfef9cb-d66a-4818-b5b2-6be81f0bd7c3",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1160,
+        500
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "3fd73086-62cc-49c4-9c56-b2467a27601c",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1980,
+        360
+      ],
+      "parameters": {
+        "mode": "combineBySql"
+      },
+      "notesInFlow": true,
+      "typeVersion": 3
+    },
+    {
+      "id": "a894cc7b-7e2c-40af-bbdd-de03c9fdf71c",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2200,
+        440
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e3956615-6ad2-4df7-a15f-63f1f21d10fe",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.sustainability }}",
+              "rightValue": "yes"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "b1b1616c-68f7-4911-b58d-8792ac4e822c",
+      "name": "Extract Yesterday Records",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        280,
+        500
+      ],
+      "parameters": {
+        "url": "=https://oeil.secure.europarl.europa.eu/oeil/en/search?sessionDay.allDays=false&sessionDay.day={{$now.minus(18,'days').format('yyyyMMdd')}}&sessionDay.type=ALL",
+        "options": {}
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "707ae04c-51d3-4547-9868-1c603d359cc0",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1080,
+        "height": 660,
+        "content": "### 1. First Block: scrape the page to extract all the legislative procedures scheduled for debate yesterday\nThis workflow sends an HTTP request to collect the HTML of the page by block. For each block we extract the information of the procedures: **Reference Number**. **Committee**, **Rapporteur**, **Title/Description**, **PDF Link**.\n\n#### How to setup?\n*Nothing to do*\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "721a14b6-c860-431e-8475-b877d5a83768",
+      "name": "Extract HTML Blocks",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        500,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "Blocks",
+              "cssSelector": ".erpl_document-wrapper",
+              "returnArray": true,
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "fe609066-0f08-40b7-b8a8-13acd8338468",
+      "name": "Parse Blocks",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        720,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "Blocks",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "Reference Number",
+              "cssSelector": "h3 span.t-item"
+            },
+            {
+              "key": "Committee",
+              "cssSelector": "span.erpl_badge-committee"
+            },
+            {
+              "key": "Rapporteur",
+              "cssSelector": "span.erpl_document-subtitle-author"
+            },
+            {
+              "key": "Title/Description",
+              "cssSelector": "div.erpl_document-body p"
+            },
+            {
+              "key": "PDF Link\t",
+              "attribute": "href",
+              "cssSelector": "a.erpl_document-subtitle-pdf",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "Date",
+              "cssSelector": "div.mt-1 p"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "75770b01-0c98-4077-97d7-3bbc82166372",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1020,
+        "height": 660,
+        "content": "### 2. Use a LLM to keep only the procedures related to sustainability\nWe loop though all items parsed and we provide the description and the committee to a LLM (Open AI). The LLM will use these information to assess if the procedure is related to **sustainability** or not.\n\n#### How to setup?\n\n- **Open AI Node**:\n   1. Add the required credentials Open AI credentials and select the model *(Example: Open AI 4o-mini)*\n   2. Adapt the system prompt with the topic you want to filter out or keep.\n  [Learn more about the AI Agent Node](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bfdc9844-7d9c-4582-83bb-9e945276864e",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2140,
+        20
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 500,
+        "height": 660,
+        "content": "### 3. Topics related to sustainability are stored in a Google Sheet\nThe output of the LLM is combined with the other fields. A IF node filters out all the procedure not related to sustainability. The remaining items are loaded in a Google Sheet.\n\n#### How to setup?\n\n- **Record outputs in the Google Sheet Node**:\n   1. Add your Google Sheet API credentials to access the Google Sheet file\n   2. Select the file using the list, an URL or an ID\n   3. Select the sheet in which you want to record your working sessions\n   4. Map the fields: **Reference Number**. **Committee**, **Rapporteur**, **Title/Description**, **PDF Link**\n  [Learn more about the Google Sheet Node](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.googlesheets)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "38a6d477-0a95-4177-a5d4-10f4c97bcf0c",
+      "name": "Google Tasks",
+      "type": "n8n-nodes-base.googleTasks",
+      "position": [
+        2400,
+        940
+      ],
+      "parameters": {
+        "task": "MTIxODU0NDk4MzM3NzAxMTQ0NzY6MDow",
+        "title": "=Study {{ $json['Reference Number'] }} - EU Legislation",
+        "additionalFields": {
+          "notes": "=Title: {{ $json['Title/Description'] }}\nReference Number: {{ $json['Reference Number'] }}\nCommittee: {{ $json.Committee }}\nRapporteur: {{ $json.Rapporteur }}\nPDF Link: {{ $json['PDF Link\t'] }}\nDate: {{ $json.Date }}",
+          "status": "needsAction"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9d27672c-2434-46d3-ae52-e0ba07b3a181",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2140,
+        700
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 500,
+        "height": 440,
+        "content": "### 4. Create Sustainability Study Task\nCreate a Google Task for each EU legislative file related to sustainability, scheduled for tomorrow at 09:00 AM.\n#### How to setup?\n\n- **Add a task in Google Task**:\n   1. Add your Google Task API credentials to access your task list\n   2. Change the Task List name\n  [Learn more about the Google Task Node](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.googletasks)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8196fd1c-3223-402b-935b-a6a135795999",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        60,
+        500
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "ff6f948b-9db4-479d-afab-3db6176abad6",
+      "name": "Classification Agent",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        1380,
+        280
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4-turbo",
+          "cachedResultName": "GPT-4-TURBO"
+        },
+        "options": {},
+        "messages": {
+          "values": [
+            {
+              "content": "=Is the following legislative document related to sustainability? Answer \"yes\" or \"no\".\n\nTitle: {{ $json['Title/Description'] }}\nCommittee: {{ $json[\"Committee\"] }}\n\nBe strict: Only answer \"yes\" if the topic directly impacts environmental or climate sustainability, circular economy, resource conservation, or pollution reduction.\n"
+            },
+            {
+              "role": "system",
+              "content": "Sample output:\n{\"answer\": \"yes\"}\n"
+            }
+          ]
+        },
+        "jsonOutput": true
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "01379394-a5e9-4673-bc0e-225e2d3f5214",
+      "name": "Collect Answer",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1760,
+        280
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "19b1ea4c-3c78-4473-9f16-17d37b273735",
+              "name": "sustainability",
+              "type": "string",
+              "value": "={{ $json.message.content.answer }}"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "8f96dfd0-0a38-435c-83a0-7649b350f813",
+      "name": "Record Sustainability Procedures",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2420,
+        380
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Date": "={{ $json.Date }}",
+            "PDF Link": "={{ $json['PDF Link\t'] }}",
+            "Committee": "={{ $json.Committee }}",
+            "Rapporteur": "={{ $json.Rapporteur }}",
+            "Reference Number": "={{ $json['Reference Number'] }}",
+            "Title/Description": "={{ $json['Title/Description'] }}"
+          },
+          "schema": [
+            {
+              "id": "Reference Number",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Reference Number",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Committee",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Committee",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Rapporteur",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Rapporteur",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title/Description",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Title/Description",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "PDF Link",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "PDF Link",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "=",
+          "cachedResultName": "EU Legislative Procedure"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "=",
+          "cachedResultUrl": "=",
+          "cachedResultName": "Sustainability Content"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rnPYZIig8l6seOd5",
+          "name": "Google Sheets Temporary"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.5
+    },
+    {
+      "id": "c2cf974e-f182-48f8-9d26-8aea4dbdf486",
+      "name": "Edit Links",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        940,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7a802593-2b9b-42fe-bd0c-66e11510834a",
+              "name": "PDF Link\t",
+              "type": "string",
+              "value": "=https://oeil.secure.europarl.europa.eu{{ $json['PDF Link\t'] }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "bdc398f0-a882-4fbe-ac37-7ca7e15a1081",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2660,
+        20
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 340,
+        "content": "![Tutorial](https://www.samirsaci.com/content/images/2025/04/temp-9.png)\n[🎥 Check My Tutorial](https://www.youtube.com/watch?v=f_nyArpH6kk)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Record Sustainability Procedures",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Links": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Tasks": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Blocks": {
+      "main": [
+        [
+          {
+            "node": "Edit Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Answer": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Classification Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract HTML Blocks": {
+      "main": [
+        [
+          {
+            "node": "Parse Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classification Agent": {
+      "main": [
+        [
+          {
+            "node": "Collect Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Yesterday Records": {
+      "main": [
+        [
+          {
+            "node": "Extract HTML Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Extract Yesterday Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

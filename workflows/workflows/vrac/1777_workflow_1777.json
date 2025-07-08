@@ -1,0 +1,245 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "e95fc182-b13e-4eab-852b-66ea821c4129",
+      "name": "On product created",
+      "type": "n8n-nodes-base.pipedriveTrigger",
+      "position": [
+        440,
+        500
+      ],
+      "webhookId": "4a700bc2-a3bf-43fb-902c-5ca5a74bf38d",
+      "parameters": {
+        "action": "added",
+        "object": "product"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "1",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a64af9df-3084-4376-ace9-50f0f21bbf35",
+      "name": "Set item to only current product data",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        680,
+        500
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nitem = item.current;\n\n// You can write logs to the browser console\nconsole.log('Done!');\n\nreturn item;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "79b265a9-4021-4a1a-9b4a-4f3aeace9fe5",
+      "name": "Create product in Stripe",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        900,
+        660
+      ],
+      "parameters": {
+        "url": "https://api.stripe.com/v1/products",
+        "options": {},
+        "requestMethod": "POST",
+        "authentication": "predefinedCredentialType",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "name",
+              "value": "={{ $json[\"name\"] }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json[\"description\"] || ' '}}"
+            }
+          ]
+        },
+        "nodeCredentialType": "stripeApi"
+      },
+      "credentials": {
+        "stripeApi": {
+          "id": "3",
+          "name": "Stripe account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "69e40a2b-1680-42f9-add9-cbef9bc0f63f",
+      "name": "Add created product Id to data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1320,
+        520
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bc7428ba-829f-4a9b-af61-ea11c102d1d3",
+      "name": "Keep only productId of created product",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1100,
+        660
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "StripeCreatedProductId",
+              "value": "={{ $json[\"id\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8571acfb-8ee9-410d-a5ca-9b173d034202",
+      "name": "Create price records in Stripe",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1760,
+        520
+      ],
+      "parameters": {
+        "url": "https://api.stripe.com/v1/prices",
+        "options": {},
+        "requestMethod": "POST",
+        "authentication": "predefinedCredentialType",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "currency",
+              "value": "={{ $json[\"prices\"].currency }}"
+            },
+            {
+              "name": "unit_amount",
+              "value": "={{ $json[\"prices\"].price * 100 }}"
+            },
+            {
+              "name": "product",
+              "value": "={{ $json[\"StripeCreatedProductId\"] }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "stripeApi"
+      },
+      "credentials": {
+        "stripeApi": {
+          "id": "3",
+          "name": "Stripe account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f849ae73-aa7d-49b2-81a9-7470278d30a3",
+      "name": "Split prices to seperate items",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        1540,
+        520
+      ],
+      "parameters": {
+        "include": "selectedOtherFields",
+        "options": {},
+        "fieldToSplitOut": "prices",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "StripeCreatedProductId"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "On product created": {
+      "main": [
+        [
+          {
+            "node": "Set item to only current product data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create product in Stripe": {
+      "main": [
+        [
+          {
+            "node": "Keep only productId of created product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add created product Id to data": {
+      "main": [
+        [
+          {
+            "node": "Split prices to seperate items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split prices to seperate items": {
+      "main": [
+        [
+          {
+            "node": "Create price records in Stripe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set item to only current product data": {
+      "main": [
+        [
+          {
+            "node": "Create product in Stripe",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add created product Id to data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only productId of created product": {
+      "main": [
+        [
+          {
+            "node": "Add created product Id to data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  }
+}

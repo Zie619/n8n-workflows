@@ -1,0 +1,359 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "0bd18974-8414-4b83-b3fb-85d2f6a74164",
+      "name": "Create database page",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1220,
+        400
+      ],
+      "parameters": {
+        "title": "={{$json[\"body\"][\"issue\"][\"title\"]}}",
+        "resource": "databasePage",
+        "databaseId": "5026700b-6693-473a-8100-8cc6ddef62a6",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Issue ID|number",
+              "numberValue": "={{$node[\"Trigger on issues\"].json[\"body\"][\"issue\"][\"id\"]}}"
+            },
+            {
+              "key": "Link|url",
+              "urlValue": "={{$node[\"Trigger on issues\"].json[\"body\"][\"issue\"][\"html_url\"]}}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "dfce23fd-7ff8-42d1-9544-694345156080",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        800
+      ],
+      "parameters": {
+        "content": "## IF & Switch\nDepends on what action was taken on an issue in GitHub."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "577e0d7a-0539-414f-8ec8-00ce12807d5b",
+      "name": "Find database page",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1400,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "resource": "databasePage",
+        "operation": "getAll",
+        "returnAll": true,
+        "databaseId": "5026700b-6693-473a-8100-8cc6ddef62a6",
+        "filterJson": "={{$node[\"Create custom Notion filters\"].json[\"notionfilter\"]}}",
+        "filterType": "json"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "91b0586c-eb08-41d0-bbb0-8a03c4a0ac3a",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1580,
+        600
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "edited"
+            },
+            {
+              "output": 1,
+              "value2": "deleted"
+            },
+            {
+              "output": 2,
+              "value2": "closed"
+            },
+            {
+              "output": 3,
+              "value2": "reopened"
+            }
+          ]
+        },
+        "value1": "={{$node[\"Trigger on issues\"].json[\"body\"][\"action\"]}}",
+        "dataType": "string"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5262e14e-adc2-45d1-9e3f-c0eba013077a",
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1040,
+        500
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Trigger on issues\"].json[\"body\"][\"action\"]}}",
+              "value2": "opened"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "735ef0b3-70c3-4a88-ad02-35edf8f749c4",
+      "name": "Edit issue",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1760,
+        360
+      ],
+      "parameters": {
+        "pageId": "={{ $node[\"Find database page\"].json[\"id\"] }}",
+        "resource": "databasePage",
+        "operation": "update",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Issue|title",
+              "title": "={{$node[\"Trigger on issues\"].json[\"body\"][\"issue\"][\"title\"]}}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "39b75e78-bd62-40e4-9e88-12c6a1901c34",
+      "name": "Delete issue",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1760,
+        520
+      ],
+      "parameters": {
+        "pageId": "={{$node[\"Find database page\"].json[\"id\"]}}",
+        "operation": "archive"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d8fee72d-c19d-4b99-85c2-dcc5d4fa6756",
+      "name": "Create custom Notion filters",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1220,
+        600
+      ],
+      "parameters": {
+        "functionCode": "const new_items = [];\nfor (item of $items(\"Trigger on issues\")) {\n\n  // do not process this item if action is created\n  if (item.json[\"body\"][\"action\"] == \"opened\") {\n    continue;\n  }\n\n  // build the output template\n  var new_item = {\n    \"json\": {\n      \"notionfilter\": \"\"\n    }\n  };\n  new_item = JSON.stringify(new_item);\n  new_item = JSON.parse(new_item);\n  new_items.push(new_item);\n\n  // create Notion filter to find specific database page by issue ID\n  notionfilter = {\n    or: [],\n  }\n\n  const filter = {\n    property: 'Issue ID',\n    number: {\n      equals: parseInt(item.json[\"body\"][\"issue\"][\"id\"])\n    }\n  }\n  notionfilter[\"or\"].push(filter);\n\n  new_item.json.notionfilter = JSON.stringify(notionfilter); \n}\n\nreturn new_items;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "99c69200-d932-4379-9a36-96cd8420f21c",
+      "name": "Close issue",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1760,
+        680
+      ],
+      "parameters": {
+        "pageId": "={{$node[\"Find database page\"].json[\"id\"]}}",
+        "resource": "databasePage",
+        "operation": "update",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Closed|checkbox",
+              "checkboxValue": true
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3f4b27d3-33ae-44f8-ab18-1c23ae7cf890",
+      "name": "Reopen issue",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1760,
+        840
+      ],
+      "parameters": {
+        "pageId": "={{$node[\"Find database page\"].json[\"id\"]}}",
+        "resource": "databasePage",
+        "operation": "update",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Closed|checkbox"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "9",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "62e1a9d3-3fc6-46de-a048-cf8176f30f94",
+      "name": "Trigger on issues",
+      "type": "n8n-nodes-base.githubTrigger",
+      "position": [
+        860,
+        500
+      ],
+      "webhookId": "bc0a0a44-00db-473b-8746-b60b3b36039c",
+      "parameters": {
+        "owner": "John-n8n",
+        "events": [
+          "issues"
+        ],
+        "repository": "DemoRepo"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "20",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Create database page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create custom Notion filters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Edit issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Close issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reopen issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger on issues": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find database page": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create custom Notion filters": {
+      "main": [
+        [
+          {
+            "node": "Find database page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

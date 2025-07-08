@@ -1,0 +1,92 @@
+{
+  "id": 1,
+  "name": "Create Nextcloud Deck card from email",
+  "nodes": [
+    {
+      "name": "IMAP Email",
+      "type": "n8n-nodes-base.emailReadImap",
+      "notes": "Check email",
+      "position": [
+        480,
+        140
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "imap": {
+          "id": "2",
+          "name": "todo@yourdomain.com"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Function",
+      "type": "n8n-nodes-base.function",
+      "notes": "Strip HTML code",
+      "position": [
+        730,
+        140
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run only once, no matter how many input items there are.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.function\n\n// Loop over inputs and add a new field called 'myNewField' to the JSON of each one\nfor (item of items) {\n  if (item.json.textHtml) {\n    // Remove HTML, double quotations, line breaks, carriage returns\n    item.json.body = item.json.textHtml.replace(/<br(\\s*?\\/?)>/g, \"\\\\n\").replace(/(<([^>]+)>)/g, \"\").replace(/\\\"/g, \"\");\n    //item.json.body = item.json.textHtml.eplace(/(<([^>]+)>)/g, \"\").replace(/\\\"/g, \"\").replace(/\\n/g, \"\").replace(/\\r/g, \"\");\n  } else {\n    // Remove double quotations, line breaks, carriage returns\n    item.json.body = item.json.textPlain.replace(/\\\"/g, \"\").replace(/\\n/g, \"\\\\n\").replace(/\\r/g, \"\");\n  }\n}\n\n// You can write logs to the browser console\nconsole.log('Done!');\n\nreturn items;"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "Add card to Nextcloud Deck App. Configure board / stack id to your environment.",
+      "position": [
+        970,
+        140
+      ],
+      "parameters": {
+        "url": "https://your.nextcloud.com/index.php/apps/deck/api/v1.0/boards/YOUR-BOARD-ID/stacks/YOUR-STACK-ID/cards",
+        "options": {},
+        "requestMethod": "POST",
+        "authentication": "basicAuth",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\n\"title\": \"{{$json[\"subject\"]}}\",\n\"type\": \"plain\",\n\"order\": -1,\n\"description\": \"{{$json[\"body\"]}}\"\n}",
+        "headerParametersJson": "{\n\"OCS-APIRequest\": \"true\",\n\"Content-Type\": \"application/json\"\n}"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "3",
+          "name": "Nextcloud credential"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "settings": {},
+  "connections": {
+    "Function": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IMAP Email": {
+      "main": [
+        [
+          {
+            "node": "Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

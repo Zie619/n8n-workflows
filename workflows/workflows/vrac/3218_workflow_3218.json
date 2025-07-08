@@ -1,0 +1,392 @@
+{
+  "meta": {
+    "instanceId": "e634e668fe1fc93a75c4f2a7fc0dad807ca318b79654157eadb9578496acbc76",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "33114dba-d3e2-469c-bb01-e50d4e84be53",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        120,
+        60
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "68a92424-8345-40d1-bdb2-ad4b68c35406",
+      "name": "Get Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "url": "https://{store}.myshopify.com/admin/api/2025-01/orders.json",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "sendQuery": true,
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "250"
+            },
+            {
+              "name": "fields",
+              "value": "id,note,email,processed_at,customer"
+            },
+            {
+              "name": "={{ $json.page_info ? \"page_info\" : \"status\" }}",
+              "value": "={{ $json.page_info ? $json.page_info : 'any' }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "shopifyAccessTokenApi"
+      },
+      "credentials": {
+        "shopifyAccessTokenApi": {
+          "id": "vtyKGPLLdjc7MLea",
+          "name": "Shopify Access Token account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e0e67ff4-cba3-420e-ad06-4201d8517470",
+      "name": "Extract page_info ",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        900,
+        120
+      ],
+      "parameters": {
+        "jsCode": "function parseNextParams(headerValue) {\n    // Match the URL inside <>\n    const urlMatch = headerValue.match(/<([^>]+)>;\\s*rel=\"next\"/);\n    if (!urlMatch) return null;\n\n    const url = urlMatch[1]; // Extracted URL\n    const paramsString = url.split(\"?\")[1]; // Get query string\n\n    if (!paramsString) return {}; // No params found\n\n    // Convert query string to object\n    return paramsString.split(\"&\").reduce((acc, param) => {\n        const [key, value] = param.split(\"=\");\n        acc[decodeURIComponent(key)] = decodeURIComponent(value);\n        return acc;\n    }, {});\n}\n\n/* Example usage\n`<https://59b774-3.myshopify.com/admin/api/2025-01/orders.json?limit=250&fields=id%2Cnote%2Cemail%2Cprocessed_at%2Ccustomer&page_info=eyJzdGF0dXMiOiJhbnkiLCJsYXN0X2lkIjo2MzQ5MjI3MDAwMDk0LCJsYXN0X3ZhbHVlIjoiMjAyNC0xMi0zMSAwOToxMzowMi42MTcxNjYiLCJkaXJlY3Rpb24iOiJuZXh0In0>; rel=\"next\"`\n*/\nconst headerValue = $input.first().json.headers.link;\nconst params = parseNextParams(headerValue);\nreturn params;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "fd06d8fa-3c6d-4877-a2e8-cb71b0d0ef32",
+      "name": "Merge Loop items",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1120,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "let results = [],\n  i = 0;\n\ndo {\n  try {\n    results = results.concat($(\"Get Orders\").all(0, i));\n  } catch (error) {\n    return results;\n  }\n  i++;\n} while (true);"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cd9840ad-4ec2-4979-b0cc-c7dc42917452",
+      "name": "List Orders",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1380,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "body.orders"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9d491fda-ab2e-4247-85bd-969a07476471",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1620,
+        -100
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "id": "={{ $json.id }}",
+            "note": "={{ $json.note }}",
+            "email": "={{ $json.email }}",
+            "processed_at": "={{ $json.processed_at }}"
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "email",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "processed_at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "note",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "note",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 2030201341,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yf_RYZGFHpMyOvD3RKGSvIFY2vumvI4474Qm_1t4-jM/edit#gid=2030201341",
+          "cachedResultName": "shopify_orders"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1yf_RYZGFHpMyOvD3RKGSvIFY2vumvI4474Qm_1t4-jM",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yf_RYZGFHpMyOvD3RKGSvIFY2vumvI4474Qm_1t4-jM/edit?usp=drivesdk",
+          "cachedResultName": "Squarespace automation"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JgI9maibw5DnBXRP",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "d1974350-5fcb-448a-b895-17b296de0019",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        440,
+        -160
+      ],
+      "parameters": {
+        "width": 232,
+        "height": 346,
+        "content": "## Edit this node 👇\n\nGet your store URL and replace in the GET url: https://{your-store}.myshopify.com/admin/api/2025-01/orders.json\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bbc911a5-0020-47d9-8b2f-2edd7ac83325",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1580,
+        -260
+      ],
+      "parameters": {
+        "width": 252,
+        "height": 346,
+        "content": "## Clone this spreadsheet\n\nhttps://docs.google.com/spreadsheets/d/1KRl6aCCU2SE3Z6vB2EbTnSwSUAre0BLf9Wu6fyPlrIE/edit?usp=sharing"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fdec0965-3a0c-4886-90b4-f2ef4f0cebdd",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        120,
+        -120
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "87cdb9e8-a031-4a40-a5e6-65a0cfc40180",
+      "name": "Assign page_info parameter",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1120,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "57e59bb7-ac20-4a1b-b54a-3468fc0519d3",
+              "name": "page_info",
+              "type": "string",
+              "value": "={{ $json.page_info }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "8f15e8a1-19de-401f-8ef2-358a42e806bb",
+      "name": "Check page_info existence",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "30d965c3-cbba-430e-81c2-ef8b543665e7",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              },
+              "leftValue": "={{ $json.headers.link }}",
+              "rightValue": "rel=\"next\""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Orders": {
+      "main": [
+        [
+          {
+            "node": "Check page_info existence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Orders": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Loop items": {
+      "main": [
+        [
+          {
+            "node": "List Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract page_info ": {
+      "main": [
+        [
+          {
+            "node": "Assign page_info parameter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check page_info existence": {
+      "main": [
+        [
+          {
+            "node": "Merge Loop items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract page_info ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign page_info parameter": {
+      "main": [
+        [
+          {
+            "node": "Get Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

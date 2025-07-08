@@ -1,0 +1,760 @@
+{
+  "id": "zmgSshZ5xESr3ozl",
+  "meta": {
+    "instanceId": "1fedaf0aa3a5d200ffa1bbc98554b56cac895dd5d001907cb6f1c7a3c0a78215",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "HR & IT Helpdesk Chatbot with Audio Transcription",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "c6cb921e-97ac-48f6-9d79-133993dd6ef7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -300,
+        -280
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 780,
+        "height": 460,
+        "content": "## 1. Download & Extract Internal Policy Documents\n[Read more about the HTTP Request Tool](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest)\n\nBegin by importing the PDF documents that contain your internal policies and FAQs\u2014these will become the knowledge base for your Internal Helpdesk Assistant. For example, you can store a company handbook or IT/HR policy PDFs on a shared drive or cloud storage and reference a direct download link here.\n\nIn this demonstration, we'll use the **HTTP Request node** to fetch the PDF file from a given URL and then parse its text contents using the **Extract from File node**. Once extracted, these text chunks will be used to build the vector store that underpins your helpdesk chatbot\u2019s responses.\n\n[Example Employee Handbook with Policies](https://s3.amazonaws.com/scschoolfiles/656/employee_handbook_print_1.pdf)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "450a254c-eec3-41ea-a11d-eb87b62ee4f4",
+      "name": "When clicking \u2018Test workflow\u2019",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -80,
+        20
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "0972f31c-1f62-430c-8beb-bef8976cd0eb",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        100,
+        20
+      ],
+      "parameters": {
+        "url": "https://s3.amazonaws.com/scschoolfiles/656/employee_handbook_print_1.pdf",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "bf523255-39f5-410a-beb7-6331139c5f9b",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        280,
+        20
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "pdf"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "88901c7c-e747-44c7-87d9-e14ac99a93db",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        -280
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 780,
+        "height": 1020,
+        "content": "## 2. Create Internal Policy Vector Store\n[Read more about the In-Memory Vector Store](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.vectorstoreinmemory/)\n\nVector stores power the retrieval process by matching a user's natural language questions to relevant chunks of text. We'll transform your extracted internal policy text into vector embeddings and store them in a database-like structure.\n\nWe will be using PostgreSQL which has production ready vector support.\n\n**How it works** \n1. The text extracted in Step 1 is split into manageable segments (chunks). \n2. An embedding model transforms these segments into numerical vectors. \n3. These vectors, along with metadata, are stored in PostgreSQL. \n4. When users ask a question, their query is embedded and matched to the most relevant vectors, improving the accuracy of the chatbot's response."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8d6472ab-dcff-4d24-a320-109787bce52a",
+      "name": "Create HR Policies",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "position": [
+        620,
+        100
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "wQK6JXyS5y1icHw3",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e669b3fb-aaf1-4df8-855b-d3142215b308",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        600,
+        320
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "J2D6m1evHLUJOMhO",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e25418af-65bb-4628-9b26-ec59cae7b2b4",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        760,
+        340
+      ],
+      "parameters": {
+        "options": {},
+        "jsonData": "={{ $('Extract from File').item.json.text }}",
+        "jsonMode": "expressionData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4538deb-8406-4a5b-9b1e-4e2f859943c8",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "position": [
+        860,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "chunkSize": 2000
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7ee0e861-1576-4b0c-b2ef-3fc023371907",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        1420,
+        240
+      ],
+      "webhookId": "65f501de-3c14-4089-9b9d-8956676bebf3",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "jSdrxiRKb8yfG6Ty",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "bcf1e82e-0e83-4783-a59f-857a6d1528b6",
+      "name": "Verify Message Type",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1620,
+        240
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Text",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "array",
+                      "operation": "contains",
+                      "rightType": "any"
+                    },
+                    "leftValue": "={{ $json.message.keys()}}",
+                    "rightValue": "text"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Audio",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d16eb899-cccb-41b6-921e-172c525ff92c",
+                    "operator": {
+                      "type": "array",
+                      "operation": "contains",
+                      "rightType": "any"
+                    },
+                    "leftValue": "={{ $json.message.keys()}}",
+                    "rightValue": "voice"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "typeVersion": 3.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "d403f864-c781-48fc-a62b-de0c8bfedf06",
+      "name": "OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        2340,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "=data"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "J2D6m1evHLUJOMhO",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "5b17c8f1-4bee-4f2a-abcb-74fe72d4cdfd",
+      "name": "Telegram1",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        2120,
+        380
+      ],
+      "parameters": {
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "resource": "file"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "jSdrxiRKb8yfG6Ty",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "cc6862cb-acfc-465b-b142-dd5fdc12fb13",
+      "name": "Unsupported Message Type",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        2200,
+        560
+      ],
+      "parameters": {
+        "text": "I'm not able to process this message type.",
+        "chatId": "={{ $json.message.chat.id }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "jSdrxiRKb8yfG6Ty",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "8b97aaa1-ea0d-4b11-89c9-9ac6376c0760",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2860,
+        400
+      ],
+      "parameters": {
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "You are a helpful assistant for HR and employee policies"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "e0d5416e-a799-46a2-83e3-fa6919ec0e36",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2800,
+        840
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "J2D6m1evHLUJOMhO",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "9149f41d-692e-49bc-ad70-848492d2c345",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "position": [
+        3060,
+        840
+      ],
+      "parameters": {
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "sessionIdType": "customKey"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "wQK6JXyS5y1icHw3",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "a1f68887-da44-4bff-86fc-f607a5bd0ab6",
+      "name": "Answer questions with a vector store",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "position": [
+        3360,
+        580
+      ],
+      "parameters": {
+        "name": "hr_employee_policies",
+        "description": "data for HR and employee policies"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "76220fe4-2448-4b32-92d8-68c564cc702d",
+      "name": "Postgres PGVector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "position": [
+        3220,
+        780
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "wQK6JXyS5y1icHw3",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "055fd294-7483-45ce-b58a-c90075199f5f",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        3640,
+        780
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "J2D6m1evHLUJOMhO",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "cc13eac7-8163-45bf-8d8a-9cf72659e357",
+      "name": "Embeddings OpenAI1",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        3300,
+        920
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "J2D6m1evHLUJOMhO",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "d46e415e-75ff-46b8-b382-cdcda216b1ed",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        4200,
+        420
+      ],
+      "parameters": {
+        "text": "={{ $json.output }}",
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "jSdrxiRKb8yfG6Ty",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "ddf623a1-0a5e-48c9-b897-6a339895a891",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2120,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "403b336f-87ce-4bef-a5f2-1640425f8198",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $json.message.text }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "4ae84e17-cfc1-425c-930d-949da7308b78",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1340,
+        -280
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 1300,
+        "height": 1020,
+        "content": "## 3. Handling Messages with Fallback Support\n\nThis workflow processes Telegram messages to handle **text** and **voice** inputs, with a fallback for unsupported message types. Here\u2019s how it works:\n\n1. **Trigger Node**:\n - The workflow starts with a Telegram trigger that listens for incoming messages.\n\n2. **Message Type Check**:\n - The workflow verifies the type of message received:\n - **Text Message**: If the message contains `$json.message.text`, it is sent directly to the agent.\n - **Voice Message**: If the message contains `$json.message.voice`, the audio is transcribed into text using a transcription service, and the result is sent to the agent.\n\n3. **Fallback Path**:\n - If the message is neither text nor voice, a fallback response is returned:\n `\"Sorry, I couldn\u2019t process your message. Please try again.\"`\n\n4. **Unified Output**:\n - Both text messages and transcribed voice messages are converted into the same format before sending to the agent, ensuring consistency in handling.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "86ad4e08-ef2d-405e-8861-bff38e1db651",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        220,
+        220
+      ],
+      "parameters": {
+        "width": 260,
+        "height": 80,
+        "content": "The setup needs to be run at the start or when data is changed"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b05c4437-00fb-40f6-87fa-8dc564b16005",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2680,
+        -280
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 1180,
+        "height": 1420,
+        "content": "## 4. HR & IT AI Agent Provides Helpdesk Support \nn8n's AI agents allow you to create intelligent and interactive workflows that can access and retrieve data from internal knowledgebases. In this workflow, the AI agent is configured to provide answers for HR and IT queries by performing Retrieval-Augmented Generation (RAG) on internal documents.\n\n### How It Works:\n- **Internal Knowledgebase Access**: A **Vector store tool** is used to connect the agent to the HR & IT knowledgebase built earlier in the workflow. This enables the agent to fetch accurate and specific answers for employee queries.\n- **Chat Memory**: A **Chat memory subnode** tracks the conversation, allowing the agent to maintain context across multiple queries from the same user, creating a personalized and cohesive experience.\n- **Dynamic Query Responses**: Whether employees ask about policies, leave balances, or technical troubleshooting, the agent retrieves relevant data from the vector store and crafts a natural language response.\n\nBy integrating the AI agent with a vector store and chat memory, this workflow empowers your HR & IT helpdesk chatbot to provide quick, accurate, and conversational support to employees. \n\nPostgrSQL is used for all steps to simplify development in production."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b266ca42-de62-4341-9aff-33ee0ac68045",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3900,
+        300
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 540,
+        "height": 280,
+        "content": "## 5. Send Message\n\nThe simplest and most important part :)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7b1d11ca-9b56-4c5f-9189-26d536c24b76",
+  "connections": {
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram1": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Verify Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Create HR Policies",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Create HR Policies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Postgres PGVector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Create HR Policies",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Message Type": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported Message Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres PGVector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \u2018Test workflow\u2019": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer questions with a vector store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

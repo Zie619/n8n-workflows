@@ -1,0 +1,209 @@
+{
+  "meta": {
+    "instanceId": "ef45cd7f45f7589c4c252d786d5d1a3233cdbfc451efa7e17688db979f2dc6ae"
+  },
+  "nodes": [
+    {
+      "id": "b83bfb2d-6d1b-4984-8fc4-6cf0a35309dc",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1380,
+        960
+      ],
+      "parameters": {
+        "width": 1074,
+        "height": 468,
+        "content": "# ⚠️ When and how to use this workflow\n\nIf you previously upgraded to n8n version `0.214.3`, some of your workflows might have accidentally been re-wired in the wrong way. This affected nodes which have more than 1 output, such as `If`, `Switch`, and `Compare Datasets`.\n\nThis workflow helps you identify potentially affected workflows and nodes that you should  check.\n\n**❗️Please ensure to run this workflow as the instance owner❗️**\n\n1. Configure the \"Get all workflows\" node to use your n8n API key. (You can find/create your API key under \"Settings > n8n API\")\n2. If you have community nodes installed that have more than 1 output, add them to the constant `MULTI_OUTPUT_NODES` in the \"Parse potentially affected workflows\" code node.\n3. Activate the workflow\n4. Visit `{YOUR_INSTANCE_URL}/webhooks/affected-workflows` from your browser\n5. The report will list potentially affected workflows/nodes.\n    1. The square brackets after the workflow name list the potentially affected nodes\n    2. Inspect each reported workflow individually (you can click on a row to open it in a new tab)\n    3. **Verify that the correct outbound connectors are used to connect subsequent nodes.**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ba065db3-be3c-4694-afbd-c9095526adf6",
+      "name": "Get all workflows",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        1540,
+        1460
+      ],
+      "parameters": {
+        "filters": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "13",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0fdd3ac4-8c11-4c90-b613-fcbe479a71f6",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        1380,
+        1460
+      ],
+      "webhookId": "9f6c90b5-1d0a-4dca-8009-2ee39a4f8002",
+      "parameters": {
+        "path": "affected-workflows",
+        "options": {
+          "rawBody": false,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        },
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "88725f34-678a-4127-b163-368ab2fc7b39",
+      "name": "Parse potentially affected workflows",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1880,
+        1460
+      ],
+      "parameters": {
+        "jsCode": "// Define an array of objects representing node types that have multiple outputs.\n// Each object specifies the node type and the number of outputs it has.\nconst MULTI_OUTPUT_NODES = [\n  { type: 'n8n-nodes-base.compareDatasets', outputs: 4 }, \n  { type: 'n8n-nodes-base.switch', outputs: 4}, \n  { type: 'n8n-nodes-base.if', outputs: 2}\n]\n\n// Initialize an empty array to store the affected workflows.\nconst affectedWorkflows = [];\n\n// Loop through each item in the $input array.\nfor (const item of $input.all()) {\n  // Get the workflow data from the item.\n  const workflowData = item.json;\n\n  const nodes = workflowData.nodes;\n  const connections = workflowData.connections;\n\n  // Initialize an empty array to store the potentially affected connections.\n  const potentiallyAffectedNodes = [];\n\n  for (const connectionName of Object.keys(connections)) {\n    const connection = connections[connectionName];\n    // Match connection by its name to get the node data\n    const connectionNode = nodes.find(node => node.name === connectionName);\n\n    // Check if the connection node is a multi-output node.\n    const matchedMultiOutputNode = MULTI_OUTPUT_NODES.find(n => n.type === connectionNode.type);\n    if(matchedMultiOutputNode) {\n      const connectedOutputs = connection.main.filter(c => c && c.length > 0);\n\n      // Check if the connection has empty outputs.\n      const hasEmptyOutputs = connectedOutputs.length <  matchedMultiOutputNode.outputs;\n\n      // If there are no connected outputs, skip this connection, it couldn't been affected by the migration\n      if(connectedOutputs.length === 0) continue;\n\n      // If the connection has empty outputs, it might have been affected by the wrong connections migration\n      // which filtered-out empty indexes\n      if(hasEmptyOutputs) potentiallyAffectedNodes.push(connectionName);\n    }\n  }\n\n  if(potentiallyAffectedNodes.length > 0) {\n    affectedWorkflows.push(\n      { \n        workflowId: workflowData.id, \n        workflowName: workflowData.name,\n        active: workflowData.active, \n        potentiallyAffectedNodes\n      }\n    )\n  }\n}\n\nreturn {workflows: affectedWorkflows};\n"
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a2324a53-da62-4386-8c86-4d85ffb228b4",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1880,
+        1620
+      ],
+      "parameters": {
+        "width": 236,
+        "height": 194,
+        "content": "# 👆\n\nIn case you have community nodes installed, add them to `MULTI_OUTPUT_NODES`"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "019f564b-edd4-40be-97f5-f1b1cf433005",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1540,
+        1620
+      ],
+      "parameters": {
+        "width": 208,
+        "height": 197,
+        "content": "# 👆\n\nConfigure this node to use your n8n API credential"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9fa255a8-8e2d-4e3f-ad83-d56b69066e67",
+      "name": "Generate Report",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        2200,
+        1460
+      ],
+      "parameters": {
+        "html": "\n<!DOCTYPE html>\n\n<html>\n<head>\n  <meta charset=\"UTF-8\" />\n  <title>n8n workflows report</title>\n</head>\n<body>\n  <div class=\"container\">\n    <h1>Affected workflows:</h1>\n    <ul id=\"list\"></ul>\n  </div>\n</body>\n</html>\n\n<style>\n.container {\n  background-color: #ffffff;\n  text-align: center;\n  padding: 16px;\n  border-radius: 8px;\n}\n\nh1 {\n  color: #ff6d5a;\n  font-size: 24px;\n  font-weight: bold;\n  padding: 8px;\n}\n\nh2 {\n  color: #909399;\n  font-size: 18px;\n  font-weight: bold;\n  padding: 8px;\n}\n\nul {\n  list-style: none;\n  text-align: left;\n  padding: 0;\n}\n\nli {\n  margin: 8px 0;\n}\n\na {\n  color: #409eff;\n  text-decoration: none;\n  transition: color 0.2s ease-in-out;\n}\n\na:hover {\n  color: #ff9900;\n}\n</style>"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7923de27-9d69-4ad2-a6e1-dc061c9e8e8f",
+      "name": "Serve HTML Report",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        2360,
+        1460
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        },
+        "respondWith": "text",
+        "responseBody": "={{ $node[\"Generate Report\"].parameter[\"html\"] }}\n<script>\nconst { workflows } = {{  JSON.stringify($node[\"Parse potentially affected workflows\"].json) }}\n\nconst $list = document.getElementById('list');\n// Append LI element to the UL element for each item in the affectedWorkflows array\nworkflows.forEach((workflow) => {\n  const $listItem = document.createElement('li');\n  if(!workflow) return;\n  const title = `<a \n target=\"_blank\" href=\"//${window.location.host}/workflow/${workflow.workflowId}\">ID: ${workflow.workflowId}: ${workflow.workflowName} [${workflow.potentiallyAffectedNodes.join(', ')}]</a>`\n  $listItem.innerHTML = title\n  $list.appendChild($listItem);\n});\n\n</script>"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fd63ade5-c7b4-43d5-9849-79bb9aa8dca3",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2360,
+        1620
+      ],
+      "parameters": {
+        "width": 451,
+        "height": 194,
+        "content": "# 👆\n\nFind the generated report at  `{YOUR_INSTANCE_URL}/webhooks/affected-workflows`"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get all workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Serve HTML Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all workflows": {
+      "main": [
+        [
+          {
+            "node": "Parse potentially affected workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse potentially affected workflows": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

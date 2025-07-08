@@ -1,0 +1,887 @@
+{
+  "id": "NOycL25YOISt8OLU",
+  "meta": {
+    "instanceId": "95a1299fb2b16eb2219cb044f54e72c2d00dcd2c72efe717b3c308d200f29927",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Search LinkedIn companies and add them to Airtable CRM",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "671698bb-adb4-48dc-9115-c6557b5ffc5d",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        80,
+        460
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "315d7d7d-145d-4326-a1ae-9da2d1a420b4",
+      "name": "Process Each Company",
+      "type": "n8n-nodes-base.splitInBatches",
+      "onError": "continueRegularOutput",
+      "position": [
+        1020,
+        460
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "efaca93a-d954-491d-a03b-d727efeafe07",
+      "name": "Get Company Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        1260,
+        460
+      ],
+      "parameters": {
+        "url": "https://api.ghostgenius.fr/v2/company",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        },
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.url }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bLl270qRTYghd4Za",
+          "name": "Instantly"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "22551be2-9c65-44e4-9e07-9491a5e8e12e",
+      "name": "Filter Valid Companies",
+      "type": "n8n-nodes-base.if",
+      "onError": "continueRegularOutput",
+      "position": [
+        1480,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "5ea943a6-8f6c-4cb0-b194-8c92d4b2aacc",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.website }}",
+              "rightValue": "[null]"
+            },
+            {
+              "id": "8235b9bb-3cd4-4ed4-a5dc-921127ff47c7",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.followers_count }}",
+              "rightValue": 200
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "d68f1aef-c0af-4611-8e66-bce1cc041197",
+      "name": "Check If Company Exists",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        1880,
+        460
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "appjYSpxvs8mlJaIW",
+          "cachedResultUrl": "https://airtable.com/appjYSpxvs8mlJaIW",
+          "cachedResultName": "CRM"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tbliG5xhydGGgk3nD",
+          "cachedResultUrl": "https://airtable.com/appjYSpxvs8mlJaIW/tbliG5xhydGGgk3nD",
+          "cachedResultName": "CRM"
+        },
+        "options": {},
+        "operation": "search",
+        "filterByFormula": "={id} = '{{ $json.id.toNumber() }}'"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "xEgnWLP3bQAkHxtH",
+          "name": "Airtable Personal Access Token account 3"
+        }
+      },
+      "typeVersion": 2.1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "79b37427-388f-42f8-abde-43b47badd7b8",
+      "name": "Is New Company?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2120,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "050c33be-c648-44d7-901c-51f6ff024e97",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $('Check If Company Exists').all().first().json }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "8c2a5434-261e-48c7-b515-d6517e6e9304",
+      "name": "Add Company to CRM",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        2380,
+        460
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "appjYSpxvs8mlJaIW",
+          "cachedResultUrl": "https://airtable.com/appjYSpxvs8mlJaIW",
+          "cachedResultName": "CRM"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tbliG5xhydGGgk3nD",
+          "cachedResultUrl": "https://airtable.com/appjYSpxvs8mlJaIW/tbliG5xhydGGgk3nD",
+          "cachedResultName": "CRM"
+        },
+        "columns": {
+          "value": {
+            "id": "={{ $('Filter Valid Companies').item.json.id.toNumber() }}",
+            "Name": "={{ $('Filter Valid Companies').item.json.name }}",
+            "Country": "🇺🇸 United States",
+            "Summary": "={{ $('Filter Valid Companies').item.json.description }}",
+            "Tagline": "={{ $('Filter Valid Companies').item.json.tagline }}",
+            "Website": "={{ $('Filter Valid Companies').item.json.website }}",
+            "Category": "Growth Marketing Agency 11-50 🌍",
+            "LinkedIn": "={{ $('Filter Valid Companies').item.json.url }}"
+          },
+          "schema": [
+            {
+              "id": "Name",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Website",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "LinkedIn",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Category",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Growth Marketing Agency 11-50 🌍",
+                  "value": "Growth Marketing Agency 11-50 🌍"
+                }
+              ],
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Category",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "id",
+              "type": "number",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tagline",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Tagline",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Summary",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Index",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Index",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Country",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "🇨🇱 Chili",
+                  "value": "🇨🇱 Chili"
+                },
+                {
+                  "name": "🇰🇿 Kazakhstan",
+                  "value": "🇰🇿 Kazakhstan"
+                },
+                {
+                  "name": "🇸🇪 Suède",
+                  "value": "🇸🇪 Suède"
+                },
+                {
+                  "name": "🇳🇴 Norvège",
+                  "value": "🇳🇴 Norvège"
+                },
+                {
+                  "name": "🇵🇪 Pérou",
+                  "value": "🇵🇪 Pérou"
+                },
+                {
+                  "name": "🇹🇼 Taïwan",
+                  "value": "🇹🇼 Taïwan"
+                },
+                {
+                  "name": "🇦🇹 Autriche",
+                  "value": "🇦🇹 Autriche"
+                },
+                {
+                  "name": "🇩🇰 Danemark",
+                  "value": "🇩🇰 Danemark"
+                },
+                {
+                  "name": "🇷🇺 Russie",
+                  "value": "🇷🇺 Russie"
+                },
+                {
+                  "name": "🇰🇷 Corée du Sud",
+                  "value": "🇰🇷 Corée du Sud"
+                },
+                {
+                  "name": "🇪🇪 Estonie",
+                  "value": "🇪🇪 Estonie"
+                },
+                {
+                  "name": "🇷🇴 Roumanie",
+                  "value": "🇷🇴 Roumanie"
+                },
+                {
+                  "name": "🇨🇴 Colombie",
+                  "value": "🇨🇴 Colombie"
+                },
+                {
+                  "name": "🇮🇷 Iran",
+                  "value": "🇮🇷 Iran"
+                },
+                {
+                  "name": "🇦🇷 Argentine",
+                  "value": "🇦🇷 Argentine"
+                },
+                {
+                  "name": "🇧🇪 Belgique",
+                  "value": "🇧🇪 Belgique"
+                },
+                {
+                  "name": "🇬🇷 Grèce",
+                  "value": "🇬🇷 Grèce"
+                },
+                {
+                  "name": "🇲🇦 Maroc",
+                  "value": "🇲🇦 Maroc"
+                },
+                {
+                  "name": "🇵🇱 Pologne",
+                  "value": "🇵🇱 Pologne"
+                },
+                {
+                  "name": "🇵🇹 Portugal",
+                  "value": "🇵🇹 Portugal"
+                },
+                {
+                  "name": "🇧🇷 Brésil",
+                  "value": "🇧🇷 Brésil"
+                },
+                {
+                  "name": "🇰🇪 Kenya",
+                  "value": "🇰🇪 Kenya"
+                },
+                {
+                  "name": "🇮🇹 Italie",
+                  "value": "🇮🇹 Italie"
+                },
+                {
+                  "name": "🇮🇱 Israël",
+                  "value": "🇮🇱 Israël"
+                },
+                {
+                  "name": "🇲🇽 Mexique",
+                  "value": "🇲🇽 Mexique"
+                },
+                {
+                  "name": "🇺🇦 Ukraine",
+                  "value": "🇺🇦 Ukraine"
+                },
+                {
+                  "name": "🇫🇷 France",
+                  "value": "🇫🇷 France"
+                },
+                {
+                  "name": "🇹🇷 Turquie",
+                  "value": "🇹🇷 Turquie"
+                },
+                {
+                  "name": "🇲🇾 Malaisie",
+                  "value": "🇲🇾 Malaisie"
+                },
+                {
+                  "name": "🇵🇭 Philippines",
+                  "value": "🇵🇭 Philippines"
+                },
+                {
+                  "name": "🇿🇦 Afrique du Sud",
+                  "value": "🇿🇦 Afrique du Sud"
+                },
+                {
+                  "name": "🇩🇪 Allemagne",
+                  "value": "🇩🇪 Allemagne"
+                },
+                {
+                  "name": "🇳🇱 Pays-Bas",
+                  "value": "🇳🇱 Pays-Bas"
+                },
+                {
+                  "name": "🇪🇸 Espagne",
+                  "value": "🇪🇸 Espagne"
+                },
+                {
+                  "name": "🇸🇬 Singapour",
+                  "value": "🇸🇬 Singapour"
+                },
+                {
+                  "name": "🇦🇺 Australie",
+                  "value": "🇦🇺 Australie"
+                },
+                {
+                  "name": "🇨🇦 Canada",
+                  "value": "🇨🇦 Canada"
+                },
+                {
+                  "name": "🇦🇪 Émirats arabes unis",
+                  "value": "🇦🇪 Émirats arabes unis"
+                },
+                {
+                  "name": "🇵🇰 Pakistan",
+                  "value": "🇵🇰 Pakistan"
+                },
+                {
+                  "name": "🇬🇧 Royaume-Uni",
+                  "value": "🇬🇧 Royaume-Uni"
+                },
+                {
+                  "name": "🇮🇳 Inde",
+                  "value": "🇮🇳 Inde"
+                },
+                {
+                  "name": "🇺🇸 United States",
+                  "value": "🇺🇸 United States"
+                }
+              ],
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Country",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "State",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Not yet added",
+                  "value": "Not yet added"
+                },
+                {
+                  "name": "Added to the campaign",
+                  "value": "Added to the campaign"
+                },
+                {
+                  "name": "No mail found",
+                  "value": "No mail found"
+                },
+                {
+                  "name": "No employee found",
+                  "value": "No employee found"
+                },
+                {
+                  "name": "To do later",
+                  "value": "To do later"
+                },
+                {
+                  "name": "Meeting booked",
+                  "value": "Meeting booked"
+                }
+              ],
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "State",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "create"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "xEgnWLP3bQAkHxtH",
+          "name": "Airtable Personal Access Token account 3"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "e7bc9249-8873-4db8-8a17-e0c064e72f07",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        40,
+        100
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 800,
+        "height": 560,
+        "content": "## LinkedIn Company Search\nThis section initiates the workflow and searches for your target companies on LinkedIn using the Ghost Genius API. \n\nYou can filter and refine your search using keywords, company size, location, industry, or even whether the company has active job postings. Use the \"Set Variables\" node for it.\n\nNote that you can retrieve a maximum of 1000 companies per search (corresponding to 100 LinkedIn pages), so it's important not to exceed this number of results to avoid losing prospects.\n\n**Example:** Let's say I want to target Growth Marketing Agencies with 11-50 employees. I do my search and see that there are 10,000 results. So I refine my search by using location to go country by country and retrieve all 10,000 results in several batches ranging from 500 to 1000 depending on the country.\n\n**Tips:** To test the workflow or to see the number of results of your search, change the pagination parameter (Max Pages) in the \"Search Companies\" node. It will be displayed at the very top of the response JSON."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "77f086d4-c2a5-4e09-92fc-b8db0dc8d610",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        920,
+        100
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 780,
+        "height": 560,
+        "content": "## Company Data Processing \nThis section processes each company individually.\n\nWe retrieve all the company information using Get Company Details by using the LinkedIn link obtained from the previous section.\n\nThen we filter the company based on the number of followers, which gives us a first indication of the company's credibility (200 in this case), and whether their LinkedIn page has a website listed.\n\nThe workflow implements batch processing with a 2-second delay between requests to respect API rate limits. This methodical approach ensures reliable data collection while preventing API timeouts.\n\nYou can adjust these thresholds based on your target market - increasing the follower count for more established businesses or decreasing it for emerging markets."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4e2d908a-2f75-4a94-ba81-998a0d3dc72d",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1780,
+        100
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 780,
+        "height": 560,
+        "content": "## CRM Integration\nThis section handles the Airtable CRM integration.\n\nIt first checks if the company already exists in your database (using LinkedIn ID) to prevent duplicates because when you do close enough searches, some companies may come up several times.\n\nIf it's a new company, it adds the record to Airtable with comprehensive details including name, LinkedIn URL, website, tagline, description, and category. \n\nThe workflow automatically tags companies as 'Growth Marketing Agency 11-50 🌍' and sets the country to '🇺🇸 United States' (customize according to your use case)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9620a657-e17d-4728-a040-dd2ac2d290e0",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        -300
+      ],
+      "parameters": {
+        "width": 600,
+        "height": 320,
+        "content": "## Introduction\nWelcome to my template! Before explaining how to set it up, here's some important information:\n\nThis automation is very easy to implement and is designed for anyone wanting to build and enrich a solid CRM through LinkedIn research.\n\nThe initial data source can be changed as long as you have the LinkedIn URL of the company.\n\nFor any questions, you can send me a DM on my [LinkedIn](https://www.linkedin.com/in/matthieu-belin83/) :)  "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "09e9a6bd-1790-4f0f-a97c-5d2bb2595efb",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1000,
+        -300
+      ],
+      "parameters": {
+        "width": 600,
+        "height": 320,
+        "content": "## Setup\n- Create an account on [Ghost Genius API](https://ghostgenius.fr) and get your API key.\n\n- Configure the Search Companies and Get Company Info modules by creating a \"Header Auth\" credential:\n**Name: \"Authorization\"**\n**Value: \"Bearer api_key\"**\n\n- Create an Airtable base named \"CRM\" and add at least the following columns: name (default), website (url), LinkedIn (url), id (number).\n\n- Configure your Airtable credential by following the n8n documentation.\n\n- Add your company search selection criteria to the “Set Variables” node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d90e07f3-d87c-4a1e-a94a-5540464026c5",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1700,
+        -300
+      ],
+      "parameters": {
+        "width": 600,
+        "height": 320,
+        "content": "## Tools \n**(You can use the API and CRM of your choice; this is only a suggestion)**\n\n- API Linkedin : [Ghost Genius API](https://ghostgenius.fr) \n\n- API Documentation : [Documentation](https://ghostgenius.fr/docs)\n\n- CRM : [Airtable](https://airtable.com)\n\n- LinkedIn Location ID Finder : [Ghost Genius Locations ID Finder](https://ghostgenius.fr/tools/search-sales-navigator-locations-id)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "89a5a739-b1ce-4012-a64a-d1dfced589ab",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        280,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e81e4891-4786-4dd9-a338-d1095e27f382",
+              "name": "Your target",
+              "type": "string",
+              "value": "Growth Marketing Agency"
+            },
+            {
+              "id": "ed2b6b08-66aa-4d4b-b68c-698b5e841930",
+              "name": "B: 1-10 employees, C: 11-50 employees, D: 51-200 employees, E: 201-500 employees, F: 501-1000 employees, G: 1001-5000 employees, H: 5001-10,000 employees, I: 10,001+ employees",
+              "type": "string",
+              "value": "C"
+            },
+            {
+              "id": "f1d02f1a-8115-4e0c-a5ec-59bf5b54263b",
+              "name": "Location (find it on : https://www.ghostgenius.fr/tools/search-sales-navigator-locations-id)",
+              "type": "string",
+              "value": "103644278"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "3de1fad5-53c0-4fc3-b97b-1a96515df9c6",
+      "name": "Search Companies",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        480,
+        460
+      ],
+      "parameters": {
+        "url": "https://api.ghostgenius.fr/v2/search/companies",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "page",
+                    "value": "={{ $pageCount + 1 }}"
+                  }
+                ]
+              },
+              "requestInterval": 2000,
+              "limitPagesFetched": true,
+              "completeExpression": "={{ $response.body.data.isEmpty() }}",
+              "paginationCompleteWhen": "other"
+            }
+          }
+        },
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "keywords",
+              "value": "={{ $json['Your target'] }}"
+            },
+            {
+              "name": "company_size",
+              "value": "={{ $json['B: 1-10 employees, C: 11-50 employees, D: 51-200 employees, E: 201-500 employees, F: 501-1000 employees, G: 1001-5000 employees, H: 5001-10,000 employees, I: 10,001+ employees'] }}"
+            },
+            {
+              "name": "location",
+              "value": "={{ $json['Location (https://www'].ghostgenius['fr/tools/search-sales-navigator-locations-id)'] }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "XdFg4wGkcxwRPUMo",
+          "name": "Header Auth account 4"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "1e696afe-cb72-4be0-b04d-c9965f53de0d",
+      "name": "Extract Company Data",
+      "type": "n8n-nodes-base.splitOut",
+      "onError": "continueRegularOutput",
+      "position": [
+        680,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c3c47cd6-24f4-4be9-b5bd-147abde5c3e1",
+  "connections": {
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Search Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Company?": {
+      "main": [
+        [
+          {
+            "node": "Add Company to CRM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Each Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Company Info": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Companies": {
+      "main": [
+        [
+          {
+            "node": "Extract Company Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Company to CRM": {
+      "main": [
+        [
+          {
+            "node": "Process Each Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Company Data": {
+      "main": [
+        [
+          {
+            "node": "Process Each Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Each Company": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get Company Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Companies": {
+      "main": [
+        [
+          {
+            "node": "Check If Company Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Each Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Company Exists": {
+      "main": [
+        [
+          {
+            "node": "Is New Company?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

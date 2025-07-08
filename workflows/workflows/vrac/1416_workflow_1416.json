@@ -1,0 +1,286 @@
+{
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        340,
+        380
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Write Binary File",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "position": [
+        1680,
+        280
+      ],
+      "parameters": {
+        "fileName": "={{$node[\"Config\"].parameter[\"values\"][\"string\"][0][\"value\"]}}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Read Binary File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "position": [
+        580,
+        460
+      ],
+      "parameters": {
+        "filePath": "={{$node[\"Config\"].parameter[\"values\"][\"string\"][0][\"value\"]}}"
+      },
+      "typeVersion": 1,
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1020,
+        460
+      ],
+      "parameters": {
+        "url": "https://readwise.io/reader/api/state/",
+        "options": {},
+        "authentication": "headerAuth",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "schemaVersion",
+              "value": "5"
+            },
+            {
+              "name": "filter[updated_at][gt]",
+              "value": "={{$json[\"last_synced\"]}}"
+            }
+          ]
+        },
+        "headerParametersUi": {
+          "parameter": []
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "10",
+          "name": "Header Auth account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1480,
+        460
+      ],
+      "parameters": {
+        "text": "={{$json[\"title\"]}} by {{$json[\"author\"]}}\n\n{{$json[\"summary\"]}}\n\n{{$json[\"url\"]}}",
+        "chatId": "={{$node[\"Config\"].parameter[\"values\"][\"number\"][0][\"value\"]}}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "2",
+          "name": "my bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Binary to json",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "position": [
+        800,
+        460
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "name": "Json to binary",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "position": [
+        1480,
+        280
+      ],
+      "parameters": {
+        "mode": "jsonToBinary",
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set new update time",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        1280,
+        280
+      ],
+      "parameters": {
+        "functionCode": "return {\n  last_synced: new Date().getTime()\n};"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Split into baches",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1280,
+        460
+      ],
+      "parameters": {
+        "functionCode": "const newValue = Object.values(items[0].json.documents).filter(it => it.category === 'article').filter(it => it.children.length === 0).map(it => ({\n  json: {\n      url: it.url,\n  title: it.title,\n  author: it.author,\n  summary: it.summary,\n  saved_at: new Date(it.saved_at),\n  }\n}))\n\n\nreturn newValue;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        340,
+        540
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "Telegram chat it",
+              "value": 19999
+            }
+          ],
+          "string": [
+            {
+              "name": "file path",
+              "value": "/whatever/readwiseLastSynced.json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Read Binary File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split into baches",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set new update time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Binary to json": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Json to binary": {
+      "main": [
+        [
+          {
+            "node": "Write Binary File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Binary File": {
+      "main": [
+        [
+          {
+            "node": "Binary to json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split into baches": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set new update time": {
+      "main": [
+        [
+          {
+            "node": "Json to binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Read Binary File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

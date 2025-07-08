@@ -1,0 +1,1094 @@
+{
+  "meta": {
+    "instanceId": "56d2f4e489ee5971b498fdc86622af934b4f6de5339e9825a61dbe25e604dccd"
+  },
+  "nodes": [
+    {
+      "id": "d2a02884-a082-4d77-8558-b819fdfd8e09",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1305,
+        -337
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 629.040241216464,
+        "height": 1416.261500302191,
+        "content": "## Use **Config Bot** to setup your telegram details, like:\n1- Telegram Group ID (Don't forget add bot as admin)\n2- Telegram Channel ID (Don't forget add bot as admin)\n3- Your telegram Bot Token. (Generate through @BotFather)\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n## Setup data & filter & route to the correct Side.\n0- None of them - Soon - Wait V2\n1- Chat Type (`Private`)\n2- Chat Type (`Supergroup`)\n3- Chat Type (`Channel`)\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n## Remember:\n* Do not make your support group public. Every message sent in the group on various topics will be forwarded to the user's ticket.\n* There is no need to promote your broadcasting channel; the main reason for the channel is to organize and broadcast messages.\n* You can host a Redis database without any coding/server management skills through Coolify.io.\n* In the next version, I will add the **edit messages** feature, where the forwarded messages will be updated with the new edited one.\n\n## Why use this method?\n* If you deal with Telegram P2P, anyone can delete messages from both sides. If you run a business, then one of your clients may delete all messages, causing you to lose the history. This solution prevents people from deleting messages; every message forwarded into the support group will not be possible to delete by the sender.\n* Team collaboration: Why share one account when you can convert the whole group into a ticketing system? With this project, you can invite all your coworkers to reply and provide support to your clients through Telegram.\n* Integrate with third-party services? Using N8N will pave the way for integrating your Telegram users' data into a CRM. In V2, we will enable the option to force new users to share their leads before receiving support."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c45c5efc-9c4d-4373-b267-bb13a01cb1de",
+      "name": "New User ?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -400,
+        -140
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.isEmpty() }}",
+              "value2": "true",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ab015a1f-9ee3-48f6-88c2-02d43fa739bc",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1260,
+        260
+      ],
+      "parameters": {
+        "jsCode": "function escapeRedisJsonSyntax(value) {\n  if (typeof value === 'string') {\n    return value.replace(/[\"\\\\/]/g, '\\\\$&');\n  }\n  return value;\n}\n\nconst outputItems = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const escapedItem = { TG_USER_: {} };\n\n  for (const key in item) {\n    const value = item[key];\n    if (Array.isArray(value)) {\n      escapedItem.TG_USER_[key] = [escapeRedisJsonSyntax(value[0])];\n    } else if (typeof value === 'object') {\n      flattenObject(value, escapedItem.TG_USER_, key);\n    } else {\n      escapedItem.TG_USER_[key] = escapeRedisJsonSyntax(value);\n    }\n  }\n\n  outputItems.push(escapedItem);\n}\n\nfunction flattenObject(obj, result, prefix) {\n  for (const key in obj) {\n    const newKey = prefix ? `${prefix}_${key}` : key;\n    const value = obj[key];\n    if (typeof value === 'object') {\n      if (Array.isArray(value)) {\n        result[newKey] = [escapeRedisJsonSyntax(value[0])];\n      } else {\n        flattenObject(value, result, newKey);\n      }\n    } else {\n      result[newKey.replace('json_message_', '').replace('json_', '')] = escapeRedisJsonSyntax(value);\n    }\n  }\n}\n\nreturn outputItems;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "18c5126d-6c3e-4b5f-989e-d6830cb73a90",
+      "name": "Bot-Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1120,
+        260
+      ],
+      "parameters": {
+        "mode": "raw",
+        "include": "selected",
+        "options": {},
+        "jsonOutput": "={{ $json.TG_USER_.removeField('BotToken').removeField('pairedItem_item').removeField('Support_Group_ID') }}"
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "0cc142e7-4fbc-4104-9529-1087a7bac68a",
+      "name": "Create Topic (Chat Ticket)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        80,
+        -260
+      ],
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $('Bot-Config').item.json.BotToken }}/createForumTopic?chat_id={{ $('Bot-Config').item.json[\"Support_Group_ID\"]}}&name={{ encodeURIComponent(('['+$('Bot-Fields').item.json.from_first_name +'] - [id:'+ $('Bot-Fields').item.json.chat_id +']'))}}&icon_color=9367192&icon_custom_emoji_id=5417915203100613993",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "e983994f-7922-49c2-8c4e-73100a030898",
+      "name": "Save Topic ID",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        260,
+        -260
+      ],
+      "parameters": {
+        "key": "=TG-USER-{{ $('Bot-Fields').item.json.chat_id }}",
+        "value": "={\"message_thread_id\":{{ $json.result.message_thread_id }}}",
+        "keyType": "hash",
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1f3afe0c-3ec4-431f-92b7-f06df5e1b39d",
+      "name": "Get User Chat Topic",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        200,
+        -80
+      ],
+      "parameters": {
+        "key": "=TG-USER-{{ $('Bot-Fields').item.json.chat_id }}",
+        "keyType": "hash",
+        "options": {},
+        "operation": "get",
+        "propertyName": "result"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "591e1768-58c9-428e-8a0d-69ba4cce7ccc",
+      "name": "Forward New Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueErrorOutput",
+      "position": [
+        560,
+        -80
+      ],
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $('Bot-Config').item.json.BotToken }}/forwardMessage?chat_id={{ $('Bot-Config').item.json[\"Support_Group_ID\"] }}&message_thread_id={{ $json[\"result\"][\"message_thread_id\"] }}&from_chat_id={{ $('Bot-Fields').item.json[\"chat_id\"] }}&message_id={{ $('Bot-Fields').item.json[\"message_id\"] }}",
+        "method": "POST",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "fd063a6d-0caa-4f81-921d-f8fa952d7b9b",
+      "name": "IF No Topic Created",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        40,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.error.message }}",
+              "value2": "thread not found",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ef044803-5e2e-4e54-a10b-21ad5feadb26",
+      "name": "ReCreate Topic (Chat Ticket)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        220,
+        220
+      ],
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $('Bot-Config').item.json.BotToken }}/createForumTopic?chat_id={{ $('Bot-Config').item.json[\"Support_Group_ID\"]}}&name={{ encodeURIComponent(('['+$('Bot-Fields').item.json.from_first_name +'] - [id:'+ $('Bot-Fields').item.json.chat_id +']'))}}&icon_color=9367192&icon_custom_emoji_id=5417915203100613993",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "691398ab-b434-46d0-b3fe-046235d7cdf8",
+      "name": "ReSave Topic ID",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        380,
+        220
+      ],
+      "parameters": {
+        "key": "=TG-USER-{{ $('Bot-Fields').item.json.chat_id }}",
+        "value": "={\"message_thread_id\":{{ $json.result.message_thread_id }}}",
+        "keyType": "hash",
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "69fc3fe2-a339-4c99-a85b-6facf41526bf",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        20,
+        120.47661481708235
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 734.3067601294108,
+        "height": 466.5190319644644,
+        "content": "## Re Create New Topic\n**Sometimes** in support group may the team delete or close a ticket (topic) in case of that this steps will create topic again for the user, and store the new ticket id (topic/thread ID)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4cb855d4-a306-4bd4-b24d-ee5f6db518d4",
+      "name": "Update User Data",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        -140,
+        -80
+      ],
+      "parameters": {
+        "key": "=TG-USER-{{ $('Bot-Fields').item.json.chat_id }}",
+        "value": "={{ $item(\"0\").$node[\"Bot-Fields\"].json }}",
+        "keyType": "hash",
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "878f0dec-ad7b-4584-b20a-dd3db634d6dd",
+      "name": "Save User Data",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        -140,
+        -260
+      ],
+      "parameters": {
+        "key": "=TG-USER-{{ $('Bot-Fields').item.json.chat_id }}",
+        "value": "={{ $item(\"0\").$node[\"Bot-Fields\"].json }}",
+        "keyType": "hash",
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e411b235-74bf-4f1b-9070-da1d0dc15815",
+      "name": "Support Forum",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -620,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Bot-Config').item.json.message.chat.id }}",
+              "value2": "={{ $('Bot-Config').item.json.Support_Group_ID }}",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "05c04455-1406-47aa-8a81-aa2ec914c502",
+      "name": "From Ticket",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -420,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Bot-Fields').item.json.message_thread_id }}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{ $('Bot-Fields').item.json.reply_to_message_is_topic_message }}",
+              "value2": "true",
+              "operation": "regex"
+            },
+            {
+              "value1": "={{ $('Bot-Fields').item.json.is_topic_message }}",
+              "value2": "true",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "71b55beb-7c93-40a1-a94b-f411d11eb713",
+      "name": "Forward Support Reply To User",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -200,
+        200
+      ],
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $('Bot-Config').item.json.BotToken }}/forwardMessage?chat_id={{ $json[\"reply_to_message_forward_from_id\"] || $('Bot-Fields').item.json.reply_to_message_forum_topic_created_name.match(/\\[id:(\\d+)\\]/)[1] }}&from_chat_id={{ $('Bot-Config').item.json[\"Support_Group_ID\"] }}&message_id={{ $('Bot-Fields').item.json[\"message_id\"] }}",
+        "method": "POST",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "aa70a9f6-ac3c-4ac4-a829-ef3e35720f2f",
+      "name": "IF Topic Created",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -420,
+        440
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.forum_topic_created_name.isNotEmpty() }}",
+              "value2": "true",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4b1ba81a-6986-48a9-b439-cd79cfe278b7",
+      "name": "Forward New Message to the recrated topic",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        540,
+        220
+      ],
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $('Bot-Config').item.json.BotToken }}/forwardMessage?chat_id={{ $('Bot-Config').item.json[\"Support_Group_ID\"] }}&message_thread_id={{ $json[\"result\"][\"message_thread_id\"] }}&from_chat_id={{ $('Bot-Fields').item.json[\"chat_id\"] }}&message_id={{ $('Bot-Fields').item.json[\"message_id\"] }}",
+        "method": "POST",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "7eef7a26-8c59-4020-90f8-45f28e36c43f",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        540,
+        420
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "db77035a-1256-4210-a13d-8333778fb579",
+      "name": "Check User in Database",
+      "type": "n8n-nodes-base.redis",
+      "notes": "Search Key",
+      "position": [
+        -580,
+        -140
+      ],
+      "parameters": {
+        "operation": "keys",
+        "keyPattern": "=TG-USER-{{ $json.chat_id }}"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "c01200b7-8aa4-4d44-a9a9-a802179f3afc",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -660,
+        120
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 656,
+        "height": 473,
+        "content": "## Support Side\n**This Part** is meant to forward replies that sent by support (members in the group)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a443f847-248a-4287-8aad-737c4891b344",
+      "name": "Send User Ticket Created Notification",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -220,
+        420
+      ],
+      "parameters": {
+        "text": "A new ticket has been created for you. Please wait while one of our support team members becomes available to reply.",
+        "chatId": "={{ $json.forum_topic_created_name.match(/\\[id:(\\d+)\\]/)[1] }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "dZzfZH7baUnF4hiH",
+          "name": "The Live Chat Bot"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2746b480-91ed-4968-809d-9eca523d290a",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -656.2527877074685,
+        -340
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 1409.9137494026593,
+        "height": 422,
+        "content": "## User Side\n**This Part** is meant to save user data on a RAM database which is fast, and in same time forward the message to support after creating a new ticket (Topic) dedciated for the user id in the support group."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "545d768f-a0b2-465a-a084-c43a6231d31a",
+      "name": "Bot-Config",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -880,
+        -200
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "BotToken",
+              "stringValue": "Your Bot Token here (Also add credntinals in Telegram Node)"
+            },
+            {
+              "name": "Support_Group_ID",
+              "stringValue": "Your Telegram Group here (Don't forget to give BOT admin privileges)"
+            },
+            {
+              "name": "Boradcast_Channel_ID",
+              "stringValue": "Your Telegram Channel here (Don't forget to give BOT admin privileges)"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "59145dcd-51e3-4392-ad79-85601c872931",
+      "name": "Telegram-Bot",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -1240,
+        -200
+      ],
+      "webhookId": "d8b773ab-aee9-494b-8749-f0aa80032871",
+      "parameters": {
+        "updates": [
+          "message",
+          "channel_post"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "dZzfZH7baUnF4hiH",
+          "name": "The Live Chat Bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "14b0ac28-5be5-4878-ab57-f7361291cc8e",
+      "name": "1st",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -980,
+        260
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "output": 1,
+              "value2": "private",
+              "operation": "regex"
+            },
+            {
+              "output": 2,
+              "value2": "supergroup",
+              "operation": "regex"
+            },
+            {
+              "output": 3,
+              "value2": "channel",
+              "operation": "regex"
+            }
+          ]
+        },
+        "value1": "={{ $json.chat_type || $json.channel_post_sender_chat_type }}",
+        "dataType": "string",
+        "fallbackOutput": 0
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d91e0fdf-7344-4968-beac-49c2331b5170",
+      "name": "Split In Batches1",
+      "type": "n8n-nodes-base.splitInBatches",
+      "notes": "Telegram Limitation 29/sec",
+      "position": [
+        160,
+        780
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 29
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "f6ce5dbb-8707-4243-9814-5bd57397e652",
+      "name": "Wait1",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        560,
+        740
+      ],
+      "webhookId": "9f87deed-d502-46d3-8c85-ce99552a0441",
+      "parameters": {
+        "unit": "seconds",
+        "amount": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "640e9ca9-de7d-4dae-a15a-d0232864c877",
+      "name": "Format Users",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -200,
+        780
+      ],
+      "parameters": {
+        "jsCode": "let response = items[0].json; // get the Redis response\nlet newItems = []; // to store the new items\n\nfor(let key in response) {\n    if(response.hasOwnProperty(key)) {\n        newItems.push({\n            json: {\n                user: response[key]\n            }\n        });\n    }\n}\n\nreturn newItems;\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8c330aca-3720-439e-87c6-47d914f828c3",
+      "name": "Broadcast Channel Post into Users",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueErrorOutput",
+      "position": [
+        380,
+        760
+      ],
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $('Bot-Config').item.json.BotToken }}/copyMessage?chat_id={{ $('Split In Batches1').item.json[\"user\"][\"chat_id\"] }}&from_chat_id={{ $('Bot-Config').item.json[\"Boradcast_Channel_ID\"] }}&message_id={{ $('Bot-Config').item.json[\"channel_post\"][\"message_id\"] }}",
+        "method": "POST",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "3beb15dd-6e76-4350-97c3-22f39d768497",
+      "name": "Set Blocked Member",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        560,
+        900
+      ],
+      "parameters": {
+        "key": "=TG-USER-{{ $('Bot-Fields').item.json.chat_id || $('Split In Batches1').item.json.user.chat_id }}",
+        "value": "={\"Blocked\":{{ '1' }}}",
+        "keyType": "hash",
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "03d457f1-ca11-4134-b0f9-d4d029ce141a",
+      "name": "IF Verified Channel",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -558,
+        800
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Bot-Config').item.json.channel_post.sender_chat.id }}",
+              "value2": "={{ $('Bot-Config').item.json.Boradcast_Channel_ID }}",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6f38d2d0-5734-4829-ab97-8aca57827646",
+      "name": "Filter Blocked Users",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        -20,
+        780
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.user.Blocked }}",
+              "value2": "1",
+              "operation": "notRegex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "37ffb301-0284-493e-abed-aaff293b4a92",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -660,
+        620
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 1413.320293398532,
+        "height": 460.58353708231465,
+        "content": "## Channel Side (Broadcasting)\n**This Part** where the support of brand broadcasting message to all previous users who used this bot before."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d34a0080-6db8-4d29-b6ff-b0b0bf3be8af",
+      "name": "Retrieve all users in DB",
+      "type": "n8n-nodes-base.redis",
+      "notes": "Search Key",
+      "position": [
+        -378,
+        780
+      ],
+      "parameters": {
+        "operation": "keys",
+        "keyPattern": "=TG-USER-*"
+      },
+      "credentials": {
+        "redis": {
+          "id": "LNn51V8Wv8nlnOrK",
+          "name": "Livegram Bot"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1st": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Check User in Database",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Support Forum",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF Verified Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Bot-Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot-Config": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot-Fields": {
+      "main": [
+        [
+          {
+            "node": "1st",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New User ?": {
+      "main": [
+        [
+          {
+            "node": "Save User Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update User Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "From Ticket": {
+      "main": [
+        [
+          {
+            "node": "Forward Support Reply To User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF Topic Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Users": {
+      "main": [
+        [
+          {
+            "node": "Filter Blocked Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram-Bot": {
+      "main": [
+        [
+          {
+            "node": "Bot-Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Topic ID": {
+      "main": [
+        [
+          {
+            "node": "Forward New Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Support Forum": {
+      "main": [
+        [
+          {
+            "node": "From Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save User Data": {
+      "main": [
+        [
+          {
+            "node": "Create Topic (Chat Ticket)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReSave Topic ID": {
+      "main": [
+        [
+          {
+            "node": "Forward New Message to the recrated topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Topic Created": {
+      "main": [
+        [
+          {
+            "node": "Send User Ticket Created Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update User Data": {
+      "main": [
+        [
+          {
+            "node": "Get User Chat Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches1": {
+      "main": [
+        [
+          {
+            "node": "Broadcast Channel Post into Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Blocked Member": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward New Message": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF No Topic Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Chat Topic": {
+      "main": [
+        [
+          {
+            "node": "Forward New Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF No Topic Created": {
+      "main": [
+        [
+          {
+            "node": "ReCreate Topic (Chat Ticket)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Verified Channel": {
+      "main": [
+        [
+          {
+            "node": "Retrieve all users in DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Blocked Users": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check User in Database": {
+      "main": [
+        [
+          {
+            "node": "New User ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve all users in DB": {
+      "main": [
+        [
+          {
+            "node": "Format Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Topic (Chat Ticket)": {
+      "main": [
+        [
+          {
+            "node": "Save Topic ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ReCreate Topic (Chat Ticket)": {
+      "main": [
+        [
+          {
+            "node": "ReSave Topic ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward Support Reply To User": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Broadcast Channel Post into Users": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Blocked Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send User Ticket Created Notification": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward New Message to the recrated topic": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

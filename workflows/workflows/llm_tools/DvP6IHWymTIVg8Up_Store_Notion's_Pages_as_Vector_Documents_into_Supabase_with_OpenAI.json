@@ -1,0 +1,302 @@
+{
+  "id": "DvP6IHWymTIVg8Up",
+  "meta": {
+    "instanceId": "b9faf72fe0d7c3be94b3ebff0778790b50b135c336412d28fd4fca2cbbf8d1f5",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Store Notion's Pages as Vector Documents into Supabase with OpenAI",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "495609cd-4ca0-426d-8413-69e771398188",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        400
+      ],
+      "parameters": {
+        "width": 637.1327972412109,
+        "height": 1113.7434387207031,
+        "content": "## Store Notion's Pages as Vector Documents into Supabase\n\n**This workflow assumes you have a Supabase project with a table that has a vector column. If you don't have it, follow the instructions here:** [Supabase Vector Columns Guide](https://supabase.com/docs/guides/ai/vector-columns)\n\n## Workflow Description\n\nThis workflow automates the process of storing Notion pages as vector documents in a Supabase database with a vector column. The steps are as follows:\n\n1. **Notion Page Added Trigger**:\n   - Monitors a specified Notion database for newly added pages. You can create a specific Notion database where you copy the pages you want to store in Supabase.\n   - Node: `Page Added in Notion Database`\n\n2. **Retrieve Page Content**:\n   - Fetches all block content from the newly added Notion page.\n   - Node: `Get Blocks Content`\n\n3. **Filter Non-Text Content**:\n   - Excludes blocks of type \"image\" and \"video\" to focus on textual content.\n   - Node: `Filter - Exclude Media Content`\n\n4. **Summarize Content**:\n   - Concatenates the Notion blocks content to create a single text for embedding.\n   - Node: `Summarize - Concatenate Notion's blocks content`\n\n5. **Store in Supabase**:\n   - Stores the processed documents and their embeddings into a Supabase table with a vector column.\n   - Node: `Store Documents in Supabase`\n\n6. **Generate Embeddings**:\n   - Utilizes OpenAI's API to generate embeddings for the textual content.\n   - Node: `Generate Text Embeddings`\n\n\n7. **Create Metadata and Load Content**:\n   - Loads the block content and creates associated metadata, such as page ID and block ID.\n   - Node: `Load Block Content & Create Metadata`\n\n8. **Split Content into Chunks**:\n   - Divides the text into smaller chunks for easier processing and embedding generation.\n   - Node: `Token Splitter`\n\n\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3f3e65dc-2b26-407c-87e5-52ba3b315fed",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        2200,
+        760
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6d2579b8-376f-44c3-82e8-9dc608efd98b",
+      "name": "Token Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterTokenSplitter",
+      "position": [
+        2340,
+        960
+      ],
+      "parameters": {
+        "chunkSize": 256,
+        "chunkOverlap": 30
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "79b3c147-08ca-4db4-9116-958a868cbfd9",
+      "name": "Notion - Page Added Trigger",
+      "type": "n8n-nodes-base.notionTrigger",
+      "position": [
+        1180,
+        520
+      ],
+      "parameters": {
+        "simple": false,
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "databaseId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultUrl": "",
+          "cachedResultName": ""
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e4a6f524-e3f5-4d02-949a-8523f2d21965",
+      "name": "Notion - Retrieve Page Content",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1400,
+        520
+      ],
+      "parameters": {
+        "blockId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $json.url }}"
+        },
+        "resource": "block",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "bfebc173-8d4b-4f8f-a625-4622949dd545",
+      "name": "Filter Non-Text Content",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1620,
+        520
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e5b605e5-6d05-4bca-8f19-a859e474620f",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "image"
+            },
+            {
+              "id": "c7415859-5ffd-4c78-b497-91a3d6303b6f",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "video"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b04939f9-355a-430b-a069-b11800066313",
+      "name": "Summarize - Concatenate Notion's blocks content",
+      "type": "n8n-nodes-base.summarize",
+      "position": [
+        1920,
+        520
+      ],
+      "parameters": {
+        "options": {
+          "outputFormat": "separateItems"
+        },
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "field": "content",
+              "separateBy": "\n",
+              "aggregation": "concatenate"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0e64dbb5-20c1-4b90-b818-a1726aaf5112",
+      "name": "Create metadata and load content",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        2320,
+        760
+      ],
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "pageId",
+                "value": "={{ $('Notion - Page Added Trigger').item.json.id }}"
+              },
+              {
+                "name": "createdTime",
+                "value": "={{ $('Notion - Page Added Trigger').item.json.created_time }}"
+              },
+              {
+                "name": "pageTitle",
+                "value": "={{ $('Notion - Page Added Trigger').item.json.properties.Page.title[0].text.content }}"
+              }
+            ]
+          }
+        },
+        "jsonData": "={{ $('Summarize - Concatenate Notion's blocks content').item.json.concatenated_content }}",
+        "jsonMode": "expressionData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "187aba6f-eaed-4427-8d40-b9da025fb37d",
+      "name": "Supabase Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "position": [
+        2200,
+        520
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {},
+        "tableName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": ""
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "77f6b6f7-d699-4a7e-b3e7-fe8a60bde7ba",
+  "connections": {
+    "Token Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Create metadata and load content",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Non-Text Content": {
+      "main": [
+        [
+          {
+            "node": "Summarize - Concatenate Notion's blocks content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Page Added Trigger": {
+      "main": [
+        [
+          {
+            "node": "Notion - Retrieve Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Retrieve Page Content": {
+      "main": [
+        [
+          {
+            "node": "Filter Non-Text Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create metadata and load content": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize - Concatenate Notion's blocks content": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

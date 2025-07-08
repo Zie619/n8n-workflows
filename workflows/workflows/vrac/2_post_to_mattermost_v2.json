@@ -1,0 +1,158 @@
+{
+  "id": "2",
+  "name": "post to mattermost v2",
+  "nodes": [
+    {
+      "name": "RSS Feed Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        580,
+        150
+      ],
+      "parameters": {
+        "url": "{HERE YOUR TINY TINY RSS PUBLIC FEED}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1170,
+        90
+      ],
+      "parameters": {
+        "url": "=https://{HERE YOUR MASTONDON INSTANCE URL}/api/v1/statuses?access_token={HERE YOUR MASTODON ACCESS TOKEN}",
+        "options": {},
+        "requestMethod": "POST",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "status",
+              "value": "={{$node[\"RSS Feed Read\"].json[\"title\"]}} \n{{$node[\"RSS Feed Read\"].json[\"link\"]}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        400,
+        150
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Function",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        790,
+        150
+      ],
+      "parameters": {
+        "functionCode": "// Get the global workflow static data\nconst staticData = getWorkflowStaticData('global');\n\n// Access its data\nconst lastRssId = staticData.lastRssId\n\nlet list = []\n\n\nfor (const item of $items(\"RSS Feed Read\")){\n  let currentId = item.json[\"id\"].split('/').pop()\n  if(currentId == lastRssId) break;\n  list.push({'json': {\n    'id': currentId,\n    'lastId': lastRssId,\n    'title': item.json[\"title\"],\n    'url': item.json[\"link\"]\n  }})\n}\n\n\n// Get the last ID from Rss Feed\nlet currentRssId = $item(0).$node[\"RSS Feed Read\"].json[\"id\"].split('/').pop()\n\n// TODO: make a loop to get all the items beyond the last saved id\nif(!lastRssId || currentRssId != lastRssId)\n{  \n  // Update its data\n  staticData.lastRssId = currentRssId;\n  \n}\nelse { list = [{'json':{'id': 'NaN', 'lastId': staticData.lastRssId }}] }\nreturn list;\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        960,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Function\"].json[\"id\"]}}",
+              "value2": "NaN",
+              "operation": "notEqual"
+            }
+          ],
+          "boolean": []
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1180,
+        280
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "settings": {},
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "RSS Feed Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Feed Read": {
+      "main": [
+        [
+          {
+            "node": "Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

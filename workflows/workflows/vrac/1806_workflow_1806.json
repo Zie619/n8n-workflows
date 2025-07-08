@@ -1,0 +1,559 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "9d40c0b9-498f-421c-b731-3a387402b69a",
+      "name": "Get last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        380,
+        360
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nif(!staticData.lastExecution){\n  staticData.lastExecution = new Date().getTime();\n}\n\nitem.executionTimeStamp = new Date().getTime();\nitem.lastExecution = staticData.lastExecution;\n\n\nreturn item;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ddb12f68-1f6b-41fb-bfd4-038697ce4d75",
+      "name": "Set new last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        3280,
+        380
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nstaticData.lastExecution = $item(0).$node[\"Get last execution timestamp\"].executionTimeStamp;\n\nreturn item;"
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "42888df0-1f7e-4990-87b3-3226a474110e",
+      "name": "Get tickets created after last execution",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        620,
+        360
+      ],
+      "parameters": {
+        "options": {
+          "query": "=created>{{ $json[\"lastExecution\"] }}",
+          "sortBy": "updated_at",
+          "sortOrder": "desc"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2f0f71f6-3d4c-4895-9313-7f47e3b2ed86",
+      "name": "Get requester information",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        840,
+        460
+      ],
+      "parameters": {
+        "id": "={{ $json[\"requester_id\"] }}",
+        "resource": "user",
+        "operation": "get"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "284fd54b-bd7b-4fbb-8a14-0c4fa62a3200",
+      "name": "Keep only needed requester information",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1060,
+        460
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "requester_id",
+              "value": "={{ $json[\"id\"] }}"
+            }
+          ],
+          "string": [
+            {
+              "name": "requester_email",
+              "value": "={{ $json[\"email\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "17c3b860-60cb-4885-b503-9086b461bde0",
+      "name": "Keep only requester owner email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2000,
+        480
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "requester_pipedrive_email",
+              "value": "={{ $node[\"Search requester in pipedrive\"].json[\"primary_email\"] }}"
+            },
+            {
+              "name": "requester_pipedrive_owner_email",
+              "value": "={{ $json[\"data\"].email }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4ccf1d7-5d9f-4c4e-a5b9-c54ed77c5c44",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        160,
+        360
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 5
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "99fb51d8-0d93-4db9-868d-757046d1bdc2",
+      "name": "Add requester information to ticket data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1280,
+        380
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "requester_id",
+        "propertyName2": "requester_id"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4c7acd0-b2b6-48bb-b7b7-d2826ddb1f9d",
+      "name": "Search requester in pipedrive",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        1560,
+        480
+      ],
+      "parameters": {
+        "term": "={{ $json[\"requester_email\"] }}",
+        "resource": "person",
+        "operation": "search",
+        "additionalFields": {
+          "fields": "email"
+        }
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "1",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7a8a3bf3-9f57-40ad-a31f-45522264f101",
+      "name": "Get owner information of Pipedrive contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1780,
+        480
+      ],
+      "parameters": {
+        "url": "=https://n8n.pipedrive.com/api/v1/users/{{$json[\"owner\"][\"id\"]}}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "pipedriveApi"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "1",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "64a7fc0c-ddb4-4d84-86a6-3e9bd361ce46",
+      "name": "Get agents and admins",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        1780,
+        700
+      ],
+      "parameters": {
+        "filters": {
+          "role": [
+            "agent",
+            "admin"
+          ]
+        },
+        "resource": "user",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0117d5f8-e9b2-46c9-9777-7ae82e002cc2",
+      "name": "Keep only email and Id",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2000,
+        700
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "agent_email",
+              "value": "={{ $json[\"email\"] }}"
+            },
+            {
+              "name": "agent_id",
+              "value": "={{ $json[\"id\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eaa7b072-0499-4b3a-96af-433d3afc12f9",
+      "name": "Add Pipedrive agent data to pipedrive contact information",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2280,
+        500
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "requester_pipedrive_owner_email",
+        "propertyName2": "agent_email"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b9619e3d-c951-47ae-bbb5-db50e7ae5abe",
+      "name": "Add contact owner to ticket data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2540,
+        400
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "requester_email",
+        "propertyName2": "requester_pipedrive_email"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "14f88f5f-2bab-42f2-bea7-a7566e6d45b1",
+      "name": "Contact exists in Pipedrive",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2760,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"agent_id\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "38da1ccc-3d23-41cd-84b3-6fc249aedca5",
+      "name": "Change assignee to Pipedrive contact owner",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        3020,
+        380
+      ],
+      "parameters": {
+        "id": "={{ $json[\"id\"] }}",
+        "operation": "update",
+        "updateFields": {
+          "assigneeEmail": "={{$json[\"requester_pipedrive_owner_email\"]}}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4295e0e2-88e8-4f93-8432-47fff452cfc5",
+      "name": "Add a note requester not found",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        3020,
+        580
+      ],
+      "parameters": {
+        "id": "={{ $json[\"id\"] }}",
+        "operation": "update",
+        "updateFields": {
+          "internalNote": "Requester not found in Pipedrive"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Get last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get agents and admins": {
+      "main": [
+        [
+          {
+            "node": "Keep only email and Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only email and Id": {
+      "main": [
+        [
+          {
+            "node": "Add Pipedrive agent data to pipedrive contact information",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get requester information": {
+      "main": [
+        [
+          {
+            "node": "Keep only needed requester information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contact exists in Pipedrive": {
+      "main": [
+        [
+          {
+            "node": "Change assignee to Pipedrive contact owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add a note requester not found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last execution timestamp": {
+      "main": [
+        [
+          {
+            "node": "Get tickets created after last execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search requester in pipedrive": {
+      "main": [
+        [
+          {
+            "node": "Get owner information of Pipedrive contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add a note requester not found": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only requester owner email": {
+      "main": [
+        [
+          {
+            "node": "Add Pipedrive agent data to pipedrive contact information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add contact owner to ticket data": {
+      "main": [
+        [
+          {
+            "node": "Contact exists in Pipedrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep only needed requester information": {
+      "main": [
+        [
+          {
+            "node": "Add requester information to ticket data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Add requester information to ticket data": {
+      "main": [
+        [
+          {
+            "node": "Search requester in pipedrive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add contact owner to ticket data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get tickets created after last execution": {
+      "main": [
+        [
+          {
+            "node": "Add requester information to ticket data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get requester information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Change assignee to Pipedrive contact owner": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get owner information of Pipedrive contact": {
+      "main": [
+        [
+          {
+            "node": "Keep only requester owner email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Pipedrive agent data to pipedrive contact information": {
+      "main": [
+        [
+          {
+            "node": "Add contact owner to ticket data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  }
+}

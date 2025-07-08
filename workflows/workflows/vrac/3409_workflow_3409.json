@@ -1,0 +1,1142 @@
+{
+  "meta": {
+    "instanceId": "97d44c78f314fab340d7a5edaf7e2c274a7fbb8a7cd138f53cc742341e706fe7"
+  },
+  "nodes": [
+    {
+      "id": "fa4f8fd6-3272-4a93-8547-32d13873bbc1",
+      "name": "Submit batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        180,
+        40
+      ],
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages/batches",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={ \"requests\": {{ JSON.stringify($json.requests) }} }",
+        "sendBody": true,
+        "sendQuery": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "={{ $json[\"anthropic-version\"] }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "anthropicApi"
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "ub0zN7IP2V83OeTf",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "2916dc85-829d-491a-a7a8-de79d5356a53",
+      "name": "Check batch status",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        840,
+        115
+      ],
+      "parameters": {
+        "url": "=https://api.anthropic.com/v1/messages/batches/{{ $json.id }}",
+        "options": {},
+        "sendHeaders": true,
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"anthropic-version\"] }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "anthropicApi"
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "ub0zN7IP2V83OeTf",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "1552ec92-2f18-42f6-b67f-b6f131012b3c",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -40,
+        40
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "anthropic-version"
+            },
+            {
+              "name": "requests",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "4bd40f02-caf1-419d-8261-a149cd51a534",
+      "name": "Get results",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        620,
+        -160
+      ],
+      "parameters": {
+        "url": "={{ $json.results_url }}",
+        "options": {},
+        "sendHeaders": true,
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"anthropic-version\"] }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "anthropicApi"
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "ub0zN7IP2V83OeTf",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5df366af-a54d-4594-a1ab-7a9df968101e",
+      "name": "Parse response",
+      "type": "n8n-nodes-base.code",
+      "notes": "JSONL separated by newlines",
+      "position": [
+        840,
+        -160
+      ],
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  if (item.json && item.json.data) {\n    // Split the string into individual JSON objects\n    const jsonStrings = item.json.data.split('\\n');\n\n    // Parse each JSON string and store them in an array\n    const parsedData = jsonStrings.filter(str => str.trim() !== '').map(str => JSON.parse(str));\n\n    // Replace the original json with the parsed array.\n    item.json.parsed = parsedData;\n  }\n}\n\nreturn $input.all();"
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "68aa4ee2-e925-4e30-a7ab-317d8df4d9bc",
+      "name": "If ended processing",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        400,
+        40
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9494c5a3-d093-49c5-837f-99cd700a2f13",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.processing_status }}",
+              "rightValue": "ended"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "2b974e3b-495b-48af-8080-c7913d7a2ba8",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -200,
+        -720
+      ],
+      "parameters": {
+        "width": 1060,
+        "height": 520,
+        "content": "### This workflow automates sending batched prompts to Claude using the Anthropic API. It submits multiple prompts at once and retrieves the results.\n\n#### How to use\n\nCall this workflow with array of `requests`\n\n```json\n{\n    \"anthropic-version\": \"2023-06-01\",\n    \"requests\": [\n        {\n            \"custom_id\": \"first-prompt-in-my-batch\",\n            \"params\": {\n                \"max_tokens\": 100,\n                \"messages\": [\n                    {\n                        \"content\": \"Hey Claude, tell me a short fun fact about video games!\",\n                        \"role\": \"user\"\n                    }\n                ],\n                \"model\": \"claude-3-5-haiku-20241022\"\n            }\n        }\n    ]\n}\n```\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "928a30b5-5d90-4648-a82e-e4f1a01e47a5",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1200,
+        -720
+      ],
+      "parameters": {
+        "width": 980,
+        "height": 600,
+        "content": "#### Results\n\nThis workflow returns an array of results with custom_ids.\n\n```json\n[\n    {\n        \"custom_id\": \"first-prompt-in-my-batch\",\n        \"result\": {\n            \"message\": {\n                \"content\": [\n                    {\n                        \"text\": \"Did you know that the classic video game Tetris was...\",\n                        \"type\": \"text\"\n                    }\n                ],\n                \"id\": \"msg_01AiLiVZT18XnoBD4r2w9x2t\",\n                \"model\": \"claude-3-5-haiku-20241022\",\n                \"role\": \"assistant\",\n                \"stop_reason\": \"end_turn\",\n                \"stop_sequence\": null,\n                \"type\": \"message\",\n                \"usage\": {\n                    \"cache_creation_input_tokens\": 0,\n                    \"cache_read_input_tokens\": 0,\n                    \"input_tokens\": 45,\n                    \"output_tokens\": 83\n                }\n            },\n            \"type\": \"succeeded\"\n        }\n    }\n]\n```"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5dcb554e-32df-4883-b5a1-b40305756201",
+      "name": "Batch Status Poll Interval",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        620,
+        40
+      ],
+      "webhookId": "7efafe72-063a-45c6-8775-fcec14e1d263",
+      "parameters": {
+        "amount": 10
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "c25cfde5-ab83-4e5a-a66f-8cc9f23a01f6",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -160,
+        325
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 340,
+        "height": 620,
+        "content": "# Usage example"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6062ca7c-aa08-4805-9c96-65e5be8a38fd",
+      "name": "Run example",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -40,
+        625
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "9878729a-123d-4460-a582-691ca8cedf98",
+      "name": "One query example",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        634,
+        775
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1ea47ba2-64be-4d69-b3db-3447cde71645",
+              "name": "query",
+              "type": "string",
+              "value": "Hey Claude, tell me a short fun fact about bees!"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "df06c209-8b6a-4b6d-8045-230ebdfcfbad",
+      "name": "Delete original properties",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1528,
+        775
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d238d62b-2e91-4242-b509-8cfc698d2252",
+              "name": "custom_id",
+              "type": "string",
+              "value": "={{ $json.custom_id }}"
+            },
+            {
+              "id": "21e07c09-92e3-41e7-8335-64653722e7e9",
+              "name": "params",
+              "type": "object",
+              "value": "={{ $json.params }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "f66d6a89-ee33-4494-9476-46f408976b29",
+      "name": "Construct 'requests' array",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1968,
+        625
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "requests"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0f9eb605-d629-4cb7-b9cb-39702d201567",
+      "name": "Set desired 'anthropic-version'",
+      "type": "n8n-nodes-base.set",
+      "notes": "2023-06-01",
+      "position": [
+        2188,
+        625
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9f9e94a0-304b-487a-8762-d74421ef4cc0",
+              "name": "anthropic-version",
+              "type": "string",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "f71f261c-f4ad-4c9f-bd72-42ab386a65e1",
+      "name": "Execute Workflow 'Process Multiple Prompts in Parallel with Anthropic Claude Batch API'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "notes": "See above",
+      "position": [
+        2408,
+        625
+      ],
+      "parameters": {
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "xQU4byMGhgFxnTIH",
+          "cachedResultName": "Process Multiple Prompts in Parallel with Anthropic Claude Batch API"
+        },
+        "workflowInputs": {
+          "value": {
+            "requests": "={{ $json.requests }}",
+            "anthropic-version": "={{ $json['anthropic-version'] }}"
+          },
+          "schema": [
+            {
+              "id": "anthropic-version",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "anthropic-version",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "requests",
+              "type": "array",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "requests",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "requests"
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "bd27c1a6-572c-420d-84ab-4d8b7d14311b",
+      "name": "Build batch 'request' object for single query",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1308,
+        775
+      ],
+      "parameters": {
+        "jsCode": "// Loop over input items and modify them to match the response example, then return input.all()\nfor (const item of $input.all()) {\n  item.json.params = {\n    max_tokens: item.json.max_tokens,\n    messages: [\n      {\n        content: item.json.query,\n        role: \"user\"\n      }\n    ],\n    model: item.json.model\n  };\n}\n\nreturn $input.all();\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "fa342231-ea94-43ab-8808-18c8d04fdaf8",
+      "name": "Simple Memory Store",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        644,
+        595
+      ],
+      "parameters": {
+        "sessionKey": "\"Process Multiple Prompts in Parallel with Anthropic Claude Batch API example\"",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "67047fe6-8658-45ba-be61-52cf6115f4e4",
+      "name": "Fill Chat Memory with example data",
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "position": [
+        556,
+        375
+      ],
+      "parameters": {
+        "mode": "insert",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a helpful AI assistant"
+            },
+            {
+              "type": "user",
+              "message": "Hey Claude, tell me a short fun fact about video games!"
+            },
+            {
+              "type": "ai",
+              "message": "short fun fact about video games!"
+            },
+            {
+              "type": "user",
+              "message": "No, an actual fun fact"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "dbb295b8-01fd-445f-ab66-948442b6c71d",
+      "name": "Build batch 'request' object from Chat Memory and execution data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1528,
+        475
+      ],
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const inputMessages = item.json.messages;\n  const customId = item.json.custom_id;\n  const model = item.json.model;\n  const maxTokens = item.json.max_tokens;\n\n  if (inputMessages && inputMessages.length > 0) {\n    let systemMessageContent = undefined;\n    const transformedMessages = [];\n\n    // Process each message entry in sequence\n    for (const messageObj of inputMessages) {\n      // Extract system message if present\n      if ('system' in messageObj) {\n        systemMessageContent = messageObj.system;\n      }\n      \n      // Process human and AI messages in the order they appear in the object keys\n      // We need to determine what order the keys appear in the original object\n      const keys = Object.keys(messageObj);\n      \n      for (const key of keys) {\n        if (key === 'human') {\n          transformedMessages.push({\n            role: \"user\",\n            content: messageObj.human\n          });\n        } else if (key === 'ai') {\n          transformedMessages.push({\n            role: \"assistant\",\n            content: messageObj.ai\n          });\n        }\n        // Skip 'system' as we already processed it\n      }\n    }\n\n    const params = {\n      model: model,\n      max_tokens: maxTokens,\n      messages: transformedMessages\n    };\n\n    if (systemMessageContent !== undefined) {\n      params.system = systemMessageContent;\n    }\n\n    output.push({\n      custom_id: customId,\n      params: params\n    });\n  }\n}\n\nreturn output;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f9edb335-c33d-45fc-8f9b-12d7f37cc23e",
+      "name": "Load Chat Memory Data",
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "position": [
+        932,
+        475
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "22399660-ebe5-4838-bad3-c542d6d921a3",
+      "name": "First Prompt Result",
+      "type": "n8n-nodes-base.executionData",
+      "position": [
+        2848,
+        525
+      ],
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "assistant_response",
+              "value": "={{ $json.result.message.content[0].text }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0e7f44f4-c931-4e0f-aebc-1b8f0327647f",
+      "name": "Second Prompt Result",
+      "type": "n8n-nodes-base.executionData",
+      "position": [
+        2848,
+        725
+      ],
+      "parameters": {
+        "dataToSave": {
+          "values": [
+            {
+              "key": "assistant_response",
+              "value": "={{ $json.result.message.content[0].text }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e42b01e0-8fc5-42e1-aa45-aa85477e766b",
+      "name": "Split Out Parsed Results",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1060,
+        -160
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "parsed"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "343676b9-f147-4981-b555-8af570374e8c",
+      "name": "Filter Second Prompt Results",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        2628,
+        725
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9e4b3524-7066-46cc-a365-8d23d08c1bda",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.custom_id }}",
+              "rightValue": "={{ $('Append execution data for single query example').item.json.custom_id }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "c9f5f366-27c4-4401-965b-67c314036fb6",
+      "name": "Filter First Prompt Results",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        2628,
+        525
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9e4b3524-7066-46cc-a365-8d23d08c1bda",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.custom_id }}",
+              "rightValue": "={{ $('Append execution data for chat memory example').item.json.custom_id }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "0a5b9c3d-665b-4e35-be9e-c8297314969d",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        110,
+        -100
+      ],
+      "parameters": {
+        "height": 300,
+        "content": "## Submit batch request to Anthropic"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f19813a5-f669-45dd-a446-947a30b02b09",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        350,
+        -5
+      ],
+      "parameters": {
+        "width": 640,
+        "height": 300,
+        "content": "## Loop until processing status is 'ended'"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9f424fce-5610-4b85-9be6-4c2c403002db",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        -200
+      ],
+      "parameters": {
+        "width": 280,
+        "height": 180,
+        "content": "### Retrieve Message Batch Results\n\n[User guide](https://docs.anthropic.com/en/docs/build-with-claude/batch-processing)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b87673b1-f08d-4c51-8ee5-4d54557cb382",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        900,
+        380
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 820,
+        "height": 340,
+        "content": "# Example usage with Chat History Node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d6d8ac02-7005-40a1-9950-9517e98e315c",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        720
+      ],
+      "parameters": {
+        "width": 1540,
+        "height": 220,
+        "content": "# Example usage with single query string"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0d63deb0-dece-4502-9020-d67c1f194466",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        180,
+        320
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 660,
+        "height": 400,
+        "content": "# Environment setup\nFor Chat History Node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cab94e09-6b84-4a38-b854-670241744db5",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2120,
+        800
+      ],
+      "parameters": {
+        "height": 220,
+        "content": "## anthropic-version\n\n[Documentation](https://docs.anthropic.com/en/api/versioning)\n\nWhen making API requests, you must send an anthropic-version request header. For example, anthropic-version: `2023-06-01` (latest supported version)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ab0a51a1-3c84-4a88-968b-fd46ab07de85",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2560,
+        400
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 480,
+        "height": 300,
+        "content": "# Example usage with Chat History Node (result)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d91b9be7-ef32-48d6-b880-cab0e99ba9bc",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2560,
+        700
+      ],
+      "parameters": {
+        "width": 480,
+        "height": 300,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n# Example usage with single query string (result)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "341811e9-6677-42d9-be28-c388dbf68101",
+      "name": "Join two example requests into array",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1748,
+        625
+      ],
+      "parameters": {},
+      "typeVersion": 3.1
+    },
+    {
+      "id": "45a09f05-7610-4b0a-ab7f-0094c4b3f318",
+      "name": "Append execution data for single query example",
+      "type": "n8n-nodes-base.set",
+      "notes": "custom_id, model and max tokens",
+      "position": [
+        1010,
+        775
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8276602f-689f-45c2-bce0-5df8500912b6",
+              "name": "custom_id",
+              "type": "string",
+              "value": "second-prompt-in-my-batch"
+            },
+            {
+              "id": "2c513dc2-d8cb-4ba3-b3c1-ea79517b9434",
+              "name": "model",
+              "type": "string",
+              "value": "claude-3-5-haiku-20241022"
+            },
+            {
+              "id": "b052140b-1152-4327-9c5a-5030b78990b7",
+              "name": "max_tokens",
+              "type": "number",
+              "value": 100
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "c4e35349-840c-4c81-852c-0d8cd9331364",
+      "name": "Append execution data for chat memory example",
+      "type": "n8n-nodes-base.set",
+      "notes": "custom_id, model and max tokens",
+      "position": [
+        1308,
+        475
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8276602f-689f-45c2-bce0-5df8500912b6",
+              "name": "custom_id",
+              "type": "string",
+              "value": "first-prompt-in-my-batch"
+            },
+            {
+              "id": "2c513dc2-d8cb-4ba3-b3c1-ea79517b9434",
+              "name": "model",
+              "type": "string",
+              "value": "claude-3-5-haiku-20241022"
+            },
+            {
+              "id": "b052140b-1152-4327-9c5a-5030b78990b7",
+              "name": "max_tokens",
+              "type": "number",
+              "value": 100
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "058aedb1-fdfe-4edc-8d51-3b93ec7d232d",
+      "name": "Truncate Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryManager",
+      "notes": "ensure clean state",
+      "position": [
+        180,
+        475
+      ],
+      "parameters": {
+        "mode": "delete",
+        "deleteMode": "all"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get results": {
+      "main": [
+        [
+          {
+            "node": "Parse response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run example": {
+      "main": [
+        [
+          {
+            "node": "One query example",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Truncate Chat Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit batch": {
+      "main": [
+        [
+          {
+            "node": "If ended processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse response": {
+      "main": [
+        [
+          {
+            "node": "Split Out Parsed Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One query example": {
+      "main": [
+        [
+          {
+            "node": "Append execution data for single query example",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check batch status": {
+      "main": [
+        [
+          {
+            "node": "If ended processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If ended processing": {
+      "main": [
+        [
+          {
+            "node": "Get results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Batch Status Poll Interval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory Store": {
+      "ai_memory": [
+        [
+          {
+            "node": "Load Chat Memory Data",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Fill Chat Memory with example data",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Truncate Chat Memory",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Truncate Chat Memory": {
+      "main": [
+        [
+          {
+            "node": "Fill Chat Memory with example data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Chat Memory Data": {
+      "main": [
+        [
+          {
+            "node": "Append execution data for chat memory example",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Status Poll Interval": {
+      "main": [
+        [
+          {
+            "node": "Check batch status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construct 'requests' array": {
+      "main": [
+        [
+          {
+            "node": "Set desired 'anthropic-version'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete original properties": {
+      "main": [
+        [
+          {
+            "node": "Join two example requests into array",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Filter First Prompt Results": {
+      "main": [
+        [
+          {
+            "node": "First Prompt Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Second Prompt Results": {
+      "main": [
+        [
+          {
+            "node": "Second Prompt Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set desired 'anthropic-version'": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow 'Process Multiple Prompts in Parallel with Anthropic Claude Batch API'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Submit batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fill Chat Memory with example data": {
+      "main": [
+        [
+          {
+            "node": "Load Chat Memory Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join two example requests into array": {
+      "main": [
+        [
+          {
+            "node": "Construct 'requests' array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append execution data for chat memory example": {
+      "main": [
+        [
+          {
+            "node": "Build batch 'request' object from Chat Memory and execution data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build batch 'request' object for single query": {
+      "main": [
+        [
+          {
+            "node": "Delete original properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append execution data for single query example": {
+      "main": [
+        [
+          {
+            "node": "Build batch 'request' object for single query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build batch 'request' object from Chat Memory and execution data": {
+      "main": [
+        [
+          {
+            "node": "Join two example requests into array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow 'Process Multiple Prompts in Parallel with Anthropic Claude Batch API'": {
+      "main": [
+        [
+          {
+            "node": "Filter First Prompt Results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filter Second Prompt Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

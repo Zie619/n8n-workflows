@@ -1,0 +1,654 @@
+{
+  "meta": {
+    "instanceId": "257476b1ef58bf3cb6a46e65fac7ee34a53a5e1a8492d5c6e4da5f87c9b82833",
+    "templateId": "2131"
+  },
+  "nodes": [
+    {
+      "id": "2b12fb75-ec81-4d2c-a8bb-12ff2bb7e935",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        680,
+        2.662790697674268
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 410.6749642132356,
+        "height": 428.2515771212859,
+        "content": "## Setup\n1. Go to Company Settings -> Data fields -> Organization and add `Domain` as a custom field\n2. Go to Company Settings -> Data fields -> Leads and add `Enriched at` as a custom date field\n2. Add your `Pipedrive`, `Clearbit` and `Slack` credentials.\n3. Fill the `setup` node below. To get the ID of your custom domain fields, simply run the `Show only custom organization fields` and `Show only custom lead fields` nodes below and copy the keys of your domain and enriched at field."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "123ad2e5-f4f2-4411-bf03-5668124b8757",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1800,
+        160
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 223.7628185364029,
+        "height": 276.3308728978709,
+        "content": "Adjust condition to filter leads by your desired condition. e.g, revenue, number of employees, etc."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7725dc9e-5c93-475d-9522-f99b4fd1c81f",
+      "name": "Enrich company",
+      "type": "n8n-nodes-base.clearbit",
+      "position": [
+        1460,
+        140
+      ],
+      "parameters": {
+        "domain": "={{ $json[$('Setup').first().json.domainCustomFieldId2]}}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "clearbitApi": {
+          "id": "cKDImrinp9tg0ZHW",
+          "name": "Clearbit account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f65855c3-d3d2-415b-bda2-e452d4d7e154",
+      "name": "Get all leads",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        1120,
+        280
+      ],
+      "parameters": {
+        "filters": {
+          "archived_status": "not_archived"
+        },
+        "resource": "lead",
+        "operation": "getAll"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "M3l7gIG8DdOex6wX",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "39767a37-bd6d-422e-bc38-bfdfcbbf05af",
+      "name": "Add Organization ID to data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1640,
+        140
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71b4c743-fd69-4f5d-8c29-66b3672f7a2a",
+              "name": "organization_id",
+              "type": "number",
+              "value": "={{ $('Get organization details').item.json.id }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "4263cd25-dcf3-4521-b716-0ce48d3b2c26",
+      "name": "Keep leads that match the criteria",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        2320,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1b31b826-e87d-425f-a65d-370b4b20f7e1",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.tags.includes(\"B2B\") }}",
+              "rightValue": 5000000
+            },
+            {
+              "id": "90ef79a7-807a-4894-ae8c-92f9d46e7177",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.metrics.employees }}",
+              "rightValue": 100
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "98578544-b03d-44aa-a64f-285f8a7cc371",
+      "name": "Trigger every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        540,
+        280
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "69ace950-7f1e-469b-bfca-6c0c81f356b9",
+      "name": "Setup",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        820,
+        280
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dba31775-dce0-4f4c-ad61-790359197bb3",
+              "name": "slackChannel",
+              "type": "string",
+              "value": "#yourChannel"
+            },
+            {
+              "id": "f8206758-7a4f-414d-921c-6cfecd936335",
+              "name": "domainCustomFieldId",
+              "type": "string",
+              "value": "<Run \"Show only custom organization fields\" and copy the key>"
+            },
+            {
+              "id": "59c71724-f774-4d41-80e7-5fc76dd27c7d",
+              "name": "enrichedAtCustomFieldId",
+              "type": "string",
+              "value": "<Run \"Show only custom lead fields\" and copy the key>"
+            },
+            {
+              "id": "da4ec51e-cc5c-4512-b675-0888d6a0213e",
+              "name": "enrichedAtCustomFieldId2",
+              "type": "string",
+              "value": "68a15ecb2e1255250617c1fd1c06385893334e3c"
+            },
+            {
+              "id": "43544b80-88d3-44ad-9e36-634e9eeaf013",
+              "name": "domainCustomFieldId2",
+              "type": "string",
+              "value": "ab26f671c92146268edacd244181e76579286e71"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "63db576a-6bb7-4215-88f3-98e304081b3e",
+      "name": "Send alert to Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        2520,
+        260
+      ],
+      "parameters": {
+        "text": "=New high-quality lead 🤑\n*Company Name*: {{ $json.name }} \n*Website*: {{ \"https://\" + $json.domain }}\n*Revenue*: {{ $json.metrics.estimatedAnnualRevenue}}\n*Number of employees*: {{ $json.metrics.employees }}",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('Setup').item.json.slackChannel }}"
+        },
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "6",
+          "name": "Idea Bot"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "9bef53b4-3732-4ce5-a72c-81c65a533196",
+      "name": "Merge data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1880,
+        260
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {
+          "clashHandling": {
+            "values": {
+              "resolveClash": "preferInput2"
+            }
+          }
+        },
+        "joinMode": "enrichInput2",
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "organization_id",
+              "field2": "organization_id"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "9c8d106a-ffc6-4295-bc22-8ceddeb0061f",
+      "name": "Get organization details",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        1280,
+        140
+      ],
+      "parameters": {
+        "resource": "organization",
+        "operation": "get",
+        "organizationId": "={{ $json.organization_id }}"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "M3l7gIG8DdOex6wX",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "632477f4-77d1-4c87-a819-2f7022fa6f23",
+      "name": "Get all organization keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        680,
+        620
+      ],
+      "parameters": {
+        "url": "https://api.pipedrive.com/v1/organizationFields",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "nodeCredentialType": "pipedriveApi"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "M3l7gIG8DdOex6wX",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "f12c4e56-895d-4f34-8924-c99f5e5fefec",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        997,
+        520
+      ],
+      "parameters": {
+        "width": 187.68142318756514,
+        "height": 276.3308728978709,
+        "content": "Run me to find the Id of your custom domain field"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "229db444-ac48-4557-b393-4dcdc69130fd",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1597,
+        520
+      ],
+      "parameters": {
+        "width": 187.68142318756514,
+        "height": 276.3308728978709,
+        "content": "Run me to find the Id of your enriched at domain field"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ea4b0c82-e52b-4a45-9d3f-7b28b8959574",
+      "name": "Get all lead keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1260,
+        620
+      ],
+      "parameters": {
+        "url": "https://api.pipedrive.com/v1/leadFields",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "nodeCredentialType": "pipedriveApi"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "M3l7gIG8DdOex6wX",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "a74a2122-ddd5-4239-baa3-ebbc3de15e03",
+      "name": "Split out lead field data",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1440,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "84fded6b-bdeb-4863-b54c-01faf6cb64cc",
+      "name": "Split out organization field",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        860,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9d9c502e-ccf2-40f9-ae91-7008532e5528",
+      "name": "Show only custom lead fields",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1640,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b21201d0-7f9c-417c-ab02-fbaea23a8d24",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.edit_flag }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a53f58ee-9649-42bc-bee4-b70eea6a0c63",
+      "name": "Show only custom organization fields",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1040,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b21201d0-7f9c-417c-ab02-fbaea23a8d24",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.edit_flag }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f9fa198a-860c-460f-ae82-172c71b5a838",
+      "name": "Mark lead as enriched in Pipedrive",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2100,
+        260
+      ],
+      "parameters": {
+        "url": "=https://api.pipedrive.com/v1/leads/{{ $json.id }}",
+        "method": "PATCH",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "={{ $('Setup').first().json.enrichedAtCustomFieldId2 }}",
+              "value": "={{ $now.format('yyyy-MM-dd') }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "pipedriveApi"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "M3l7gIG8DdOex6wX",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 4.1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Setup": {
+      "main": [
+        [
+          {
+            "node": "Get all leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge data": {
+      "main": [
+        [
+          {
+            "node": "Mark lead as enriched in Pipedrive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all leads": {
+      "main": [
+        [
+          {
+            "node": "Get organization details",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Enrich company": {
+      "main": [
+        [
+          {
+            "node": "Add Organization ID to data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all lead keys": {
+      "main": [
+        [
+          {
+            "node": "Split out lead field data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get organization details": {
+      "main": [
+        [
+          {
+            "node": "Enrich company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all organization keys": {
+      "main": [
+        [
+          {
+            "node": "Split out organization field",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out lead field data": {
+      "main": [
+        [
+          {
+            "node": "Show only custom lead fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Organization ID to data": {
+      "main": [
+        [
+          {
+            "node": "Merge data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out organization field": {
+      "main": [
+        [
+          {
+            "node": "Show only custom organization fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep leads that match the criteria": {
+      "main": [
+        [
+          {
+            "node": "Send alert to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark lead as enriched in Pipedrive": {
+      "main": [
+        [
+          {
+            "node": "Keep leads that match the criteria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

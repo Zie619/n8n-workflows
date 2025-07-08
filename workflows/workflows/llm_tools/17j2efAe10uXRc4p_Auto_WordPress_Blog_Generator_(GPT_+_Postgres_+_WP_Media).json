@@ -1,0 +1,1162 @@
+{
+  "id": "17j2efAe10uXRc4p",
+  "meta": {
+    "instanceId": "95e5c2dbf167bd62714d47d959f677d4c29b5fcbb7d183f4fe2396c33badeac6",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Auto WordPress Blog Generator (GPT + Postgres + WP Media)",
+  "tags": [
+    {
+      "id": "k8Hqq1bbCQoesJjj",
+      "name": "Wordpress",
+      "createdAt": "2025-02-26T04:04:38.319Z",
+      "updatedAt": "2025-02-26T04:04:38.319Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "f71a8a34-5d88-48b0-bf56-44c95d970abd",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -1120,
+        -560
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtMinute": {}
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "8ce11fcd-806c-44ea-aa5f-015599eacc98",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2060,
+        -20
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-2025-04-14",
+          "cachedResultName": "gpt-4.1-2025-04-14"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BSiASwH9CasrT3uK",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "c9450a63-a89e-46eb-b083-b0f40d7b797c",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2620,
+        100
+      ],
+      "parameters": {
+        "url": "={{ $json.image_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "imagedownloaded"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "f477482d-d9b6-4d83-b707-dd19da90e25e",
+      "name": "Prepare Post JSON",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3440,
+        -520
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nlet image = null;\nlet contentBlock = null;\nlet categoryBlock = null;\nlet titleBlock = null;\n\n// Inspect all incoming JSON\nfor (const item of items) {\n  const json = item.json;\n\n  // Detect image\n  if (json?.source_url && json?.media_type === 'image') {\n    image = json;\n    continue;\n  }\n\n  // Detect GPT-generated content\n  if (typeof json.content === 'string' && json.content.includes('<!-- wp:paragraph')) {\n    contentBlock = json;\n    continue;\n  }\n\n  // Detect category block\n  if (json?.category_id && json?.description) {\n    categoryBlock = json;\n    continue;\n  }\n\n  // Detect GPT-generated title from AI output\n  if (typeof json.output === 'string') {\n    titleBlock = json;\n    continue;\n  }\n\n  // Fallback title if nothing else matched\n  if (typeof json.title === 'string') {\n    titleBlock = json;\n  }\n}\n\nreturn [{\n  json: {\n    title: $input.first().json.title,\n    content: contentBlock?.content || '<p>No content</p>',\n    status: 'publish',\n    categories: [categoryBlock?.category_id || 1],\n    featured_media: image?.id || null,\n  }\n}];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "12191b30-702c-44dd-bfaf-68de02f627b1",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        3200,
+        -520
+      ],
+      "parameters": {
+        "numberInputs": 3
+      },
+      "typeVersion": 3.1
+    },
+    {
+      "id": "9c21f5ce-b353-4193-a93d-a034e025a1a0",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        640,
+        -20
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini-2025-04-14",
+          "cachedResultName": "gpt-4.1-mini-2025-04-14"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BSiASwH9CasrT3uK",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "723d9202-7fb0-43ca-8945-8bd4b5030eb8",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2420,
+        -1340
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 1180,
+        "height": 1780,
+        "content": "# 🤖 WordPress Blog Automation Workflow\n\n## 🛠 SETUP (do once before running the flow)\n\n### 1 · DOMAIN  \nAdd one variable anywhere **before** the workflow starts (via Set node, `.env`, or instance config):\n```\nDOMAIN=https://your-wordpress-site.com\n```\nThis will be used in all WordPress REST API calls.\n\n---\n\n### 2 · CREDENTIALS (create in **n8n → Credentials**)\n| Credential Name | Purpose | Minimum Scope |\n|-----------------|---------|---------------|\n| `YOUR_WORDPRESS_CREDENTIAL` | WordPress API | `POST /media`, `POST /posts` |\n| `YOUR_POSTGRES_CREDENTIAL` | PostgreSQL access for used categories | DB + table created in step 3 |\n| `YOUR_OPENAI_CREDENTIAL` | OpenAI key for GPT | GPT-4-mini or better |\n\n🧠 Keep the names **exactly** — the workflow references them directly.\n\n---\n\n### 3 · POSTGRESQL (one-time bootstrap)\n\n### 🖥️ Terminal method (fastest — paste into `sudo -u postgres psql`)\n\n```sql\n-- 3-A · Create database and user\nCREATE DATABASE n8n_blog;\nCREATE USER n8n_writer WITH PASSWORD 'S3cur3-Pa55';\nGRANT ALL PRIVILEGES ON DATABASE n8n_blog TO n8n_writer;\n\\c n8n_blog n8n_writer  -- Reconnect to DB as the new user\n\n-- 3-B · Create the tracking table\nCREATE TABLE IF NOT EXISTS public.used_categories (\n  category_id INTEGER PRIMARY KEY,\n  name        TEXT,\n  description TEXT,\n  title       TEXT,\n  used_at     TIMESTAMPTZ\n);\nGRANT INSERT, UPDATE, SELECT ON public.used_categories TO n8n_writer;\n```\n\n### 🔗 Then configure the credential in n8n\n\n```\nName:       YOUR_POSTGRES_CREDENTIAL\nHost:       127.0.0.1\nPort:       5432\nDatabase:   n8n_blog\nUser:       n8n_writer\nPassword:   S3cur3-Pa55\nSchema:     public\n```\n\n💡 No terminal access?  \nCreate a temporary **Postgres → Execute Query** node with the same SQL, run once, then delete it.\n\n---\n\n### 4 · FIRST TEST  \nRun the first 3–5 nodes manually to verify:\n- ✅ WordPress auth works  \n- ✅ DB connection + writing works  \n- ✅ GPT responds as expected  \n\nOnce confirmed, enable the **Schedule Trigger** to automate.\n\n---\n\n## ✅ WHAT THIS WORKFLOW DOES\n\n- Loads all WP categories and filters out excluded ones  \n- Picks the **least-used category** from your DB  \n- Generates a **unique, well-structured WP article** using GPT (TOC, blocks, CTA)  \n- Generates a **cover image** and uploads it to `/media`  \n- Publishes the post to `/posts` and updates usage in your PostgreSQL DB"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "550017b6-481b-4591-8d87-04761244ef3b",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1180,
+        -740
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 220,
+        "height": 360,
+        "content": "⏰ Triggers this workflow every few hours."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8d6ae5db-3d88-4e3a-8567-6e38a6002acd",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -700,
+        -740
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 220,
+        "height": 360,
+        "content": "📥 Loads all WordPress categories."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3ef86b3a-18a1-42b7-896c-ef2352148b38",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -460,
+        -740
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "🧹 Filters out excluded category IDs.\n\nChoose them yourself, some categories are not for AI Agent, like reviews or same"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3cc6a088-0698-478d-896b-9af0f5f03f00",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -220,
+        -740
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 220,
+        "height": 360,
+        "content": "🗃 Loads recently used categories from DB."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9eccdda9-1cee-42d1-8451-24b0104917b5",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        20,
+        -740
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "🎯 Picks least-used category for next post."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1f9a4bb2-c482-47d2-9ebd-4ff1be58b3d8",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        340,
+        -360
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 220,
+        "height": 360,
+        "content": "📄 Loads 10 latest article titles for the selected category."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5faba628-67c5-4e1b-889e-7cc1b72a23d0",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        580,
+        -360
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 300,
+        "height": 460,
+        "content": "🧠 Generates a unique article title with GPT."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d23c4134-a06e-4630-a5e5-8a9b90259d4c",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        900,
+        -360
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "🧾 Prepares the new article title."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "da20f973-6889-460c-84b8-cbff0c6ceaa2",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        -740
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "🔀 Merges category + title data."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2048e683-1b37-49e4-9bc5-2530becf26ee",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1460,
+        -740
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "📦 Combines all post metadata into one object."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a5aafb45-6e89-435b-9b41-63d2b5fd8cd5",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1700,
+        -740
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 220,
+        "height": 360,
+        "content": "📝 Saves used category and title to DB."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f63a22c4-2f78-4820-87d4-eb1510f51bcc",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2000,
+        -360
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 300,
+        "height": 460,
+        "content": "✍️ Writes full WordPress-style HTML article."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "24721fd7-cb69-44b6-a48d-91f195e861cc",
+      "name": "Sticky Note13",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2320,
+        -480
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "🧾 Extracts content block from AI output."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f5bd3e8b-c188-494e-b662-ce5722848ae4",
+      "name": "Sticky Note14",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2320,
+        -100
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "🖼 Prepares a placeholder cover image URL."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "933fe208-7c8e-4683-a09b-bfd91ed22bef",
+      "name": "Sticky Note15",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2560,
+        -100
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 220,
+        "height": 360,
+        "content": "⬇️ Downloads the cover image."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "78053d06-b008-403d-b6a1-d5546814d1e9",
+      "name": "Sticky Note16",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2800,
+        -100
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 220,
+        "height": 360,
+        "content": "📤 Uploads image to WordPress media."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d11f85b0-664f-4c63-b34b-a510480957e7",
+      "name": "Sticky Note17",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3140,
+        -720
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "🔗 Merges image + content + category info."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "01fcdc38-8627-4818-8f78-b45681d22d26",
+      "name": "Sticky Note18",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3380,
+        -720
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "📬 Prepares final JSON body for the WP post."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "10f89350-e129-41df-803c-450f3fb07193",
+      "name": "Sticky Note19",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3620,
+        -720
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 220,
+        "height": 360,
+        "content": "🚀 Publishes post to your WordPress site."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bd082511-91aa-425f-9bf3-cadb3900c749",
+      "name": "Sticky Note20",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -700,
+        -360
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 220,
+        "height": 300,
+        "content": "Make sure:\n- Your WordPress site allows public access to `/wp-json/wp/v2/categories`\n- You have at least 1 category created\n- No security plugin (like Wordfence) is blocking REST API\n\nNo credential needed for public category fetch."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5f46d958-b7de-405e-a95e-57a9c0366b52",
+      "name": "Sticky Note21",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -220,
+        -360
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 220,
+        "height": 300,
+        "content": "Make sure:\n- You've created the table (see setup note)\n- Credential `YOUR_POSTGRES_CREDENTIAL` is configured\n- DB user has `SELECT` rights on the table\n\nTip: This selects the least recently used category for the next post."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3f90d8c5-7dd9-41c4-a862-e21942fdc87d",
+      "name": "Load Categories",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -640,
+        -560
+      ],
+      "parameters": {
+        "url": "={{ $json.domain }}/wp-json/wp/v2/categories?per_page=100 ",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "8b2cb2f8-2a2e-4e92-81b6-36e9e2105f94",
+      "name": "Category Filter",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -400,
+        -560
+      ],
+      "parameters": {
+        "jsCode": "const excludeIds = [1, 11, 12, 13, 15, 17, 18, 36, 37, 38, 39];\n\nreturn $input.all()\n  .filter(item => !excludeIds.includes(item.json.id))\n  .map(item => {\n    const { id, name, description, link } = item.json;\n    return {\n      json: { id, name, description, link }\n    };\n  });\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "083202d5-7053-4775-b053-2e503ce7d73f",
+      "name": "Selecting recent",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        -160,
+        -560
+      ],
+      "parameters": {
+        "query": "SELECT category_id, MAX(used_at) AS last_used_at\nFROM used_categories\nGROUP BY category_id\nORDER BY last_used_at ASC;",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "JKCOXnEh1Bqg4Gad",
+          "name": "YOUR_POSTGRES_CREDENTIAL"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "98f3ec81-f1f9-425b-83b0-2d5732acb19e",
+      "name": "Picks Less Used",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        80,
+        -560
+      ],
+      "parameters": {
+        "jsCode": "const categories = $items(\"Category Filter\");\nconst usedRows = $items(\"Selecting recent\");\n\nif (!categories || categories.length === 0) {\n  throw new Error(\"No category in Code2\");\n}\n\nif (!usedRows || usedRows.length === 0) {\n  return [categories[0]];\n}\n\nconst usedMap = new Map(\n  usedRows.map(row => {\n    const id = row.json.category_id;\n    const time = new Date(row.json.last_used_at || row.json.used_at).getTime();\n    return [id, time];\n  })\n);\n\nlet selected = null;\nlet minTime = Infinity;\n\nfor (const cat of categories) {\n  const id = cat.json.id;\n  const lastUsed = usedMap.get(id) ?? 0;\n\n  if (lastUsed < minTime) {\n    minTime = lastUsed;\n    selected = cat;\n  }\n}\n\nreturn [selected || categories[0]];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "8f94b488-d3fb-4016-a8ac-ed0e13f78190",
+      "name": "10 latest headlines",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        400,
+        -200
+      ],
+      "parameters": {
+        "query": "SELECT name, description \nFROM used_categories \nWHERE category_id = {{ $json.id }}\nORDER BY used_at DESC \nLIMIT 10;",
+        "options": {},
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "JKCOXnEh1Bqg4Gad",
+          "name": "YOUR_POSTGRES_CREDENTIAL"
+        }
+      },
+      "typeVersion": 2.6,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "04349d4d-06cc-48fc-88ae-588ec527fca4",
+      "name": "New article title",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        960,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      title: $input.first().json.output\n    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9d145f01-ff77-4c72-bec2-d8ead60d79e5",
+      "name": "AI Agent SEO Headings",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        600,
+        -200
+      ],
+      "parameters": {
+        "text": "=Based on the category \"{{ $('Picks Less Used').item.json.name }}\"  \nwith the description:  \n{{ $('Picks Less Used').item.json.description }}\n\nHere are existing article titles already published:  \n{{ $items(\"10 latest headlines\").map(i => i.json.description).join(\"\\n\") }}\n\nYour task:  \n- Come up with a **new unique article title** that fits this category  \n- The topic should be narrow, practical, and not duplicate any existing titles  \n- Make it clickable, relevant, and professional  \n- Do **not** reuse or partially copy old titles  \n- Style should be expert-level, insightful, and engaging — no clickbait\n\nImportant:  \n- Output **only** the new title (no extra words, no formatting)  \n- The title must be ready for publication as-is (plain text)",
+        "options": {},
+        "promptType": "define"
+      },
+      "typeVersion": 1.9
+    },
+    {
+      "id": "29ad413c-4ee4-4d96-8793-3a8cb4a4ce1b",
+      "name": "AI Agent SEO writer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2020,
+        -200
+      ],
+      "parameters": {
+        "text": "=You are writing a blog post using native WordPress HTML blocks.\n\n🧱 Follow this exact structure:\n\n- Paragraphs inside: <!-- wp:paragraph --> ... <!-- /wp:paragraph -->\n- Level 3 headings inside: <!-- wp:heading {\"level\":3} --> ... <!-- /wp:heading -->\n- Level 4 headings inside: <!-- wp:heading {\"level\":4} --> ... <!-- /wp:heading -->\n- Lists inside: <!-- wp:list --> ... <!-- /wp:list -->\n- Table of contents using: <!-- wp:yoast-seo/table-of-contents --> with anchor links\n- Final section: conclusion in list format\n- Final block: call-to-action with the link \"{{ $('Combines full post meta').item.json.link }}\" or {{$node[\"Config\"].json[\"domain\"]}}\n\n🎯 Use the topic info from:\n- name: {{ $json.name }}\n- description: {{ $json.description }}\n- link: {{ $('Combines full post meta').item.json.link }}\n\n---\n\n✍️ General writing guidelines:\n- The main theme always follows `name` and `description`\n- Each post must focus on a new subtopic (narrower than the main theme)\n- The article must be useful, professional, and well-structured\n- Avoid fluff or repetition — deliver actionable advice\n- Output should follow valid WordPress HTML blocks strictly\n\n---\n\n💡 Examples of subtopics for \"{{ $json.name }}\":\n- Top 5 beginner tools in {{ $json.name }}\n- How to choose the right {{ $json.name }} without risks\n- Common mistakes in using {{ $json.name }}\n- How to monetize with CPA or RevShare in {{ $json.name }}\n- Smart strategies to scale {{ $json.name }} traffic in 2025\n- Proven international platforms in {{ $json.name }} — worth trying?\n- What leads to account bans in {{ $json.name }}\n- Top scaling errors in {{ $json.name }}\n\nIn every post, generate a **new and unique** subtopic — no repeats.\n\n---\n\n🚨 Important:\nOnly output raw WordPress blocks — no additional formatting or notes.\n\n🧱 Structure Example:\n\n1. Introduction:\n<!-- wp:paragraph -->\n<p>A short, attention-grabbing intro explaining what the article covers and why it matters.</p>\n<!-- /wp:paragraph -->\n\n2. Table of Contents:\n<!-- wp:yoast-seo/table-of-contents -->\n<div class=\"wp-block-yoast-seo-table-of-contents yoast-table-of-contents\">\n  <h2>Contents</h2>\n  <ul>\n    <li><a href=\"#h-block-1\">Block 1</a></li>\n    <li><a href=\"#h-block-2\">Block 2</a></li>\n    <li><a href=\"#h-block-3\">Block 3</a></li>\n    <li><a href=\"#h-conclusion\">Conclusion</a></li>\n  </ul>\n</div>\n<!-- /wp:yoast-seo/table-of-contents -->\n\n3. Main Content Blocks:\n<!-- wp:heading {\"level\":3} -->\n<h3 class=\"wp-block-heading\" id=\"h-block-1\"><strong><mark style=\"background-color:var(--accent)\" class=\"has-inline-color has-base-3-color\">Block Title</mark></strong></h3>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Informative paragraph with practical insights.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Optional second paragraph — avoid repetition.</p>\n<!-- /wp:paragraph -->\n\n4. Actionable Tips:\n<!-- wp:list -->\n<ul class=\"wp-block-list\">\n  <li><strong>Tip:</strong> Keep it short and valuable</li>\n  <li><strong>Example:</strong> Provide a link or quick example</li>\n</ul>\n<!-- /wp:list -->\n\n5. Conclusion:\n<!-- wp:heading {\"level\":3} -->\n<h3 class=\"wp-block-heading\" id=\"h-conclusion\"><strong><mark style=\"background-color:var(--accent)\" class=\"has-inline-color has-base-3-color\">Conclusion</mark></strong></h3>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Summarize key takeaways and motivate the reader to take action.</p>\n<!-- /wp:paragraph -->\n\n6. Call to Action:\n<!-- wp:paragraph -->\n<p>Read more at <strong><mark style=\"background-color:var(--accent)\" class=\"has-inline-color has-base-3-color\">{{$node[\"Config\"].json[\"domain\"]}}/</mark></strong></p>\n<!-- /wp:paragraph -->",
+        "options": {},
+        "promptType": "define"
+      },
+      "typeVersion": 1.9
+    },
+    {
+      "id": "5b1efebe-f9e7-4088-9363-75280ba36528",
+      "name": "Merge heading",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1280,
+        -540
+      ],
+      "parameters": {},
+      "typeVersion": 3.1
+    },
+    {
+      "id": "187423ce-b80a-4e28-bdd1-02818a6dcd8f",
+      "name": "Combines full post meta",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1520,
+        -540
+      ],
+      "parameters": {
+        "jsCode": "let data = {};\n$input.all().forEach(item => {\n  Object.assign(data, item.json);\n});\nreturn [{ json: data }];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "85c0e9e2-6f2b-4bd4-9f71-f7efe940ed14",
+      "name": "Updating posts DB",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1760,
+        -540
+      ],
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "used_categories",
+          "cachedResultName": "used_categories"
+        },
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "columns": {
+          "value": {
+            "name": "={{ $json.name }}",
+            "title": "={{ $json.title }}",
+            "used_at": "={{ new Date().toISOString() }}",
+            "category_id": "={{ $json.id }}",
+            "description": "={{ $json.description }}"
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "number",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category_id",
+              "type": "number",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "category_id",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "used_at",
+              "type": "dateTime",
+              "display": true,
+              "required": false,
+              "displayName": "used_at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "description",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "description",
+              "defaultMatch": false,
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": false
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "category_id"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "upsert"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "JKCOXnEh1Bqg4Gad",
+          "name": "YOUR_POSTGRES_CREDENTIAL"
+        }
+      },
+      "typeVersion": 2.6
+    },
+    {
+      "id": "73975cf0-165c-4f53-aff9-12872a4dd228",
+      "name": "Extracting output",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2380,
+        -280
+      ],
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    content: $input.first().json.output,\n  }\n}];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a5030427-0bc1-499a-903e-e10ba81a9b0d",
+      "name": "Placeholder creator",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2380,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const name = $('Updating posts DB').first().json.name || \"{{ $json.domain }}\";\nconst encoded = encodeURIComponent(name); \n\nreturn {\n  image_url: `https://placehold.co/1200x675/FF0000/FFFFFF.png?text=${encoded}&font=montserrat`\n};\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6f0f0202-3803-48ef-b8f5-dd56a023c43f",
+      "name": "Media Upload to WP",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2860,
+        100
+      ],
+      "parameters": {
+        "url": "={{ $('Config').first().json.domain }}/wp-json/wp/v2/media",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "binaryData",
+        "sendHeaders": true,
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Disposition",
+              "value": "attachment; filename=crypto.webp"
+            },
+            {
+              "name": "Content-Type",
+              "value": "image/png"
+            }
+          ]
+        },
+        "inputDataFieldName": "imagedownloaded",
+        "nodeCredentialType": "wordpressApi"
+      },
+      "credentials": {
+        "wordpressApi": {
+          "id": "7NOAxTvRC1RY2TSN",
+          "name": "Wordpress account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "0621bad7-e7bf-4aae-bbf3-2e1f571d81d8",
+      "name": "Post to WP",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3680,
+        -520
+      ],
+      "parameters": {
+        "url": "={{ $('Config').first().json.domain }}/wp-json/wp/v2/posts",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "={{ $json[\"title\"] }}"
+            },
+            {
+              "name": "content",
+              "value": "={{ $json.content }}"
+            },
+            {
+              "name": "status",
+              "value": "={{ $json.status }}"
+            },
+            {
+              "name": "featured_media",
+              "value": "={{ $json[\"featured_media\"] }}"
+            },
+            {
+              "name": "categories[0]",
+              "value": "={{ $json[\"categories\"][0] }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "wordpressApi"
+      },
+      "credentials": {
+        "wordpressApi": {
+          "id": "7NOAxTvRC1RY2TSN",
+          "name": "Wordpress account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "28f3b69a-22a2-4448-a9d0-a5fd42e1ed2c",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        3900,
+        -520
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "c98d9193-1dd9-493c-bf76-b72de8e53e28",
+      "name": "Sticky Note22",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -940,
+        -740
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 220,
+        "height": 360,
+        "content": "! Set your WordPress domain inside the “Config” Set node.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1c881f9f-dcf1-4bf0-889b-0738d1ff49a4",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -880,
+        -560
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d7165db3-6fc8-4398-aa16-29a34ff27d78",
+              "name": "domain",
+              "type": "string",
+              "value": "https://yourdomain.com"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f787c571-bcc3-47d6-82ca-f138fa2922e1",
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Load Categories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to WP": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge heading": {
+      "main": [
+        [
+          {
+            "node": "Combines full post meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Media Upload to WP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Category Filter": {
+      "main": [
+        [
+          {
+            "node": "Selecting recent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Categories": {
+      "main": [
+        [
+          {
+            "node": "Category Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Picks Less Used": {
+      "main": [
+        [
+          {
+            "node": "10 latest headlines",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge heading",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selecting recent": {
+      "main": [
+        [
+          {
+            "node": "Picks Less Used",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extracting output": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "New article title": {
+      "main": [
+        [
+          {
+            "node": "Merge heading",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent SEO writer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Post JSON": {
+      "main": [
+        [
+          {
+            "node": "Post to WP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Updating posts DB": {
+      "main": [
+        [
+          {
+            "node": "AI Agent SEO writer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Media Upload to WP": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent SEO Headings",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 latest headlines": {
+      "main": [
+        [
+          {
+            "node": "AI Agent SEO Headings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent SEO writer": {
+      "main": [
+        [
+          {
+            "node": "Placeholder creator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extracting output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Placeholder creator": {
+      "main": [
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent SEO Headings": {
+      "main": [
+        [
+          {
+            "node": "New article title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combines full post meta": {
+      "main": [
+        [
+          {
+            "node": "Updating posts DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

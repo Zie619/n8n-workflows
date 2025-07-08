@@ -1,0 +1,204 @@
+{
+  "id": "200",
+  "name": "BillBot",
+  "nodes": [
+    {
+      "name": "Set relevant data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        780,
+        460
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Category",
+              "value": "={{$node[\"Parse details from receipt\"].json[\"predictions\"][0][\"category\"][\"value\"]}}"
+            },
+            {
+              "name": "Date",
+              "value": "={{$node[\"Parse details from receipt\"].json[\"predictions\"][0][\"date\"][\"iso\"]}}"
+            },
+            {
+              "name": "Merchant",
+              "value": "={{$node[\"Parse details from receipt\"].json[\"predictions\"][0][\"merchant\"][\"name\"]}}"
+            },
+            {
+              "name": "Time",
+              "value": "={{$node[\"Parse details from receipt\"].json[\"predictions\"][0][\"time\"][\"iso\"]}}"
+            },
+            {
+              "name": "Amount",
+              "value": "={{$node[\"Parse details from receipt\"].json[\"predictions\"][0][\"total\"][\"amount\"]}}"
+            },
+            {
+              "name": "Currency",
+              "value": "={{$node[\"Parse details from receipt\"].json[\"predictions\"][0][\"locale\"][\"currency\"]}}"
+            },
+            {
+              "name": "Added by",
+              "value": "={{$node[\"Get receipts from bot\"].json[\"message\"][\"chat\"][\"first_name\"]}} {{$node[\"Get receipts from bot\"].json[\"message\"][\"chat\"][\"last_name\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send confirmation",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1180,
+        460
+      ],
+      "parameters": {
+        "text": "=✅ Bill of {{$node[\"Set relevant data\"].json[\"Amount\"]}} {{$node[\"Set relevant data\"].json[\"Currency\"]}} from {{$node[\"Set relevant data\"].json[\"Merchant\"]}}, dated {{$node[\"Set relevant data\"].json[\"Date\"]}} at {{$node[\"Set relevant data\"].json[\"Time\"]}}. Category was {{$node[\"Set relevant data\"].json[\"Category\"]}}.",
+        "chatId": "={{$node[\"Get receipts from bot\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get receipts from bot",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        380,
+        460
+      ],
+      "webhookId": "ef81fe75-10c8-40c3-8bea-d65648556705",
+      "parameters": {
+        "updates": [
+          "*"
+        ],
+        "additionalFields": {
+          "download": true
+        }
+      },
+      "credentials": {
+        "telegramApi": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Parse details from receipt",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        580,
+        460
+      ],
+      "parameters": {
+        "url": "https://api.mindee.net/products/expense_receipts/v2/predict",
+        "options": {
+          "bodyContentType": "multipart-form-data"
+        },
+        "requestMethod": "POST",
+        "authentication": "headerAuth",
+        "jsonParameters": true,
+        "sendBinaryData": true
+      },
+      "credentials": {
+        "httpHeaderAuth": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Add to expense record",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        980,
+        460
+      ],
+      "parameters": {
+        "range": "A:G",
+        "options": {},
+        "sheetId": "",
+        "operation": "append",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send SMS notification",
+      "type": "n8n-nodes-base.twilio",
+      "position": [
+        1380,
+        460
+      ],
+      "parameters": {
+        "to": "",
+        "from": "",
+        "message": "=A receipt worth {{$node[\"Set relevant data\"].json[\"Amount\"]}} {{$node[\"Set relevant data\"].json[\"Currency\"]}} was submitted by {{$node[\"Set relevant data\"].json[\"Added by\"]}} and has been added to the following spreadsheet:\nhttps://docs.google.com/spreadsheets/d/{{$node[\"Add to expense record\"].parameter[\"sheetId\"]}}/"
+      },
+      "credentials": {
+        "twilioApi": "Twilio Programmable SMS"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Send confirmation": {
+      "main": [
+        [
+          {
+            "node": "Send SMS notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set relevant data": {
+      "main": [
+        [
+          {
+            "node": "Add to expense record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to expense record": {
+      "main": [
+        [
+          {
+            "node": "Send confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get receipts from bot": {
+      "main": [
+        [
+          {
+            "node": "Parse details from receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse details from receipt": {
+      "main": [
+        [
+          {
+            "node": "Set relevant data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

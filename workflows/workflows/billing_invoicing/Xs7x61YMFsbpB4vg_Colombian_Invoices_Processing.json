@@ -1,0 +1,876 @@
+{
+  "id": "Xs7x61YMFsbpB4vg",
+  "meta": {
+    "instanceId": "51270372ea87f40bc06437a6d111ae29e684e524a2e6c52d7a6f84dde18d4a17",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Colombian Invoices Processing",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "3bcb9b75-a697-4948-974a-f4ea29947bfa",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        880,
+        445
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "03076b82-d824-4fe1-b659-7fbfa2f3fd87",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2420,
+        790
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "BfhecJBx32L0a2gT",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "201ae476-d189-4ba7-9a96-6f272b95795d",
+      "name": "Calculator",
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "position": [
+        2540,
+        790
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "9aca7e2d-af43-4de6-aa07-2e880d660d20",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        2660,
+        790
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"Tipo\": \"Factura\",\n  \"Numero_Factura\": \"FAC-2025-00123\",\n  \"Fecha_Emision\": \"2025-05-07\",\n  \"CUFE\": \"f4a6c8b03e1e4e8b90f9e3e2945d8b23c5b4e2fa\",\n  \"NIT_Emisor\": \"900123456\",\n  \"Razon_Social_Emisor\": \"Comercializadora XYZ S.A.S.\",\n  \"NIT_Receptor\": \"1012345678\",\n  \"Valor_Antes_Impuesto\": 1000000,\n  \"Impuesto\": 190000,\n  \"Total\": 1190000,\n  \"Resumen_Compra\": \"Compra de equipos de oficina incluyendo escritorios y sillas ejecutivas\"\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "7793086c-b1f7-49f7-b67a-77721087fea5",
+      "name": "On Email receipt",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "notes": "Executed every 30 minutes as it's for personal invoices, one can wait",
+      "position": [
+        0,
+        445
+      ],
+      "parameters": {
+        "simple": false,
+        "filters": {
+          "q": "has:attachment filename:zip"
+        },
+        "options": {
+          "downloadAttachments": true
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 30
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "DIVionghQwRFOcIe",
+          "name": "Gmail account"
+        }
+      },
+      "notesInFlow": false,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "97460873-8220-476b-97e7-cf433be3f9cd",
+      "name": "Get Filename and mimeType",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        445
+      ],
+      "parameters": {
+        "jsCode": "let results = [];\n\nfor (item of items) {\n    for (key of Object.keys(item.binary)) {\n        results.push({\n            json: {\n                fileName: item.binary[key].fileName,\n                mimeType: item.binary[key].mimeType,\n            },\n            binary: {\n                data: item.binary[key],\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e01cdfc7-c343-444e-a6ca-57b2139c3b6e",
+      "name": "Filter ZIP files only",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        440,
+        445
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "ccb7942e-8cef-480c-98a4-b5b68d98a235",
+              "operator": {
+                "type": "string",
+                "operation": "endsWith"
+              },
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "zip"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "855b3a55-5d2e-4da1-aef7-76bf559da876",
+      "name": "Unzip Invoice",
+      "type": "n8n-nodes-base.compression",
+      "position": [
+        660,
+        445
+      ],
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "c48abfc9-dff9-49ef-bb59-212f2f1eb472",
+      "name": "Just for style",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1100,
+        270
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "b84984d5-f736-40be-b0b5-2d0a245c79a6",
+      "name": "Get filename and mimeType on extracted docs",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1100,
+        470
+      ],
+      "parameters": {
+        "jsCode": "let results = [];\n\nfor (item of items) {\n    for (key of Object.keys(item.binary)) {\n        results.push({\n            json: {\n                fileName: item.binary[key].fileName,\n                mimeType: item.binary[key].mimeType,\n            },\n            binary: {\n                data: item.binary[key],\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9ff8e500-8135-4960-81f5-fbc0945d45db",
+      "name": "Split XML and PDF",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1320,
+        470
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "pdf",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "69784ebe-7edd-4e50-89c3-8440a662f25a",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "pdf"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "xml",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "90f50e8d-bd72-4fdf-b854-e473b117377a",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "xml"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "1132645b-9270-4581-9707-59bec4ee2417",
+      "name": "Extract PDF Data",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1760,
+        445
+      ],
+      "parameters": {
+        "options": {
+          "joinPages": true
+        },
+        "operation": "pdf"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "215b29f9-0e0a-4989-a6d3-65faa5941729",
+      "name": "Extract XML Data",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1540,
+        645
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "xml"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7fa1555e-11ae-4fca-b526-52d2b4a1773e",
+      "name": "Convert to JSON",
+      "type": "n8n-nodes-base.xml",
+      "position": [
+        1760,
+        645
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cb581772-cb26-4d36-b1b9-c290f5a0a4ea",
+      "name": "Append both Docs",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1980,
+        570
+      ],
+      "parameters": {},
+      "typeVersion": 3.1
+    },
+    {
+      "id": "225b6fd6-4cfd-43d7-9c3e-fe20d97831d7",
+      "name": "Aggregate all Data into 1 list",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        2200,
+        580
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "947001a4-bcdc-4421-bdce-07d41fc85c88",
+      "name": "Extract Data from PDF and XML",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2452,
+        570
+      ],
+      "parameters": {
+        "text": "=PDF:\n{{ $json.data[0].text }}\n\nXML: \n{{ $json.data[1].AttachedDocument['cac:Attachment']['cac:ExternalReference']['cbc:Description'] }}",
+        "options": {
+          "systemMessage": "=Extrae del PDF y el XML proporcionados la siguiente información:\n\t•\tTipo: Factura o Nota Crédito\n\t•\tNúmero de factura\n\t•\tFecha de emisión (formato: YYYY-MM-DD)\n\t•\tNIT del emisor (sin dígito de verificación, solo los números antes del guion)\n\t•\tNIT del receptor (sin dígito de verificación)\n\t•\tRazón social del emisor\n\t•\tValor antes de IVA\n\t•\tValor del IVA\n\t•\tValor total de la factura\n\t•\tCUFE\n\t•\tResumen de la compra (máximo 20 palabras, describiendo en términos generales qué se compró, usando solo mayúsculas donde corresponda gramaticalmente. Ejemplo: “CONSULTA DE PRIMERA VEZ POR OPTOMETRIA” → “Consulta de primera vez por optometría”)\n\nVerifica que:\nValor total = Valor antes de IVA + Valor del IVA, usando la herramienta Calculator."
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.9
+    },
+    {
+      "id": "3eb86ff2-7a4b-4e17-af92-057b715fd69d",
+      "name": "Create initial PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        2530,
+        220
+      ],
+      "parameters": {
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1v0sqvMCFAN02WzXdTuoYF8KGw7Y0Tmf1",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/xxxxxxx",
+          "cachedResultName": "Facturas"
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "UeBZlmzBxNp4aScN",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "cbe7bcf2-972b-4110-8d1c-075fcc34497a",
+      "name": "Merge both flows",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2860,
+        495
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combineBy": "combineAll"
+      },
+      "typeVersion": 3.1
+    },
+    {
+      "id": "14243355-766d-425d-90d1-6f114903636a",
+      "name": "Update PDF with actual name",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        3080,
+        495
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {},
+        "operation": "update",
+        "changeFileContent": "",
+        "newUpdatedFileName": "={{ $json.output.Fecha_Emision }}-{{ $json.output.Numero_Factura }}.pdf"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "UeBZlmzBxNp4aScN",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "aa623454-553a-4b95-b320-964c68dd7555",
+      "name": "Get Current Date",
+      "type": "n8n-nodes-base.code",
+      "notes": "Not in use actually...",
+      "position": [
+        3300,
+        495
+      ],
+      "parameters": {
+        "jsCode": "const now = new Date();\n\n// Get Colombia time values\nconst options = { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' };\nconst formatter = new Intl.DateTimeFormat('en-CA', options); // en-CA gives YYYY-MM-DD format\nconst [year, month, day] = formatter.format(now).split('-');\n\nreturn [\n  {\n    json: {\n      year,\n      month,\n      day\n    }\n  }\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "466a2885-adba-41ce-8a51-8c36db58a113",
+      "name": "Create or update row",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        3520,
+        620
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Key": "={{ $('Merge both flows').item.json.output.NIT_Emisor }}-{{ $('Merge both flows').item.json.output.Numero_Factura }}",
+            "CUFE": "={{ $('Merge both flows').item.json.output.CUFE }}",
+            "Tipo": "={{ $('Merge both flows').item.json.output.Tipo }}",
+            "Fecha": "={{ $('Merge both flows').item.json.output.Fecha_Emision }}",
+            "Total": "={{ $('Merge both flows').item.json.output.Total }}",
+            "Factura": "={{ $('Extract Data from PDF and XML').item.json.output.Numero_Factura }}",
+            "Impuesto": "={{ $('Merge both flows').item.json.output.Impuesto }}",
+            "Subtotal": "={{ $('Merge both flows').item.json.output.Valor_Antes_Impuesto }}",
+            "NIT Emisor": "={{ $('Merge both flows').item.json.output.NIT_Emisor }}",
+            "NIT Receptor": "={{ $('Merge both flows').item.json.output.NIT_Receptor }}",
+            "Razón Social": "={{ $('Merge both flows').item.json.output.Razon_Social_Emisor }}",
+            "Resumen Compra": "={{ $('Merge both flows').item.json.output.Resumen_Compra }}"
+          },
+          "schema": [
+            {
+              "id": "Factura",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Factura",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tipo",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Tipo",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Key",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Key",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Fecha",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Razón Social",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Razón Social",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "NIT Emisor",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "NIT Emisor",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "NIT Receptor",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "NIT Receptor",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subtotal",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Subtotal",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Impuesto",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Impuesto",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Total",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CUFE",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "CUFE",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Resumen Compra",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Resumen Compra",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Key"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/xxxxx/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1HmtB_MXS7oOJn86V3dcBjLdvnw3aWLkD36avc147zuI",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/xxxxx/edit?usp=drivesdk",
+          "cachedResultName": "Facturas"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "phQyVnZ7ZojxewDR",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "e7076c9e-1998-4aab-bb43-9d9f89a3377f",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -60,
+        -480
+      ],
+      "parameters": {
+        "width": 960,
+        "height": 880,
+        "content": "# 🧾 Colombian electronic invoices processing\n\nThis N8N workflow automates the extraction and organization of **personal electronic invoices** in Colombia received via **Gmail**. It includes the following key steps:\n\n## 🔁 Flow Summary\n\n1. **Email Trigger**\n   - Polls Gmail every **30 minutes** for emails with `.zip` attachments (assumed to contain invoices).\n   - Following DIAN requirements in Colombia\n\n2. **ZIP File Handling**\n   - Extracts all files.\n   - Filters only **PDF** and **XML** files for processing.\n\n3. **Data Extraction & Processing**\n   - Uses **LangChain Agent + OpenAI (GPT-4o-mini)** to extract:\n     - Tipo de documento (Factura / Nota Crédito)\n     - Número de factura\n     - Fecha de emisión (YYYY-MM-DD)\n     - NIT emisor y receptor (sin dígito de verificación)\n     - Razón social del emisor\n     - Subtotal, IVA, Total\n     - CUFE\n     - Resumen de compra (max 20 words, formatted sentence)\n\n4. **Validation**\n   - Ensures **Total = Subtotal + IVA** using a calculator node.\n\n5. **Storage**\n   - Uploads the original PDF to **Google Drive**.\n   - Renames the file to: `YYYY-MM-DD-NUMERO_FACTURA.pdf`.\n   - Inserts or updates invoice details in **Google Sheets** using a unique `Key` (`NIT_Emisor + Numero_Factura`) to prevent duplication.\n\n---\n\n> ⚙️ Designed for personal use with minimal latency tolerance and high automation reliability."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fefb527f-7457-46bc-a80c-ca290b163bce",
+  "connections": {
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Extract Data from PDF and XML",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unzip Invoice": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to JSON": {
+      "main": [
+        [
+          {
+            "node": "Append both Docs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Just for style",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get filename and mimeType on extracted docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append both Docs": {
+      "main": [
+        [
+          {
+            "node": "Aggregate all Data into 1 list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Data": {
+      "main": [
+        [
+          {
+            "node": "Append both Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract XML Data": {
+      "main": [
+        [
+          {
+            "node": "Convert to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current Date": {
+      "main": [
+        [
+          {
+            "node": "Create or update row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge both flows": {
+      "main": [
+        [
+          {
+            "node": "Update PDF with actual name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Email receipt": {
+      "main": [
+        [
+          {
+            "node": "Get Filename and mimeType",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Data from PDF and XML",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split XML and PDF": {
+      "main": [
+        [
+          {
+            "node": "Create initial PDF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract PDF Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract XML Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create initial PDF": {
+      "main": [
+        [
+          {
+            "node": "Merge both flows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create or update row": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter ZIP files only": {
+      "main": [
+        [
+          {
+            "node": "Unzip Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extract Data from PDF and XML",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Filename and mimeType": {
+      "main": [
+        [
+          {
+            "node": "Filter ZIP files only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update PDF with actual name": {
+      "main": [
+        [
+          {
+            "node": "Get Current Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data from PDF and XML": {
+      "main": [
+        [
+          {
+            "node": "Merge both flows",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Aggregate all Data into 1 list": {
+      "main": [
+        [
+          {
+            "node": "Extract Data from PDF and XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get filename and mimeType on extracted docs": {
+      "main": [
+        [
+          {
+            "node": "Split XML and PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

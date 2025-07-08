@@ -1,0 +1,1058 @@
+{
+  "id": "V1vbO2m79cFNH59h",
+  "meta": {
+    "instanceId": "255b605d49a6677a536746e05401de51bb4c62e65036d9acdb9908f6567f0361"
+  },
+  "name": "Basic PDF Digital Sign Service",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "a3aa7495-e5a8-4b7f-882a-e642fae414b8",
+      "name": "Validate Key Gen Params",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -220,
+        220
+      ],
+      "parameters": {
+        "jsCode": "// Check required parameters for key generation\nconst requiredParams = [\n  'subjectCN', 'issuerCN', 'serialNumber', \n  'validFrom', 'validTo', 'password'\n];\n\nlet missingParams = [];\nconst requestBody = $input.item.json.body || {}; // Access the body object\n\nfor (const param of requiredParams) {\n  if (!requestBody[param]) {\n    missingParams.push(param);\n  }\n}\n\nif (missingParams.length > 0) {\n  return {\n    json: {\n      success: false,\n      message: `Missing required parameters: ${missingParams.join(', ')}`\n    }\n  };\n}\n\n// Set default output directory if not provided\nconst outputDir = $input.item.json.keyPath || '/tmp';\nconst timestamp = new Date().getTime();\nconst outputPfx = `${outputDir}certificate_${timestamp}.pfx`;\nconst outputPrivateKey = `${outputDir}private_${timestamp}.key`;\nconst outputCertPem = `${outputDir}certificate_${timestamp}.pem`;\n\nreturn {\n  json: {\n    ...requestBody,\n    success: true,\n    outputDir,\n    outputPfx,\n    outputPrivateKey,\n    outputCertPem\n  }\n};\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6a463b95-04e4-421d-b6e0-46fb98c85e20",
+      "name": "Validate PDF Sign Params",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -220,
+        380
+      ],
+      "parameters": {
+        "jsCode": "// Check required parameters for PDF signing\nconst requiredParams = ['inputPdf', 'pfxFile', 'pfxPassword'];\n\n// Access the body object from input\nconst requestBody = $input.item.json.body || {}; \n\nlet missingParams = [];\nfor (const param of requiredParams) {\n  if (!requestBody[param]) {\n    missingParams.push(param);\n  }\n}\n\nif (missingParams.length > 0) {\n  return {\n    json: {\n      success: false,\n      message: `Missing required parameters: ${missingParams.join(', ')}`\n    }\n  };\n}\n\n// Set default output directory if not provided\nconst pdfDir = $input.item.json.pdfPath || '/tmp';\nconst keyDir = $input.item.json.keyPath || '/tmp';\nconst outputDir = $input.item.json.pdfPath || '/tmp';\n\nconst timestamp = new Date().getTime();\nconst inputPdfPath = `${pdfDir}${requestBody.inputPdf}`;\nconst pfxFilePath = `${keyDir}${requestBody.pfxFile}`;\nconst outputPdfPath = `${pdfDir}signed_${timestamp}.pdf`;\n\nreturn {\n  json: {\n    ...requestBody,\n    success: true,\n    outputDir,\n    inputPdfPath,\n    pfxFilePath,\n    outputPdfPath\n  }\n};"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cec07784-a42b-4443-ad8e-1bd7686558c3",
+      "name": "Validate PDF Upload",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        80,
+        -440
+      ],
+      "parameters": {
+        "jsCode": "// Check required parameters for PDF upload\nconst requiredParams = ['fileData'];\n\nlet missingParams = [];\nfor (const param of requiredParams) {\n  if (!$input.item.json[param]) {\n    missingParams.push(param);\n  }\n}\n\nif (missingParams.length > 0) {\n  return {\n    json: {\n      success: false,\n      message: `Missing required parameters: ${missingParams.join(', ')}`\n    }\n  };\n}\n\n// Set default output directory if not provided\nconst outputDir = $input.item.json.outputDir || '/tmp';\nconst timestamp = new Date().getTime();\nconst outputPath = $input.item.json.fileName \n  ? `${outputDir}/${$input.item.json.fileName}` \n  : `${outputDir}/uploaded_pdf_${timestamp}.pdf`;\n\nreturn {\n  json: {\n    ...$input.item.json,\n    success: true,\n    outputDir,\n    outputPath\n  }\n};"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1b9304fd-f31d-45c7-8344-01c779e86f0d",
+      "name": "Validate Key Upload",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        80,
+        -140
+      ],
+      "parameters": {
+        "jsCode": "// Check required parameters for key upload\nconst requiredParams = ['fileData'];\n\nlet missingParams = [];\nfor (const param of requiredParams) {\n  if (!$input.item.json[param]) {\n    missingParams.push(param);\n  }\n}\n\nif (missingParams.length > 0) {\n  return {\n    json: {\n      success: false,\n      message: `Missing required parameters: ${missingParams.join(', ')}`\n    }\n  };\n}\n\n// Set default output directory if not provided\nconst outputDir = $input.item.json.outputDir || '/tmp';\nconst timestamp = new Date().getTime();\nconst outputPath = $input.item.json.fileName \n  ? `${outputDir}/${$input.item.json.fileName}` \n  : `${outputDir}/uploaded_key_${timestamp}.pfx`;\n\nreturn {\n  json: {\n    ...$input.item.json,\n    success: true,\n    outputDir,\n    outputPath\n  }\n};"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "efd59edb-6952-4165-ab21-745e03db74eb",
+      "name": "Generate Keys",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        20,
+        220
+      ],
+      "parameters": {
+        "jsCode": "console.log(\"!!!!!!!!!\" + process.env.NODE_PATH);\n\n// Key Generation Code\nconst forge = require('node-forge');\nconst fs = require('fs');\n\n// Get parameters from input\nconst subjectCN = $input.item.json.subjectCN;\nconst issuerCN = $input.item.json.issuerCN;\nconst serialNumber = $input.item.json.serialNumber;\nconst validFrom = $input.item.json.validFrom;\nconst validTo = $input.item.json.validTo;\nconst pfxPassword = $input.item.json.password;\nconst outputPfx = $input.item.json.outputPfx;\nconst outputPrivateKey = $input.item.json.outputPrivateKey;\nconst outputCertPem = $input.item.json.outputCertPem;\n\ntry {\n  // Generate a key pair\n  const keys = forge.pki.rsa.generateKeyPair(2048);\n  const privateKey = keys.privateKey;\n  const publicKey = keys.publicKey;\n\n  // Create a certificate\n  const cert = forge.pki.createCertificate();\n  cert.publicKey = publicKey;\n  cert.serialNumber = serialNumber;\n\n  // Parse date strings (format: YYYYMMDDHHMMSS)\n  const parseDate = (dateStr) => {\n    const year = parseInt(dateStr.substring(0, 4));\n    const month = parseInt(dateStr.substring(4, 6)) - 1; // JS months are 0-based\n    const day = parseInt(dateStr.substring(6, 8));\n    const hour = parseInt(dateStr.substring(8, 10));\n    const minute = parseInt(dateStr.substring(10, 12));\n    const second = parseInt(dateStr.substring(12, 14));\n    \n    return new Date(year, month, day, hour, minute, second);\n  };\n\n  cert.validity.notBefore = parseDate(validFrom);\n  cert.validity.notAfter = parseDate(validTo);\n\n  const attrs = [{\n    name: 'commonName',\n    value: subjectCN\n  }, {\n    name: 'countryName',\n    value: 'US'\n  }, {\n    shortName: 'ST',\n    value: 'State'\n  }, {\n    name: 'localityName',\n    value: 'City'\n  }, {\n    name: 'organizationName',\n    value: 'Organization'\n  }, {\n    shortName: 'OU',\n    value: 'Test'\n  }];\n\n  cert.setSubject(attrs);\n  cert.setIssuer(attrs); // Self-signed, so issuer = subject\n\n  // Sign the certificate with the private key\n  cert.sign(privateKey, forge.md.sha256.create());\n\n  // Convert to PEM format\n  const pemCert = forge.pki.certificateToPem(cert);\n  const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);\n\n  // Create a PKCS#12 (PFX) file\n  const p12Asn1 = forge.pkcs12.toPkcs12Asn1(\n    privateKey, \n    [cert], \n    pfxPassword,\n    { generateLocalKeyId: true, friendlyName: subjectCN }\n  );\n\n  const p12Der = forge.asn1.toDer(p12Asn1).getBytes();\n  const p12b64 = forge.util.encode64(p12Der);\n\n  // Save files\n  fs.writeFileSync(outputPrivateKey, pemPrivateKey);\n  fs.writeFileSync(outputCertPem, pemCert);\n  fs.writeFileSync(outputPfx, forge.util.decode64(p12b64), { encoding: 'binary' });\n\n  return {\n    json: {\n      success: true,\n      message: \"Certificate and keys generated successfully\",\n      fileName: outputPfx.split('/').pop(),\n      filePaths: {\n        pfx: outputPfx,\n        privateKey: outputPrivateKey,\n        certificate: outputCertPem\n      },\n      fileNames: {\n        pfx: outputPfx.split('/').pop(),\n        privateKey: outputPrivateKey.split('/').pop(),\n        certificate: outputCertPem.split('/').pop()\n      }\n    }\n  };\n} catch (error) {\n  return {\n    json: {\n      success: false,\n      message: `Error generating keys: ${error.message}`,\n      error: error.stack\n    }\n  };\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6834b314-dd66-429f-9264-6eba74c5984e",
+      "name": "Sign PDF",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        20,
+        380
+      ],
+      "parameters": {
+        "jsCode": "// PDF Signing Code\nconst fs = require('fs');\nconst forge = require('node-forge');\nconst { SignPdf } = require('@signpdf/signpdf');\nconst { P12Signer } = require('@signpdf/signer-p12');\nconst { plainAddPlaceholder } = require('@signpdf/placeholder-plain');\n\n// Get parameters from input\n// const inputPdfBase64 = $input.item.json.inputPdf;\n// const pfxFileBase64 = $input.item.json.pfxFile;\nconst pfxPassword = $input.item.json.pfxPassword;\nconst inputPdfPath = $input.item.json.inputPdfPath;\nconst pfxFilePath = $input.item.json.pfxFilePath;\nconst outputPdfPath = $input.item.json.outputPdfPath;\n\ntry {\n    // Read the PDF\n    const pdfBuffer = fs.readFileSync(inputPdfPath);\n\n    // Add a signature placeholder\n    const pdfWithPlaceholder = plainAddPlaceholder({\n      pdfBuffer,\n      reason: 'Digital Signature',\n      contactInfo: 'info@example.com',\n      location: 'New York, USA',\n      signatureLength: 8192 // Ensure enough space for signature\n    });\n    \n    // Read the P12 file\n    const p12Buffer = fs.readFileSync(pfxFilePath);\n\n    // Create a signer instance\n    const signer = new P12Signer(p12Buffer, {\n      passphrase: pfxPassword\n    });\n    \n    // Create SignPdf instance and sign the PDF\n    const signPdfInstance = new SignPdf();\n    const signedPdf = await signPdfInstance.sign(pdfWithPlaceholder, signer);\n    \n    // Write the signed PDF to file\n    fs.writeFileSync(outputPdfPath, signedPdf);\n    console.log(`PDF successfully signed: ${outputPdfPath}`);\n\n  return {\n    json: {\n      success: true,\n      message: \"PDF successfully signed\",\n      filePath: outputPdfPath,\n      fileName: outputPdfPath.split('/').pop()\n    }\n  };\n} catch (error) {\n  return {\n    json: {\n      success: false,\n      message: `Error signing PDF: ${error.message}`,\n      error: error.stack\n    }\n  };\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "80e56344-b037-4c4f-8f18-b419e9c7516b",
+      "name": "Prepare Success Response",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1380,
+        40
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "serverFileName",
+              "value": "={{ $json.fileName }}"
+            }
+          ],
+          "boolean": [
+            {
+              "name": "success",
+              "value": true
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e32d1e3e-6877-4c1f-b46a-0c3c67fba609",
+      "name": "Switch Operation",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -520,
+        200
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "upload",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.method }}",
+                    "rightValue": "upload"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "genKey",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "4ac6de12-4cb9-454e-a2b8-ebc879e430ba",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.method }}",
+                    "rightValue": "genKey"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "signPdf",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d8fca3d7-e1da-486e-b6bb-01a676d888cb",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.method }}",
+                    "rightValue": "signPdf"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "download",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "6ae9a589-9208-48b0-873b-2b3c4db22718",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.method }}",
+                    "rightValue": "download"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "f28cb401-f180-4877-9440-aeb0c9f07791",
+      "name": "Switch Upload Type",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -100,
+        -300
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "pdfDoc",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.uploadType }}",
+                    "rightValue": "pdfDoc"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "signKey",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "4790b1de-5541-4a46-a46a-708085c4c0a1",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.body.uploadType }}",
+                    "rightValue": "signKey"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "5aa1d5f3-66d4-4440-a953-6e453d00b757",
+      "name": "Prepare input params",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -280,
+        -300
+      ],
+      "parameters": {
+        "options": {
+          "stripBinary": true
+        },
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2323096-8db7-4c5a-8f52-8902f0e18785",
+              "name": "fileData",
+              "type": "object",
+              "value": "={{ $('API POST Endpoint').item.binary }}"
+            },
+            {
+              "id": "7d2593ba-8582-42cb-8312-6c11be5fbcbf",
+              "name": "uniqueFileName",
+              "type": "string",
+              "value": "={{ 'file_' + $now.toMillis() + '.' + $('API POST Endpoint').item.binary.fileData.mimeType.split('/')[1].replace(/\\n/g, '').trim() }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "ae983277-f9cf-43b3-86ef-1135919f976c",
+      "name": "set file path",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -700,
+        220
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7378e581-86ac-43bc-b7c4-7faeef848cd8",
+              "name": "pdfPath",
+              "type": "string",
+              "value": "/data/files/"
+            },
+            {
+              "id": "f6592b74-6238-4bb7-9b8b-bbde240f2260",
+              "name": "keyPath",
+              "type": "string",
+              "value": "/data/files/"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "2667149c-8d3b-4772-be8c-a01c1a8efa6f",
+      "name": "Convert PDF to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        260,
+        -440
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "={{ $json.body.fileName }}",
+          "mimeType": "={{ $json.fileData.fileData.mimeType }}"
+        },
+        "operation": "toBinary",
+        "sourceProperty": "fileData.fileData.data"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6559070f-e071-4e3a-ad3b-87911032358f",
+      "name": "Write PDF File to Disk",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        440,
+        -440
+      ],
+      "parameters": {
+        "options": {
+          "append": false
+        },
+        "fileName": "={{ $('set file path').item.json.pdfPath }}{{ $('Prepare input params').item.json.uniqueFileName }}",
+        "operation": "write"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0f6dfb44-8d83-4539-bec8-4aa4066c42bb",
+      "name": "Read PDF File from Disk",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        620,
+        -440
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "={{ $json.fileName }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "59e18825-dd53-4b09-aefc-0c567ada7f1a",
+      "name": "Convert PFX to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        260,
+        -140
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "={{ $json.body.fileName }}",
+          "mimeType": "={{ $json.fileData.fileData.mimeType }}"
+        },
+        "operation": "toBinary",
+        "sourceProperty": "fileData.fileData.data"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "d079d173-5c68-4b57-9efd-29a3ec89b6c0",
+      "name": "Write PFX File to Disk",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        440,
+        -140
+      ],
+      "parameters": {
+        "options": {
+          "append": false
+        },
+        "fileName": "={{ $('set file path').item.json.pdfPath }}{{ $('Prepare input params').item.json.uniqueFileName }}",
+        "operation": "write"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a2517543-fa29-4097-8f69-0c8cea6f9e07",
+      "name": "Read PFX File from Disk",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        620,
+        -140
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "={{ $json.fileName }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2ec5c8cd-c9f5-4008-988b-ab724b9d8a0f",
+      "name": "Check PDF file is OK",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        800,
+        -380
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8afd6a42-b651-4905-8339-92607d4b59cc",
+              "name": "success",
+              "type": "boolean",
+              "value": "={{ $json.fileName  ===  $('Prepare input params').item.json.uniqueFileName }}"
+            },
+            {
+              "id": "d0125043-e398-47b2-9f9f-156b33c92cc4",
+              "name": "fileName",
+              "type": "string",
+              "value": "={{ $json.fileName }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "2de3d4d5-6654-4019-b05a-2d1dc48c016f",
+      "name": "Check PFX file is OK",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        800,
+        -220
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8afd6a42-b651-4905-8339-92607d4b59cc",
+              "name": "success",
+              "type": "boolean",
+              "value": "={{ $json.fileName  ===  $('Prepare input params').item.json.uniqueFileName }}"
+            },
+            {
+              "id": "9af39faf-abf6-4d74-9001-444179abdaeb",
+              "name": "fileName",
+              "type": "string",
+              "value": "={{ $json.fileName }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "5a2405a6-daef-4e57-8ab8-62dc9600cd26",
+      "name": "check success",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1180,
+        180
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "dded9782-4619-4dc7-b264-f5e029099750",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.success }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "e7c2412e-eba2-4092-808f-808a27c2a64f",
+      "name": "set downlowd file info",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -220,
+        740
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f7affa96-85bc-4879-8ca3-aaabd985f67b",
+              "name": "fullFileName",
+              "type": "string",
+              "value": "={{ $json.body.fileName.endsWith('.pdf') ? $json.pdfPath + $json.body.fileName : $json.keyPath + $json.body.fileName }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "5710c64c-5edf-4de8-bb0a-dd9379c6ba1e",
+      "name": "Read download file from Disk",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        0,
+        740
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "={{ $json.fullFileName }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c6c8aea2-a770-4e32-94b5-c4b9f18ea3fe",
+      "name": "API POST Endpoint",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -900,
+        220
+      ],
+      "webhookId": "0c12b17f-77a7-46b2-99a0-432b29b58dfb",
+      "parameters": {
+        "path": "docu-digi-sign",
+        "options": {
+          "binaryData": false
+        },
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c7387236-4d72-4123-b181-31059c7fb973",
+      "name": "API GET Endpoint",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -900,
+        560
+      ],
+      "webhookId": "71854b24-a2b8-4cae-bb5d-3959f1573974",
+      "parameters": {
+        "path": "docu-download",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "c87290be-95fd-4edf-8993-b0710714919b",
+      "name": "POST Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1540,
+        120
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "501c7371-99a5-4d2f-bd54-ed8a9e8a67a9",
+      "name": "POST Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1540,
+        280
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3905360c-581c-4588-a509-7329e73a7ed6",
+      "name": "GET Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        240,
+        740
+      ],
+      "parameters": {
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "comment-dispositions",
+                "value": "=attachment; filename={{ $json.fileName }}"
+              }
+            ]
+          }
+        },
+        "respondWith": "binary"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "088c46b6-0d52-4059-877c-bb38408b4c22",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        100
+      ],
+      "parameters": {
+        "width": 740,
+        "height": 440,
+        "content": "# Cryptographic Operations\n## Generate Certificate and  Sign PDF"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6be21f42-4d11-4dc3-9d01-afed8afcde02",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        600
+      ],
+      "parameters": {
+        "width": 740,
+        "height": 320,
+        "content": "# Document Management\n## Download document\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8972ffd2-ae7e-4999-ba31-242d23734498",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        -560
+      ],
+      "parameters": {
+        "width": 1380,
+        "height": 620,
+        "content": "# Document Management\n## Upload Certificate and Upload PDF\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "262cfa68-f9bd-4145-9101-1bf3a3d2ea4a",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1100,
+        -80
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 740,
+        "height": 840,
+        "content": "# Request Processing and Method Routing"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3d3620d6-4937-483d-a2e2-0a1089415a44",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1120,
+        -100
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 680,
+        "height": 560,
+        "content": "# Response Checking and Formatting"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6ee0f9e6-8c82-46e1-a263-5fedb2e71ad5",
+  "connections": {
+    "Sign PDF": {
+      "main": [
+        [
+          {
+            "node": "check success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Keys": {
+      "main": [
+        [
+          {
+            "node": "check success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check success": {
+      "main": [
+        [
+          {
+            "node": "Prepare Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set file path": {
+      "main": [
+        [
+          {
+            "node": "Switch Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API GET Endpoint": {
+      "main": [
+        [
+          {
+            "node": "set file path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Operation": {
+      "main": [
+        [
+          {
+            "node": "Prepare input params",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Key Gen Params",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate PDF Sign Params",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set downlowd file info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API POST Endpoint": {
+      "main": [
+        [
+          {
+            "node": "set file path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Upload Type": {
+      "main": [
+        [
+          {
+            "node": "Validate PDF Upload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Key Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert PDF to File": {
+      "main": [
+        [
+          {
+            "node": "Write PDF File to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert PFX to File": {
+      "main": [
+        [
+          {
+            "node": "Write PFX File to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Key Upload": {
+      "main": [
+        [
+          {
+            "node": "Convert PFX to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate PDF Upload": {
+      "main": [
+        [
+          {
+            "node": "Convert PDF to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check PDF file is OK": {
+      "main": [
+        [
+          {
+            "node": "check success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check PFX file is OK": {
+      "main": [
+        [
+          {
+            "node": "check success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare input params": {
+      "main": [
+        [
+          {
+            "node": "Switch Upload Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Write PDF File to Disk": {
+      "main": [
+        [
+          {
+            "node": "Read PDF File from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write PFX File to Disk": {
+      "main": [
+        [
+          {
+            "node": "Read PFX File from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set downlowd file info": {
+      "main": [
+        [
+          {
+            "node": "Read download file from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read PDF File from Disk": {
+      "main": [
+        [
+          {
+            "node": "Check PDF file is OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read PFX File from Disk": {
+      "main": [
+        [
+          {
+            "node": "Check PFX file is OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Key Gen Params": {
+      "main": [
+        [
+          {
+            "node": "Generate Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Success Response": {
+      "main": [
+        [
+          {
+            "node": "POST Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate PDF Sign Params": {
+      "main": [
+        [
+          {
+            "node": "Sign PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read download file from Disk": {
+      "main": [
+        [
+          {
+            "node": "GET Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

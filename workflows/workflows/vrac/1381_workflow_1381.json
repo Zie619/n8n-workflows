@@ -1,0 +1,230 @@
+{
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        310,
+        300
+      ],
+      "webhookId": "6be952e8-e30f-4dd7-90b3-bc202ae9f174",
+      "parameters": {
+        "path": "6be952e8-e30f-4dd7-90b3-bc202ae9f174",
+        "options": {
+          "rawBody": true
+        },
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "SearchTorrent",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        530,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const TorrentSearchApi = require('torrent-search-api');\n\nTorrentSearchApi.enableProvider('KickassTorrents');\nTorrentSearchApi.enableProvider('Rarbg');\n\nitem.title = $node[\"Webhook\"].json[\"body\"].title.trim();\n\nconst torrents = await TorrentSearchApi.search(item.title, 'All', 5);\n\nitem.torrents = torrents;\nitem.found = true;\n\nif(!torrents.length)\n  item.found = false;\n  \nconsole.log('Done!');\n\nreturn item;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Start download",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        960,
+        280
+      ],
+      "parameters": {
+        "url": "http://localhost:9091/transmission/rpc",
+        "options": {},
+        "requestMethod": "POST",
+        "authentication": "basicAuth",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\"method\":\"torrent-add\",\"arguments\":{\"paused\":false,\"download-dir\":\"/media/FILM/TORRENT\",\"filename\":\"{{$node[\"SearchTorrent\"].json[\"torrents\"][0][\"magnet\"]}}\"}}",
+        "headerParametersJson": "{\"X-Transmission-Session-Id\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}"
+      },
+      "credentials": {
+        "httpBasicAuth": "Transmission-basic-auth"
+      },
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json[\"found\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Torrent not found",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        960,
+        470
+      ],
+      "parameters": {
+        "text": "=Film {{$node[\"Webhook\"].json[\"body\"].title}} non trovato.",
+        "chatId": "00000000",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": "your_bot_credential"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Telegram1",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1500,
+        490
+      ],
+      "parameters": {
+        "text": "=Scarico {{$node[\"Webhook\"].json[\"body\"].title}}!\nTitolo: {{$node[\"SearchTorrent\"].json[\"torrents\"][0][\"title\"]}}",
+        "chatId": "0000000",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": "your_bot_credential"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF2",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1150,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "=\"{{$json[\"error\"][\"statusCode\"]}}\"",
+              "value2": "=\"409\""
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Start download new token",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1340,
+        260
+      ],
+      "parameters": {
+        "url": "http://localhost:9091/transmission/rpc",
+        "options": {},
+        "requestMethod": "POST",
+        "authentication": "basicAuth",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\"method\":\"torrent-add\",\"arguments\":{\"paused\":false,\"download-dir\":\"/media/FILM/TORRENT\",\"filename\":\"{{$node[\"SearchTorrent\"].json[\"torrents\"][0][\"magnet\"]}}\"}}",
+        "headerParametersJson": "={\"X-Transmission-Session-Id\":\"{{$node[\"Start download\"].json[\"error\"][\"response\"][\"headers\"][\"x-transmission-session-id\"]}}\"}"
+      },
+      "credentials": {
+        "httpBasicAuth": "Transmission-basic-auth"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Start download",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Torrent not found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF2": {
+      "main": [
+        [
+          {
+            "node": "Start download new token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "SearchTorrent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SearchTorrent": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start download": {
+      "main": [
+        [
+          {
+            "node": "IF2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start download new token": {
+      "main": [
+        [
+          {
+            "node": "Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

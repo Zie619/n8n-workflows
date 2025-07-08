@@ -1,0 +1,1147 @@
+{
+  "meta": {
+    "instanceId": "26ba763460b97c249b82942b23b6384876dfeb9327513332e743c5f6219c2b8e"
+  },
+  "nodes": [
+    {
+      "id": "1bb3c94e-326e-41ca-82e4-102a598dba39",
+      "name": "When clicking \u2018Test workflow\u2019",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -320,
+        300
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "751b283b-ea88-4fcd-ace3-3c86631f8876",
+      "name": "Embeddings Mistral Cloud",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsMistralCloud",
+      "position": [
+        1760,
+        560
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "EIl2QxhXAS9Hkg37",
+          "name": "Mistral Cloud account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f0851949-1036-4040-84df-61295cc5db74",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        1900,
+        560
+      ],
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "chapter",
+                "value": "={{ $('For Each Section...').item.json.chapter }}"
+              },
+              {
+                "name": "section",
+                "value": "={{ $('For Each Section...').item.json.label }}"
+              },
+              {
+                "name": "=title",
+                "value": "={{ $('For Each Section...').item.json.title }}"
+              },
+              {
+                "name": "content_order",
+                "value": "={{ $itemIndex }}"
+              }
+            ]
+          }
+        },
+        "jsonData": "={{ $json.content }}",
+        "jsonMode": "expressionData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "41d10b61-9fbe-446e-a65a-0db6e0116e5b",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "position": [
+        1920,
+        680
+      ],
+      "parameters": {
+        "options": {},
+        "chunkSize": 2000
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a1ecb096-4d31-4993-b801-ca3f09a9edc7",
+      "name": "Get Tax Code Zip File",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -20,
+        340
+      ],
+      "parameters": {
+        "url": "https://statutes.capitol.texas.gov/Docs/Zips/TX.pdf.zip",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "cf983315-fe2a-43c1-8dc6-b17a217b845e",
+      "name": "Extract Zip Files",
+      "type": "n8n-nodes-base.compression",
+      "position": [
+        140,
+        340
+      ],
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "8d02dd80-d14a-4e56-ab40-f2c4a445c57b",
+      "name": "Files as Items",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        300,
+        340
+      ],
+      "parameters": {
+        "include": "allOtherFields",
+        "options": {},
+        "fieldToSplitOut": "$binary"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "038060dc-e01d-40ae-878d-5043bc36ab91",
+      "name": "Extract PDF Contents",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        560,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "pdf",
+        "binaryPropertyName": "=file_{{ $itemIndex }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4a85003b-b988-467b-b1cb-29206cbed879",
+      "name": "Extract From Chapter",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        740,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d791928a-d775-48cc-9004-a92cbe2403d3",
+              "name": "contents",
+              "type": "array",
+              "value": "={{\n $json.text\n .substring($json.text.search(/\\nSec\\.\\nA[0-9]{1,4}\\.[0-9]{1,5}\\.AA/), $json.text.length)\n .split(/\\nSec\\.\\nA[0-9]{1,2}\\.[0-9]{1,2}\\.AA/g)\n .filter(text => !text.isEmpty())\n .map(text => {\n const output = text.replaceAll('AA', ' ').replaceAll('\\nA', ' ');\n const title = output.substring(0, output.indexOf('.'));\n const content = output.substring(output.indexOf('.')+1, output.length).replaceAll('\\n', ' ').trim();\n return { title, content };\n })\n}}"
+            },
+            {
+              "id": "bc06641f-0b75-4a35-8752-78803231d5d6",
+              "name": "labels",
+              "type": "array",
+              "value": "={{\n $json.text\n .match(/\\nSec\\.\\nA[0-9]{1,4}\\.[0-9]{1,5}\\.AA/g)\n .map(text => ({\n label: text.replaceAll('AA', ' ')\n .replaceAll('\\nA', ' ')\n .replaceAll('\\n', '')\n .trim()\n }))\n}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "ee338786-91df-4784-bd7e-f86c0e13ca26",
+      "name": "Map To Sections",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        740,
+        520
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "60109e60-d760-45bb-be09-7cb2b5eb85bc",
+              "name": "section",
+              "type": "array",
+              "value": "={{\n $json.labels.map((label, idx) => ({\n label: label.label.match(/\\d.+/)[0].replace(/\\.$/, ''),\n title: $json.contents[idx].title,\n content: $json.contents[idx].content,\n chapter: $('Extract PDF Contents').first().json.info.Title,\n }))\n}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "41c9899d-26d7-48af-9af2-8563ab0fb7e4",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        1313,
+        1200
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "3a93c19b-09d9-4e38-8b0c-2008fc03f7fc",
+      "name": "Get Mistral Embeddings",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1660,
+        1060
+      ],
+      "parameters": {
+        "url": "https://api.mistral.ai/v1/embeddings",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "mistral-embed"
+            },
+            {
+              "name": "encoding_format",
+              "value": "float"
+            },
+            {
+              "name": "input",
+              "value": "={{ $json.query }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "mistralCloudApi"
+      },
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "EIl2QxhXAS9Hkg37",
+          "name": "Mistral Cloud account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "1adc12bd-ba61-4f1a-b1f9-3f19a542e294",
+      "name": "Content Chunking @ 50k Chars",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1580,
+        400
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7753a4f4-3ec2-4c05-81df-3d5e8979a478",
+              "name": "=content",
+              "type": "array",
+              "value": "={{ new Array(Math.round($json.content.length / Math.min($json.content.length, 30000))).fill('').map((_,idx) => $json.content.substring(idx * 30000, idx * 50000 + 30000)) }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "ff8adce2-8f73-4a8f-b512-5aa560ca0954",
+      "name": "Split Out Chunks",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1580,
+        580
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "content"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5f08ce3c-240d-4c91-bb23-953866fd0361",
+      "name": "For Each Section...",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1400,
+        280
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 5
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "6346cf67-7d93-4315-bb0d-2e016c9853b9",
+      "name": "Sections To List",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        940,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "section"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "95e34952-03e2-40e3-a245-9da8c9e1f249",
+      "name": "Only Valid Sections",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1100,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "121e8f86-2ead-47e0-8e17-52d7c6ba8265",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.content }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "dfe1818f-93b7-4116-8a6e-dcb2e6c23fcf",
+      "name": "Use Qdrant Search API1",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1860,
+        1060
+      ],
+      "parameters": {
+        "url": "=http://qdrant:6333/collections/texas_tax_codes/points/search",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "={{ 4 }}"
+            },
+            {
+              "name": "vector",
+              "value": "={{ $json.data[0].embedding }}"
+            },
+            {
+              "name": "with_payload",
+              "value": "={{ true }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "qdrantApi"
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "NyinAS3Pgfik66w5",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "588318e6-e188-4d99-9c11-39b2f3fb1c18",
+      "name": "Use Qdrant Scroll API",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1660,
+        1320
+      ],
+      "parameters": {
+        "url": "=http://qdrant:6333/collections/texas_tax_codes/points/scroll",
+        "method": "POST",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "next_page_offset",
+                    "type": "body",
+                    "value": "={{ $response.body.result.next_page_offset }}"
+                  }
+                ]
+              },
+              "completeExpression": "={{ $response.body.result.next_page_offset === null }}",
+              "paginationCompleteWhen": "other"
+            }
+          }
+        },
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "={{ 100 }}"
+            },
+            {
+              "name": "with_payload",
+              "value": "={{ true }}"
+            },
+            {
+              "name": "filter",
+              "value": "={{\n{\n \"must\": [\n ($json.query.section\n ? { \"key\": \"metadata.section\", \"match\": { \"value\": $json.query.section } }\n : { \"key\": \"metadata.chapter\", \"match\": { \"value\": $json.query.chapter } }\n )\n ]\n}\n}}"
+            }
+          ]
+        },
+        "nodeCredentialType": "qdrantApi"
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "NyinAS3Pgfik66w5",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "bbf01344-c60e-42b3-8d7d-2bb360876d79",
+      "name": "Get Search Response",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1860,
+        1320
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "08ad2d6e-4ed1-409e-b89c-1f0c7fdf1b64",
+              "name": "response",
+              "type": "string",
+              "value": "=---\nchapter: {{ $json.result.points.first().payload.metadata.chapter }}\nsection: {{ $json.result.points.first().payload.metadata.section }}\ntitle: {{ $json.result.points.first().payload.metadata.title }}\n---\n{{ $json.result.points\n .toSorted((a,b) => (a.payload.metadata.content_order || 0) - (b.payload.metadata.content_order || 0))\n .map(point => point.payload.content).join('\\n') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "3b23ff5e-158a-470f-a262-d001d52feeba",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -100,
+        183.38345554113084
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 571.4359274276384,
+        "height": 352.65642339230595,
+        "content": "## Step 1. Download the Tax Code PDF\n[Read more about handling Zip Files](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.compression/)\n\nLet's begin by pulling a zip file containing all the tax codes as separate PDF files. We can unzip on the fly with n8n's compression node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "02826887-eb26-48a0-928e-fe56ee008425",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        199.87747230655896
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 777.897719182587,
+        "height": 503.3459981018574,
+        "content": "## Step 2. Extract and Partition Into Chapters & Sections\n[Learn more about reading PDF Files](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.extractfromfile)\n\nRather than ingest the raw text of the PDF, we'll be a little more strategic and extract the tax code sections separately instead. Not only will this provide cleaner results, we'll also be able to fetch sections in isolation if required."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "31a34972-31ab-4b96-9d09-cd30a3b184cf",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1300,
+        108.82958126396
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1045.1698686248747,
+        "height": 771.1260499456115,
+        "content": "## Step 3. Save into Qdrant VectorStore\n[Read more about using the Qdrant Vectorstore](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.vectorstoreqdrant)\n\nWe'll save our data into a Qdrant collection being mindful to use metadata to take full advantage of Qdrant's filtering capabilities later.\nThough not always required, since the tax code documents can be quite large we'll implement a loop here to throttle the number of tokens being processed as to not trip the Mistral.ai rate limits for embeddings."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "27039fa6-6388-45ee-a2d5-6bb68554944b",
+      "name": "Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "position": [
+        1760,
+        400
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {},
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "list",
+          "value": "texas_tax_codes",
+          "cachedResultName": "texas_tax_codes"
+        }
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "NyinAS3Pgfik66w5",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5ec16c20-eb1e-454a-8165-594d83dd8711",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        360,
+        900
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 858.1415560000298,
+        "height": 513.2269439624808,
+        "content": "## Step 4. Build a Tax Code Assistant ChatBot\n[Learn more about using AI Agents in n8n](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent)\n\nFor our chatbot, we'll use an AI agent node because we want to achieve more than one functionality. The first will be querying to relevant texts to answer a user's question and secondly, a direct search feature to pull full section text when requested."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d5145c6f-768b-42d8-a045-20e045f52b0b",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1240,
+        904.6076722083936
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1030.0926850706744,
+        "height": 577.7854680142904,
+        "content": "## Step 5. Use Qdrant API as Tools\n[Learn more about using AI Agents in n8n](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent)\n\nOur Ask Tool will generate embeddings using Mistral.ai and query our Qdrant collection using the Qdrant Search API.\nOur Search Tool will use filter our Qdrant collection using the Qdrant Scroll API, matching on each doc's section metadata key."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ccf50479-53d8-4edf-8f2b-73060a6a6e0f",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        700,
+        1063
+      ],
+      "parameters": {
+        "options": {
+          "systemMessage": "You are a helpful assistant answering user questions on the tax code legistration for the state of Texas, united states of america.\n\nAlong with your response also note in which chapter and section number the information was found. "
+        }
+      },
+      "typeVersion": 1.6
+    },
+    {
+      "id": "d7e7fa9e-73ba-4df3-862e-25af63d9d9b4",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        820,
+        1223
+      ],
+      "parameters": {},
+      "typeVersion": 1.2
+    },
+    {
+      "id": "a79bdbcd-7157-470a-aadc-bd3f8a4c40d2",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        420,
+        1063
+      ],
+      "webhookId": "db2b118d-942e-4be9-b154-7df887232f97",
+      "parameters": {
+        "public": true,
+        "options": {
+          "loadPreviousSession": "memory"
+        },
+        "initialMessages": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6046f137-b508-484f-8577-ac51a35eee09",
+      "name": "Window Buffer Memory1",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        420,
+        1223
+      ],
+      "parameters": {},
+      "typeVersion": 1.2
+    },
+    {
+      "id": "30f238f8-1987-4d6d-b06d-ac2106ea3734",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        700,
+        1223
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8a8490f6-5957-495c-a7af-15cec669f39c",
+      "name": "1sec",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        2160,
+        660
+      ],
+      "webhookId": "852317f0-aadf-4658-ae44-d05e5de29302",
+      "parameters": {
+        "amount": 1
+      },
+      "executeOnce": false,
+      "typeVersion": 1.1
+    },
+    {
+      "id": "142450f5-8ec1-4ae6-b25c-df3233394d4e",
+      "name": "Ask Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        960,
+        1223
+      ],
+      "parameters": {
+        "name": "query_tax_code_knowledgebase",
+        "fields": {
+          "values": [
+            {
+              "name": "route",
+              "stringValue": "ask_tool"
+            }
+          ]
+        },
+        "workflowId": "={{ $workflow.id }}",
+        "description": "Call this tool to query the tax code database for information. Structure your query in the form of a question for best results."
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "ee455a4e-c9a1-49b2-a036-d3f3d34099c6",
+      "name": "Search Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        1060,
+        1223
+      ],
+      "parameters": {
+        "name": "get_tax_code_section",
+        "fields": {
+          "values": [
+            {
+              "name": "route",
+              "stringValue": "search_tool"
+            }
+          ]
+        },
+        "workflowId": "={{ $workflow.id }}",
+        "description": "Call this tool to search for specific sections of the tax code document. Pass in either a known section number/id to get the section's text or a known chapter name to return all sections for the chapter.",
+        "jsonSchemaExample": "{\n\t\"chapter\": \"some_value\",\n \"section\": \"Sec 1.01\"\n}",
+        "specifyInputSchema": true
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "f3240f8d-8869-4088-8e4f-d4e23a3c12a8",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1473,
+        1200
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "ask_tool",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "ask_tool"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "search_tool",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "909362ed-eb97-405c-9f2f-f404a3bfeaf3",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "search_tool"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "71441b5a-099b-49e0-a212-3087d958b38b",
+      "name": "Get Ask Response",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2060,
+        1060
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eb5f2b3c-bb88-4cae-a960-164016c9a9e4",
+              "name": "response",
+              "type": "string",
+              "value": "=|chapter|section|title|content|\n|-|-|-|-|\n{{\n $json.result.map(row => [\n '',\n row.payload.metadata.chapter,\n row.payload.metadata.section,\n row.payload.metadata.title,\n row.payload.content,\n ''\n ].join('|')).join('\\n')\n}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "54a744a3-95c9-4d9a-b1e7-e266a51f77ca",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -520,
+        -79.56762868134751
+      ],
+      "parameters": {
+        "width": 383.14868794462586,
+        "height": 563.604204119637,
+        "content": "## Try Me Out!\n### This workflow builds an AI powered Legal assistant who answers questions about tax codes.\n* Download publically available tax code PDFs from the relevant government website.\n* Strategically exact tax code sections and store these in our Qdrant Vectorstore using Mistral.ai embeddings.\n* Use an AI Agent to answer user's tax questions by attaching tools which query our Qdrant vectorstore.\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Hacking!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7f802f12-03e0-4b8e-a880-8c26242c1152",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        790.1971986436472,
+        720
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 489.3944544742706,
+        "height": 131.61363932813174,
+        "content": "### \ud83d\ude4b\u200d\u2640\ufe0fWhat's the difference?\nWith raw PDF data, we may blur the boundaries between chapters and sections making later results hard to find, incoherent or misleading.\nDepending on your use-case, store your data in a way you intend to retrieve it!"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1sec": {
+      "main": [
+        [
+          {
+            "node": "For Each Section...",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get Mistral Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Qdrant Scroll API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Files as Items": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Contents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map To Sections": {
+      "main": [
+        [
+          {
+            "node": "Sections To List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sections To List": {
+      "main": [
+        [
+          {
+            "node": "Only Valid Sections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Chunks": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Zip Files": {
+      "main": [
+        [
+          {
+            "node": "Files as Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "For Each Section...": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Content Chunking @ 50k Chars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Valid Sections": {
+      "main": [
+        [
+          {
+            "node": "For Each Section...",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "main": [
+        [
+          {
+            "node": "1sec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From Chapter": {
+      "main": [
+        [
+          {
+            "node": "Map To Sections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Contents": {
+      "main": [
+        [
+          {
+            "node": "Extract From Chapter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tax Code Zip File": {
+      "main": [
+        [
+          {
+            "node": "Extract Zip Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Qdrant Scroll API": {
+      "main": [
+        [
+          {
+            "node": "Get Search Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "When chat message received",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Mistral Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Use Qdrant Search API1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Qdrant Search API1": {
+      "main": [
+        [
+          {
+            "node": "Get Ask Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Mistral Cloud": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Chunking @ 50k Chars": {
+      "main": [
+        [
+          {
+            "node": "Split Out Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \u2018Test workflow\u2019": {
+      "main": [
+        [
+          {
+            "node": "Get Tax Code Zip File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "35451a0c-1ad5-4c02-804b-d19afd282b09",
+      "name": "Get last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        540,
+        100
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nif(!staticData.lastExecution){\n  staticData.lastExecution = new Date();\n}\n\nitem.executionTimeStamp = new Date();\nitem.lastExecution = staticData.lastExecution;\n\n\nreturn item;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "18ff2308-216e-4c1e-afb9-bd41ae7b5e4d",
+      "name": "Every day at 07:00",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        320,
+        100
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 7
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "53d3203b-2518-471f-9c72-2ab41303cdf2",
+      "name": "Set new last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        1240,
+        100
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nstaticData.lastExecution = $item(0).$node[\"Get last execution timestamp\"].executionTimeStamp;\n\nreturn item;"
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "bf6f8843-53e8-4096-8614-da0b43f5f193",
+      "name": "Create/Update contact",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        1020,
+        100
+      ],
+      "parameters": {
+        "email": "={{ $json[\"email_address\"] }}",
+        "resource": "contact",
+        "authentication": "appToken",
+        "additionalFields": {
+          "lastName": "={{ $json[\"merge_fields\"].LNAME }}",
+          "firstName": "={{ $json[\"merge_fields\"].FNAME }}"
+        }
+      },
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "13",
+          "name": "HubSpot App Token account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6bce7f89-e22e-4372-a1cc-1723756bb617",
+      "name": "Get changed members",
+      "type": "n8n-nodes-base.mailchimp",
+      "position": [
+        780,
+        100
+      ],
+      "parameters": {
+        "list": "bcfb6ff8f1",
+        "options": {
+          "sinceLastChanged": "={{ $json[\"lastExecution\"] }}"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "mailchimpApi": {
+          "id": "19",
+          "name": "Mailchimp account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Every day at 07:00": {
+      "main": [
+        [
+          {
+            "node": "Get last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get changed members": {
+      "main": [
+        [
+          {
+            "node": "Create/Update contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create/Update contact": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last execution timestamp": {
+      "main": [
+        [
+          {
+            "node": "Get changed members",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

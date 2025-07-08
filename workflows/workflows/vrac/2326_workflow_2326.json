@@ -1,0 +1,855 @@
+{
+  "meta": {
+    "instanceId": "257476b1ef58bf3cb6a46e65fac7ee34a53a5e1a8492d5c6e4da5f87c9b82833",
+    "templateId": "2326"
+  },
+  "nodes": [
+    {
+      "id": "806e7f80-b936-49c3-9759-6f91fab5781e",
+      "name": "For Each User ID...",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1640,
+        1438
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "users"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8a932c63-18d2-438d-a09c-256c3432a01f",
+      "name": "Get User",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1900,
+        1278
+      ],
+      "parameters": {
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.users }}"
+        },
+        "resource": "user"
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "fefe8889-a564-4d70-a909-a3e836ca6286",
+      "name": "Search for Invite Requests",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        340,
+        840
+      ],
+      "parameters": {
+        "limit": 3,
+        "query": "in:#n8n-events has::calendar:",
+        "options": {},
+        "operation": "search"
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "bbe29b66-2b02-409a-a7c9-c6afd08f62f8",
+      "name": "Get Existing Invite EventID",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        815,
+        883
+      ],
+      "parameters": {
+        "jsCode": "const channel =  $('Search for Invite Requests').item.json.channel;\n\nreturn $input\n  .all()\n  .filter(item => !item.json.thread_ts || item.json.ts === item.json.thread_ts)\n  .map(invite => {\n    const replies = $input\n      .all()\n      .filter(reply => reply.json.thread_ts === invite.json.thread_ts);\n    const replyWithEventTag = replies\n      .find(reply => reply.json.bot_id && reply.json.text.match(/#event([a-z0-9]+)/i));\n    const eventId = replyWithEventTag\n      ? replyWithEventTag.json.text.match(/#event([a-z0-9]+)/i)[1]\n      : null;\n    return {\n      eventId,\n      invite,\n      channel,\n    }\n  });\n\nreturn output;"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "82053e1b-0ed2-4967-9654-9d1488c0ab3c",
+      "name": "Should Create Event?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        995,
+        883
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "5c45447a-ab61-42c8-92c9-4c5d6970def7",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.eventId }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "d051c89a-d337-4db4-b9dd-208a6b9488f6",
+      "name": "Create Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        1940,
+        600
+      ],
+      "parameters": {
+        "end": "={{ $json.output.output.event_end_date ? $json.output.output.event_end_date + ' ' + $json.output.output.event_end_time : (new Date($json.output.output.event_start_date + ' ' + $json.output.output.event_start_time)).plus(3, 'hour').format('yyyy-MM-dd HH:mm:ss') }}",
+        "start": "={{ $json.output.output.event_start_date }} {{ $json.output.output.event_start_time }}",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "c_5792bdf04bc395cbcbc6f7b754268245a33779d36640cc80a357711aa2f09a0a@group.calendar.google.com",
+          "cachedResultName": "n8n-events"
+        },
+        "additionalFields": {
+          "summary": "={{ $json.output.output.event_title }}",
+          "location": "={{ $json.output.output.location_address }}",
+          "description": "=## {{ $json.output.output.event_title }}\n\n{{ $('Should Create Event?').item.json.invite.json.text }}\n\nTime:\n{{ $json[\"output\"][\"output\"][\"event_start_date\"] + ' ' + $json[\"output\"][\"output\"][\"event_start_time\"] }}{{ $json[\"output\"][\"output\"][\"event_end_date\"] ? ' to ' : '' }}{{ $json[\"output\"][\"output\"][\"event_end_date\"] ? \n $json[\"output\"][\"output\"][\"event_end_date\"] + ' ' + $json[\"output\"][\"output\"][\"event_end_time\"] : '' }}\n\nLocation:\n{{ $json[\"output\"][\"output\"][\"location_address\"] }}\n{{ $json[\"output\"][\"output\"][\"location_url\"] }}",
+          "guestsCanModify": true,
+          "guestsCanInviteOthers": true,
+          "guestsCanSeeOtherGuests": true
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "9b4ab665-edd2-4a4c-b84f-4c1c466c7957",
+      "name": "Get Invite Reactions",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1640,
+        1258
+      ],
+      "parameters": {
+        "resource": "reaction",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Should Create Event?').item.json.channel.id }}"
+        },
+        "operation": "get",
+        "timestamp": "={{ $('Should Create Event?').item.json.invite.json.ts }}"
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "783e0e31-43c1-40aa-89de-f886ff7511d9",
+      "name": "Get Invite Replies",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        635,
+        883
+      ],
+      "parameters": {
+        "ts": "={{ $json.ts }}",
+        "filters": {},
+        "resource": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "C074W8X9UJV",
+          "cachedResultName": "n8n-events"
+        },
+        "operation": "replies"
+      },
+      "typeVersion": 2.2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "963c872e-858d-47bc-b648-d98079dd722a",
+      "name": "Extract Invite Reactions",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1320,
+        1438
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "message.reactions"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f4132852-cfc3-4662-8976-cfc262a9ad78",
+      "name": "Get Old EventId",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1320,
+        1258
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "={\n  \"eventId\": \"{{ $json.eventId }}\",\n}"
+      },
+      "typeVersion": 3.3,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "a83ea855-a2fa-4f9f-9b1e-298a97b78591",
+      "name": "Add Attendee to Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        2380,
+        1278
+      ],
+      "parameters": {
+        "eventId": "={{ $('Get Old EventId').item.json.eventId }}",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "c_5792bdf04bc395cbcbc6f7b754268245a33779d36640cc80a357711aa2f09a0a@group.calendar.google.com",
+          "cachedResultName": "n8n-events"
+        },
+        "operation": "update",
+        "updateFields": {
+          "attendees": [
+            "={{ $json.email }}"
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "80b74ca6-5d98-4db9-8555-56e5967266e8",
+      "name": "Get Event Details",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        1480,
+        1258
+      ],
+      "parameters": {
+        "eventId": "={{ $json.eventId }}",
+        "options": {},
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "c_5792bdf04bc395cbcbc6f7b754268245a33779d36640cc80a357711aa2f09a0a@group.calendar.google.com",
+          "cachedResultName": "n8n-events"
+        },
+        "operation": "get"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "a059fe82-4d12-48ce-a378-d1e9b7625000",
+      "name": "Is Attending",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1480,
+        1438
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "858b779e-732e-4b89-9007-93f9aafbb50b",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "white_check_mark"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "14716446-8014-46d9-a9db-851d35ebfb33",
+      "name": "Get User Email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2220,
+        1278
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "16978160-49ce-42d4-a4ed-677bb2bdfe8d",
+              "name": "email",
+              "type": "string",
+              "value": "={{ $json.profile.email }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "8540e7f5-fce1-40cb-89a7-5be4c9f7cd63",
+      "name": "Should Add Attendee?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2060,
+        1278
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cb9590b0-2c0d-40e3-b379-cac9666d9ffe",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              },
+              "leftValue": "={{ Boolean($('Get Event Details').item.json.attendees.find(x => x.email === $json.profile.email)) }}",
+              "rightValue": "false"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6958ed3a-5d59-40b8-969a-e90988ca68cb",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1620,
+        680
+      ],
+      "parameters": {
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"event_title\": { \"type\": \"string\" },\n    \"event_start_date\": { \"type\": \"string\" },\n    \"event_start_time\": { \"type\": \"string\" },\n    \"event_end_date\": { \"type\": \"string\" },\n    \"event_end_time\": { \"type\": \"string\" },\n    \"location_address\": { \"type\": \"string\" },\n    \"location_url\": { \"type\": \"string\" },\n    \"event_type\": { \"type\": \"string\" }\n  }\n}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "f4518e1e-595f-4492-8439-9de9e8701665",
+      "name": "SerpAPI",
+      "type": "@n8n/n8n-nodes-langchain.toolSerpApi",
+      "position": [
+        1440,
+        740
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "821c4388-317d-4f40-ac1a-ea7f2d0da711",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1340,
+        680
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2b0aa447-164f-4f7c-95b1-ae44c699fc89",
+      "name": "Wikipedia",
+      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
+      "position": [
+        1520,
+        740
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "66b28991-1417-4b4a-a604-68bea258c141",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        140,
+        840
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "6cfe47dc-d630-42da-a755-325b5f466488",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        65.15658774955875,
+        620
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 468.0872755624215,
+        "height": 401.633728593893,
+        "content": "## 1. Pull Messages from Slack Channel\n[Read more about using the Slack](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.slack/)\n\nUsing the Slack Node, we're able to filter all top level messages marked with the calendar emoji signifying a request that a calendar event is created. Be sure to configure your slack app with all the required permissions for your workspace."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "89b74ffd-6581-43c6-821d-50f34004be6f",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        643.4948198232535
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 612.4609442091373,
+        "height": 463.294565931203,
+        "content": "## 2. Decide Whether a new Event Should Be Created\n[Read more about using the Code](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.code)\n\nFor more complex workflows, sometimes you may need to gather and prepare variables before the rest of the workflow runs. The Code node is one such tool to achieve this if you're familiar with code but its not the only way.\n\nThis workflow splits based on whether the event needs to be created. When it already exists, attendees are updated for the existing event instead."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "355b928a-3f1f-415b-8bcf-3a715ac770c3",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        264.3100105144731
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 582.5773441997128,
+        "height": 614.2457232899785,
+        "content": "## 3. Using AI Agent to Automate Event Creation\n[Read more about AI Agents](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent)\n\nAI Agents are generally described as self-governing LLMs with access to various \"tools\" which extend their knowledge and/or capability. In this demo, we've instructed the AI to do the following:\n1. Generate a nice Event title.\n2. Parse and assume dates and times from user message.\n3. Parse the address and website of location/venue and to use the \"tools\" if it cannot get this data from the message or its own knowledge."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d9ab9ce6-c2ae-43f1-af69-b39403b8ef36",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1260,
+        1040
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 555.022465659362,
+        "height": 579.2571386002115,
+        "content": "## 5. Get Emoji Reactions to Track Attendees\n[Read more about using Slack](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.slack)\n\nWhen the event exists, we can instead start adding other team members who've reacted to the message with the ✅ emoji. In this part of the workflow, there's a bit of logic to compare the number of people who've reacted to the attendee list of the actual event. This is necessary to avoid unwanted notifications which could get quite annoying!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8d60d40a-5eae-4a57-ab68-5572199ddfbb",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1860,
+        1107
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 665.8690262556933,
+        "height": 354.87325537783204,
+        "content": "## 6. Add Attendees to Existing Calendar Event\n[Read more about using Google Calendar](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.googlecalendar)\n\nn8n nodes make it easy to work with Google Calendar by having great converage on the Google API. Most common actions can be found in the dropdown list - there is no need to learn the code itself!\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2e58ced7-5849-4726-9050-57e60a3f8e93",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        600
+      ],
+      "parameters": {
+        "width": 359.6648027457353,
+        "height": 416.9747281125149,
+        "content": "## Try It Out!\n### This workflow does the following\n* Monitors a slack channel for event messages tagged with the Calendar (📅) emoji.\n* Checks if a calender event exists otherwise uses ChatGPT to create the calendar event; AI will add event title, description and location details.\n* If calendar event exists, checks for channel users who have reacted with checkmark (✅) emoji.\n* These users are automatically added as attendees to the event.\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Hacking!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e64b575a-e422-4c98-86b7-dc69e15150c3",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1840,
+        400
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 492.07150832656214,
+        "height": 414.62723127587867,
+        "content": "## 4. Create Event and Send Reply Message\n[Read more about using Google Calendar](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.googlecalendar)\n\nOnce we have these details, we create the invite and reply to original user message acknowleging the event was created successfully. Note, we also use this reply to avoid duplicates!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3d3a6d11-a68f-4623-943d-55493d334290",
+      "name": "Reply Invite with EventId",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        2120,
+        600
+      ],
+      "parameters": {
+        "text": "=Event Created!\nAdd to Calendar: {{ $json.htmlLink }}\n#event{{ $json.id }}",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Should Create Event?').item.json.channel.id }}"
+        },
+        "otherOptions": {
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $('Should Create Event?').item.json.invite.json.ts }}"
+            }
+          }
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "0b0e02e7-1375-4de9-9781-915d7e96ef20",
+      "name": "Calendar Event Booking Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1380,
+        540
+      ],
+      "parameters": {
+        "text": "=Your role is to create professional event calendar events based on user message.\nGiven the following user message, do the following 5 tasks. Note, Assume all dates are within the current year which is {{ $now.format(\"yyyy\") }} unless stated otherwise.\n1. Summarize the message and generate a title for the event. Make sure it's eye-catching to attract more attendees!\n2. Determine and extract the start date and time for the event. Date must be in the format yyyy-MM-dd and time in the format of hh:mm:ss. If no start time is indicated, the start time is 9am. If you are unable to do so, just leave it blank.\n3. Determine and extract the end date and time for the event. Date must be in the format yyyy-MM-dd and time in the format of hh:mm:ss. If you are unable to do so, just leave it blank.\n4. Where the user message refers to a location or venue, use the SerpAPI tool to search for this location or venue on the web and retrieve the full address.\n5. Additionally, if the location or venue has a website or relevant webpage, return the URL of the location or venue.\n6. Try to identify the event type as one of \"social meeting\", \"social gathering\", \"business meeting\", \"business gathering\" or \"unknown\".\n\nuser message:\n```{{ $json.invite.json.text }}```",
+        "agent": "openAiFunctionsAgent",
+        "options": {},
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "e4ce06a0-cc42-4732-aadd-519fe7307a4d",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1220,
+        160
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 394.45954589267495,
+        "height": 80,
+        "content": "### Part 1: Creating the Event\nThis branch runs when we have a new Event."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "463a2dbc-2d10-403a-a417-aec442e917dd",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1260,
+        940
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 394.45954589267495,
+        "height": 80,
+        "content": "### Part 2: Adding Attendees to Event\nThis branch runs if the event already exists."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "aa4d41ca-1332-40da-a2b9-331257b6a1f2",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        820
+      ],
+      "parameters": {
+        "width": 179.82769272818715,
+        "height": 362.21121634583966,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n🚨**Required**\n* Set the channel to monitor here. Also, make sure to use the user access token in your credential"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "790293df-46bc-47ba-a60b-be611f46b670",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1900,
+        580
+      ],
+      "parameters": {
+        "width": 179.82769272818715,
+        "height": 317.6738512911155,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n🚨**Required**\n* Set the Google Calendar to use here."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SerpAPI": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Event Booking Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User": {
+      "main": [
+        [
+          {
+            "node": "Should Add Attendee?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Event Booking Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event": {
+      "main": [
+        [
+          {
+            "node": "Reply Invite with EventId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Attending": {
+      "main": [
+        [
+          {
+            "node": "For Each User ID...",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Email": {
+      "main": [
+        [
+          {
+            "node": "Add Attendee to Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Old EventId": {
+      "main": [
+        [
+          {
+            "node": "Get Event Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Search for Invite Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Event Details": {
+      "main": [
+        [
+          {
+            "node": "Get Invite Reactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Calendar Event Booking Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Invite Replies": {
+      "main": [
+        [
+          {
+            "node": "Get Existing Invite EventID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "For Each User ID...": {
+      "main": [
+        [
+          {
+            "node": "Get User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Invite Reactions": {
+      "main": [
+        [
+          {
+            "node": "Extract Invite Reactions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Add Attendee?": {
+      "main": [
+        [
+          {
+            "node": "Get User Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Create Event?": {
+      "main": [
+        [
+          {
+            "node": "Calendar Event Booking Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Old EventId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invite Reactions": {
+      "main": [
+        [
+          {
+            "node": "Is Attending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Calendar Event Booking Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search for Invite Requests": {
+      "main": [
+        [
+          {
+            "node": "Get Invite Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Invite EventID": {
+      "main": [
+        [
+          {
+            "node": "Should Create Event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Event Booking Agent": {
+      "main": [
+        [
+          {
+            "node": "Create Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

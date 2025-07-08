@@ -1,0 +1,185 @@
+{
+  "id": 2,
+  "name": "RSS to Telegram",
+  "nodes": [
+    {
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        440,
+        30
+      ],
+      "parameters": {
+        "text": "=💹 #日幣匯率 {{$json[\"title\"]}}\n\n{{$json[\"link\"]}}",
+        "chatId": "",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "RSS Feed Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        -359.5,
+        130
+      ],
+      "parameters": {
+        "url": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Latest Read",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -160,
+        130
+      ],
+      "parameters": {
+        "functionCode": "const staticData = this.getWorkflowStaticData('global');\n\nlatestRead = staticData.latestRead;\n\nfor (let item of items) {\n  item.json.latestRead = latestRead || '2021-06-01';\n}\n\nreturn items;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        40,
+        130
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{new Date($node[\"Latest Read\"].data[\"latestRead\"]).getTime()}}",
+              "value2": "={{new Date($node[\"RSS Feed Read\"].data[\"isoDate\"]).getTime()}}"
+            }
+          ],
+          "string": [
+            {
+              "value1": "={{$json[\"title\"]}}",
+              "value2": "",
+              "operation": "contains"
+            }
+          ],
+          "boolean": []
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Write Latest Read",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        240,
+        30
+      ],
+      "parameters": {
+        "functionCode": "const staticData = this.getWorkflowStaticData('global');\n\nif (items.length > 0) {\n  staticData.latestRead = items[0].json.isoDate || staticData.latestRead;\n}\n\n\nreturn items;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        230,
+        270
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        -560,
+        130
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "settings": {
+    "timezone": "Asia/Taipei",
+    "errorWorkflow": "3",
+    "saveExecutionProgress": "DEFAULT"
+  },
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Write Latest Read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "RSS Feed Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Latest Read": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Feed Read": {
+      "main": [
+        [
+          {
+            "node": "Latest Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Latest Read": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

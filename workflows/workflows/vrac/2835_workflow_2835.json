@@ -1,0 +1,515 @@
+{
+  "nodes": [
+    {
+      "id": "6b1865a7-f150-4d2b-b1f7-37c68b2173d6",
+      "name": "Fetch Manifest Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        920,
+        -300
+      ],
+      "parameters": {
+        "url": "={{\"https://<<your-registry-url>>/v2/\" + $json.name + \"/manifests/\" + $json.tag}}",
+        "options": {
+          "fullResponse": true
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3c1daca9-3897-4596-b62d-db561f8cb047",
+      "name": "Remove Old Tags",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueErrorOutput",
+      "position": [
+        840,
+        -40
+      ],
+      "parameters": {
+        "url": "={{\"https://<<your-registry-url>>/v2/\" + $json.image + \"/manifests/\" + $json.tag.digest}}",
+        "options": {},
+        "requestMethod": "DELETE",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.docker.distribution.manifest.v2+json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6974749e-8c85-4334-a7e7-e964f057ed6f",
+      "name": "Retrieve Image Tags",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        400,
+        -300
+      ],
+      "parameters": {
+        "url": "={{\"https://<<your-registry-url>>/v2/\" + $json[\"image\"] + \"/tags/list\"}}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "30857c32-508e-4f95-8e26-c9f2fc84e074",
+      "name": "List Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        40,
+        -300
+      ],
+      "parameters": {
+        "url": "https://<<your-registry-url>>/v2/_catalog",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "c5965a6a-28e6-4217-a846-a849de153430",
+      "name": "Extract Image Names",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        -300
+      ],
+      "parameters": {
+        "jsCode": "const images = items[0].json.repositories;\nreturn images.map(image => ({ json: { image } }));"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b13eb6e5-1a16-4992-b0bd-9b228559fecf",
+      "name": "Identify Tags to Remove",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        600,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "const result = [];\n\nfor (const item of items) {\n  const tags = item.json.tags;\n  if (tags) {\n    const latestTag = tags.includes('latest') ? 'latest' : null;\n    const sortedTags = tags.filter(tag => tag !== 'latest')\n                            .sort((a, b) => new Date(b.created) - new Date(a.created));\n    const keepTags = sortedTags.slice(0, 10);\n    if (latestTag) keepTags.push('latest');\n    const deleteTags = sortedTags.slice(10);\n    result.push(...deleteTags.map(tag => ({ json: { image: item.json.name, tag } })));\n  }\n}\n\nreturn result;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "da15ae49-09ee-4658-86a5-9b0a2180c637",
+      "name": "Scheduled Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -140,
+        -300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "bcc347be-5520-46c0-aac9-0b14ddd8b184",
+      "name": "Send Notification Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        840,
+        180
+      ],
+      "webhookId": "47f852c3-7136-4e6d-92f6-47322dbba5da",
+      "parameters": {
+        "text": "=Image : {{ $json.image }}\nTag : {{ $json.tag.tag }}\n\nRemoved",
+        "options": {},
+        "subject": "Docker Registry Cleaner Notification",
+        "toEmail": "to@example.com",
+        "fromEmail": "from@example.com",
+        "emailFormat": "text"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "2c3770ef-cb4c-4007-8897-f4eb7ad3b7cf",
+      "name": "Split Tags",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        580,
+        -300
+      ],
+      "parameters": {
+        "include": "selectedOtherFields",
+        "options": {
+          "destinationFieldName": "tag"
+        },
+        "fieldToSplitOut": "tags",
+        "fieldsToInclude": "name"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4fffa947-02cf-4608-acab-8284250cf622",
+      "name": "Filter Valid Tags",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        740,
+        -300
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "bb56b84e-e7cb-4867-93f8-ac40c71bde4f",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.tag }}",
+              "rightValue": ""
+            },
+            {
+              "id": "acd8e00c-5fa0-4c62-ba96-9e6f456f7703",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "c023ba14-d12d-497c-9b30-97db04a34c1b",
+      "name": "Fetch Manifest Digest for Blob",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -120,
+        -40
+      ],
+      "parameters": {
+        "url": "={{\"https://<<your-registry-url>>/v2/\" + $('Filter Valid Tags').item.json.name + \"/blobs/\" + $json.body.config.digest}}",
+        "options": {
+          "fullResponse": false
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.docker.distribution.manifest.v2+json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f054b91e-abd4-4854-9bfa-e4a2b70f7e2c",
+      "name": "Update Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        60,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c970bdb8-ddbf-486b-a716-c66274a248a7",
+              "name": "name",
+              "type": "string",
+              "value": "={{ $('Filter Valid Tags').item.json.name }}"
+            },
+            {
+              "id": "7ce79761-6557-413c-a9a6-5d1ca564a3df",
+              "name": "tag",
+              "type": "string",
+              "value": "={{ $('Filter Valid Tags').item.json.tag }}"
+            },
+            {
+              "id": "45948a25-d35c-4e3f-9556-3d52a1a89f80",
+              "name": "created",
+              "type": "string",
+              "value": "={{ $json.created }}"
+            },
+            {
+              "id": "c73a14ad-91f6-477f-b4c3-037db319b9ee",
+              "name": "digest",
+              "type": "string",
+              "value": "={{ $('Fetch Manifest Digest').item.json.headers['docker-content-digest'] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "54405505-8445-491a-8f5d-232da8c842d2",
+      "name": "Group Tags by Image",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        420,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "const groupedData = items.reduce((acc, item) => {\n  const name = item.json.name;\n  if (!acc[name]) {\n    acc[name] = [];\n  }\n  acc[name].push({\n    tag: item.json.tag,\n    created: item.json.created,\n    digest: item.json.digest\n  });\n  return acc;\n}, {});\n\nreturn Object.keys(groupedData).map(name => ({\n  json: { name, tags: groupedData[name] }\n}));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "980aab86-44cd-47d5-b3b7-42cbae26eb09",
+      "name": "Sort by Creation Date",
+      "type": "n8n-nodes-base.sort",
+      "position": [
+        240,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "order": "descending",
+              "fieldName": "created"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0561efb9-4903-4bec-bc1a-8131e5f5de67",
+      "name": "Send Failure Notification Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1120,
+        80
+      ],
+      "webhookId": "47f852c3-7136-4e6d-92f6-47322dbba5da",
+      "parameters": {
+        "text": "=Image : {{ $json.image }}\nTag : {{ $json.tag.tag }}\n\nFailed",
+        "options": {},
+        "subject": "[FAIL] Docker Registry Cleaner Notification",
+        "toEmail": "to@example.com",
+        "fromEmail": "from@example.com",
+        "emailFormat": "text"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "eaa28914-351c-4934-ba1c-0d39faf67ef3",
+      "name": "Execute Garbage Collection",
+      "type": "n8n-nodes-base.ssh",
+      "position": [
+        1120,
+        -100
+      ],
+      "parameters": {
+        "cwd": "/opt/services/",
+        "command": "docker compose exec -it -u root registry bin/registry garbage-collect --delete-untagged /etc/docker/registry/config.yml",
+        "authentication": "privateKey"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Split Tags": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Images": {
+      "main": [
+        [
+          {
+            "node": "Extract Image Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Fields": {
+      "main": [
+        [
+          {
+            "node": "Sort by Creation Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Old Tags": {
+      "main": [
+        [
+          {
+            "node": "Execute Garbage Collection",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Failure Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Tags": {
+      "main": [
+        [
+          {
+            "node": "Fetch Manifest Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scheduled Trigger": {
+      "main": [
+        [
+          {
+            "node": "List Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image Names": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Image Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Tags by Image": {
+      "main": [
+        [
+          {
+            "node": "Identify Tags to Remove",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Image Tags": {
+      "main": [
+        [
+          {
+            "node": "Split Tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Manifest Digest": {
+      "main": [
+        [
+          {
+            "node": "Fetch Manifest Digest for Blob",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort by Creation Date": {
+      "main": [
+        [
+          {
+            "node": "Group Tags by Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify Tags to Remove": {
+      "main": [
+        [
+          {
+            "node": "Remove Old Tags",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Manifest Digest for Blob": {
+      "main": [
+        [
+          {
+            "node": "Update Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

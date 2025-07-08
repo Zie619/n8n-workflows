@@ -1,0 +1,469 @@
+{
+  "name": "Backup workflows to git repository",
+  "nodes": [
+    {
+      "id": "b09ae4c6-ad75-4b3b-a78a-4cc2d48b2d24",
+      "name": "GitHub",
+      "type": "n8n-nodes-base.github",
+      "position": [
+        -40,
+        -20
+      ],
+      "parameters": {
+        "owner": "={{$node[\"Globals\"].json[\"repo\"][\"owner\"]}}",
+        "filePath": "={{$node[\"Globals\"].json[\"repo\"][\"path\"]}}{{$json[\"name\"]}}.json",
+        "resource": "file",
+        "operation": "get",
+        "repository": "={{$node[\"Globals\"].json[\"repo\"][\"name\"]}}",
+        "asBinaryProperty": false,
+        "additionalParameters": {}
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "lSdxakI6ik5M2np2",
+          "name": "Shashikanth | GitHub account"
+        }
+      },
+      "typeVersion": 1,
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "639582ef-f13e-4844-bd10-647718079121",
+      "name": "Globals",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -740,
+        -100
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "repo.owner",
+              "value": "shashikanth171"
+            },
+            {
+              "name": "repo.name",
+              "value": "n8n-backup"
+            },
+            {
+              "name": "repo.path",
+              "value": "workflows/"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9df89713-220e-43b9-b234-b8f5612629cf",
+      "name": "n8n",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        -500,
+        -100
+      ],
+      "parameters": {
+        "filters": {},
+        "requestOptions": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "RgwFr3HsPUEjFJNO",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "43a60315-d381-4ac4-be4c-f6a158651a00",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -280,
+        -100
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "executeOnce": false,
+      "typeVersion": 3
+    },
+    {
+      "id": "41a7da89-1c8c-4100-8c30-d0788962efc1",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        160,
+        -20
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "16a9182d-059d-4774-ba95-654fb4293fdb",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.error }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "ab9246eb-a253-4d76-b33b-5f8f12342542",
+      "name": "If1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1040,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e0c66624-429a-4f1f-bf7b-1cc1b32bad7b",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "={{ $('Loop Over Items').item.json.toJsonString() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "72e4a5a4-6dfe-4b5c-b57b-7c1c9625e967",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        720,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "let items = $input.all()\n\nfor (item of items) {\n    item.json.content = Buffer.from(item.json.content, 'base64').toString('utf8')\n}\n\nreturn items;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "68f14ac5-14d6-432e-9e6b-25df610eadac",
+      "name": "Create new file and commit",
+      "type": "n8n-nodes-base.github",
+      "position": [
+        340,
+        140
+      ],
+      "parameters": {
+        "owner": "={{$node[\"Globals\"].json[\"repo\"][\"owner\"]}}",
+        "filePath": "={{$node[\"Globals\"].json[\"repo\"][\"path\"]}}{{ $('Loop Over Items').item.json.name }}.json",
+        "resource": "file",
+        "repository": "={{$node[\"Globals\"].json[\"repo\"][\"name\"]}}",
+        "fileContent": "={{ $('Loop Over Items').item.json.toJsonString()  }}",
+        "commitMessage": "=[N8N Backup] {{ $('Loop Over Items').item.json.name }}.json"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "lSdxakI6ik5M2np2",
+          "name": "Shashikanth | GitHub account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e50f00a3-292c-4285-b767-8d6ee4606575",
+      "name": "Update file content and commit",
+      "type": "n8n-nodes-base.github",
+      "position": [
+        1400,
+        460
+      ],
+      "parameters": {
+        "owner": "={{$node[\"Globals\"].json[\"repo\"][\"owner\"]}}",
+        "filePath": "={{$node[\"Globals\"].json[\"repo\"][\"path\"]}}{{ $('Loop Over Items').item.json.name }}.json",
+        "resource": "file",
+        "operation": "edit",
+        "repository": "={{$node[\"Globals\"].json[\"repo\"][\"name\"]}}",
+        "fileContent": "={{ $('Loop Over Items').item.json.toJsonString()  }}",
+        "commitMessage": "=[N8N Backup] {{ $('Loop Over Items').item.json.name }}.json"
+      },
+      "credentials": {
+        "githubApi": {
+          "id": "lSdxakI6ik5M2np2",
+          "name": "Shashikanth | GitHub account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4b2d375c-a339-404c-babd-555bd2fc4091",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -960,
+        -100
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "ea026e96-0db1-41fd-b003-2f2bf4662696",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1560,
+        480
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "Workflow changes committed to the repository"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9c402daa-6d03-485d-b8a0-58f1b65d396d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1180,
+        260
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "Check if there are any changes in the workflow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1d9216d9-bf8d-4945-8a58-22fb1ffc9be8",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        160
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "Create a new file for the workflow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "60a3953b-d9f1-4afd-b299-e314116b96c6",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        -120
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "Check if file exists in the repository"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6df689fb-cb49-4634-9d1e-59648a1e7219",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        660,
+        -140
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "Convert the file contents to JSON string"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f2340ad0-71a1-4c74-8d90-bcb974b8b305",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -560,
+        -200
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "Get all workflows"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "617bea19-341a-4e9d-b6fd-6b417e58d756",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -820,
+        40
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "Set variables"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create new file and commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Update file content and commit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Globals": {
+      "main": [
+        [
+          {
+            "node": "n8n",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Globals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create new file and commit": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update file content and commit": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

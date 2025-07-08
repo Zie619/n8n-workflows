@@ -1,0 +1,319 @@
+{
+  "id": "ITH6r6UYtlCyUcpj",
+  "meta": {
+    "instanceId": "b9faf72fe0d7c3be94b3ebff0778790b50b135c336412d28fd4fca2cbbf8d1f5"
+  },
+  "name": "AI Agent : Google calendar assistant using OpenAI",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "2e670a54-f789-4c8b-abba-ae35c458f5ed",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -280,
+        0
+      ],
+      "webhookId": "5308edc9-738b-4aae-a789-214e2392579a",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "96bf895f-a18c-4a4c-bc26-3ec5d2372de5",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        160,
+        820
+      ],
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAi"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "270176df-9c2d-4f1a-b017-9349cb249341",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        580,
+        820
+      ],
+      "parameters": {},
+      "typeVersion": 1.3
+    },
+    {
+      "id": "5cdece35-bd69-4c77-b240-963df8781d64",
+      "name": "Google Calendar - Get Events",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        960,
+        800
+      ],
+      "parameters": {
+        "options": {
+          "timeMax": "={{ $fromAI('end_date') }}",
+          "timeMin": "={{ $fromAI('start_date') }}"
+        },
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": ""
+        },
+        "operation": "getAll",
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool when you\u2019re asked to retrieve events data."
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "634e6472-099c-4f0e-b9eb-67956c4881b8",
+      "name": "Google Calendar - Create events",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        1380,
+        800
+      ],
+      "parameters": {
+        "end": "={{ $fromAI('end_date') }} ",
+        "start": "={{ $fromAI('start_date') }} ",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": ""
+        },
+        "descriptionType": "manual",
+        "toolDescription": "Use this Google Calendar tool when you are asked to create an event.",
+        "additionalFields": {
+          "summary": "={{ $fromAI('event_title') }} ",
+          "attendees": [],
+          "description": "={{ $fromAI('event_description') }} "
+        },
+        "useDefaultReminders": false
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "5c93e130-29d5-489b-84ea-3e31f5849b3a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -380,
+        -380
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 320,
+        "height": 560,
+        "content": "## Chat trigger - When a message is received\n\nThis node is the **entry point of the workflow**. \nIt triggers the workflow whenever a message is sent to the **chat interface**.\n\nOptions with n8n:\n- **Embed the chat interface** anywhere you want.\n- Use a **webhook node** instead of this node to connect with interfaces like **[Streamlit](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)** or **[OpenWebUI](https://docs.openwebui.com/)**.\n- Use nodes for communication platforms (**Slack**, **Teams**, **Discord**, etc.) if you know how to configure them.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a1e850b4-d0fe-417c-8e1e-13fb4cdbb0a8",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        60,
+        -380
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1520,
+        "height": 560,
+        "content": "## Tools Agent - Calendar AI Agent\n\nThis **node** configures the **AI agent** for interaction with Google Calendar. \nIt includes the following features:\n\n- A **prompt source**: This is the user message derived from the chat input of the preceding node (`When chat message is received`).\n- A **system message**: This defines the system prompt to guide the AI agent's behavior. It incorporates the variable `{{ DateTime.local().toFormat('cccc d LLLL yyyy') }`, allowing the AI agent to determine the current date and interact with Google Calendar accordingly. For example, the agent can understand a request like \"Create an event called 'n8n workflow review' for next Tuesday.\"\n\n\nn8n nodes come with built-in **guardrails**, ensuring that if the user requests tasks outside the AI agent's setup, it may not function as intended. (Feel free to test it!)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9b259245-5fd5-4798-973e-bc6aa15da20f",
+      "name": "Calendar AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        580,
+        0
+      ],
+      "parameters": {
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "=You are a Google Calendar assistant.\nYour primary goal is to assist the user in managing their calendar effectively using two tools: Event Creation and Event Retrieval. Always base your responses on the current date: \n{{ DateTime.local().toFormat('cccc d LLLL yyyy') }}.\nGeneral Guidelines:\nIf the user's initial message is vague (e.g., \"hello\" or a generic greeting) or does not specify a request, explain your capabilities clearly:\nExample: \"Hello! I can help you manage your Google Calendar. You can ask me to create an event or retrieve event data. What would you like me to do?\"\nIf the user specifies a request in their first message, begin preparing to use the appropriate tool:\nFor event creation, gather necessary details like start date, end date, title, and description.\nFor event retrieval, ask for the date range or time period they want to query.\nTool: Event Creation\nWhen asked to create an event:\n\nRequest the start and end dates/times from the user.\nDate format: YYYY-MM-DD HH:mm:ss\nCollect the following information:\nstart_date: Exact start date and time of the event.\nend_date: Exact end date and time of the event.\nevent_title: Event title in uppercase. Suggest one if not provided.\nevent_description: Generate a brief description and present it for confirmation.\nTool: Event Retrieval\nWhen asked to retrieve events:\n\nAsk for the date range or period they are interested in. Examples:\nFor \"last week,\" retrieve events from Monday of the previous week to Friday of the same week.\nFor \"today,\" use the current date.\nFormat the date range:\nstart_date: Start date and time in YYYY-MM-DD HH:mm:ss.\nend_date: End date and time in YYYY-MM-DD HH:mm:ss.\nKey Behaviors:\nClarity: Provide a clear and helpful introduction when the user's request is unclear.\nValidation: Confirm details with the user before finalizing actions.\nAdaptation: Handle varying levels of detail in requests (e.g., \"Add a meeting for next Monday morning\" or \"Retrieve my events for this weekend\").\nProactivity: Offer suggestions to fill in missing details or clarify ambiguous inputs.\nLanguage Matching: Ensure all interactions, including event titles, descriptions, and messages, are in the user's language to provide a seamless experience."
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "b902a7d0-c2ca-4ab9-9f2a-047b9ccb1678",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        60,
+        240
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 320,
+        "height": 720,
+        "content": "## OpenAI chat model\n\nThis node specifies the chat model used by the agent. \nIn the template, the **default LLM is gpt-4o** for its high relevance.\n\nOther options:\n- You can **try gpt-4o-mini**, which is more cost-effective.\n- You can also choose **other LLM providers besides OpenAI**, but make sure the LLM you select **supports tool-calling**.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c67e1e1b-ef9a-4fec-a860-4ec6b7439df6",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        240
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 320,
+        "height": 720,
+        "content": "## Window buffer memory\n\nThis node manages the **memory** of the agent, specifically the **context window length** for chat history. \nThe default is set to 5 messages.\n\nNote: \nThe **memory** is **temporary**. If you want to **store conversations with the agent**, you should use other nodes like **Postgres chat memory**. \nThis can be easily set up with services like **[Supabase](https://supabase.com/)**.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bf719d53-e21b-4bd5-9443-c24d008f732b",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        860,
+        240
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 320,
+        "height": 720,
+        "content": "## Google Calendar - Get Events\n\nThis sub-node is a tool used by the AI agent. \nIts purpose is to **retrieve events based on the user input**. \nFor example: *\"Can you give me the events from last week about internal process ?\"*\n\nThe AI agent is designed to **use this tool only** when it has a **date range**. \nIf the user hasn\u2019t provided a date range, the **AI agent will ask the user** for it.\n\nThe **variables** `{{ $fromAI('start_date') }}` and `{{ $fromAI('end_date') }}` are **dynamically filled by the AI**.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e94eb1f8-df42-414b-9bec-9e6991a5a832",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1260,
+        240
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 320,
+        "height": 720,
+        "content": "## Google Calendar - Create Events\n\nThis sub-node is a tool used by the AI agent. \nIts purpose is to **create events based on the user input**. \nFor example: \"Can you create an event 'Quarter revenue meeting' on [date] from [hour] to [hour] ?\"\n\nThe AI agent is designed to **use this tool only** when it has a **date range**. \nIf the user hasn\u2019t provided a **date range**, the AI agent will **ask the user** for it. \nThe variables `{{ $fromAI('start_date') }}` and `{{ $fromAI('end_date') }}` are dynamically filled by the AI.\n\nBefore creating the event, the AI agent will **confirm with the user** if the **title** and **description** of the event are correct. \nThe variables used for this are:\n- `{{ $fromAI('event_title') }}`\n- `{{ $fromAI('event_description') }}`\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "707c011c-c822-4922-8ef7-c4368947d179",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        860,
+        1000
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 720,
+        "height": 380,
+        "content": "## Having fun with it ? Here\u2019s how to level up this AI agent ! \n\nThis workflow demonstrates **how easily you can set up an AI agent to call tools** for you using **n8n**. \nThe tasks here are **useful but very basic**. \n\nIf you want to **enhance the tool-calling capabilities**, consider the following:\n\n- Explore the **\"options\"** in the Google Calendar nodes to see additional features you can use. \n For example, let the AI agent add attendees to events it creates.\n\n- Implement the AI agent with your **teammates and link it to each calendar**. \n Use a `{{ $fromAI('') }}` variable for the calendar field and refine the prompts to suit your needs.\n\n- Add **more actions** for the AI agent to perform with the **Google Calendar API**, expanding its functionality.\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "timezone": "Europe/Paris",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionOrder": "v1"
+  },
+  "versionId": "25b51038-e103-4be6-bcd1-64df4b90d4c6",
+  "connections": {
+    "Calendar AI Agent": {
+      "main": [
+        []
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Calendar AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Calendar AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Calendar AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar - Get Events": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar - Create events": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,470 @@
+{
+  "meta": {
+    "instanceId": "6f3fb2495ae05d668c93cbf9e1649128d6e08178f8a900941cf97e588f18fdfc",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "7fe02521-c46a-4314-9387-b7b4983fa859",
+      "name": "POST Sales Receipt",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        -120
+      ],
+      "parameters": {
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341453851324714/salesreceipt?minorversion=73",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"Line\": [\n    {\n      \"Description\": \"{{ $json.data.object.description }}\",\n      \"DetailType\": \"SalesItemLineDetail\",\n      \"SalesItemLineDetail\": {\n        \"TaxCodeRef\": {\n          \"value\": \"NON\"\n        },\n        \"Qty\": 1,\n        \"UnitPrice\": {{ $json.data.object.amount_received / 100 }},\n        \"ItemRef\": {\n          \"name\": \"Subscription\", \n          \"value\": \"10\"\n        }\n      },\n      \"Amount\": {{ $json.data.object.amount / 100 }},\n      \"LineNum\": 1\n    }\n  ],\n  \"CustomerRef\": {\n    \"value\": {{ $input.all()[2].json.QueryResponse.Customer[0].BillAddr.Id }},\n    \"name\": \"{{ $input.all()[2].json.QueryResponse.Customer[0].DisplayName }}\"\n  },\n  \"CurrencyRef\": {\n    \"value\": \"{{ $json.data.object.currency.toUpperCase() }}\"\n  },\n  \"PrivateNote\": \"Payment from Stripe Payment Intent ID: {{ $json.data.object.id }}\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api"
+      },
+      "credentials": {
+        "quickBooksOAuth2Api": {
+          "id": "IUNAfwwSgnbwWygB",
+          "name": "QuickBooks Online account"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5ed429d7-c93d-48c8-b603-ca8d7efb57ed",
+      "name": "GET Quickbooks Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        400,
+        -20
+      ],
+      "parameters": {
+        "url": "=https://sandbox-quickbooks.api.intuit.com/v3/company/9341453851324714/query?query=select * from Customer Where PrimaryEmailAddr = '{{ $json.email }}'&minorversion=73\n\n",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api"
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "hqXGCVkt6W41KDDK",
+          "name": "Custom Auth account"
+        },
+        "quickBooksOAuth2Api": {
+          "id": "IUNAfwwSgnbwWygB",
+          "name": "QuickBooks Online account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "bef5b4c3-4948-4294-bd80-7039342edf0d",
+      "name": "Get Stripe Customer",
+      "type": "n8n-nodes-base.stripe",
+      "position": [
+        240,
+        -140
+      ],
+      "parameters": {
+        "resource": "customer",
+        "customerId": "={{ $json.data.object.customer }}"
+      },
+      "credentials": {
+        "stripeApi": {
+          "id": "o6KHVZiU8S7O38wq",
+          "name": "Stripe account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "042fff2c-b5e7-4877-b935-f6a707118c4a",
+      "name": "New Payment",
+      "type": "n8n-nodes-base.stripeTrigger",
+      "position": [
+        80,
+        -260
+      ],
+      "webhookId": "5cc15770-f762-4389-8372-1b2926de4570",
+      "parameters": {
+        "events": [
+          "payment_intent.succeeded"
+        ]
+      },
+      "credentials": {
+        "stripeApi": {
+          "id": "o6KHVZiU8S7O38wq",
+          "name": "Stripe account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "12235c25-712b-4e84-b744-60573e00d381",
+      "name": "If Customer Exists",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        560,
+        100
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "aef7393c-c4ff-4196-887d-6a9b057381f8",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.QueryResponse.Customer[0].PrimaryEmailAddr.Address }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "68f63246-cb95-494f-918c-c0c6da5a64f9",
+      "name": "Use Stripe Customer",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        880,
+        120
+      ],
+      "parameters": {},
+      "executeOnce": true,
+      "typeVersion": 3
+    },
+    {
+      "id": "e9eea332-7109-479f-8f50-65b3b9438e0e",
+      "name": "Create QuickBooks Customer",
+      "type": "n8n-nodes-base.quickbooks",
+      "position": [
+        1100,
+        120
+      ],
+      "parameters": {
+        "operation": "create",
+        "displayName": "={{ $input.all()[0].json.name }}",
+        "additionalFields": {
+          "Balance": "={{ $input.all()[0].json.balance }}",
+          "PrimaryEmailAddr": "={{ $input.all()[0].json.email }}"
+        }
+      },
+      "credentials": {
+        "quickBooksOAuth2Api": {
+          "id": "IUNAfwwSgnbwWygB",
+          "name": "QuickBooks Online account"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "f805f03d-93b7-4e3b-8b6a-37d9dd802368",
+      "name": "Merge Stripe and QuickBooks Data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1100,
+        -120
+      ],
+      "parameters": {
+        "numberInputs": 3
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "b9c31838-2bb7-4882-bd15-c096cb97e225",
+      "name": "Merge Payment and QuickBooks Customer",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1320,
+        120
+      ],
+      "parameters": {},
+      "executeOnce": true,
+      "typeVersion": 3
+    },
+    {
+      "id": "cb69fcee-8d5d-47ab-be76-9e25cb0a7f42",
+      "name": "POST Sales Receipt To QuickBooks",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1540,
+        120
+      ],
+      "parameters": {
+        "url": "https://sandbox-quickbooks.api.intuit.com/v3/company/9341453851324714/salesreceipt?minorversion=73",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"Line\": [\n    {\n      \"Description\": \"{{ $json.data.object.description }}\",\n      \"DetailType\": \"SalesItemLineDetail\",\n      \"SalesItemLineDetail\": {\n        \"TaxCodeRef\": {\n          \"value\": \"NON\"\n        },\n        \"Qty\": 1,\n        \"UnitPrice\": {{ $json.data.object.amount_received / 100 }},\n        \"ItemRef\": {\n          \"name\": \"Subscription\", \n          \"value\": \"10\"\n        }\n      },\n      \"Amount\": {{ $json.data.object.amount / 100 }},\n      \"LineNum\": 1\n    }\n  ],\n  \"CustomerRef\": {\n    \"value\": {{ $input.all()[1].json.Id}},\n    \"name\": \"{{ $input.all()[1].json.DisplayName }}\"\n  },\n  \"CurrencyRef\": {\n    \"value\": \"{{ $json.data.object.currency.toUpperCase() }}\"\n  },\n  \"PrivateNote\": \"Payment from Stripe Payment Intent ID: {{ $json.data.object.id }}\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "quickBooksOAuth2Api"
+      },
+      "credentials": {
+        "quickBooksOAuth2Api": {
+          "id": "IUNAfwwSgnbwWygB",
+          "name": "QuickBooks Online account"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 4.2
+    }
+  ],
+  "pinData": {
+    "New Payment": [
+      {
+        "id": "evt_3Qjf7fJJNVDH5POn01Am9Q1x",
+        "data": {
+          "object": {
+            "id": "pi_3Qjf54D14htxZ8341jkWWJJs",
+            "amount": 9500,
+            "object": "payment_intent",
+            "review": null,
+            "source": null,
+            "status": "succeeded",
+            "created": 1737456794,
+            "invoice": "in_1Qje8QD14htxZ834S3Gh3Nn6",
+            "currency": "usd",
+            "customer": "cus_R4OkhTTT1ebzPl",
+            "livemode": false,
+            "metadata": {},
+            "shipping": null,
+            "processing": null,
+            "application": null,
+            "canceled_at": null,
+            "description": "Subscription update",
+            "next_action": null,
+            "on_behalf_of": null,
+            "client_secret": "pi_3Qjf54D14htxZ8341jkWWJJs_secret_FXltcZHFUDM8I4F0AQjRPE9Vz",
+            "latest_charge": "ch_3Qjf54D14htxZ8341xwQhggm",
+            "receipt_email": null,
+            "transfer_data": null,
+            "amount_details": {
+              "tip": {}
+            },
+            "capture_method": "automatic",
+            "payment_method": "pm_1Qh6nED14htxZ834bTgSzUQy",
+            "transfer_group": null,
+            "amount_received": 9500,
+            "amount_capturable": 0,
+            "last_payment_error": null,
+            "setup_future_usage": null,
+            "cancellation_reason": null,
+            "confirmation_method": "automatic",
+            "payment_method_types": [
+              "amazon_pay",
+              "card",
+              "cashapp",
+              "link"
+            ],
+            "statement_descriptor": null,
+            "application_fee_amount": null,
+            "payment_method_options": {
+              "card": {
+                "network": null,
+                "installments": null,
+                "mandate_options": null,
+                "request_three_d_secure": "automatic"
+              },
+              "link": {
+                "persistent_token": null
+              },
+              "cashapp": {},
+              "amazon_pay": {
+                "express_checkout_element_session_id": null
+              }
+            },
+            "automatic_payment_methods": null,
+            "statement_descriptor_suffix": null,
+            "payment_method_configuration_details": null
+          }
+        },
+        "type": "payment_intent.succeeded",
+        "object": "event",
+        "created": 1737456956,
+        "request": {
+          "id": "req_vbXfG1vUORKZJ6",
+          "idempotency_key": "e63d5e07-f753-429c-bd06-c642e23d9ff8"
+        },
+        "livemode": false,
+        "api_version": "2020-08-27",
+        "pending_webhooks": 3
+      }
+    ],
+    "Get Stripe Customer": [
+      {
+        "id": "cus_R4OkhTTT1ebzPl",
+        "name": "Test Usershvili",
+        "email": "Birds@Intuit.com",
+        "phone": null,
+        "object": "customer",
+        "address": {
+          "city": null,
+          "line1": null,
+          "line2": null,
+          "state": null,
+          "country": "GE",
+          "postal_code": null
+        },
+        "balance": 0,
+        "created": 1729495354,
+        "currency": "usd",
+        "discount": null,
+        "livemode": false,
+        "metadata": {},
+        "shipping": null,
+        "delinquent": false,
+        "tax_exempt": "none",
+        "test_clock": null,
+        "description": null,
+        "default_source": null,
+        "invoice_prefix": "F73B0901",
+        "default_currency": "usd",
+        "invoice_settings": {
+          "footer": null,
+          "custom_fields": null,
+          "rendering_options": null,
+          "default_payment_method": null
+        },
+        "preferred_locales": [
+          "en-GB"
+        ]
+      }
+    ]
+  },
+  "connections": {
+    "New Payment": {
+      "main": [
+        [
+          {
+            "node": "Get Stripe Customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Stripe and QuickBooks Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Payment and QuickBooks Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Customer Exists": {
+      "main": [
+        [
+          {
+            "node": "Merge Stripe and QuickBooks Data",
+            "type": "main",
+            "index": 2
+          }
+        ],
+        [
+          {
+            "node": "Use Stripe Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Sales Receipt": {
+      "main": [
+        []
+      ]
+    },
+    "Get Stripe Customer": {
+      "main": [
+        [
+          {
+            "node": "GET Quickbooks Customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Use Stripe Customer",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Use Stripe Customer": {
+      "main": [
+        [
+          {
+            "node": "Create QuickBooks Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Quickbooks Customer": {
+      "main": [
+        [
+          {
+            "node": "If Customer Exists",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Stripe and QuickBooks Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Create QuickBooks Customer": {
+      "main": [
+        [
+          {
+            "node": "Merge Payment and QuickBooks Customer",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Stripe and QuickBooks Data": {
+      "main": [
+        [
+          {
+            "node": "POST Sales Receipt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Payment and QuickBooks Customer": {
+      "main": [
+        [
+          {
+            "node": "POST Sales Receipt To QuickBooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

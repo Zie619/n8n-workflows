@@ -1,0 +1,168 @@
+{
+  "id": 89,
+  "name": "Post RSS feed items from yesterday to Slack",
+  "nodes": [
+    {
+      "name": "Build our message",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1160,
+        400
+      ],
+      "parameters": {
+        "functionCode": "// Create our Slack message\n// This will output a list of RSS items in the following format\n// Title - Description\nlet message = \"*:new: Posts from yesterday :new:*\\n\\n\";\n\n// Loop the input items\nfor (item of items) {\n  message += \"*<\" + item.json.link + \"|\" + item.json.title + \">*\\n\" + item.json.contentSnippet + \"\\n\\n\"; \n}\n\n// Return our message\nreturn [{json: {message}}];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Every Morning",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        380,
+        420
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 8
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get Yesterdays Date",
+      "type": "n8n-nodes-base.dateTime",
+      "position": [
+        560,
+        420
+      ],
+      "parameters": {
+        "value": "={{Date()}}",
+        "action": "calculate",
+        "options": {},
+        "duration": 1,
+        "operation": "subtract"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get the RSS Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        740,
+        420
+      ],
+      "parameters": {
+        "url": "https://n8n.io/blog/rss"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "If it was published after yesterday",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        940,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{$item(0).$node[\"Get Yesterdays Date\"].json.data}}",
+              "value2": "={{$json[\"pubDate\"]}}",
+              "operation": "before"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1340,
+        400
+      ],
+      "parameters": {
+        "text": "={{$json[\"message\"]}}",
+        "channel": "#news",
+        "blocksUi": {
+          "blocksValues": []
+        },
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "53",
+          "name": "Slack Access Token"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Every Morning": {
+      "main": [
+        [
+          {
+            "node": "Get Yesterdays Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get the RSS Feed": {
+      "main": [
+        [
+          {
+            "node": "If it was published after yesterday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build our message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Yesterdays Date": {
+      "main": [
+        [
+          {
+            "node": "Get the RSS Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If it was published after yesterday": {
+      "main": [
+        [
+          {
+            "node": "Build our message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

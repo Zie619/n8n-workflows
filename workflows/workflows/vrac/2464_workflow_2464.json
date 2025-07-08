@@ -1,0 +1,1774 @@
+{
+  "meta": {
+    "instanceId": "408f9fb9940c3cb18ffdef0e0150fe342d6e655c3a9fac21f0f644e8bedabcd9"
+  },
+  "nodes": [
+    {
+      "id": "9ce4eadf-7eef-43bd-bbe9-e25bc5a42df7",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -1076,
+        594
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "b8d12c00-4004-44b4-b793-e9608fd36d5d",
+      "name": "Sort Pages",
+      "type": "n8n-nodes-base.sort",
+      "position": [
+        1440,
+        777
+      ],
+      "parameters": {
+        "options": {},
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "fileName"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "27520282-af95-415e-a3d3-3cf9e4373813",
+      "name": "Split PDF into Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        900,
+        777
+      ],
+      "parameters": {
+        "url": "http://stirlingpdf.io/api/v1/convert/pdf/img",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "fileInput",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "imageFormat",
+              "value": "jpg"
+            },
+            {
+              "name": "singleOrMultiple",
+              "value": "multiple"
+            },
+            {
+              "name": "dpi",
+              "value": "300"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e3862292-3261-4876-b53e-acea88810afb",
+      "name": "Extract Zip File",
+      "type": "n8n-nodes-base.compression",
+      "position": [
+        1080,
+        777
+      ],
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2d949fb6-980f-409a-9b71-bf12927eaa6d",
+      "name": "Images To List",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1260,
+        777
+      ],
+      "parameters": {
+        "jsCode": "let results = [];\n\nfor (item of items) {\n    for (key of Object.keys(item.binary)) {\n        results.push({\n            json: {\n                fileName: item.binary[key].fileName\n            },\n            binary: {\n                data: item.binary[key],\n            }\n        });\n    }\n}\n\nreturn results;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "115c202b-2496-4218-b54d-a6f8974b7698",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        460
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 848.0232558139535,
+        "height": 533.5469767441862,
+        "content": "## 3. Split PDF Pages into Seperate Images\n\nCurrently, the vision model we'll be using can't accept raw PDFs so we'll have to convert our PDF to a image in order to use it. To achieve this, we'll use the free [Stirling PDF webservice](https://stirlingpdf.io/) for convenience but if we need data privacy (recommended!), we could self-host our own [Stirling PDF instance](https://github.com/Stirling-Tools/Stirling-PDF/) instead. Alternatively, feel free to swap this service out for one of your own as long as it can convert PDFs into images!\n\nWe will ask the PDF service to return each page of our statement as separate images, which it does so as a zip file. Next steps is to just unzip the file and convert the output as a list of images."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "186ba0b4-1857-457e-bc5a-e3f9e770a2bd",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        850,
+        737
+      ],
+      "parameters": {
+        "width": 199.23348837209306,
+        "height": 374.95069767441856,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### Privacy Warning!\nThis example uses a public third party service. If your data is senstive, please swap this out for the self-hosted version!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "820bd16b-5311-40ba-9e75-3ca195a9a59b",
+      "name": "Resize Images For AI",
+      "type": "n8n-nodes-base.editImage",
+      "position": [
+        1840,
+        820
+      ],
+      "parameters": {
+        "width": 50,
+        "height": 50,
+        "options": {},
+        "operation": "resize",
+        "resizeOption": "percent"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7f31fbf2-9ec1-42f9-83df-3a8e3f08e1ec",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1680,
+        500
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 775.3441860465115,
+        "height": 636.0809302325588,
+        "content": "## 4. Convert PDF Pages to Markdown Using Vision Model\n[Learn more about using the Basic LLM node](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.chainllm)\n\nPitch decks are fundamentally extravagant sales documents and as such, are incredibly varied in how they are styled, structured and presented. Traditional OCR has often struggled with parsing these kinds of documents as layers and graphical elements and when extracting their contents typically yields poor results; either garbled or missing texts.\n\nMultimodal LLMs are a solution as they use AI vision to \"read\" the pitch deck and can reason about it's layout and intent. Images can be understood and described with context and charts and graphs can also be interpreted. In this demonstration, we'll ask our LLM to transcribe each page in the pitch deck into markdown ensuring it also describes any images or charts it sees."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "187e350c-6526-43d6-b314-aa376a123694",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2500,
+        475.5341395348837
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 814.0329302325591,
+        "height": 518.7793488372092,
+        "content": "## 5. Extract Key Data Confidently From Statement\n[Read more about the Information Extractor](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.information-extractor)\n\nWith our generated markdown, we can use an information extractor node to extract required information or data point from the pitch deck. This can be useful to generate reports and later compare pitch decks against each other. Here, we'll retain the extracted data by updating the relevant row in our Airtable database."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "925a5cea-0c53-4756-94e8-c01bdf38dea7",
+      "name": "Combine All Pages",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        2580,
+        680
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "renameField": true,
+              "outputFieldName": "pages",
+              "fieldToAggregate": "text"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5f521f14-7e0e-48cc-923f-e920343b4027",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        3100,
+        1500
+      ],
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "name",
+                "value": "={{ $('Execute Workflow Trigger').first().json.Name }}"
+              }
+            ]
+          }
+        },
+        "jsonData": "={{ $json.text }}",
+        "jsonMode": "expressionData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "dad5928a-872d-43d2-ad17-5ac98ac6fb27",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "position": [
+        3100,
+        1640
+      ],
+      "parameters": {
+        "options": {},
+        "chunkSize": 2048
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "95f26a88-96f8-42af-9b58-f8b76a45a619",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        4040,
+        1457
+      ],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "761dec49-a251-4727-9976-6e709bd6e030",
+      "name": "OpenAI Chat Model2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2760,
+        840
+      ],
+      "parameters": {
+        "model": "gpt-4o-2024-08-06",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a05ee988-ea08-454d-b7dc-606af4ff4996",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        2980,
+        1500
+      ],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fde83717-68df-49f8-b3c2-d371fbe8a42b",
+      "name": "Delete Existing Vectors",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2620,
+        1340
+      ],
+      "parameters": {
+        "url": "http://qdrant:6333/collections/pitchdecks/points/delete",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={{\n{\n  \"filter\": {\n    \"must\": {\n      \"key\": \"metadata.name\",\n      \"match\": {\n        \"value\": $('Execute Workflow Trigger').first().json.Name\n      }\n    }\n  }\n}\n}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "qdrantApi"
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "NyinAS3Pgfik66w5",
+          "name": "QdrantApi account"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "2555d50b-6645-4990-a7dd-f47327b8a83b",
+      "name": "Continue With Pages Only",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2800,
+        1340
+      ],
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "f59777bf-6bfe-4d5f-a272-be549d6bd583",
+      "name": "Update Pitchdecks Table",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        3100,
+        680
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appCkqc2jc3MoVqDO"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "tblI660SRJAOlSx3p"
+        },
+        "columns": {
+          "value": {
+            "DAUs": "={{ $json.output.current_number_of_DAU.toString() }}",
+            "Name": "={{ $('Execute Workflow Trigger').first().json.Name }}",
+            "Email": "={{ $json.output.email }}",
+            "Phone": "={{ $json.output.phone }}",
+            "Address": "={{ $json.output.address }}",
+            "SignUps": "={{ $json.output.current_number_of_signups.toString() }}",
+            "Twitter": "={{ $json.output.twitter }}",
+            "Founders": "={{ $json.output.founders.join(', ') }}",
+            "LinkedIn": "={{ $json.output.linkedin }}",
+            "Traction": "={{ $json.output.traction }}",
+            "Investors": "={{ $json.output.current_investors.join(', ') }}",
+            "Team Size": "={{ $json.output.team_size.toString() }}",
+            "Verticals": "={{ $json.output.verticals.join(', ') }}",
+            "Location HQ": "={{ $json.output.location }}",
+            "Amount Raised": "={{ $json.output.amount_raised }}",
+            "Founding Year": "={{ $json.output.founding_year }}",
+            "Funding Stage": "={{ $json.output.funding_stage }}",
+            "Business Model": "={{ $json.output.business_model }}",
+            "Is Interesting": "={{ $json.output.is_interesting }}",
+            "Current Revenue": "={{ $json.output.current_revenue }}",
+            "Amount Requested": "={{ $json.output.amount_requested }}",
+            "Executive Summary": "={{ $json.output.executive_summary }}",
+            "Market Validation": "={{ $json.output.market_validation_summary }}",
+            "Value Proposition": "={{ $json.output.value_proposition }}",
+            "Compatible with VC": "={{ $json.output.compatible_with_venture_capital }}",
+            "Geographical Markets": "={{ $json.output.geographical_markets.join(', ') }}",
+            "Requires Fact-Checking": "={{ $json.output.items_requiring_factchecking.join(', ') }}"
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true
+            },
+            {
+              "id": "Name",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "File",
+              "type": "array",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "File",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Executive Summary",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Executive Summary",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Is Interesting",
+              "type": "boolean",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Is Interesting",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Founding Year",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Founding Year",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Funding Stage",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Funding Stage",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Investors",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Investors",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount Raised",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Amount Raised",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount Requested",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Amount Requested",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Current Revenue",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Current Revenue",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SignUps",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "SignUps",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DAUs",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "DAUs",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Traction",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Traction",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Compatible with VC",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Compatible with VC",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Business Model",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Business Model",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Value Proposition",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Value Proposition",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Market Validation",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Market Validation",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Geographical Markets",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Geographical Markets",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Verticals",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Verticals",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Founders",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Founders",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location HQ",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Location HQ",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Address",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Address",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Phone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Email",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "LinkedIn",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Twitter",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Twitter",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Team Size",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Team Size",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Requires Fact-Checking",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Requires Fact-Checking",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Created",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Modified",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Last Modified",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Name"
+          ]
+        },
+        "options": {},
+        "operation": "upsert"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Und0frCQ6SNVX3VV",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "6f2728f4-5dfe-41d8-b4f0-47afd82b9899",
+      "name": "Search Pending Rows",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        -876,
+        594
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appCkqc2jc3MoVqDO"
+        },
+        "limit": 1,
+        "table": {
+          "__rl": true,
+          "mode": "id",
+          "value": "tblI660SRJAOlSx3p"
+        },
+        "options": {},
+        "operation": "search",
+        "returnAll": false,
+        "filterByFormula": "=AND(\n  Name != \"\",\n  File,\n  OR(\n    {Executive Summary} = \"\",\n    {Executive Summary} = BLANK()\n  )\n)"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Und0frCQ6SNVX3VV",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "8131dcb0-bf52-4789-a4d4-256c1c48c9d6",
+      "name": "Get Row",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -696,
+        774
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "={{ $json.fields || $json }}\n"
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "b6c08ce3-b257-44a0-9f69-48a11c12f38f",
+      "name": "Prequisites Met",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -536,
+        774
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "2ef90345-6c34-4f2a-82e6-c79f6fe49975",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.Name }}",
+              "rightValue": ""
+            },
+            {
+              "id": "4af233ee-0f4b-4de4-9eb4-cc9ed9f8ebe9",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.File }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "9e0418ad-06cc-4a54-82e1-ea6b2a3f2ced",
+      "name": "Execute Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        -336,
+        594
+      ],
+      "parameters": {
+        "mode": "each",
+        "options": {},
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $workflow.id }}"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "1d019927-9fdb-45a6-84e5-e3dd198483a2",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        -336,
+        774
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "ffc1fe69-01e4-4ea6-ae86-dd67d6520ec1",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        20,
+        780
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "2c27e01a-47c0-4efc-a7ab-6006c5d7886c",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        380,
+        780
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "binaryToPropery"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b0db2421-3b0b-4975-beba-39a34a05f31c",
+      "name": "Convert to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        560,
+        780
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "data.pdf",
+          "mimeType": "application/pdf"
+        },
+        "operation": "toBinary",
+        "sourceProperty": "data"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2cb33775-0602-4c24-b2cf-271992dcc501",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2500,
+        1040
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 910.9613023255822,
+        "height": 769.9451162790697,
+        "content": "## 6. Build a Vector Store Collection for the Pitch Deck\n[Read more about Qdrant Vector Store](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.vectorstoreqdrant)\n\nWhen it comes to pitch deck, it may not be enough to capture static attributes in table. Wouldn't it be cool if we could also ask questions about the pitch deck itself? Well, thanks for n8n's first class support for vector stores, you can and quite easily too!\n\nIn this demonstration, we'll use the Qdrant Vector Store which you can either sign-up for a free instance at https://qdrant.tech or self-host via docker. Next, it's a simple case of just funneling our transcribed pages into the vector store using the Qdrant Vector Store node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5102a1d4-f64e-4614-9599-eb7e9a3ff1d3",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        3740,
+        1457
+      ],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "224edb67-1a12-4ab4-a44f-381436d5e055",
+      "name": "Vector Store Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "position": [
+        4280,
+        1457
+      ],
+      "parameters": {
+        "name": "get_company_pitchdeck",
+        "description": "Call this tool to search for information contained in a startup/company's pitchdeck."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "51f2bb6c-ec1d-4f53-a852-96e83c243e5b",
+      "name": "OpenAI Chat Model3",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        4420,
+        1597
+      ],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f4f26085-8e0f-4bba-913a-10fe0249f55d",
+      "name": "Embeddings OpenAI1",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        4160,
+        1717
+      ],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3671d902-21f6-407d-b651-beac854ff78c",
+      "name": "OpenAI Chat Model4",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2020,
+        980
+      ],
+      "parameters": {
+        "model": "gpt-4o-2024-08-06",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4916585b-e029-42b6-9391-aa6b81c4ff95",
+      "name": "Generate Report",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "position": [
+        2760,
+        680
+      ],
+      "parameters": {
+        "text": "= {{ $json.pages.join('---') }}",
+        "options": {
+          "systemPromptTemplate": "You are playing the role of a Venture Capitalist with the following persona:\n\nLocation: San Francisco, California, USA\n\n## Background \n* Education: Bachelor's in Finance from the University of California, Berkeley. MBA from Stanford Graduate School of Business.\n* Career: Started as an investment banker at Goldman Sachs, then transitioned into venture capital as a junior partner at a mid-sized VC firm in Silicon Valley. Founded his own VC firm, Harper Capital, after several successful investments in early-stage startups. With over 15 years of experience, Jim has built a reputation for identifying promising startups and helping them scale.\n* Track Record: His early investments in fintech companies like Plaid and Robinhood brought significant returns. Currently managing a $500 million fund focused on early-stage startups.\n* Industry Focus: Fintech\n\nJim is particularly passionate about financial technology startups, especially those disrupting traditional banking, payment systems, and lending. He’s interested in companies that promote financial inclusion, simplify personal finance, or democratize investing. He believes the next major financial revolution will come from blockchain and decentralized finance (DeFi) platforms, but he remains cautious about overhyped cryptocurrencies.\n\n## Investment Style:\n* Stage: Seed to Series A\n* Check Size: $1 million to $10 million\n* Preferred Business Models: B2B SaaS and platform-driven fintech solutions\n* Founder Criteria: He looks for passionate, gritty founders who deeply understand the financial system and can navigate regulatory complexities.\n\n## Personality:\n\n### Strengths:\n* Analytical: Jim is highly data-driven and excels at performing thorough due diligence, meticulously analyzing financial projections and market data.\nHands-on Mentor: He takes an active role in the companies he invests in, offering strategic guidance on business models, scaling, and leadership development.\n* Networked: Jim has deep connections with major banks, hedge funds, and technology partners, helping his startups form crucial partnerships.\nPersonality Weakness: Overly Risk-Averse\n\nWhile Jim is known for his sharp financial acumen, he often hesitates to invest in more disruptive, experimental technologies. This risk aversion can cause him to miss out on breakthrough opportunities in early, unproven markets. He tends to favor startups with proven business models over \"moonshot\" ideas, which has occasionally led to regrets about passing on high-risk, high-reward ventures.\nJim Harper's experience, focus on fintech, and a disciplined investment approach have made him a trusted name in venture capital, though his cautious nature sometimes keeps him on the sidelines during tech's biggest waves.\n--\n\nAnalyse the pitch deck and provide an executive summary, fact checking review and judgement of if the pitching startup would be of interest to you based on your experience and investment strategy.\n\nFor any property not found, leave blank."
+        },
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n    \t\"startup_name\": { \"type\": \"string\" },\n        \"founders\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n\t\t\"founding_year\": { \"type\": \"string\" },\n        \"team_size\": { \"type\": \"number\" },\n        \"location\": { \"type\": \"string\" },\n        \"address\": { \"type\": \"string\" },\n        \"phone\": { \"type\": \"string\" },\n        \"email\": { \"type\": \"string\" },\n        \"linkedin\": { \"type\": \"string\" },\n        \"twitter\": { \"type\": \"string\" },\n\n        \"funding_stage\": { \"type\": \"string\" },\n        \"current_investors\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n        \"amount_raised\": { \"type\": \"string\" },\n        \"current_revenue\": { \"type\": \"string\" },\n        \"current_number_of_signups\": { \"type\": \"number\" },\n        \"current_number_of_DAU\": { \"type\": \"number\" },\n\n        \"business_model\": { \"type\": \"string\" },\n        \"geographical_markets\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n        \"verticals\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },   \n        \"value_proposition\": { \"type\": \"string\" },\n        \"market_validation_summary\": { \"type\": \"string\" },\n        \"traction\": { \"type\": \"string\", \"description\": \"a summary of the amount of traction claimed\" },\n        \"amount_requested\": { \"type\": \"string\", \"description\": \"A range\" },\n        \"compatible_with_venture_capital\": { \"type\": \"boolean\" },\n\n        \"executive_summary\": { \"type\": \"string\" },\n        \"items_requiring_factchecking\":  { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n        \"is_interesting\": { \"type\": \"boolean\" }\n \t}\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b31ab62d-655c-4b5d-aeb6-4c397b70b743",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3440,
+        1040
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1265.6381521804071,
+        "height": 846.3684803288264,
+        "content": "## 6. Offer a Pitch Deck Q&A Chatbot to your Team\n[Learn more about using AI Agents](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent)\n\nTake your workflows to the next level with n8n's AI Agents! This step demonstrates how powerful and yet simple it is to spin up an AI-powered chatbot and RAG implementation over the pitch decks. This AI Agent connects to our Pitch deck vector store and because it able to filter by company, it is capable of answering any questions about any relevant pitch decks the user is enquirying about. This makes for a powerful workflow which goes beyond just reporting and is a way to engage all stakeholders!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6de1428a-4b0f-498c-8fb5-d9a9983be592",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -60,
+        564.0002976744187
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 830.0502325581398,
+        "height": 431.48621395348823,
+        "content": "## 2. Download the Pitch Deck \n[Learn more about Execute Workflow Trigger](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executeworkflowtrigger)\n\nIn step 1 we triggered the subworkflow with the name and Airtable asset URL of the pitch deck. We'll use the HTTP request node to download the PDF of the pitch deck. Important to note that this template only handles PDF pitch decks and if you have pitchdecks in other formats such as PPT, you'll have to convert them to PDF."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2f1aad79-f765-4678-bf38-d37982e3ffc7",
+      "name": "Download Deck From Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        200,
+        780
+      ],
+      "parameters": {
+        "url": "={{ $json.File[0].url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "966f6673-7cfe-4bf0-9e72-8ad3b1cb389b",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1180,
+        380
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1077.6820093023243,
+        "height": 612.7294511627911,
+        "content": "## 1. Trigger Workflow From Airtable \n[Read more about using Airtable](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.airtable)\n\nThis workflow uses Airtable as the database to find and track which pitch decks are available and which need to be processed. You can find the example Airtable here: https://airtable.com/appCkqc2jc3MoVqDO/shrS21vGqlnqzzNUc. This workflow is also designed to run through multiple pitch decks using seperate executions. To do this, we'll send each pitch deck through the \"execute workflow\" to start a new subworkflow execution."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "951d48ee-5767-44af-af6e-eb4456803bf5",
+      "name": "Airtable Trigger For Pending Rows",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "position": [
+        -1076,
+        774
+      ],
+      "parameters": {
+        "baseId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "appCkqc2jc3MoVqDO"
+        },
+        "tableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "tblI660SRJAOlSx3p"
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerField": "File",
+        "authentication": "airtableTokenApi",
+        "additionalFields": {
+          "fields": "Name,File,Executive Summary",
+          "formula": "=AND(\n  Name != \"\",\n  File,\n  OR(\n    {Executive Summary} = \"\",\n    {Executive Summary} = BLANK()\n  )\n)"
+        },
+        "downloadFieldNames": "data",
+        "downloadAttachments": true
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Und0frCQ6SNVX3VV",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "de2d910c-1307-408a-ba30-9dd30ec5b35f",
+      "name": "Transcribe to Markdown",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        2020,
+        820
+      ],
+      "parameters": {
+        "text": "transcribe the document to markdown.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You help transcribe documents to markdown, keeping faithful to all text printed and visible to the best of your ability.\n* Ensure you capture all headings, subheadings, titles as well as small print.\n* For any tables found with the document, convert them to markdown tables. If table row descriptions overflow into more than 1 row, concatanate and fit them into a single row. If two or more tables are adjacent horizontally, stack the tables vertically instead. There should be a newline after every markdown table.\n* For any charts, describe the chart type, purpose and result and capture all relevant titles, labels, legends and generaet a table for the datapoints if possible.\n* For images, describe the image along with any captions.\n* Label headers and footers with \"HEADER:\" and \"FOOTER:\" respectively."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "messageType": "imageBinary"
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.4
+    },
+    {
+      "id": "f3b7828e-39db-4e65-a512-4fa363043bf4",
+      "name": "Identify Companies In Question",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "position": [
+        3740,
+        1257
+      ],
+      "parameters": {
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemPromptTemplate": "Help identify the names of one or more company who the user is interested in or is requesting the pitch deck of."
+        },
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"array\",\n\t\"items\": {\n\t\t\"type\": \"string\"\n    }\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "83637db6-da8a-4424-9c8a-23a771e1a9b5",
+      "name": "Qdrant Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "position": [
+        4160,
+        1597
+      ],
+      "parameters": {
+        "options": {
+          "searchFilterJson": "={{\n{\n  [$json.output.length > 1 ? \"should\" : \"must\"]: $json.output.map(item => ({\n     \"key\": \"metadata.name\",\n     \"match\": { \"value\": item }\n  }))\n}\n}}"
+        },
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "pitchdecks"
+        }
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "NyinAS3Pgfik66w5",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5b228dd3-1c24-4da9-bbe9-86926e603c8b",
+      "name": "Ask Questions About Pitchdecks",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        4060,
+        1257
+      ],
+      "parameters": {
+        "text": "={{ $('When chat message received').item.json.chatInput }}\n",
+        "options": {
+          "systemMessage": "You help the user answer questions about a startup's pitch deck if it is available in our knowledge base. Assume all user questions are referring to the pitchdecks. Only use the knowledge base to answer questions. If you cannot find the requested information in the knowledge base, then let the user know.\n\nBefore answering any questions, ensure the user has specified a startup in which they want to enquire about and that the startup pitchdeck exists in the database. If the pitchdeck is not known to us, let the user know."
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.6
+    },
+    {
+      "id": "619f5ae1-476c-47b7-bdbe-b691732088cc",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        4160,
+        1457
+      ],
+      "parameters": {
+        "sessionKey": "={{ $('When chat message received').first().json.sessionId }}",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "0da11ff6-46b9-4cb3-9285-1e3b03c3ce6e",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1880,
+        280
+      ],
+      "parameters": {
+        "width": 671.0736854602326,
+        "height": 705.4789168988943,
+        "content": "## Try It Out!\n\n### This n8n template imports Pitch Decks and generates a report into Airtable as well as creates an AI Chatbot to ask questions about each Pitch Deck.\n\n* Airtable is used as the pitch deck database and PDF decks are downloaded from it.\n* An AI Vision model is used to transcribe each page of the pitch deck into markdown.\n* An Information Extractor is used to generate a report from the transcribed markdown and update required information back into pitch deck database.\n* The transcribed markdown is also uploaded to a vector store to build an AI chatbot which can be used to ask questions on the pitch deck.\n\nCheck out the sample Airtable here: https://airtable.com/appCkqc2jc3MoVqDO/shrS21vGqlnqzzNUc\n\n### How To Use\n* This template depends on the availability of the Airtable - make a duplicate of the airtable (https://airtable.com/appCkqc2jc3MoVqDO/shrS21vGqlnqzzNUc) and its columns before running the workflow.\n* When a new pitchdeck is received, enter the company name into the **Name** column and upload the pdf into the **File** column. Leave all other columns blank.\n* If you have the Airtable trigger active, the execution should start immediately once the file is uploaded. Otherwise, click the manual test trigger to start the workflow.\n* When manually triggered, all \"new\" pitch decks will be handled by the workflow as separate executions.\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "960b5909-84a2-4bb2-b86f-8c9d1d80e4ab",
+      "name": "Check Pitch Deck Exists",
+      "type": "n8n-nodes-base.airtableTool",
+      "position": [
+        4560,
+        1457
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "appCkqc2jc3MoVqDO",
+          "cachedResultUrl": "https://airtable.com/appCkqc2jc3MoVqDO",
+          "cachedResultName": "Pitchdecks"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblI660SRJAOlSx3p",
+          "cachedResultUrl": "https://airtable.com/appCkqc2jc3MoVqDO/tblI660SRJAOlSx3p",
+          "cachedResultName": "Table 1"
+        },
+        "options": {},
+        "operation": "search",
+        "descriptionType": "manual",
+        "filterByFormula": "=AND(Name=\"{{ $fromAI(\"company_name\", \"The name of the company\", \"string\", \"\") }}\")",
+        "toolDescription": "Call this tool to check if a startup or company's pitchdeck exists in the knowledge base. This tool does not search for information inside the pitchdeck. An error or empty response indicates that the startup/company's pitchdeck does not exist."
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "Und0frCQ6SNVX3VV",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "bb542537-ef88-4a4b-8af5-b679f6e42885",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        3560,
+        1257
+      ],
+      "webhookId": "9322ad29-d67e-4ced-abb3-46fa569393f1",
+      "parameters": {
+        "public": true,
+        "options": {
+          "title": "Pitch Deck Analysis",
+          "subtitle": "Ask question's about a startup's pitch deck"
+        },
+        "initialMessages": "This chat allows you to ask questions about a startup's pitch deck. Please start by giving the name of the startup."
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "706fe30c-b725-4453-a3b4-4880380ceef0",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -720,
+        600
+      ],
+      "parameters": {
+        "color": 5,
+        "height": 91.86072082734213,
+        "content": "### Change Me!\nRemember to update Airtable nodes to point  to your own."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "33fcc696-c25d-4141-82e0-b6c537e70a08",
+      "name": "Pitchdecks Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "position": [
+        3000,
+        1340
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {
+          "collectionConfig": "={{\n{\n  \"vectors\": {\n    \"distance\": \"Cosine\",\n    \"size\": 1536\n  }\n}\n}}"
+        },
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=pitchdecks"
+        }
+      },
+      "credentials": {
+        "qdrantApi": {
+          "id": "NyinAS3Pgfik66w5",
+          "name": "QdrantApi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6b0e7b83-e552-4809-bb38-0cc9921206e8",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2300,
+        1340
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 278.26180226980307,
+        "height": 91.64489634298351,
+        "content": "### Change Me!\nYou'll need to update the Qdrant URL in the \"Delete Existing Vectors\" node."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Row": {
+      "main": [
+        [
+          {
+            "node": "Prequisites Met",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Pages": {
+      "main": [
+        [
+          {
+            "node": "Resize Images For AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Images To List": {
+      "main": [
+        [
+          {
+            "node": "Sort Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Split PDF into Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Update Pitchdecks Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prequisites Met": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Zip File": {
+      "main": [
+        [
+          {
+            "node": "Images To List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine All Pages": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pitchdecks Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Ask Questions About Pitchdecks",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Store Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Ask Questions About Pitchdecks",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Identify Companies In Question",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Vector Store Tool",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Transcribe to Markdown",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pitchdecks Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Vector Store Tool",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Pending Rows": {
+      "main": [
+        [
+          {
+            "node": "Get Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resize Images For AI": {
+      "main": [
+        [
+          {
+            "node": "Transcribe to Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Ask Questions About Pitchdecks",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split PDF into Images": {
+      "main": [
+        [
+          {
+            "node": "Extract Zip File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe to Markdown": {
+      "main": [
+        [
+          {
+            "node": "Combine All Pages",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Continue With Pages Only",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Delete Existing Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Pitch Deck Exists": {
+      "ai_tool": [
+        [
+          {
+            "node": "Ask Questions About Pitchdecks",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Existing Vectors": {
+      "main": [
+        [
+          {
+            "node": "Continue With Pages Only",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Continue With Pages Only": {
+      "main": [
+        [
+          {
+            "node": "Pitchdecks Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download Deck From Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Identify Companies In Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Deck From Airtable": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify Companies In Question": {
+      "main": [
+        [
+          {
+            "node": "Ask Questions About Pitchdecks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable Trigger For Pending Rows": {
+      "main": [
+        [
+          {
+            "node": "Get Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Search Pending Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

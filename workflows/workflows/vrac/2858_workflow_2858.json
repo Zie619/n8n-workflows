@@ -1,0 +1,414 @@
+{
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "b9a807c3-5847-477a-a242-2fdf5b15ba7e",
+      "name": "API to Check existing merge request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -840,
+        -20
+      ],
+      "parameters": {
+        "url": "=https://gitlab.com/<projectid>/merge_requests",
+        "options": {
+          "allowUnauthorizedCerts": false
+        },
+        "sendQuery": true,
+        "sendHeaders": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "state",
+              "value": "opened"
+            },
+            {
+              "name": "source_branch",
+              "value": "=sourceBranchName"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "PRIVATE-TOKEN",
+              "value": "=gitlabToken"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "42270a5a-d696-44f3-b2f5-16b2ddb3488c",
+      "name": "Is Exists",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -660,
+        -20
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d895b8cc-5679-442f-a1bf-d8375174a24b",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $node[\"API to Check existing merge request\"].data.isEmpty() }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "d380c943-0525-4976-9e70-c90de1177f0c",
+      "name": "Create New Merge Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -440,
+        -200
+      ],
+      "parameters": {
+        "url": "=https://gitlab.com/<projectid>/merge_requests",
+        "method": "POST",
+        "options": {
+          "allowUnauthorizedCerts": false
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source_branch",
+              "value": "=sourceBranchName"
+            },
+            {
+              "name": "target_branch",
+              "value": "=targetBranchName"
+            },
+            {
+              "name": "title",
+              "value": "=mergeTitle"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "PRIVATE-TOKEN",
+              "value": "=gitlabToken"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "600a0ed5-cb68-4479-8aee-55b55f0d8630",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -440,
+        160
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "555643cb-761c-41ec-b983-8e0194851a8d",
+      "name": "API to CLOSE existing Merge Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -220,
+        180
+      ],
+      "parameters": {
+        "url": "=https://gitlab.com/<projectid>/merge_requests/<merge_iid>",
+        "method": "PUT",
+        "options": {
+          "allowUnauthorizedCerts": false
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "state_event",
+              "value": "close"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "PRIVATE-TOKEN",
+              "value": "=gitlabToken"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "0c94b06a-80e3-4e50-8bac-2bd4015f085e",
+      "name": "Add Custom Notes To Merge Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -220,
+        -200
+      ],
+      "parameters": {
+        "url": "=https://gitlab.com/<projectid>/merge_requests/<merge_iid>/notes",
+        "method": "POST",
+        "options": {
+          "allowUnauthorizedCerts": false
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "=<mergeComments>"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "PRIVATE-TOKEN",
+              "value": "=gitlabToken"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "8e849f4f-2a52-46ba-9e0a-17126a8d966c",
+      "name": "30 secs wait to approve merge request and pipeline to finish1",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        140,
+        -200
+      ],
+      "webhookId": "ac7bb2de-2c6f-479a-8807-13a29d8eaf5e",
+      "parameters": {
+        "amount": 30
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "05cca829-b2df-4c1e-9441-56349acc4a0d",
+      "name": "Merge When Pipeline Succeeds",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        720,
+        -200
+      ],
+      "parameters": {
+        "url": "=https://gitlab.com/<projectid>/merge_requests/<merge_iid>/merge",
+        "method": "PUT",
+        "options": {
+          "allowUnauthorizedCerts": false
+        },
+        "jsonBody": "={\n\"merge_when_pipeline_succeeds\": {{ $('setValueForMerge').item.json.merge_when_pipeline_succeeds }},\n  \"should_remove_source_branch\": {{ $('setValueForMerge').item.json.should_remove_source_branch }}\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "PRIVATE-TOKEN",
+              "value": "=gitlabToken"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e3ce9cdc-5484-4b4b-8701-6b9089a1f76d",
+      "name": "setValueForMerge",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        460,
+        -200
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a22922c7-0c69-4ac1-bd15-4d289fa57737",
+              "name": "merge_when_pipeline_succeeds",
+              "type": "boolean",
+              "value": false
+            },
+            {
+              "id": "17580668-84d9-4ad6-b93b-e7b6c9c0f8ea",
+              "name": "should_remove_source_branch",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "0d49ec98-4806-492e-a6c2-a298ed8bb11a",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -1160,
+        -20
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Is Exists": {
+      "main": [
+        [
+          {
+            "node": "Create New Merge Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "API to Check existing merge request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "API to CLOSE existing Merge Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "API to Check existing merge request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "setValueForMerge": {
+      "main": [
+        [
+          {
+            "node": "Merge When Pipeline Succeeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create New Merge Request": {
+      "main": [
+        [
+          {
+            "node": "Add Custom Notes To Merge Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Custom Notes To Merge Request": {
+      "main": [
+        [
+          {
+            "node": "30 secs wait to approve merge request and pipeline to finish1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API to CLOSE existing Merge Request": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API to Check existing merge request": {
+      "main": [
+        [
+          {
+            "node": "Is Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "30 secs wait to approve merge request and pipeline to finish1": {
+      "main": [
+        [
+          {
+            "node": "setValueForMerge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

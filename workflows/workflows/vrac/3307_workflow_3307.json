@@ -1,0 +1,835 @@
+{
+  "meta": {
+    "instanceId": "6a5e68bcca67c4cdb3e0b698d01739aea084e1ec06e551db64aeff43d174cb23",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "bc49829b-45f2-4910-9c37-907271982f14",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        100,
+        0
+      ],
+      "parameters": {
+        "width": 780,
+        "height": 540,
+        "content": "### 4. Do you need more details?\nFind a step-by-step guide in this tutorial\n![Guide](https://www.samirsaci.com/content/images/2025/04/Pomodoro-Timer.png)\n[🎥 Watch My Tutorial](https://www.youtube.com/watch?v=ztMMrmbgGEo)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b5f24526-f1fc-43b0-82bf-887288838304",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        -2560,
+        540
+      ],
+      "webhookId": "09021985-57be-46c0-ac3d-c3a029ebf9e9",
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "8bb53ae0-515a-493d-9c1a-8a06362ada2e",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -2340,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a0be860f-a9ae-4a49-b478-dac25bd550e2",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              },
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.text }}",
+              "rightValue": "/"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "2bba3d64-03b7-4875-ac13-d4be13d2aa6d",
+      "name": "Deep Work",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -1680,
+        460
+      ],
+      "webhookId": "e4e8c51c-286e-47ff-809c-510069debd56",
+      "parameters": {
+        "unit": "minutes",
+        "amount": 25
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "bc3ea269-cbc5-4c7d-8ea1-74413883e425",
+      "name": "Break",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -1340,
+        460
+      ],
+      "webhookId": "3d3e199b-257c-4517-ab36-3e32242dabf8",
+      "parameters": {
+        "unit": "minutes"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "da225392-cd09-4afb-ba56-816484c742ae",
+      "name": "Initiate Static Data",
+      "type": "n8n-nodes-base.code",
+      "notes": "You only need to run the initialization step once per workflow, regardless of the number of Telegram chat IDs. The initialization creates the telegramStates object within the global static data of the workflow. Once that object exists, the workflow will use it to store the state for any chat ID.",
+      "position": [
+        -2540,
+        -160
+      ],
+      "parameters": {
+        "jsCode": "let workflowStaticData = $getWorkflowStaticData('global');\nif (!workflowStaticData.telegramStates) {\n    workflowStaticData.telegramStates = {}; \n}\nreturn workflowStaticData;\n"
+      },
+      "notesInFlow": false,
+      "typeVersion": 2
+    },
+    {
+      "id": "b4f1ae18-ff8d-4b1d-8c26-8e3f87350d2d",
+      "name": "Increment Count",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1180,
+        460
+      ],
+      "parameters": {
+        "jsCode": "let workflowStaticData = $getWorkflowStaticData('global');\n\nif (!workflowStaticData.telegramStates) {\n    workflowStaticData.telegramStates = {}; \n}\n\nlet userId = $('Telegram Trigger').first().json.message.chat.id.toString();\n\n// Ensure the user object exists\nif (!workflowStaticData.telegramStates[userId]) {\n    workflowStaticData.telegramStates[userId] = { count: 0, sessionId: \"\", startTime: \"\" };\n}\n\n// Check if sessionId is missing, then generate one\nif (!workflowStaticData.telegramStates[userId].sessionId) {\n    workflowStaticData.telegramStates[userId].sessionId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);\n    workflowStaticData.telegramStates[userId].startTime = new Date().toISOString();\n}\n\n// Increment the Pomodoro count\nworkflowStaticData.telegramStates[userId].count += 1;\n\n// Return the updated session details\nreturn [\n    {\n        json: {\n            count: workflowStaticData.telegramStates[userId].count,\n            sessionId: workflowStaticData.telegramStates[userId].sessionId,\n            startTime: workflowStaticData.telegramStates[userId].startTime\n        }\n    }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "5315d3fc-9c1e-4f3d-9e00-81f806d84e6a",
+      "name": "Record Deep Work",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -720,
+        400
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Date": "={{ $now.format('dd-LL-yyyy') }}",
+            "Time": "={{ $now.hour.toString().padStart(2, '0') }}:{{ $now.minute.toString().padStart(2, '0') }} ",
+            "User ID": "={{ $json.result.chat.id }}",
+            "Block Type": "Deep Work",
+            "Pomodoro Count": "={{ $('Increment Count').item.json.count }}",
+            "Working Session ID": "={{ $('Increment Count').item.json.sessionId }}",
+            "Break Duration (min)": "5",
+            "Focus Duration (min)": "25"
+          },
+          "schema": [
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Time",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "User ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "User ID",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Working Session ID",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Working Session ID",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Block Type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Block Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pomodoro Count",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Pomodoro Count",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Focus Duration (min)",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Focus Duration (min)",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Break Duration (min)",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Break Duration (min)",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "=",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.5
+    },
+    {
+      "id": "7328bccb-bb00-42bb-9659-6f66600894cc",
+      "name": "Record Long Break",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        -120,
+        460
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Date": "={{ $now.format('dd-LL-yyyy') }}",
+            "Time": "={{ $now.hour.toString().padStart(2, '0') }}:{{ $now.minute.toString().padStart(2, '0') }} ",
+            "User ID": "={{ $json.result.chat.id }}",
+            "Block Type": "Long Break",
+            "Pomodoro Count": "={{ $('Increment Count').item.json.count }}",
+            "Working Session ID": "={{ $('Increment Count').item.json.sessionId }}",
+            "Break Duration (min)": "15",
+            "Focus Duration (min)": "0"
+          },
+          "schema": [
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Time",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "User ID",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "User ID",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Working Session ID",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Working Session ID",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Block Type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Block Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pomodoro Count",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Pomodoro Count",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Focus Duration (min)",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Focus Duration (min)",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Break Duration (min)",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Break Duration (min)",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "=",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "2d45a378-7188-4ac2-bb2e-c0ba745794d7",
+      "name": "Instructions Message",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -2160,
+        660
+      ],
+      "webhookId": "a4c1043e-0520-4ef6-994c-6e733f90827b",
+      "parameters": {
+        "text": "=💡 Oops! That’s not a valid command.\n\nHere’s what you can do:\n✅ /start – Kick off a Pomodoro session and get in the zone.\n✅ /stop – Wrap up your session like a productivity pro.\n\nNow, let’s get some deep work done! 🔥💻",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "additionalFields": {}
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "14c90858-f22d-4495-bda0-c846209e6736",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2580,
+        -400
+      ],
+      "parameters": {
+        "width": 440,
+        "height": 380,
+        "content": "### 0. Initiate Workplace Static Data\nRun it **once** before activating the workflow to initialize workspace data that will be used to **store state flags** and **outputs from users**.\n\n#### How to setup?\n- **Code Node:** do not change anything, just run it\n  [Learn more about the code node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.code)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "26cdb973-26eb-41a6-b071-11b5b51faf70",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2580,
+        0
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 620,
+        "height": 940,
+        "content": "### 1. Workflow Trigger with Telegram Message\n1. The workflow is triggered by a user message. \n2. The second is checking if the message is a command (starting with \"/\") to route it to the proper block. If the message is not a command, the bot sends an instruction message to the user.\n3. The third node checks if the message is a **/stop**. If yes, we stop the workflow the bot send a notice to the user and state variables are clears\n\n#### How to setup?\n- **Telegram Nodes:** set up your telegram bot credentials\n[Learn more about the Telegram Trigger Node](https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.telegramtrigger/)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6d4f131c-076e-4d0a-9738-847692557468",
+      "name": "start or stop?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -2160,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f169eadd-424b-42b0-8229-615608ecb23c",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.text }}",
+              "rightValue": "/start"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "aa50b802-83f1-47da-a9eb-cf2fc9576c28",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1900,
+        0
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1360,
+        "height": 940,
+        "content": "### 2. Deep Work Blocks of 25 minutes\n1. The bot notifies the user that the session started.\n2. After 25 minutes, it sends a notification to inform the user that [he/she] should take a break.\n3. The loop continues until we reached four working sessions.\n\n#### Why do we need Google Sheets?\nEach deep work session is recorded to help users keep track of their stats.\n\n#### How to setup?\n- **Deep Work & Break Mode**: fix the amount of time you want for the deep work session (Default: 25 min) and the short break (Default: 5 min)\n- **Telegram Nodes:** set up your telegram bot credentials\n[Learn more about the Telegram Trigger Node](https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.telegramtrigger/)\n- **Record Deep Work in the Google Sheet Node**:\n   1. Add your Google Sheet API credentials to access the Google Sheet file\n   2. Select the file using the list, an URL or an ID\n   3. Select the sheet in which you want to record your working sessions\n   4. Map the fields\n  [Learn more about the Google Sheet Node](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.googlesheets)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6a7b7b74-61b0-40de-8def-7bc602302d05",
+      "name": "Long Break Notification",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -440,
+        520
+      ],
+      "webhookId": "251e850d-fcad-4fe8-a335-001ff1677415",
+      "parameters": {
+        "text": "🍴 Time for a long break. Great job!",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "fc63c241-53ee-4443-9a8c-a8f8a5da992b",
+      "name": "Clear Variables1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1680,
+        760
+      ],
+      "parameters": {
+        "jsCode": "let workflowStaticData = $getWorkflowStaticData('global');\nif (workflowStaticData.telegramStates) {\n    delete workflowStaticData.telegramStates[$('Telegram Trigger').first().json.message.chat.id.toString()];\n}\n\nreturn $input.all();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "12297308-57ca-493f-8e65-49e396042893",
+      "name": "Clear Variables2",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -120,
+        640
+      ],
+      "parameters": {
+        "jsCode": "let workflowStaticData = $getWorkflowStaticData('global');\nif (workflowStaticData.telegramStates) {\n    delete workflowStaticData.telegramStates[$('Telegram Trigger').first().json.message.chat.id.toString()];\n}\n\nreturn $input.all();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "46ab1b8b-c9be-4da9-a470-d1a4c9fcc219",
+      "name": "< 4 Cycles",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -720,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "307c1ccf-9a10-49e6-a59d-d250edb1cae5",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $('Increment Count').item.json.count }}",
+              "rightValue": 4
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "22752905-50fc-48ee-9b4c-f80e6184c17f",
+      "name": "Short Break Notification",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -1520,
+        460
+      ],
+      "webhookId": "b436cc4e-83d8-4bfa-9de9-e37cde83f9f9",
+      "parameters": {
+        "text": "🚰 Work session complete! Take a short break.",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "d43993be-ae96-4f83-8047-fffc956d2bac",
+      "name": "Back to Work Notification",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -1000,
+        460
+      ],
+      "webhookId": "d13ad958-abf2-46a8-8785-da369933de24",
+      "parameters": {
+        "text": "=🏢 Break over! Back to work for the cycle: {{ $json.count }}",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "480f9003-3c1d-44a1-8552-8b59d9d074af",
+      "name": "Start Cycle Notification",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -1840,
+        460
+      ],
+      "webhookId": "16fa6143-2d4e-44b5-b0d0-3d58bc6022a8",
+      "parameters": {
+        "text": "⏰ Time to focus! 25 minutes of deep work starts now.",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "b0ce8b4c-7e41-47f6-b505-46fdf606b84d",
+      "name": "End of Session Notification",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        -1860,
+        760
+      ],
+      "webhookId": "126e70c5-ea40-4bd5-81ee-5ca459db6a0d",
+      "parameters": {
+        "text": "=🛑 You decided to stop the session early.\n🚀 Use /start to relaunch a working session.",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "notesInFlow": true,
+      "retryOnFail": false,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "bd6b313b-2418-4b03-ad0e-7373b26b68c3",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -500,
+        0
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 560,
+        "height": 940,
+        "content": "### 3. End of the session for a long break\n1. The bot notifies the user that the session ended.\n2. The long break is recorded in the Google Sheets.\n3. Variables are cleared so the workflow is ready for a new session with this user.\n\n#### How to setup?\n- **Telegram Nodes:** set up your telegram bot credentials\n[Learn more about the Telegram Trigger Node](https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.telegramtrigger/)\n- **Record Long Break in the Google Sheet Node**:\n   1. Add your Google Sheet API credentials to access the Google Sheet file\n   2. Select the file using the list, an URL or an ID\n   3. Select the sheet in which you want to record your working sessions\n   4. Map the fields\n  [Learn more about the Google Sheet Node](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.googlesheets)\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {
+    "Telegram Trigger": [
+      {
+        "message": {
+          "chat": {
+            "id": 0,
+            "type": "private",
+            "username": "=",
+            "first_name": "="
+          },
+          "date": 1742551547,
+          "from": {
+            "id": 0,
+            "is_bot": false,
+            "username": "=",
+            "first_name": "=",
+            "language_code": "en"
+          },
+          "text": "/stop",
+          "entities": [
+            {
+              "type": "bot_command",
+              "length": 6,
+              "offset": 0
+            }
+          ],
+          "message_id": 1846
+        },
+        "update_id": 567456699
+      }
+    ]
+  },
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "start or stop?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Instructions Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Break": {
+      "main": [
+        [
+          {
+            "node": "Increment Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deep Work": {
+      "main": [
+        [
+          {
+            "node": "Short Break Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "< 4 Cycles": {
+      "main": [
+        [
+          {
+            "node": "Long Break Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Start Cycle Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "start or stop?": {
+      "main": [
+        [
+          {
+            "node": "Start Cycle Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "End of Session Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Count": {
+      "main": [
+        [
+          {
+            "node": "Back to Work Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Long Break Notification": {
+      "main": [
+        [
+          {
+            "node": "Clear Variables2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Record Long Break",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Short Break Notification": {
+      "main": [
+        [
+          {
+            "node": "Break",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Cycle Notification": {
+      "main": [
+        [
+          {
+            "node": "Deep Work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Back to Work Notification": {
+      "main": [
+        [
+          {
+            "node": "< 4 Cycles",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Record Deep Work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "End of Session Notification": {
+      "main": [
+        [
+          {
+            "node": "Clear Variables1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

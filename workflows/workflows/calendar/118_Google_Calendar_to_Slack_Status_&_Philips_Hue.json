@@ -1,0 +1,252 @@
+{
+  "id": 118,
+  "name": "Google Calendar to Slack Status & Philips Hue",
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "disabled": true,
+      "position": [
+        420,
+        420
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Google Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        720,
+        600
+      ],
+      "parameters": {
+        "eventId": "={{$node[\"Event Started\"].json[\"id\"].split(\"_\")[0]}}",
+        "options": {},
+        "calendar": "youremail@domain.com",
+        "operation": "get"
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "15",
+          "name": "GoogleCalendar - Personal"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Light - Busy",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1220,
+        180
+      ],
+      "parameters": {
+        "url": "WEBHOOK1",
+        "options": {},
+        "requestMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Light - Available",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1220,
+        600
+      ],
+      "parameters": {
+        "url": "WEBHOOK3",
+        "options": {},
+        "requestMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1040,
+        460
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "4dw_doing",
+              "operation": "startsWith"
+            },
+            {
+              "value2": "4dw_managing",
+              "operation": "startsWith"
+            },
+            {
+              "value2": "4dw_leading",
+              "operation": "startsWith"
+            },
+            {
+              "output": 1,
+              "value2": "4dw_living",
+              "operation": "startsWith"
+            }
+          ]
+        },
+        "value1": "={{$json[\"calColor\"]}}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Light - Personal",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1220,
+        340
+      ],
+      "parameters": {
+        "url": "WEBHOOK2",
+        "options": {},
+        "requestMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Event Started",
+      "type": "n8n-nodes-base.googleCalendarTrigger",
+      "position": [
+        540,
+        600
+      ],
+      "parameters": {
+        "options": {},
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 5
+            }
+          ]
+        },
+        "triggerOn": "eventStarted",
+        "calendarId": "youremail@domain.com"
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "15",
+          "name": "GoogleCalendar - Personal"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slack - Status",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1040,
+        720
+      ],
+      "parameters": {
+        "resource": "userProfile",
+        "operation": "update",
+        "additionalFields": {
+          "status_text": "={{$json[\"summary\"]}}",
+          "status_emoji": "=:{{$json[\"calColor\"]}}:"
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "17",
+          "name": "CompanySlack"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set CalColor",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        880,
+        600
+      ],
+      "parameters": {
+        "functionCode": "for (item of items) {\n\n  switch (item.json.colorId) {\n    case '1':\n      calColor = 'Lavendar';\n      break;\n    case '2':\n      calColor = '4dw_leading';\n      break;\n    case '3':\n      calColor = 'Grape';\n      break;\n    case '4':\n      calColor = 'Flamingo';\n      break;\n    case '5':\n      calColor = '4dw_managing';\n      break;\n    case '6':\n      calColor = 'Tangerine';\n      break;\n    case '7':\n      calColor = '4dw_living';\n      break;\n    case '8':\n      calColor = 'Graphite';\n      break;\n    case '9':\n      calColor = 'Blueberry';\n      break;\n    case '10':\n      calColor = 'Basil';\n      break;\n    case '11':\n      calColor = '4dw_doing';\n      break;\n    default:\n      calColor = 'undefined';\n  }\n  item.json.calColor = calColor;\n}\n\nreturn items;"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Light - Busy",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Light - Personal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Light - Available",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set CalColor": {
+      "main": [
+        [
+          {
+            "node": "Slack - Status",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Started": {
+      "main": [
+        [
+          {
+            "node": "Google Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar": {
+      "main": [
+        [
+          {
+            "node": "Set CalColor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        []
+      ]
+    }
+  }
+}

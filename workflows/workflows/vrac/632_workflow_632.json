@@ -1,0 +1,233 @@
+{
+  "nodes": [
+    {
+      "name": "Read Harvey's Email",
+      "type": "n8n-nodes-base.emailReadImap",
+      "position": [
+        270,
+        390
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "imap": "Read Harvey's Mail"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Who Is The Email From?",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        460,
+        390
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "Louis Litt <louis_litt_1970@yahoo.com>"
+            }
+          ]
+        },
+        "value1": "={{$node[\"Read Harvey's Email\"].json[\"from\"]}}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "name": "Read Excuses File",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "position": [
+        670,
+        230
+      ],
+      "parameters": {
+        "filePath": "/home/n8n/Excuse_Generator.xlsx"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Retrieve Excuses Spreadsheet Data",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "position": [
+        860,
+        230
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Generate Excuse",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1040,
+        230
+      ],
+      "parameters": {
+        "functionCode": "var leadinmax = 24;\nvar perpmax = 25;\nvar delaymax = 23;\nvar leadin = Math.floor((Math.random() * leadinmax ) + 1);\nvar perp = Math.floor((Math.random() * perpmax ) + 1);\nvar delay = Math.floor((Math.random() * delaymax) + 1);\n\nvar excuse = items[leadin].json.Leadin + \" \" + items[perp].json.Perpetrator + \" \" + items[delay].json.Delay;\n\nitems = [{json:{}}];\n\nitems[0].json.excuse = excuse;\nreturn items;\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge Excuse and Mail Data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1230,
+        330
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1460,
+        250
+      ],
+      "parameters": {
+        "text": "= {{$node[\"Merge Excuse and Mail Data\"].json[\"excuse\"]}}\n\nMaybe next time.\n\nHarvey",
+        "options": {},
+        "subject": "=RE: {{$node[\"Merge Excuse and Mail Data\"].json[\"subject\"]}}",
+        "toEmail": "={{$node[\"Merge Excuse and Mail Data\"].json[\"from\"]}}",
+        "fromEmail": "={{$node[\"Merge Excuse and Mail Data\"].json[\"to\"]}}"
+      },
+      "credentials": {
+        "smtp": "Send Harvey's Mail"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slack (Louis)",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1470,
+        410
+      ],
+      "parameters": {
+        "text": "=Here is what Louis emailed you:\n```\n{{$node[\"Merge Excuse and Mail Data\"].json[\"textPlain\"]}}\n```\n\nHere is how \"you\" responded:\n> {{$node[\"Merge Excuse and Mail Data\"].json[\"excuse\"]}}\n\n:+1: *You're Welcome!* :smirk:",
+        "channel": "private",
+        "attachments": [],
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "credentials": {
+        "slackApi": "Nathan's Slack API Token"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slack (General)",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        890,
+        470
+      ],
+      "parameters": {
+        "text": "You've just received an email. You may wish to check it out.",
+        "channel": "private",
+        "attachments": [],
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "credentials": {
+        "slackApi": "Nathan's Slack API Token"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Generate Excuse": {
+      "main": [
+        [
+          {
+            "node": "Merge Excuse and Mail Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Excuses File": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Excuses Spreadsheet Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Harvey's Email": {
+      "main": [
+        [
+          {
+            "node": "Who Is The Email From?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Who Is The Email From?": {
+      "main": [
+        [
+          {
+            "node": "Read Excuses File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Excuse and Mail Data",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Slack (General)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Excuse and Mail Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack (Louis)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Excuses Spreadsheet Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Excuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        200,
+        470
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        600,
+        470
+      ],
+      "parameters": {
+        "url": "={{$node[\"Config URL\"].json[\"next\"]}}",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "hapikey",
+              "value": "<YOUR_API_KEY>"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        800,
+        470
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Wait",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1000,
+        470
+      ],
+      "parameters": {
+        "functionCode": "return new Promise((resolve, reject) => {\n      setTimeout(() => { resolve([{ json: {} }]) }, 5000);\n    })\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Config URL",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        400,
+        470
+      ],
+      "parameters": {
+        "functionCode": "\nlet next = 'https://api.hubapi.com/crm/v3/objects/contacts'\n\nif (items[0].json.next) {\n  next = items[0].json.next\n}\n\nreturn [\n  {\n    json: {\n      next : next\n    }\n  }\n]"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Check if pagination?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1250,
+        470
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [],
+          "boolean": [
+            {
+              "value1": "={{$node[\"HTTP Request\"].json[\"paging\"] ? true : false}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set next URL",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        890,
+        210
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "next",
+              "value": "={{$node[\"HTTP Request\"].json[\"paging\"][\"next\"][\"link\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Combine all data",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1500,
+        560
+      ],
+      "parameters": {
+        "functionCode": "const allData = []\n\nlet counter = 0;\ndo {\n  try {\n    const items = $items(\"HTTP Request\", 0, counter).map(item => item.json.results);\n                    \n    const aja = items[0].map(item => {\n      return { json: item }\n    })    \n    \n    allData.push.apply(allData, aja);\n    //allData.push($items(\"Increment\", 0, counter));\n  } catch (error) {\n    return allData;  \n  }\n\n  counter++;\n} while(true);\n\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "NoOp": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Check if pagination?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config URL": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set next URL": {
+      "main": [
+        [
+          {
+            "node": "Config URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if pagination?": {
+      "main": [
+        [
+          {
+            "node": "Set next URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Combine all data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Config URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

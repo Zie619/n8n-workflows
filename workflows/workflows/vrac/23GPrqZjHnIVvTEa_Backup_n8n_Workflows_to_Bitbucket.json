@@ -1,0 +1,366 @@
+{
+  "id": "23GPrqZjHnIVvTEa",
+  "meta": {
+    "instanceId": "[instance id auto generated]",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Backup n8n Workflows to Bitbucket",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "b3363b9d-ea6e-47b7-99f9-f48a21805886",
+      "name": "Calculate Wait Time",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1400,
+        -260
+      ],
+      "parameters": {
+        "jsCode": "// Get all input items and ensure we have data\nif ($input.all().length === 0 || !$input.all()[0].headers) {\n  // If no headers available, return default wait time\n  return { waitTime: 1 };\n}\n\n// Check rate limit headers from previous request\nconst headers = $input.all()[0].headers;\nlet waitTime = 1; // Default 1 second\n\n// Check if we have rate limit information (safely)\nconst remaining = parseInt(headers['x-ratelimit-remaining']) || null;\nconst reset = parseInt(headers['x-ratelimit-reset']) || null;\n\n// Only adjust wait time if we have valid rate limit info\nif (remaining !== null && reset !== null) {\n  // If we're running low on requests, calculate a longer wait time\n  if (remaining < 100) {\n    // Calculate seconds until reset\n    const now = Math.floor(Date.now() / 1000);\n    const timeUntilReset = reset - now;\n    \n    // Spread remaining requests over time until reset\n    // Add 10% buffer to be safe\n    waitTime = Math.ceil((timeUntilReset / remaining) * 1.1);\n  } else if (remaining < 500) {\n    // Start slowing down earlier\n    waitTime = 2;\n  }\n}\n\n// Cap maximum wait time at 30 seconds\nwaitTime = Math.min(waitTime, 30);\n\nreturn { waitTime };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3cbc2287-b36f-4839-87b7-be4a7eadcf79",
+      "name": "Run Daily at 2 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -120,
+        -20
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 2
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "09b396aa-61e8-4631-8aae-7126fbd609e6",
+      "name": "Get All Workflows",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        320,
+        -20
+      ],
+      "parameters": {
+        "filters": {},
+        "requestOptions": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "[n8n-api-credential-id]",
+          "name": "n8n Development Environment"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c46b50cd-432f-4714-ac68-b6f92663b592",
+      "name": "Loop Workflows",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        540,
+        -20
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "2a27e85d-51c0-4f45-a7d6-6422fc8a439b",
+      "name": "Get Existing Worfklow from Bitbucket",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        780,
+        -20
+      ],
+      "parameters": {
+        "url": "=https://api.bitbucket.org/2.0/repositories/{{ $('Set Bitbucket Workspace & Repository').item.json.WorkspaceSlug }}/{{ $('Set Bitbucket Workspace & Repository').item.json.RepositorySlug }}/src/main/{{ $json.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          },
+          "allowUnauthorizedCerts": true
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "[bitbucket-credential-id]",
+          "name": "Bitbucket"
+        }
+      },
+      "retryOnFail": false,
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "eeb52f03-dd60-46ae-ad86-1cabf7f6c20f",
+      "name": "New or Changed?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        980,
+        -20
+      ],
+      "parameters": {
+        "options": {
+          "ignoreCase": true
+        },
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "strict"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "2d5da90e-0f1d-436b-84d4-d82deaaa4b58",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.error.status }}",
+              "rightValue": 404
+            },
+            {
+              "id": "b7b9a48d-8954-4cc4-bf7a-ab30439ad930",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $('Get Existing Worfklow from Bitbucket').item.json.data }}",
+              "rightValue": "={{ JSON.stringify($('Loop Workflows').item.json, null, 2) }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "04400827-d331-4ee2-8a67-1238ea2dc969",
+      "name": "Upload Workflow to Bitbucket",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1200,
+        -260
+      ],
+      "parameters": {
+        "url": "=https://api.bitbucket.org/2.0/repositories/{{ $('Set Bitbucket Workspace & Repository').item.json.WorkspaceSlug }}/{{ $('Set Bitbucket Workspace & Repository').item.json.RepositorySlug }}/src",
+        "method": "POST",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $('Loop Workflows').item.json.name + ' [' + $now.format('yyyy-MM-dd HH:mm:ss') +']' }}"
+            },
+            {
+              "name": "={{ $('Loop Workflows').item.json.name.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase() }}",
+              "value": "={{ JSON.stringify($('Loop Workflows').item.json, null, 2) }}"
+            }
+          ]
+        },
+        "genericAuthType": "httpBasicAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "[bitbucket-credential-id]",
+          "name": "Bitbucket"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5f198366-3bcf-4a96-ae60-da7cc9403a6f",
+      "name": "Wait to Avoid Rate Limiting",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1620,
+        -20
+      ],
+      "webhookId": "793d7525-d166-4487-a71f-d48da7c66662",
+      "parameters": {
+        "amount": "={{ $json.waitTime || 1 }}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "adc37b33-c5af-4a44-ba87-9806efe25603",
+      "name": "Set Bitbucket Workspace & Repository",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        100,
+        -20
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "37f2ddba-188d-4bc1-98b3-5c5fa31d2d62",
+              "name": "WorkspaceSlug",
+              "type": "string",
+              "value": "[workspace-slug]"
+            },
+            {
+              "id": "303f25f0-bba8-4977-8f4f-33961e2e7e8c",
+              "name": "RepositorySlug",
+              "type": "string",
+              "value": "[repository-slug]"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f21887f2-e885-42c6-a934-4f7617e267dd",
+  "connections": {
+    "Loop Workflows": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get Existing Worfklow from Bitbucket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New or Changed?": {
+      "main": [
+        [
+          {
+            "node": "Upload Workflow to Bitbucket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait to Avoid Rate Limiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Workflows": {
+      "main": [
+        [
+          {
+            "node": "Loop Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Daily at 2 AM": {
+      "main": [
+        [
+          {
+            "node": "Set Bitbucket Workspace & Repository",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Wait Time": {
+      "main": [
+        [
+          {
+            "node": "Wait to Avoid Rate Limiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait to Avoid Rate Limiting": {
+      "main": [
+        [
+          {
+            "node": "Loop Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Workflow to Bitbucket": {
+      "main": [
+        [
+          {
+            "node": "Calculate Wait Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing Worfklow from Bitbucket": {
+      "main": [
+        [
+          {
+            "node": "New or Changed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Bitbucket Workspace & Repository": {
+      "main": [
+        [
+          {
+            "node": "Get All Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

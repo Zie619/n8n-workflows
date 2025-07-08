@@ -1,0 +1,169 @@
+{
+  "meta": {
+    "instanceId": "c59c4acfed171bdc864e7c432be610946898c3ee271693e0303565c953d88c1d",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Transform Image to Lego Style Using Line and Dall-E",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "82b62d4e-a263-4232-9bae-4c581db2269c",
+      "name": "Receive a Line Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "2a27c148-3977-485f-b197-567c96671023",
+      "parameters": {
+        "path": "lineimage",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f861c4eb-3d4f-4253-810f-8032602f079b",
+      "name": "Receive Line Messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "url": "=https://api-data.line.me/v2/bot/message/{{ $json.body.events[0].message.id }}/content",
+        "options": {},
+        "jsonHeaders": "={\n\"Authorization\": \"Bearer YOUR_LINE_BOT_TOKEN\",\n\"Content-Type\": \"application/json\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "da3a9188-028d-4c75-b23f-5f1f4e50784c",
+      "name": "Creating an Image using Dall-E",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        860,
+        0
+      ],
+      "parameters": {
+        "prompt": "={{ $json.content }}",
+        "options": {
+          "returnImageUrls": true
+        },
+        "resource": "image"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "36c826e5-eacd-43ad-b663-4d788005e61a",
+      "name": "Creating a Prompt for Dall-E (Lego Style)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        540,
+        0
+      ],
+      "parameters": {
+        "text": "Creating the DALL·E 3 prompt to transform this kind of image into a isometric LEGO image (Only provide me with a prompt).",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "options": {},
+        "resource": "image",
+        "inputType": "base64",
+        "operation": "analyze",
+        "binaryPropertyName": "=data"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "3c19f931-9ca0-4bd7-b4eb-1628d89bbba1",
+      "name": "Send Back an Image through Line",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1160,
+        0
+      ],
+      "parameters": {
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"replyToken\": \"{{ $('Receive a Line Webhook').item.json.body.events[0].replyToken }}\",\n  \"messages\": [\n    {\n      \"type\": \"image\",\n      \"originalContentUrl\": \"{{ $json.url }}\",\n      \"previewImageUrl\": \"{{ $json.url }}\"\n    }\n  ]\n}",
+        "sendBody": true,
+        "jsonHeaders": "{\n\"Authorization\": \"Bearer YOUR_LINE_BOT_TOKEN\",\n\"Content-Type\": \"application/json\"\n}",
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "specifyHeaders": "json"
+      },
+      "typeVersion": 4.2
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "connections": {
+    "Receive Line Messages": {
+      "main": [
+        [
+          {
+            "node": "Creating a Prompt for Dall-E (Lego Style)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive a Line Webhook": {
+      "main": [
+        [
+          {
+            "node": "Receive Line Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creating an Image using Dall-E": {
+      "main": [
+        [
+          {
+            "node": "Send Back an Image through Line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creating a Prompt for Dall-E (Lego Style)": {
+      "main": [
+        [
+          {
+            "node": "Creating an Image using Dall-E",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
