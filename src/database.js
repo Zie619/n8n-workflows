@@ -52,6 +52,7 @@ class WorkflowDatabase {
           workflow_id TEXT,
           active BOOLEAN DEFAULT 0,
           description TEXT,
+          translations TEXT,
           trigger_type TEXT,
           complexity TEXT,
           node_count INTEGER DEFAULT 0,
@@ -69,6 +70,7 @@ class WorkflowDatabase {
           filename,
           name,
           description,
+          translations,
           integrations,
           tags
         )`,
@@ -82,8 +84,8 @@ class WorkflowDatabase {
         
         // Triggers to sync FTS table (simplified)
         `CREATE TRIGGER IF NOT EXISTS workflows_ai AFTER INSERT ON workflows BEGIN
-          INSERT INTO workflows_fts(filename, name, description, integrations, tags)
-          VALUES (new.filename, new.name, new.description, new.integrations, new.tags);
+          INSERT INTO workflows_fts(filename, name, description, translations, integrations, tags)
+          VALUES (new.filename, new.name, new.description, new.translations, new.integrations, new.tags);
         END`,
         
         `CREATE TRIGGER IF NOT EXISTS workflows_ad AFTER DELETE ON workflows BEGIN
@@ -92,8 +94,8 @@ class WorkflowDatabase {
         
         `CREATE TRIGGER IF NOT EXISTS workflows_au AFTER UPDATE ON workflows BEGIN
           DELETE FROM workflows_fts WHERE filename = old.filename;
-          INSERT INTO workflows_fts(filename, name, description, integrations, tags)
-          VALUES (new.filename, new.name, new.description, new.integrations, new.tags);
+          INSERT INTO workflows_fts(filename, name, description, translations, integrations, tags)
+          VALUES (new.filename, new.name, new.description, new.translations, new.integrations, new.tags);
         END`
       ];
 
@@ -196,7 +198,8 @@ class WorkflowDatabase {
       workflow.integrations = Array.from(integrations);
       
       // Generate description
-      workflow.description = this.generateDescription(workflow, triggerType, integrations);
+      workflow.description = data.description || this.generateDescription(workflow, triggerType, integrations);
+      workflow.translations = data.translations || {};
       
       return workflow;
     } catch (error) {
@@ -318,10 +321,10 @@ class WorkflowDatabase {
     return new Promise((resolve, reject) => {
       const sql = `
         INSERT OR REPLACE INTO workflows (
-          filename, name, workflow_id, active, description, trigger_type,
+          filename, name, workflow_id, active, description, translations, trigger_type,
           complexity, node_count, integrations, tags, created_at, updated_at,
           file_hash, file_size, analyzed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `;
       
       const params = [
@@ -330,6 +333,7 @@ class WorkflowDatabase {
         workflow.workflow_id,
         workflow.active,
         workflow.description,
+        JSON.stringify(workflow.translations),
         workflow.trigger_type,
         workflow.complexity,
         workflow.node_count,
@@ -480,7 +484,8 @@ class WorkflowDatabase {
           const workflows = rows.map(row => ({
             ...row,
             integrations: JSON.parse(row.integrations || '[]'),
-            tags: JSON.parse(row.tags || '[]')
+            tags: JSON.parse(row.tags || '[]'),
+            translations: JSON.parse(row.translations || '{}')
           }));
           
           resolve({ workflows, total });
@@ -577,7 +582,8 @@ class WorkflowDatabase {
           const workflow = {
             ...row,
             integrations: JSON.parse(row.integrations || '[]'),
-            tags: JSON.parse(row.tags || '[]')
+            tags: JSON.parse(row.tags || '[]'),
+            translations: JSON.parse(row.translations || '{}')
           };
           
           // Load raw workflow JSON
