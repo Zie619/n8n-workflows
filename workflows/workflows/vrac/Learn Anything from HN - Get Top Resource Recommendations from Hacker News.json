@@ -1,0 +1,295 @@
+{
+  "nodes": [
+    {
+      "id": "41183066-0045-4a75-ba23-42f4efcfeccc",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        720,
+        720
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-flash"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Hx1fn2jrUvojSKye",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eb061c39-7a4d-42e7-bb42-806504731b11",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        700,
+        560
+      ],
+      "parameters": {
+        "text": "=Your Task is to find the best resources to learn {{ $('GetTopicFromToLearn').item.json[\"I want to learn\"] }}. \n\nI have scraped the HackerNews and The following is the list of comments from HackerNews on topic about Learning {{ $('GetTopicFromToLearn').item.json[\"I want to learn\"] }}\n\n\nFocus only on comments that provide any resouces or advice or insight about learning {{ $('GetTopicFromToLearn').item.json.Learn }}. Ignore all other comments that are off topic discussions.\n\nNow based on these comments, you need to find the top resources and list them. \n\nCategorize them based on resource type (course, book, article, youtube videos, lectures, etc) and also figure out the difficultiy level (beginner, intermediate, advanced, expert).\n\nYou don't always to have fill in these categories exactly, these are given here for reference. Use your intution to find the best categorization.\n\nNow based on these metrics and running a basic sentiment analysis on comments you need to figure out what the top resources are. \n\nRespond back in Markdown formatted text. In the following format\n\n**OUTPUT FORMAT**\n\n```\n\n## Top HN Recomended Resources To Learn <topic Name> \n\n### Category 1\n\n- **Resource 1** - One line description\n- **Resource 2** - One line description\n- ... \n\n<add hyperlinks if any exists>\n\n### Category 2\n\n- **Resource 1** - One line description\n- **Resource 2** - One line description\n- ... \n\n<add hyperlinks in markdown format to the resource name itself if any exists. Example [resource name](https://example.com)>\n\n...\n```\n\nHere is the list of HackerNews Comments.\n\n{{ $json.text }}",
+        "promptType": "define"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "94073fe0-d25c-421e-9c99-67b6c4f0afad",
+      "name": "SearchAskHN",
+      "type": "n8n-nodes-base.hackerNews",
+      "position": [
+        -160,
+        560
+      ],
+      "parameters": {
+        "limit": 150,
+        "resource": "all",
+        "additionalFields": {
+          "tags": [
+            "ask_hn"
+          ],
+          "keyword": "={{ $json[\"I want to learn\"] }}"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eee4dfdf-53ab-42be-91ae-7b6c405df7c2",
+      "name": "FindHNComments",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        260,
+        560
+      ],
+      "parameters": {
+        "url": "=https://hacker-news.firebaseio.com/v0/item/{{ $json.children }}.json?print=pretty",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e57d86ae-d7c1-4354-9e3c-528c76160cd9",
+      "name": "CombineIntoSingleText",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        480,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "text"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b2086d29-1de5-48f4-8c1e-affd509fb5f7",
+      "name": "SplitOutChildrenIDs",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        40,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "children"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6fe68a4b-744b-48c8-9320-d2b19e3eb92b",
+      "name": "GetTopicFromToLearn",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        -340,
+        560
+      ],
+      "webhookId": "4524d82f-86a6-4fab-ba09-1d24001e15f3",
+      "parameters": {
+        "options": {
+          "path": "learn",
+          "buttonLabel": "Submit",
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "We'll shortly send you an email with top recommendations."
+            }
+          }
+        },
+        "formTitle": "What do You want to learn ?",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "I want to learn",
+              "placeholder": "Python, DevOps, Ai, or just about anything"
+            },
+            {
+              "fieldType": "email",
+              "fieldLabel": "What's your email ?",
+              "placeholder": "john.doe@example.com",
+              "requiredField": true
+            }
+          ]
+        },
+        "formDescription": "We'll find the best resources from HackerNews and send you an email"
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "72fcb7f3-6706-47cc-8a79-364b325aa8ae",
+      "name": "SendEmailWithTopResources",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1320,
+        560
+      ],
+      "parameters": {
+        "html": "=FYI, We read through {{ $('SplitOutChildrenIDs').all().length }} comments in search for the best.\n\n{{ $json.data }}",
+        "options": {},
+        "subject": "=Here are Top HN Recommendations for Learning {{ $('GetTopicFromToLearn').item.json[\"I want to learn\"] }}",
+        "toEmail": "={{ $('GetTopicFromToLearn').item.json[\"What's your email ?\"] }}",
+        "fromEmail": "allsmallnocaps@gmail.com"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "knhWxmnfY16ZQwBm",
+          "name": "allsamll Gmail SMTP account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "b4d50b42-9e40-46b0-a411-90210b422de3",
+      "name": "Convert2HTML",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        1100,
+        560
+      ],
+      "parameters": {
+        "mode": "markdownToHtml",
+        "options": {},
+        "markdown": "={{ $json.text }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b79e867a-ea3b-4a94-9809-b5a01ee2820f",
+      "name": "Finished",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1540,
+        560
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "SearchAskHN": {
+      "main": [
+        [
+          {
+            "node": "SplitOutChildrenIDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert2HTML": {
+      "main": [
+        [
+          {
+            "node": "SendEmailWithTopResources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FindHNComments": {
+      "main": [
+        [
+          {
+            "node": "CombineIntoSingleText",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Convert2HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetTopicFromToLearn": {
+      "main": [
+        [
+          {
+            "node": "SearchAskHN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitOutChildrenIDs": {
+      "main": [
+        [
+          {
+            "node": "FindHNComments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CombineIntoSingleText": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SendEmailWithTopResources": {
+      "main": [
+        [
+          {
+            "node": "Finished",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,630 @@
+{
+  "id": "dQC8kExvbCrovWf0",
+  "meta": {
+    "instanceId": "fb8bc2e315f7f03c97140b30aa454a27bc7883a19000fa1da6e6b571bf56ad6d",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Dynamically switch between LLMs Template",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "962c4b29-c244-4d68-93e1-cacd41b436fc",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        220,
+        80
+      ],
+      "webhookId": "713a7f98-0e3d-4eb7-aafa-599ca627c8b4",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6fc4f336-09e3-4e79-94e9-e5eff04e4089",
+      "name": "Switch Model",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "position": [
+        540,
+        320
+      ],
+      "parameters": {
+        "code": {
+          "supplyData": {
+            "code": "let llms = await this.getInputConnectionData('ai_languageModel', 0);\nllms.reverse(); // reverse array, so the order matches the UI elements\n\nconst llm_index = $input.item.json.llm_index;\nif (!Number.isInteger(llm_index)) {\n  console.log(\"'llm_index' is udefined or not a valid integer\");\n  throw new Error(\"'llm_index' is udefined or not a valid integer\");\n}\n\nif(typeof llms[llm_index] === 'undefined') {\n  console.log(`No LLM found with index ${llm_index}`);\n  throw new Error(`No LLM found with index ${llm_index}`);\n}\n\nreturn llms[llm_index];"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "ai_languageModel",
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "ai_languageModel"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "68511483-355b-45c1-915f-e7517c42b809",
+      "name": "Set LLM index",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        440,
+        80
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "24b4d30e-484a-4cc1-a691-0653ed764296",
+              "name": "llm_index",
+              "type": "number",
+              "value": "={{ $json.llm_index || 0 }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "adc2f24c-0ad6-4057-bb3b-b46563c72ee8",
+      "name": "Increase LLM index",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1420,
+        -200
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "24b4d30e-484a-4cc1-a691-0653ed764296",
+              "name": "llm_index",
+              "type": "number",
+              "value": "={{ $('Set LLM index').item.json.llm_index + 1 }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "eace2dd7-9550-47ba-a4c3-4f065f80757b",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1640,
+        540
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "c1735d1c-5dc4-4bd5-9dde-3bb04b8811c3",
+      "name": "Check for expected error",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1040,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3253e1f2-172e-4af4-a492-3b9c6e9e4797",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.error }}",
+              "rightValue": "Error in sub-node Switch Model"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "4a259078-aa74-4725-9e91-d2775bbd577f",
+      "name": "Loop finished without results",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1260,
+        60
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b352627d-d692-47f8-8f8c-885b68073843",
+              "name": "output",
+              "type": "string",
+              "value": "The loop finished without a satisfying result"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "3b527ed3-a700-403d-8e3c-d0d55a83c9ea",
+      "name": "Unexpected error",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1260,
+        260
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b352627d-d692-47f8-8f8c-885b68073843",
+              "name": "output",
+              "type": "string",
+              "value": "An unexpected error happened"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "2a48a244-25ab-4330-9e89-3f8a52b7fd0a",
+      "name": "Return result",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1420,
+        -460
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b352627d-d692-47f8-8f8c-885b68073843",
+              "name": "output",
+              "type": "string",
+              "value": "={{ $json.text || $json.output }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "79da2795-800a-423d-ad5b-ec3b0498a5e6",
+      "name": "OpenAI 4o-mini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        460,
+        580
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "X7Jf0zECd3IkQdSw",
+          "name": "OpenAi (octionicsolutions)"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "c5884632-4f21-4e1e-a86d-77e3b18119b9",
+      "name": "OpenAI 4o",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        640,
+        580
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "X7Jf0zECd3IkQdSw",
+          "name": "OpenAi (octionicsolutions)"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "0693ac6a-fd1e-4a1f-b7be-bd4a1021b6c1",
+      "name": "OpenAI o1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        820,
+        580
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "o1",
+          "cachedResultName": "o1"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "X7Jf0zECd3IkQdSw",
+          "name": "OpenAi (octionicsolutions)"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "f9fa467a-804d-4abf-84e3-06a88f9142b4",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1100,
+        -100
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "X7Jf0zECd3IkQdSw",
+          "name": "OpenAi (octionicsolutions)"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "7c6bf364-1844-484f-8a1c-1ff87286c686",
+      "name": "Validate response",
+      "type": "@n8n/n8n-nodes-langchain.sentimentAnalysis",
+      "position": [
+        1040,
+        -300
+      ],
+      "parameters": {
+        "options": {
+          "categories": "pass, fail",
+          "systemPromptTemplate": "You are a highly intelligent and accurate sentiment analyzer. Analyze the sentiment of the provided text. Categorize it into one of the following: {categories}. Use the provided formatting instructions. Only output the JSON.\n\n> Evaluate the following customer support response. Give a short JSON answer with a field “quality”: “pass” or “fail”. Only return “pass” if the response:\n\n1. Acknowledges both the broken keyboard and the late delivery  \n2. Uses a polite and empathetic tone  \n3. Offers a clear resolution or next step (like refund, replacement, or contact support)"
+        },
+        "inputText": "={{ $json.text }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a7be0179-e246-4f75-8863-d03eefe9d8ac",
+      "name": "Generate response",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "onError": "continueErrorOutput",
+      "position": [
+        660,
+        80
+      ],
+      "parameters": {
+        "text": "={{ $('When chat message received').item.json.chatInput }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You’re an AI assistant replying to a customer who is upset about a faulty product and late delivery. The customer uses sarcasm and is vague. Write a short, polite response, offering help."
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "retryOnFail": false,
+      "typeVersion": 1.6
+    },
+    {
+      "id": "273f4025-2aeb-4a67-859a-690a3a086f82",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        -160
+      ],
+      "parameters": {
+        "width": 480,
+        "height": 140,
+        "content": "### Customer complaint - example\n\nI really *love* waiting two weeks just to get a keyboard that doesn’t even work. Great job. Any chance I could actually use the thing I paid for sometime this month?"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a7806fab-fdc2-4feb-be53-fcea81ede105",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        0
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 240,
+        "content": "Defines the LLM node by index which should be used."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0117d8d8-672e-458a-a9dd-30b50e05f343",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        240
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 200,
+        "content": "Dynamically connects the LLM by the index provided in the previous node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "66066bad-4fd3-4e68-88bb-0b95fd9a6e49",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        980,
+        60
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 260,
+        "content": "Check if LangChain Code Node ran into error. _Currently only supports error output from main Node_"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b9101226-0035-4de3-8720-f783d13e0cca",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 240,
+        "content": "Generates a polite answer based on the customers complaint."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ee7d70ee-2eb7-494f-ad74-2cb6108ba0ed",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        980,
+        -360
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 380,
+        "height": 220,
+        "content": "Analyses the generated answer by certain criteria"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "03bde6f5-27b1-4568-96fb-5ece77d7b2e5",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1360,
+        -280
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 240,
+        "content": "Increases the index to choose the next available LLM on the next run"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "52381ffc-bdf4-4243-bc35-462dedb929bd",
+  "connections": {
+    "OpenAI 4o": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Switch Model",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI o1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Switch Model",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Model": {
+      "ai_outputParser": [
+        []
+      ],
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate response",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set LLM index": {
+      "main": [
+        [
+          {
+            "node": "Generate response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI 4o-mini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Switch Model",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate response": {
+      "main": [
+        [
+          {
+            "node": "Validate response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check for expected error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Validate response",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate response": {
+      "main": [
+        [
+          {
+            "node": "Return result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increase LLM index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increase LLM index": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for expected error": {
+      "main": [
+        [
+          {
+            "node": "Loop finished without results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unexpected error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing": {
+      "main": [
+        [
+          {
+            "node": "Set LLM index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Set LLM index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

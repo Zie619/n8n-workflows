@@ -1,0 +1,669 @@
+{
+  "id": "Hjyv9FkH5Oh6Yxw4",
+  "meta": {
+    "instanceId": "2c4c1e23e7b067270c08aab616bada21d0c384d16f212b23cf1143c6baa09219"
+  },
+  "name": "Insert and retrieve documents",
+  "tags": [
+    {
+      "id": "msnDWKHQmwMDxWQH",
+      "name": "Milvus",
+      "createdAt": "2025-04-16T12:48:14.539Z",
+      "updatedAt": "2025-04-16T12:48:14.539Z"
+    },
+    {
+      "id": "tnCpo8hq8uKrdASK",
+      "name": "AI",
+      "createdAt": "2025-04-16T12:47:57.976Z",
+      "updatedAt": "2025-04-16T12:47:57.976Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "52044ccd-4e0d-4353-b612-cf8db1b55331",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -500,
+        -100
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "b6993775-d21b-4ae8-a59c-43aef2b7002b",
+      "name": "Fetch Essay List",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -220,
+        -100
+      ],
+      "parameters": {
+        "url": "http://www.paulgraham.com/articles.html",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "cbaeb236-5c93-4b34-a06b-ff0e5de8525f",
+      "name": "Extract essay names",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        -20,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "essay",
+              "attribute": "href",
+              "cssSelector": "table table a",
+              "returnArray": true,
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "d92b6692-4a02-4519-b113-8a9172c71de9",
+      "name": "Split out into items",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        180,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "essay"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d16ba71b-10fc-454f-8bfc-a6826280a4e7",
+      "name": "Fetch essay texts",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        580,
+        -100
+      ],
+      "parameters": {
+        "url": "=http://www.paulgraham.com/{{ $json.essay }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "c4fa74ea-6af5-410c-bf5c-9d8d3decf31b",
+      "name": "Limit to first 3",
+      "type": "n8n-nodes-base.limit",
+      "position": [
+        380,
+        -100
+      ],
+      "parameters": {
+        "maxItems": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3da8495b-62df-475d-b99d-e0f3c64266e3",
+      "name": "Extract Text Only",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        900,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "data",
+              "cssSelector": "body",
+              "skipSelectors": "img,nav"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "4a9b5d5d-fc94-40b7-af0c-13d992bc1eb9",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -300,
+        -220
+      ],
+      "parameters": {
+        "width": 1071.752021563343,
+        "height": 285.66037735849045,
+        "content": "## Scrape latest Paul Graham essays"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b8a7a288-186f-4444-b0de-33ed90009c0a",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        -220
+      ],
+      "parameters": {
+        "width": 625,
+        "height": 607,
+        "content": "## Load into Milvus vector store"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c9e7b166-cc65-47e2-a437-9c00017b492a",
+      "name": "Recursive Character Text Splitter1",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "position": [
+        1240,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "chunkSize": 6000
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e1a75f27-7c8c-4d0d-9b0f-33fe9ec96fc6",
+      "name": "Generate response",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1240,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "11396286-0378-4c3a-86e1-c9ef51afbfc7",
+              "name": "text",
+              "type": "string",
+              "value": "={{ $json.answer }} {{ $if(!$json.citations.isEmpty(), \"\\n\" + $json.citations.join(\"\"), '') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "8b3497ad-5bc8-44b3-bdf4-3a028fe265ce",
+      "name": "Compose citations",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1040,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ace6185e-8b3d-4f89-ae36-dfe0c391a0a9",
+              "name": "citations",
+              "type": "array",
+              "value": "={{ $json.citations.map(i => '[' + $('Get top chunks matching query').all()[$json.citations].json.document.metadata.file_name + ', lines ' + $('Get top chunks matching query').all()[$json.citations].json.document.metadata['loc.lines.from'] + '-' + $('Get top chunks matching query').all()[$json.citations].json.document.metadata['loc.lines.to'] + ']') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "0452cf15-145c-49dd-8803-4c8b8a7adbea",
+      "name": "Answer the query based on chunks",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "position": [
+        680,
+        560
+      ],
+      "parameters": {
+        "text": "={{ $json.context }}\n\nQuestion: {{ $('When chat message received').first().json.chatInput }}\nHelpful Answer:",
+        "options": {
+          "systemPromptTemplate": "=Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer. Important: In your response, also include the the indexes of the chunks you used to generate the answer."
+        },
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"required\": [\"answer\", \"citations\"],\n  \"properties\": {\n    \"answer\": {\n      \"type\": \"string\"\n    },\n    \"citations\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"number\"\n      }\n    }\n  }\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d385ac35-6f94-4101-99de-5ce1991f40c4",
+      "name": "Prepare chunks",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        480,
+        560
+      ],
+      "parameters": {
+        "jsCode": "let out = \"\"\nfor (const i in $input.all()) {\n  let itemText = \"--- CHUNK \" + i + \" ---\\n\"\n  itemText += $input.all()[i].json.document.pageContent + \"\\n\"\n  itemText += \"\\n\"\n  out += itemText\n}\n\nreturn {\n  'context': out\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "379837f2-4f96-43ff-8e87-722cbe6d652f",
+      "name": "Set max chunks to send to model",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -300,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "33f4addf-72f3-4618-a6ba-5b762257d723",
+              "name": "chunks",
+              "type": "number",
+              "value": 4
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9bc391bb-df47-41df-b170-9df47a6b5e87",
+      "name": "Embeddings OpenAI2",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        -100,
+        780
+      ],
+      "parameters": {
+        "model": "text-embedding-ada-002",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "hH2PTDH4fbS7fdPv",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "efb030f4-445b-4ba0-b5c9-95e4e5893664",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -540,
+        560
+      ],
+      "webhookId": "cd2703a7-f912-46fe-8787-3fb83ea116ab",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "c74943be-0008-4d4c-9dea-598a648a97a2",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -380,
+        440
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1594,
+        "height": 529,
+        "content": ""
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2e27f3d8-e8a2-4647-80dd-f2643b224cb5",
+      "name": "Milvus Vector Store in retrieval",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreMilvus",
+      "position": [
+        0,
+        560
+      ],
+      "parameters": {
+        "mode": "load",
+        "topK": 2,
+        "prompt": "answer the question",
+        "milvusCollection": {
+          "__rl": true,
+          "mode": "list",
+          "value": "my_collection",
+          "cachedResultName": "my_collection"
+        }
+      },
+      "credentials": {
+        "milvusApi": {
+          "id": "8tMHHoLiWXIAXa7S",
+          "name": "Milvus account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "a3cf7e0e-f681-4880-9ccf-5c42d5457c0f",
+      "name": "Milvus Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreMilvus",
+      "position": [
+        1120,
+        -100
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {
+          "clearCollection": true
+        },
+        "milvusCollection": {
+          "__rl": true,
+          "mode": "list",
+          "value": "my_collection",
+          "cachedResultName": "my_collection"
+        }
+      },
+      "credentials": {
+        "milvusApi": {
+          "id": "8tMHHoLiWXIAXa7S",
+          "name": "Milvus account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "4c4cc5a5-e880-466f-a298-4af53a2acbec",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -700,
+        -260
+      ],
+      "parameters": {
+        "width": 280,
+        "height": 180,
+        "content": "## Step 1\n1. Set up a Milvus server based on [this guide](https://milvus.io/docs/install_standalone-docker-compose.md). And then create a collection named `my_collection`.\n2. Click this workflow to load scrape and load Paul Graham essays to Milvus collection.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "18f42da4-42ea-4eb0-9c43-ef8bd31ab7ff",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -680,
+        460
+      ],
+      "parameters": {
+        "height": 120,
+        "content": "## Step 2\nChat and get citations in response"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0af427ed-d901-4192-9fdc-986a63fd585b",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        1020,
+        140
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "hH2PTDH4fbS7fdPv",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "3603852a-bf12-4289-9733-dcd29d12a4f6",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        1160,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "jsonData": "={{ $('Extract Text Only').item.json.data }}",
+        "jsonMode": "expressionData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b49eb3ae-82cb-4d87-8f22-0789b3a14d83",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        680,
+        780
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "hH2PTDH4fbS7fdPv",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5dc48a1d-aaf0-4052-9666-28f9e76d198c",
+  "connections": {
+    "Prepare chunks": {
+      "main": [
+        [
+          {
+            "node": "Answer the query based on chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Essay List": {
+      "main": [
+        [
+          {
+            "node": "Extract essay names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to first 3": {
+      "main": [
+        [
+          {
+            "node": "Fetch essay texts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose citations": {
+      "main": [
+        [
+          {
+            "node": "Generate response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Milvus Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text Only": {
+      "main": [
+        [
+          {
+            "node": "Milvus Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch essay texts": {
+      "main": [
+        [
+          {
+            "node": "Extract Text Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer the query based on chunks",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Milvus Vector Store in retrieval",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Milvus Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract essay names": {
+      "main": [
+        [
+          {
+            "node": "Split out into items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out into items": {
+      "main": [
+        [
+          {
+            "node": "Limit to first 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set max chunks to send to model": {
+      "main": [
+        [
+          {
+            "node": "Milvus Vector Store in retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer the query based on chunks": {
+      "main": [
+        [
+          {
+            "node": "Compose citations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Milvus Vector Store in retrieval": {
+      "main": [
+        [
+          {
+            "node": "Prepare chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Fetch Essay List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter1": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

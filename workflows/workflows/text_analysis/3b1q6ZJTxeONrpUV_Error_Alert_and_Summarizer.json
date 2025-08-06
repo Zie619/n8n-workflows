@@ -1,0 +1,469 @@
+{
+  "id": "3b1q6ZJTxeONrpUV",
+  "meta": {
+    "instanceId": ""
+  },
+  "name": "Error Alert and Summarizer",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "d29a5b06-1609-416f-bc74-0274d3321019",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "position": [
+        -600,
+        -40
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "a71d3052-a89b-4e8e-baee-7fe245575f42",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        528,
+        180
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "786",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e71dee7b-4dfd-49ab-8939-f3808ee112d7",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        648,
+        180
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n\"diagnosis\":\"\",\n\"cause\":\"\",\n\"resolution\":\"\"\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "3611e9e8-f677-49c4-b06c-fa6c28f43930",
+      "name": "SET EMAIL",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -380,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "45e1443a-fb44-42f8-96ad-423197c7265b",
+              "name": "TO",
+              "type": "string",
+              "value": "myemail@myemail.com"
+            },
+            {
+              "id": "968b05dc-f476-4e13-8166-e62005d0f936",
+              "name": "CC",
+              "type": "string",
+              "value": "theiremail@theiremail.com"
+            },
+            {
+              "id": "570663c5-29c0-44fb-9992-908b7cca8136",
+              "name": "BCC",
+              "type": "string",
+              "value": "theiremail@theiremail.com"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "3676f72e-d06d-44f8-be35-19efe09a257e",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -450,
+        -260
+      ],
+      "parameters": {
+        "color": 3,
+        "height": 380,
+        "content": "# SET YOUR EMAILS"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f0b08a20-6ecc-4487-9a0a-30be07cc0cbb",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        -260
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 280,
+        "height": 380,
+        "content": "# Enable/Disable Manual Executions"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b35cd2a6-5f22-4e06-9bb0-880855c423a8",
+      "name": "Remove Manual Exec",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        60,
+        -40
+      ],
+      "parameters": {
+        "options": {
+          "ignoreCase": true
+        },
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9b2f3ff3-db9c-406b-a97f-37620dc5fab9",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              },
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "manual"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "2a33b02a-78f1-4243-ba7d-f217ea4d1895",
+      "name": "Get Failed Exec",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        -160,
+        -40
+      ],
+      "parameters": {
+        "options": {
+          "activeWorkflows": true
+        },
+        "resource": "execution",
+        "operation": "get",
+        "executionId": "={{ $('Error Trigger').item.json.execution.id }}",
+        "requestOptions": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "786",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b36ccbf9-4e47-44fc-aed3-424b6f121329",
+      "name": "Extract Error Details",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        280,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "// 1) Grab your full execution JSON\nconst exec = items[0].json;\n\n// 2) Build execution‐level metadata\nconst meta = {\n  executionId:    exec.id,\n  finished:       exec.finished,\n  mode:           exec.mode,\n  status:         exec.status,\n  createdAt:      exec.createdAt,\n  startedAt:      exec.startedAt,\n  stoppedAt:      exec.stoppedAt,\n  deletedAt:      exec.deletedAt,\n  workflowId:     exec.workflowId,\n  workflowName:   exec.workflowData?.name,\n  retryOf:        exec.retryOf,\n  retrySuccessId: exec.retrySuccessId,\n};\n\n// 3) Identify trigger node name from startData\nconst runNodeFilter = exec.data?.startData?.runNodeFilter || [];\nconst triggerNodeName = runNodeFilter[0] || null;\n\n// 4) Grab the raw trigger runData\nconst runData = exec.data?.resultData?.runData || {};\nconst triggerRuns = triggerNodeName ? (runData[triggerNodeName] || []) : [];\n\n// 5) Extract the JSON payload from the first run of the trigger\nlet triggerPayload = {};\nif (triggerRuns.length && triggerRuns[0].data?.main?.[0]?.[0]?.json) {\n  triggerPayload = triggerRuns[0].data.main[0][0].json;\n}\n\n// 6) Merge trigger info into meta\nmeta.triggerNodeName = triggerNodeName;\nmeta.triggerPayload  = triggerPayload;\n\n// 7) Now scan for all node errors, **excluding** any nodeName that contains “SERP”\nconst allErrors = [];\nfor (const [nodeName, runs] of Object.entries(runData)) {\n  // Skip any of the SERP nodes\n  if (nodeName.includes('SERP')) continue;\n\n  runs.forEach(run => {\n    if (run.executionStatus === 'error') {\n      const err     = run.error || exec.data.resultData.error || {};\n      const nodeDef = err.node || run.node || {};\n\n      allErrors.push({\n        ...meta,                    // exec + trigger metadata\n\n        nodeName,\n        nodeId:        nodeDef.id,\n        nodeType:      nodeDef.type,\n        nodeLabel:     nodeDef.name,\n\n        startTime:     run.startTime,\n        executionTime: run.executionTime,\n        source:        run.source,\n\n        errorName:        err.name,\n        errorMessage:     err.message,\n        errorDescription: err.description,\n        httpCode:         err.httpCode,\n        messages:         err.messages,\n        context:          err.context,\n        stack:            err.stack,\n\n        parameters:       nodeDef.parameters,\n        credentials:      nodeDef.credentials,\n      });\n    }\n  });\n}\n\n// 8) Return results\nif (!allErrors.length) {\n  return [{ json: { message: '✅ No (non‑SERP) errors found in this execution.' } }];\n}\nreturn allErrors.map(e => ({ json: e }));\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a26fb0c8-99eb-466d-b201-89c402fa1af4",
+      "name": "Error Solver Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        500,
+        -40
+      ],
+      "parameters": {
+        "text": "=Can you please help me with this error that occured in my n8n workflow? {{ JSON.stringify($json) }}",
+        "options": {
+          "systemMessage": "You are an seasoned n8n expert with specializations in managing n8n instances and workflows. The user will provide a detailed error json object and your goal is to review, analyze and understand the error and using your expertise diagnose the error and provide a detailed report to the user with your diagnosis, cause and resolution so the user understands and can immediately fix the issue."
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "8cfd7229-3ff1-4ba1-a67d-caa21be8064f",
+      "name": "Set Diagnosis Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        876,
+        -40
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fac5fbee-d63d-4148-b047-5ed5af4f2574",
+              "name": "error.diagnosis",
+              "type": "string",
+              "value": "={{ $json.output.diagnosis }}"
+            },
+            {
+              "id": "ece9388d-f667-4984-a143-7241f622fe76",
+              "name": "error.cause",
+              "type": "string",
+              "value": "={{ $json.output.cause }}"
+            },
+            {
+              "id": "acb6b34a-a651-42fc-a44a-331b2e0d745c",
+              "name": "error.resolution",
+              "type": "string",
+              "value": "={{ $json.output.resolution }}"
+            },
+            {
+              "id": "c765754b-d6d5-4592-ac3f-99a350bc3c19",
+              "name": "error.workflowName",
+              "type": "string",
+              "value": "={{ $('Extract Error Details').item.json.workflowName }}"
+            },
+            {
+              "id": "dabebc62-3e0c-4d22-afbf-54ba66a912fb",
+              "name": "error.workflowId",
+              "type": "string",
+              "value": "={{ $('Extract Error Details').item.json.workflowId }}"
+            },
+            {
+              "id": "6ab19800-9a0f-439f-bf62-7a7afc5bf958",
+              "name": "workflowLink",
+              "type": "string",
+              "value": "={{ $execution.resumeUrl.split('/').slice(0, 3).join('/') }}/workflow/{{ $('Extract Error Details').item.json.workflowId }}"
+            },
+            {
+              "id": "29daaea5-052b-46d4-8192-141db159bff2",
+              "name": "error.executionId",
+              "type": "string",
+              "value": "={{ $('Extract Error Details').item.json.executionId }}"
+            },
+            {
+              "id": "9e4e553c-c82b-41ec-8ee2-14162cdc3bd8",
+              "name": "executionLink",
+              "type": "string",
+              "value": "={{ $execution.resumeUrl.split('/').slice(0, 3).join('/') }}/workflow/{{ $('Extract Error Details').item.json.workflowId }}/executions/{{ $('Extract Error Details').item.json.executionId }}"
+            },
+            {
+              "id": "7269ea9f-ed49-46cd-89f2-d4a467da529d",
+              "name": "error.finished",
+              "type": "boolean",
+              "value": "={{ $('Extract Error Details').item.json.finished }}"
+            },
+            {
+              "id": "29a6e6d2-5058-4dd9-b2f9-3980a6a9073a",
+              "name": "error.startedAt",
+              "type": "string",
+              "value": "={{ $('Extract Error Details').item.json.startedAt }}"
+            },
+            {
+              "id": "a0ad0e13-5a6e-48db-9a80-74c09434de7f",
+              "name": "error.nodeName",
+              "type": "string",
+              "value": "={{ $('Extract Error Details').item.json.nodeName }}"
+            },
+            {
+              "id": "6c1001d4-a581-4520-9f16-a2c7cf0e1f84",
+              "name": "error.previousNode",
+              "type": "string",
+              "value": "={{ $('Extract Error Details').item.json.source[0].previousNode }}"
+            },
+            {
+              "id": "8c3402ca-3f15-44ae-9b96-ea37c174334c",
+              "name": "rawJson",
+              "type": "string",
+              "value": "={{ JSON.stringify($('Extract Error Details').item.json) }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9e95edf0-b2f1-443b-9ac4-3e3b3311cad5",
+      "name": "Send Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1316,
+        -40
+      ],
+      "webhookId": "2f253c1f-36c3-4d58-ba2f-3a50bb78f188",
+      "parameters": {
+        "sendTo": "={{ $('SET EMAIL').item.json.TO }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "ccList": "={{ $('SET EMAIL').item.json.CC }}",
+          "bccList": "={{ $('SET EMAIL').item.json.BCC }}",
+          "appendAttribution": true
+        },
+        "subject": "={{ $json.subject }}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "786",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "1705ee42-0be4-41a2-8ff9-f6963eef7382",
+      "name": "Generate Email",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1100,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "// 1. Pull in your error payload\nconst rawInput = items[0].json;\nconst parsed = typeof rawInput === 'string' ? JSON.parse(rawInput) : rawInput;\nconst errorArray = Array.isArray(parsed) ? parsed : [parsed];\n\n// 2. Build HTML & Markdown sections\nlet htmlSections = '';\n\n\nfor (const errObj of errorArray) {\n  const {\n    error: {\n      workflowName,\n      executionId,\n      nodeName,\n      previousNode,\n      diagnosis,\n      cause,\n      resolution,\n      startedAt,\n    },\n    workflowLink,\n    executionLink,\n  } = errObj;\n\n  // HTML block\n  htmlSections += `\n    <div style=\"border:1px solid #ddd;border-radius:4px;padding:16px;margin-bottom:20px;background:#fafafa;\">\n      <h3 style=\"margin:0 0 10px;color:#c0392b;font-family:Arial,sans-serif;\">\n        🛑 ${workflowName} — Error in node: ${nodeName}\n      </h3>\n      <p style=\"margin:4px 0;font-family:Arial,sans-serif;\">\n        <strong>Workflow:</strong> \n        <a href=\"${workflowLink}\" style=\"color:#2980b9;text-decoration:none;\">\n          ${workflowName}\n        </a><br/>\n        <strong>Execution:</strong> \n        <a href=\"${executionLink}\" style=\"color:#2980b9;text-decoration:none;\">\n          #${executionId}\n        </a><br/>\n        <strong>Previous Node:</strong> ${previousNode}<br/>\n        <strong>Started At:</strong> ${new Date(startedAt).toLocaleString('en-US', { timeZone: 'America/New_York' })}\n      </p>\n      <hr style=\"border:none;border-top:1px solid #ccc;margin:12px 0;\"/>\n      <h4 style=\"margin:0 0 6px;color:#e67e22;font-family:Arial,sans-serif;\">🔍 Diagnosis</h4>\n      <p style=\"margin:4px 0 12px;font-family:Arial,sans-serif;\">${diagnosis}</p>\n      <h4 style=\"margin:0 0 6px;color:#e67e22;font-family:Arial,sans-serif;\">⚙️ Cause</h4>\n      <p style=\"margin:4px 0 12px;font-family:Arial,sans-serif;\">${cause}</p>\n      <h4 style=\"margin:0 0 6px;color:#e67e22;font-family:Arial,sans-serif;\">✅ Resolution</h4>\n      <p style=\"white-space:pre-wrap;margin:4px 0;font-family:Arial,sans-serif;\">${resolution}</p>\n    </div>`;\n\n// 3. Wrap up\nconst html = `\n  <div style=\"font-family:Arial,sans-serif;color:#333;background:#fff;padding:20px;\">\n    <h2 style=\"margin-top:0;color:#2c3e50;\">Automated Error Report</h2>\n    ${htmlSections}\n     <p style=\"font-size:12px;color:#777;font-family:Arial,sans-serif;\">\n  This message was generated automatically by \n  <a href=\"https://realsimple.dev\" style=\"color:#777;text-decoration:none;\"><b>Real Simple Solutions</b></a>.\n</p>\n<div style=\"background:#f0f4ff;padding:8px 12px;margin-top:6px;border-radius:6px;font-size:12px;font-family:Arial,sans-serif;\">\n  ✨ <strong>Want more n8n AI automation templates?</strong><br>\n  Check out our full collection on \n  <a href=\"https://joeper.es/4jXyRub\" style=\"color:#0066cc;text-decoration:none;\"><b>Gumroad</b></a>.\n</div>\n  </div>\n`;\n\n// 4. Return all three\nreturn [\n  {\n    json: {\n      subject: `🚨 n8n Error: ${errorArray[0].error.workflowName} (#${errorArray[0].error.executionId})`,\n      html\n    },\n  },\n];\n"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "be484a20-26cd-4df4-a993-f7d01c2956e6",
+  "connections": {
+    "SET EMAIL": {
+      "main": [
+        [
+          {
+            "node": "Get Failed Exec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "SET EMAIL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Failed Exec": {
+      "main": [
+        [
+          {
+            "node": "Remove Manual Exec",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Error Solver Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Solver Agent": {
+      "main": [
+        [
+          {
+            "node": "Set Diagnosis Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Manual Exec": {
+      "main": [
+        [
+          {
+            "node": "Extract Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Diagnosis Fields": {
+      "main": [
+        [
+          {
+            "node": "Generate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Error Details": {
+      "main": [
+        [
+          {
+            "node": "Error Solver Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Error Solver Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

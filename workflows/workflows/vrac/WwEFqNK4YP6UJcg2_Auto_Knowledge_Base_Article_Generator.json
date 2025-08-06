@@ -1,0 +1,906 @@
+{
+  "id": "WwEFqNK4YP6UJcg2",
+  "meta": {
+    "instanceId": "6bcff5ef8a06e8086902526a05c2a4c7bf5da8101f89e582301ed78094606f40",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Auto Knowledge Base Article Generator",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "17900021-8da3-4bd9-9d79-5d20d879ddc7",
+      "name": "Create Perplexity Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1220,
+        380
+      ],
+      "parameters": {
+        "url": "https://api.perplexity.ai/chat/completions",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"model\": \"sonar-deep-research\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Conduct an in-depth research on '{{ $json.output.parseJson().title }}', covering essential topics, recommended resources, and best practices. Additionally, please address these improvements: '{{ $json.output.parseJson().improvements }}'. The returned data should be at least 1000 words and use a combination of headers, tables, bold, and italics\"\n    }\n  ],\n  \"max_tokens\": 60000,\n  \"temperature\": 0.7,\n  \"top_p\": 0.9,\n  \"top_k\": 50,\n  \"stream\": false,\n  \"presence_penalty\": 0,\n  \"frequency_penalty\": 0\n}",
+        "sendBody": true,
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer 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\",\n  \"Content-Type\": \"application/json\"\n}",
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "specifyHeaders": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "0cb3f3a7-92bd-4ff3-8a89-b6fc29513e65",
+      "name": "AI Writer Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        720,
+        380
+      ],
+      "parameters": {
+        "text": "=Please create or revise an article about \"{{ $json.chatInput }}\".\n\nOr an article is already written because title: {{ $json.title }} is defined. Reference it to rewrite the {{ $json.content }} field\n\nDo not change the title, either the chatinput or the input article title. This is the title, do not change it.\n\nIf an article is NOT given, pick new categories in:\n- getting-started\n- learning-paths\n- certifications\n- programming\n- applications\n- career\n\nDo not make up a category, it should be the same in the exact case as above\n\nIf an article is given, only make ammendments to the content based on these specific improvements to include: \"{{ $json.improvements }}\".\n\nInclude the improvements key only if it is an input, and in that case don't change it\n\nRemember to return valid JSON with the fields:\n{\n  \"title\": \"...\",\n  \"slug\": \"...\",\n  \"category\": {\n    \"id\": \"...\"\n  },\n  \"description\": \"...\",\n  \"keywords\": [...],\n  \"content\": \"...\",\n  \"metaTitle\": \"...\",\n  \"metaDescription\": \"...\",\n  \"readingTime\": \"...\",\n  \"difficulty\": \"...\"\n  \"content\": \"...\"\n}",
+        "options": {
+          "systemMessage": "You are a writing assistant. You will receive instructions to create or update an article in JSON format with the following structure:\n\n{\n  \"title\": \"<string>\",\n  \"slug\": \"<string>\",\n  \"category\": {\n    \"id\": \"<string>\" // e.g., \"getting-started\", \"learning-paths\", etc.\n  },\n  \"description\": \"<string>\",\n  \"keywords\": [\"<string>\", \"<string>\", ...],\n  \"content\": \"<string>\",\n  \"metaTitle\": \"<string>\",\n  \"metaDescription\": \"<string>\",\n  \"readingTime\": \"<number or string>\",\n  \"difficulty\": \"<string>\"\n}\n\nYour task:\n1. Produce a complete article in the above format, or revise the existing article if provided.\n2. Make sure the text is clear, specific, and helpful to the reader.\n3. Return valid JSON only – do not include extra commentary or fields beyond the above structure.\n4. If any information is missing from the user instructions, make reasonable assumptions.\n"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "bc62facb-c5cb-465d-89b1-a65a893c3ce1",
+      "name": "AI Editor Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2280,
+        380
+      ],
+      "parameters": {
+        "text": "={{ $json }}",
+        "options": {
+          "maxIterations": 5,
+          "systemMessage": "=You are an editorial AI assistant. Your role is to review and evaluate a draft article represented as a JSON object.\n\nCategory IDs:\n- \"getting-started\"\n- \"learning-paths\"\n- \"certifications\"\n- \"programming\"\n- \"applications\"\n- \"career\"\n\nInput Format:\n\n{\n  \"title\": \"<string>\",\n  \"slug\": \"<string>\",\n  \"category\": { \"id\": \"<string>\" },\n  \"description\": \"<string>\",\n  \"keywords\": [\"<string>\", \"...\"],\n  \"content\": \"<string>\",\n  \"metaTitle\": \"<string>\",\n  \"metaDescription\": \"<string>\",\n  \"readingTime\": \"<string | number>\",\n  \"difficulty\": \"<string>\"\n}\n\nYour Tasks:\n\n1. Evaluate the quality of the article — especially the title, description, content, and metadata.\n2. Comment on clarity, specificity, usefulness, and overall quality.\n3. If improvements are needed, add an \"improvements\" field describing exactly what to fix.\n4. Set the \"action\" field:\n- \"rewrite\" if improvements are needed.\n- \"submit\" if the article is high quality.\n5. Include all fields from the original input in your output.\n6. If \"action\" is \"submit\", set \"improvements\" to null.\n7. Avoid repeating feedback across iterations.\n8. After 2 iterations, automatically call the accept-and-publish tool and set the \"action\" to \"submit\".\n9. VERY IMPORTANT: Do NOT modify any of the input fields\n10. VERY IMPORTANT: Do NOT truncate the sources or modify the content field in any way\n\n✅ Output Format:\n\n{\n  \"title\": \"...\",\n  \"action\": \"rewrite | submit\",\n  \"improvements\": \"... | null\",\n  \"slug\": \"...\",\n  \"category\": {\n    \"id\": \"...\"\n  },\n  \"description\": \"...\",\n  \"keywords\": [\"...\"],\n  \"content\": \"...\",\n  \"metaTitle\": \"...\",\n  \"metaDescription\": \"...\",\n  \"readingTime\": \"...\",\n  \"difficulty\": \"...\"\n}\n\nTone: Be concise, direct, and constructive. Focus on maximizing clarity, usefulness, and readability for the end reader."
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "retryOnFail": true,
+      "typeVersion": 1.7
+    },
+    {
+      "id": "8c08d67a-b916-4cfd-89cd-16b34250bcb2",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        680,
+        640
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-3.5-turbo",
+          "cachedResultName": "gpt-3.5-turbo"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "KLN8ZfDzv8mW6pyu",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "97bb1374-f502-4152-a5a3-bc5d46a18171",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2200,
+        660
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.5-preview",
+          "cachedResultName": "gpt-4.5-preview"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "KLN8ZfDzv8mW6pyu",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "1c422e76-5b1a-4615-b379-ab39d4bd13b4",
+      "name": "Accept and Publish",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        2500,
+        680
+      ],
+      "parameters": {
+        "name": "submit",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "uIREtTV8TRuF3lru",
+          "cachedResultName": "Publish to Contentful"
+        },
+        "description": "Call this tool when the article quality is above the threshold we need",
+        "workflowInputs": {
+          "value": {
+            "slug": "=  {{ $json.slug }}",
+            "title": "={{ $('Format').item.json.title }}",
+            "content": "={{ $json.content }}",
+            "category": "={{ $json.category }}",
+            "keywords": "={{ $json.keywords }}",
+            "metaTitle": "={{ $json.metaTitle }}",
+            "difficulty": "={{ $json.difficulty }}",
+            "description": "={{ $json.description }}",
+            "readingTime": "={{ $json.readingTime }}",
+            "metaDescription": "={{ $json.metaDescription }}"
+          },
+          "schema": [
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "action",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "improvements",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "required": false,
+              "displayName": "improvements",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "slug",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "slug",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "type": "object",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "category",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "description",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "keywords",
+              "type": "array",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "keywords",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "content",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "content",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metaTitle",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "metaTitle",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metaDescription",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "metaDescription",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "readingTime",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "readingTime",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "difficulty",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "difficulty",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b6807e84-900a-48fc-a869-862824c62ba1",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -60,
+        660
+      ],
+      "webhookId": "7ed20abc-d8bc-4426-95f1-b9778c075ddf",
+      "parameters": {
+        "public": true,
+        "options": {},
+        "initialMessages": "What topics should I write about?"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "e3021ac4-9444-4689-af0c-a4bbd4729c35",
+      "name": "JSON.parse1",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1320,
+        120
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const outputText = $json.output;\n\n// Parse JSON from ChatGPT response\nconst parsedOutput = JSON.parse(outputText);\n\n// Return parsed object for next nodes\nreturn parsedOutput;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d6a5eccd-c8e3-4ee0-beb0-7b8fc8428b91",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1840,
+        380
+      ],
+      "parameters": {
+        "numberInputs": 3
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "8461a1a0-a984-4ec1-bc93-3a1a312caf55",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2060,
+        380
+      ],
+      "parameters": {
+        "jsCode": "// Get all items passed into this node as an array\nconst items = $input.all();\n\n// If you always have at least two items:\nconst firstItem = items[0].json;\nconst secondItem = items[1].json;\nconst thirdItem = items[2].json;\n\n// Overwrite the first item’s “content” with the second item’s “content”\nfirstItem.content = secondItem.content;\nfirstItem.iterationCount = thirdItem.iterationCount\n\n// Return a single new item containing the merged result\nreturn [\n  {\n    json: firstItem\n  }\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9b9a82fb-990c-4be0-aee9-ed80f0631c28",
+      "name": "JSON.parse",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3300,
+        840
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const outputText = $json.output;\n\n// Parse JSON from ChatGPT response\nconst parsedOutput = JSON.parse(outputText);\n\n// Return parsed object for next nodes\nreturn parsedOutput;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "066dfd10-e97a-44a8-89e0-5b2b5c4a6244",
+      "name": "Format Perplexity Output & Add Citations",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1480,
+        380
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = { ...$json };\n\n// Clean out <think> block if present\ndata.content = $json.choices[0].message.content.replace(/<think>[\\s\\S]*?<\\/think>/g, '').trim();\n\n// Convert citations array to markdown link list\nconst citations = $json.citations\n  .map((url, i) => `- [${i + 1}](${url})`)\n  .join('\\n');\n\ndata.content += `\\n\\n---\\n\\n### Sources\\n${citations}`;\n\nreturn data;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "fc9d9e93-568a-41af-a295-8736617b157e",
+      "name": "Initialize Count",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        340,
+        660
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "iterationCount"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b0e636dd-f572-4ee2-832f-4bb4167b011b",
+      "name": "Increment Count",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1400,
+        740
+      ],
+      "parameters": {
+        "functionCode": "const current = $json.iterationCount || 0;\n\nreturn [{ iterationCount: current + 1 }];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "86689f0e-9607-4eda-bcd6-36241d0cbe63",
+      "name": "Check Limit",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2660,
+        380
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.iterationCount }}",
+              "value2": 3,
+              "operation": "largerEqual"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0f42b0f3-0b96-40df-9c06-2a6d31e142d9",
+      "name": "Stop Here",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2980,
+        300
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "1e61b3ba-e9bd-43c7-8217-d4a22f707318",
+      "name": "Execute Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        3740,
+        300
+      ],
+      "parameters": {
+        "options": {},
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "uIREtTV8TRuF3lru",
+          "cachedResultName": "Publish to Contentful"
+        },
+        "workflowInputs": {
+          "value": {
+            "slug": "={{ $json.slug }}",
+            "title": "={{ $json.title }}",
+            "content": "={{ $json.content }}",
+            "category": "={{ $json.category }}",
+            "keywords": "={{ $json.keywords }}",
+            "metaTitle": "={{ $json.metaTitle }}",
+            "difficulty": "={{ $json.difficulty }}",
+            "description": "={{ $json.description }}",
+            "readingTime": "={{ $json.readingTime }}",
+            "metaDescription": "={{ $json.metaDescription }}"
+          },
+          "schema": [
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "slug",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "slug",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "type": "object",
+              "display": true,
+              "required": false,
+              "displayName": "category",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "description",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "keywords",
+              "type": "array",
+              "display": true,
+              "required": false,
+              "displayName": "keywords",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "content",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "content",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metaTitle",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "metaTitle",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "metaDescription",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "metaDescription",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "readingTime",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "readingTime",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "difficulty",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "difficulty",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "04526224-e48c-4032-9c92-475c6bf9cd0a",
+      "name": "JSON.parse3",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3280,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const outputText = $json.output;\n\n// Parse JSON from ChatGPT response\nconst parsedOutput = JSON.parse(outputText);\n\n// Return parsed object for next nodes\nreturn parsedOutput;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "0303ab91-b788-4074-a15d-239565528dec",
+      "name": "should submit",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2980,
+        680
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3c1f6cb2-a556-4c74-885e-05e4f757997b",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "submit",
+              "rightValue": "={{ $json.output.parseJson().action }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "4f68e1ad-0b7c-41ca-a9cc-d220017cc1bd",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        80
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 940,
+        "height": 680,
+        "content": "## Writer Agent\n\n- Focuses on writing for all the fields in contentful\n- Has a specified format for input and output\n- Handles implementing feedback from editor agent"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f5e9968a-0681-4b72-9bb3-98750f55565e",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2620,
+        120
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 860,
+        "height": 880,
+        "content": "## Count Incrementer\n\n- Tracks a variable count to ensure the flow hits a max number of feedback iterations.\n- This is critical for feedback to avoid hitting an infinite loop."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "462e6c9a-162a-4f66-b846-14b29517454c",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2140,
+        160
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 640,
+        "content": "## Editor Agent\n\n- Sole purpose is to look at the quality of output for the previous combo of perplexity & openAI Agent.\n- Determines if it is publishable or not."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "27149a0a-ab95-4f73-a20c-34167ac56d2a",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3580,
+        60
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 460,
+        "height": 480,
+        "content": "## Publish To Contentful\n\n- Publishes to Contentful by converting the fields to the appropriate fields for the contentful POST create content API.\n- Converts the article to Rich Text formatting specifically for Contentful by using another AI formatter trained on it's specs.\n\nemail us if you want that flow too: christian@varritech.com"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "AKus9UvKRJfvTZBA",
+    "executionOrder": "v1",
+    "executionTimeout": 1800
+  },
+  "versionId": "69ce37b2-0909-4d9e-af89-992e22888bd8",
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "AI Editor Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stop Here": {
+      "main": [
+        [
+          {
+            "node": "JSON.parse3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON.parse": {
+      "main": [
+        [
+          {
+            "node": "AI Writer Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Increment Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Limit": {
+      "main": [
+        [
+          {
+            "node": "Stop Here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "should submit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON.parse1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON.parse3": {
+      "main": [
+        [
+          {
+            "node": "Execute Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "should submit": {
+      "main": [
+        [
+          {
+            "node": "JSON.parse3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "JSON.parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Editor Agent": {
+      "main": [
+        [
+          {
+            "node": "Check Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Writer Agent": {
+      "main": [
+        [
+          {
+            "node": "Create Perplexity Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "JSON.parse1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Count": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Initialize Count": {
+      "main": [
+        [
+          {
+            "node": "AI Writer Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Increment Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Writer Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept and Publish": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Editor Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Editor Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Perplexity Content": {
+      "main": [
+        [
+          {
+            "node": "Format Perplexity Output & Add Citations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Initialize Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Perplexity Output & Add Citations": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  }
+}

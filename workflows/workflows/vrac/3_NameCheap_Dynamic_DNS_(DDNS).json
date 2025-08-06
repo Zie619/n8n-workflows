@@ -1,0 +1,188 @@
+{
+  "id": 3,
+  "name": "NameCheap Dynamic DNS (DDNS)",
+  "nodes": [
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        380,
+        300
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 15
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Checks IP if new",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const staticData = getWorkflowStaticData('global');\nconst newItem = items.map(item => item.json[\"ip\"]);\nconst ildItem = staticData.ildItem; \n\nif (!ildItem) {\n  staticData.ildItem = newItem;\n  return items;\n}\n\n\nconst actualnewItem = newItem.filter((id) => !ildItem.includes(id));\nconst actualItem = items.filter((data) => actualnewItem.includes(data.json['ip']));\nstaticData.ildItem = [...actualnewItem, ...ildItem];\n\nreturn actualItem;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "subdomains",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "functionCode": "items[0].json = {\n    value: [\n        {id: \"subdomain1\"},\n        {id: \"subdomain2\"},\n        {id: \"subdomain3\"}\n    ]\n};\nreturn items;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Loops trough Subdomain list",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1280,
+        300
+      ],
+      "parameters": {
+        "functionCode": "const newItems = [];\n\nfor (const item of items[0].json.value) {\n  newItems.push({json: item});\n}\n\nreturn newItems;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send data to Namecheap",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1460,
+        300
+      ],
+      "parameters": {
+        "url": "=https://dynamicdns.park-your-domain.com/update?host={{$node[\"Loops trough Subdomain list\"].parameter[\"functionCode\"]}}test&domain={{$node[\"yourdomain.com\"].parameter[\"values\"][\"string\"][0][\"value\"]}}&password={{$node[\"yourdomain.com\"].parameter[\"values\"][\"string\"][1][\"value\"]}}&ip={{$node[\"Get Public IP address\"].json[\"ip\"]}}",
+        "options": {},
+        "responseFormat": "string"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get Public IP address",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        560,
+        300
+      ],
+      "parameters": {
+        "url": "https://api.ipify.org?format=json",
+        "options": {},
+        "jsonParameters": true,
+        "allowUnauthorizedCerts": true
+      },
+      "retryOnFail": true,
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "name": "yourdomain.com",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "domain",
+              "value": "yourdomain.com"
+            },
+            {
+              "name": "password",
+              "value": "your-namecheap-ddns-password"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Get Public IP address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "subdomains": {
+      "main": [
+        [
+          {
+            "node": "Loops trough Subdomain list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "yourdomain.com": {
+      "main": [
+        [
+          {
+            "node": "subdomains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checks IP if new": {
+      "main": [
+        [
+          {
+            "node": "yourdomain.com",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Public IP address": {
+      "main": [
+        [
+          {
+            "node": "Checks IP if new",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loops trough Subdomain list": {
+      "main": [
+        [
+          {
+            "node": "Send data to Namecheap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

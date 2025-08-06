@@ -1,0 +1,1217 @@
+{
+  "id": "121pu6oiTjzkJ8OT",
+  "meta": {
+    "instanceId": "d160e539d2f1a627c61dec8128071eca3529ebaa5ae124b8b92c197acd24da57"
+  },
+  "name": "↔️ Airtable Batch Processing",
+  "tags": [
+    {
+      "id": "Lt9iCvabUby2qWDA",
+      "name": "subprocess",
+      "createdAt": "2025-03-31T18:34:58.629Z",
+      "updatedAt": "2025-03-31T18:34:58.629Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "35a541ff-867e-4578-bfff-d955c6cce6c9",
+      "name": "upsert",
+      "type": "n8n-nodes-base.httpRequest",
+      "maxTries": 5,
+      "position": [
+        760,
+        -200
+      ],
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $('Airtable Subprocess').first().json.baseId }}/{{ $('Airtable Subprocess').first().json.tableIdOrName }}",
+        "method": "PATCH",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "jsonBody": "={\n  \"performUpsert\": {\n    \"fieldsToMergeOn\": {{ $('Airtable Subprocess').first().json.fieldsToMergeOn.toJsonString() }}\n  },\n  \"records\": {{ $json.records.toJsonString() }}\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "c3XcXntDvRoTITuL",
+          "name": "Airtable s.mayerhofer"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "c422716d-c0c6-4998-ac99-d62a4d298aae",
+      "name": "random data",
+      "type": "n8n-nodes-base.debugHelper",
+      "position": [
+        -240,
+        -720
+      ],
+      "parameters": {
+        "category": "randomData",
+        "randomDataType": "address"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e0a01b39-a431-40cd-bfa3-1764fd2af4cf",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -460,
+        -720
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "6082ce07-b4c0-42ac-92ea-302bd943ddad",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        -280,
+        -260
+      ],
+      "parameters": {
+        "include": "allOtherFields",
+        "options": {
+          "destinationFieldName": "fields"
+        },
+        "fieldToSplitOut": "records"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b9cd2614-4a7b-4d68-aa4f-4cc44b27e6de",
+      "name": "batch 10",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -40,
+        -260
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 10
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "bcc2b8b5-b8cf-4e0b-89dd-584c16baefa1",
+      "name": "Airtable Subprocess",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -480,
+        -260
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "baseId"
+            },
+            {
+              "name": "tableIdOrName"
+            },
+            {
+              "name": "mode"
+            },
+            {
+              "name": "fieldsToMergeOn",
+              "type": "array"
+            },
+            {
+              "name": "records",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "9cb16c31-6d7b-4e49-9d24-92047a52d5e7",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        180,
+        -260
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "update",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "1062f23a-900f-4d7e-b16d-f3c20675a435",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "update"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "upsert",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "9abb6abc-f7dc-4c6a-a32a-b7e05cf8da4b",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "upsert"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "insert",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "00e1d8d7-19bd-434d-afd2-29c9aee3f3b8",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "insert"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "7dede519-a841-45a2-b85c-6f2cd4868ddb",
+      "name": "insert",
+      "type": "n8n-nodes-base.httpRequest",
+      "maxTries": 5,
+      "position": [
+        760,
+        40
+      ],
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $('Airtable Subprocess').first().json.baseId }}/{{ $('Airtable Subprocess').first().json.tableIdOrName }}",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "jsonBody": "={\n  \"records\": {{ $json.records.toJsonString() }}\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "c3XcXntDvRoTITuL",
+          "name": "Airtable s.mayerhofer"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "f05b5c6b-38c9-455b-966b-c3e62c5856a0",
+      "name": "rate limit?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        940,
+        -200
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "432e1be3-b3f3-4be3-bf0d-6b3f1b724fe7",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 429
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "41fe368a-0fdb-4cec-b51e-a725c376f136",
+      "name": "Wait 0.2s to prevent rate limits",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1140,
+        300
+      ],
+      "webhookId": "918cd011-855e-4702-bec0-6b066b4d9765",
+      "parameters": {
+        "amount": 0.2
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "15936739-2967-4d15-87ed-9320467a6d73",
+      "name": "retry request",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1340,
+        -220
+      ],
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "697de0ae-7122-42a3-beb7-db6ddba3783b",
+      "name": "rate limit?1",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        940,
+        40
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "432e1be3-b3f3-4be3-bf0d-6b3f1b724fe7",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 429
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "51929ff9-e297-454d-b1ae-54df37534b2f",
+      "name": "retry request1",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1340,
+        20
+      ],
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "57015189-8a53-4de9-bcf3-370161ddc6a6",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1020,
+        220
+      ],
+      "parameters": {
+        "width": 360,
+        "height": 260,
+        "content": "### Adjust if your monthly call limit exceeded\nOn the Team plan this means 2 requests per second [Source](https://support.airtable.com/docs/managing-api-call-limits-in-airtable#monthly-call-limits-for-free-and-team-plans) -> 0.5 second wait"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2ceae0cb-48e2-4833-89d6-6dd3565237e5",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -520,
+        -480
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 2080,
+        "height": 1000,
+        "content": "# Subprocess\n[[API Docs](https://airtable.com/developers/web/api/update-multiple-records)]"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bb2fcf9b-da31-4827-b8d5-23c500431557",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -520,
+        -820
+      ],
+      "parameters": {
+        "width": 440,
+        "height": 260,
+        "content": "## Run with test data\nConnect to Set Fields"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7be6bdf3-a320-4005-8ccb-0ef7ac63c0cd",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        -880
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 340,
+        "height": 320,
+        "content": "## Set Fields\nEnter your row data you want to send to Airtable. The key needs to correspond to the exact column name\n⚠️  Only use fields which exist in the table  ⚠️"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9fa08e5a-2657-44b1-8403-cb70c3d15940",
+      "name": "rate limit?2",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        940,
+        -440
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "432e1be3-b3f3-4be3-bf0d-6b3f1b724fe7",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 429
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "47867b7b-a7d3-484e-b320-1377159f1b58",
+      "name": "retry request2",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1340,
+        -460
+      ],
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "c96df332-3338-4d05-82db-4a3de9f767b3",
+      "name": "Aggregate3",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        560,
+        -440
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "records"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "70298130-8fe6-46e6-985c-32093a04ae49",
+      "name": "Edit Fields4",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        380,
+        -440
+      ],
+      "parameters": {
+        "include": "except",
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "99890d82-1a4f-432d-b7f0-e1b6492d1154",
+              "name": "records.fields",
+              "type": "object",
+              "value": "={{ Object.fromEntries(Object.entries($json.fields).filter(([key]) => key !== 'id')) }}"
+            },
+            {
+              "id": "82479869-a473-4540-84a5-d5ff8ebadcd0",
+              "name": "records.id",
+              "type": "string",
+              "value": "={{ $json.fields.id }}"
+            }
+          ]
+        },
+        "excludeFields": "fields",
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "e9c5789c-2fc9-4107-8d07-6ad164ad7a69",
+      "name": "Aggregate2",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        560,
+        40
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "records"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "955e1311-7ff6-460c-bf0a-65b3f4968cbf",
+      "name": "Edit Fields2",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        380,
+        40
+      ],
+      "parameters": {
+        "include": "except",
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "99890d82-1a4f-432d-b7f0-e1b6492d1154",
+              "name": "records.fields",
+              "type": "object",
+              "value": "={{ $json.fields }}"
+            }
+          ]
+        },
+        "excludeFields": "fields",
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "602c0a94-643e-4e13-b534-3df4d0044428",
+      "name": "Aggregate1",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        560,
+        -200
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "records"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0f52badd-a85b-43b1-840f-dc4931a647e1",
+      "name": "Edit Fields1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        380,
+        -200
+      ],
+      "parameters": {
+        "include": "except",
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "99890d82-1a4f-432d-b7f0-e1b6492d1154",
+              "name": "records.fields",
+              "type": "object",
+              "value": "={{ $json.fields }}"
+            }
+          ]
+        },
+        "excludeFields": "fields",
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a6ba6292-9883-48e6-b341-a67121c42968",
+      "name": "update",
+      "type": "n8n-nodes-base.httpRequest",
+      "maxTries": 5,
+      "position": [
+        760,
+        -440
+      ],
+      "parameters": {
+        "url": "=https://api.airtable.com/v0/{{ $('Airtable Subprocess').first().json.baseId }}/{{ $('Airtable Subprocess').first().json.tableIdOrName }}/",
+        "method": "PATCH",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "jsonBody": "={\n  \"records\": {{ $json.records.toJsonString() }}\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "airtableTokenApi"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "c3XcXntDvRoTITuL",
+          "name": "Airtable s.mayerhofer"
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "da6761a1-ffa2-43f3-a53d-cbd7d09af474",
+      "name": "Airtable Batch",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "position": [
+        440,
+        -720
+      ],
+      "parameters": {
+        "options": {},
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "121pu6oiTjzkJ8OT",
+          "cachedResultName": "↔️ Airtable Batch Processing"
+        },
+        "workflowInputs": {
+          "value": {
+            "mode": "upsert",
+            "baseId": "appXXXXXXXXXXXXX",
+            "records": "={{ $json.records }}",
+            "tableIdOrName": "tblXXXXXXXXXXXXX",
+            "fieldsToMergeOn": "={{[\"field1\", \"field2\"]}}"
+          },
+          "schema": [
+            {
+              "id": "baseId",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "baseId",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tableIdOrName",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "tableIdOrName",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mode",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "mode",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fieldsToMergeOn",
+              "type": "array",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "fieldsToMergeOn",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "records",
+              "type": "array",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "records",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "1c309f68-345c-459a-b8a4-dfe716f5badf",
+      "name": "Set Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        40,
+        -720
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": []
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9be3eba5-fb5d-4fda-83c4-1295e5ed31a5",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        240,
+        -720
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "records"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cb0960ff-61e1-4930-881c-a370bb6aaf4d",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        680,
+        -1140
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 420,
+        "height": 580,
+        "content": "## Airtable Batch\n### mode\npossible values: `upsert|insert|update`\n`upsert`: update if exists or insert new\n`insert`: always insert new\n`update`: update existing record. A field with the name `id` **must** be provided.\n### fieldsToMergeOn\nWill be used as an external ID to match records for updates. For records where no match is found, a new Airtable record will be created.\npossible values: `array of strings`. Example: `{{[\"field1\", \"field2\"]}}`\nAn array with at least one and at most three field names or IDs. IDs must uniquely identify a single record. These cannot be computed fields (formulas, lookups, rollups), and must be one of the following types: number, text, long text, single select, multiple select, date.\n### baseId\nThe part with `app...` in the URL:\nairtable\\.com / **app8pqOLekaICglwg** / tblnXZOdy8VtkAAJD/...\n### tableIdOrName \nThe part with `tbl...` in the URL:\nairtable\\.com / app8pqOLekaICglwg / **tblXXZOdy8VtkAAJD** /..."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "907fe5d6-9562-4ea9-a819-71ff4b34a9bb",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        -980
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 620,
+        "height": 420,
+        "content": "# Copy to your workflow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "27f94e0c-c3bd-40f3-b509-e7301339111d",
+      "name": "Wait 5s2",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1120,
+        -460
+      ],
+      "webhookId": "918cd011-855e-4702-bec0-6b066b4d9765",
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "0378ae4c-9c77-4d7d-8211-f0aa3a29ab51",
+      "name": "Wait 5s",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1120,
+        -220
+      ],
+      "webhookId": "918cd011-855e-4702-bec0-6b066b4d9765",
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "0098737b-9482-42fe-afbe-c28f1f9569d1",
+      "name": "Wait 5s1",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1140,
+        20
+      ],
+      "webhookId": "918cd011-855e-4702-bec0-6b066b4d9765",
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2ec31fa9-6ea3-4a20-b6ed-e1d47b80e187",
+      "name": "return merged output",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        140,
+        -440
+      ],
+      "parameters": {
+        "jsCode": "const output = {\n  records: [],\n  updatedRecords: [],\n  createdRecords: []\n};\n\nfor (const item of $input.all()) {\n  output.records = output.records.concat(item.json.body.records ?? [])\n  output.updatedRecords = output.updatedRecords.concat(item.json.body.updatedRecords ?? [])\n  output.createdRecords = output.createdRecords.concat(item.json.body.createdRecords ?? [])\n}\n\nreturn output;"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "333e3b43-c098-4a97-8c47-df93df2672ed",
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert": {
+      "main": [
+        [
+          {
+            "node": "rate limit?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update": {
+      "main": [
+        [
+          {
+            "node": "rate limit?2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upsert": {
+      "main": [
+        [
+          {
+            "node": "rate limit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5s": {
+      "main": [
+        [
+          {
+            "node": "retry request",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Wait 5s1": {
+      "main": [
+        [
+          {
+            "node": "retry request1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Wait 5s2": {
+      "main": [
+        [
+          {
+            "node": "retry request2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "batch 10": {
+      "main": [
+        [
+          {
+            "node": "return merged output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Airtable Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "batch 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "upsert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "retry request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate2": {
+      "main": [
+        [
+          {
+            "node": "insert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "retry request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate3": {
+      "main": [
+        [
+          {
+            "node": "update",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "retry request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "random data": {
+      "main": [
+        []
+      ]
+    },
+    "rate limit?": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 0.2s to prevent rate limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Aggregate2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields4": {
+      "main": [
+        [
+          {
+            "node": "Aggregate3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "rate limit?1": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 0.2s to prevent rate limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "rate limit?2": {
+      "main": [
+        [
+          {
+            "node": "Wait 5s2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 0.2s to prevent rate limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "retry request": {
+      "main": [
+        [
+          {
+            "node": "upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable Batch": {
+      "main": [
+        []
+      ]
+    },
+    "retry request1": {
+      "main": [
+        [
+          {
+            "node": "insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "retry request2": {
+      "main": [
+        [
+          {
+            "node": "update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable Subprocess": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 0.2s to prevent rate limits": {
+      "main": [
+        [
+          {
+            "node": "batch 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "random data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

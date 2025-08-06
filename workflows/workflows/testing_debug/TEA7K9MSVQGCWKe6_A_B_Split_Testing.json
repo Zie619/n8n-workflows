@@ -1,0 +1,447 @@
+{
+  "id": "TEA7K9MSVQGCWKe6",
+  "meta": {
+    "instanceId": "ac63467607103d9c95dd644384984672b90b1cb03e07edbaf18fe72b2a6c45bb",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "A/B Split Testing",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "e8404493-4297-4169-a72f-89e668ae5fbc",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -1460,
+        -140
+      ],
+      "webhookId": "334e3a8d-73d2-4d3c-9927-158c1169ef5e",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "582e1c1b-12ff-42ff-8130-48f94eebd706",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        220,
+        -160
+      ],
+      "parameters": {
+        "text": "={{ $('When chat message received').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "={{ $json.prompt }}"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "39ca5c70-11d4-4f86-bde5-0f9827297be9",
+      "name": "Check If Session Exists",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        -960,
+        -140
+      ],
+      "parameters": {
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{ $('When chat message received').item.json.sessionId }}"
+            }
+          ]
+        },
+        "tableId": "split_test_sessions",
+        "operation": "get"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "1iEg1EzFrF29iqp2",
+          "name": "Supabase (bsde.ai)"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "35f2c270-9571-41ba-ab7c-47a6742d7d90",
+      "name": "If Session Does Exist",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -720,
+        -140
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "4270c464-6874-45d2-aa3b-606f45544c3d",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.id }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "ec00ad92-96e9-4936-a547-2a2715ff5c32",
+      "name": "Assign Path To Session",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        -400,
+        -20
+      ],
+      "parameters": {
+        "tableId": "split_test_sessions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "show_alternative",
+              "fieldValue": "={{ Math.random() < 0.5 }}"
+            },
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('When chat message received').item.json.sessionId }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "1iEg1EzFrF29iqp2",
+          "name": "Supabase (bsde.ai)"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "92ee7145-30ae-41e9-bc04-eef03b84485e",
+      "name": "Define Path Values",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -1200,
+        -140
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9581a184-a120-4b1f-8408-cfe97520d107",
+              "name": "baseline_value",
+              "type": "string",
+              "value": "The dog's name is Ben"
+            },
+            {
+              "id": "1752f2c4-4ce4-4893-b8db-1c59131c298a",
+              "name": "alternative_value",
+              "type": "string",
+              "value": "The dog's name is Tom"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "23c1b4e2-2ba2-4237-bb4b-b92da127d201",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        300,
+        60
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "1OMpAMAKR9l3eUDI",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "be3f14b9-68c7-457d-b5bf-a6abbadf5b67",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "position": [
+        480,
+        60
+      ],
+      "parameters": {
+        "tableName": "n8n_split_test_chat_histories",
+        "sessionKey": "={{ $('When chat message received').item.json.sessionId }}",
+        "sessionIdType": "customKey"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "tzLXHvhykxvYghPC",
+          "name": "bsde.ai Supabase (Session Pooler)"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "1c20d274-2482-4551-a4ea-64860eb35276",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1520,
+        -260
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 300,
+        "content": "## 1. Receive Message\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ee22d3b1-d447-4e35-8ac4-d093edf6deee",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1280,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1340,
+        "height": 500,
+        "content": "## 2. Determine Prompt for LLM\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7d90ec00-5fca-4b0d-bc1f-e8b8c179b960",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        80,
+        -240
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 520,
+        "height": 440,
+        "content": "## 3. AI Agent"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b9b9e0e8-53c1-4d6a-bbdc-c2a13d740dfb",
+      "name": "Get Correct Prompt",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -80,
+        -160
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "08de68ec-0f12-43ee-98ab-59d8a414f114",
+              "name": "prompt",
+              "type": "string",
+              "value": "={{ $json.show_alternative ? $('Define Path Values').item.json.alternative_value : $('Define Path Values').item.json.baseline_value }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "2b78ce9b-e6b4-4744-8ddf-00f8ae990fc8",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1260,
+        -240
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 220,
+        "height": 260,
+        "content": "### Modification\nSet the values of the  baseline and alternative prompts"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0646f176-407a-41ee-b602-34bd681fc421",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        100,
+        40
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 340,
+        "height": 140,
+        "content": "### Modification\nReplace this sub-node \nto use a different language\n model"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a391018c-5d28-4384-89e1-0435758a6945",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1480,
+        -600
+      ],
+      "parameters": {
+        "width": 520,
+        "height": 240,
+        "content": "### Setup\n1. Create a table in Supabase called **split_test_sessions**. It needs to have the following columns: **session_id** (`text`) and **show_alternative** (`bool`)\n2. Add your **Supabase**, **OpenAI**, and **PostgreSQL** credentials\n3. Modify the **Define Path Values** node to set the baseline and alternative prompt values.\n4. Activate the workflow and test by sending messages through n8n's inbuilt chat\n5. Experiment with different chat sessions to test see both prompts in action"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2382d146-f0c1-4de6-9e90-b17c304df692",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2120,
+        -360
+      ],
+      "parameters": {
+        "width": 560,
+        "height": 480,
+        "content": "\n## Split Test Different Agent Prompts with Supabase and OpenAI\n### Use Case\nOftentimes, it's useful to test different settings for a large language model in production against various metrics. Split testing is a good method for doing this.\n### What it Does\nThis workflow randomly assigns chat sessions to one of two prompts, the baseline and the alternative. The agent will use the same prompt for all interactions in that chat session.\n### How it Works\n1. When messages arrive, a table containing information regarding session ID and which prompt to use is checked to see if the chat already exists\n2. If it does not, the session ID is added to the table and a prompt is randomly assigned\n3. These values are then used to generate a response\n### Next Steps\n- Modify the workflow to test different LLM settings such as temperature\n- Add a method to measure the efficacy of the two alternative prompts"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "339c6f2f-e4d1-4922-9442-2c1a78e96067",
+  "connections": {
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Path Values": {
+      "main": [
+        [
+          {
+            "node": "Check If Session Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Correct Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Session Does Exist": {
+      "main": [
+        [
+          {
+            "node": "Get Correct Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assign Path To Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign Path To Session": {
+      "main": [
+        [
+          {
+            "node": "Get Correct Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Session Exists": {
+      "main": [
+        [
+          {
+            "node": "If Session Does Exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Define Path Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

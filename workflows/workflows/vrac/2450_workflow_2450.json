@@ -1,0 +1,498 @@
+{
+  "meta": {
+    "instanceId": "9e331a89ae45a204c6dee51c77131d32a8c962ec20ccf002135ea60bd285dba9"
+  },
+  "nodes": [
+    {
+      "id": "d72750fc-6415-4da6-977a-46d025a91ef9",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -900,
+        900
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "b00e7434-f83e-438e-a47b-12d4a2c4fe5b",
+      "name": "List Invoices",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        180,
+        900
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c142f60b-dbbd-444a-b39b-365e9eb1ff58",
+      "name": "Inject s3 Subpath",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        820,
+        640
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dca623a6-834c-440f-990a-25bfd9afa2b3",
+              "name": "_s3_year",
+              "type": "string",
+              "value": "={{ DateTime.fromSeconds($json.created).format(\"yyyy\") }}"
+            },
+            {
+              "id": "55ab18e0-b2ef-486d-898d-97f671d5049b",
+              "name": "_s3_folder",
+              "type": "string",
+              "value": "={{ $(\"Clean and Escape ENV\").first().json.subFolder }}"
+            },
+            {
+              "id": "7f998728-a70e-4495-8d34-3ba72a71986b",
+              "name": "_s3_month",
+              "type": "string",
+              "value": "={{ DateTime.fromSeconds($json.created).format(\"MM\") }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "4cdd4338-7225-442b-8df6-44bebfe6d5e9",
+      "name": "Set-Subpath",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1000,
+        640
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2969361-8ed9-453b-8c71-e5b3c962af20",
+              "name": "_s3_path",
+              "type": "string",
+              "value": "={{ ($json._s3_folder ? $json._s3_folder+\"/\" : \"\")+$json._s3_year+\"/\"+$json._s3_month+\"/\"+$binary.data.fileName  }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "4965110b-0516-4a5d-9b04-8ccbb337f9d5",
+      "name": "We do only Invoice Objects",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        360,
+        900
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "2bdd8550-526c-4833-872e-b1028019a88a",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.object }}",
+              "rightValue": "invoice"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "def30f79-593f-48b3-b46f-29c5329a59ae",
+      "name": "It shouldn't be something else",
+      "type": "n8n-nodes-base.stopAndError",
+      "position": [
+        580,
+        1042.3086136912689
+      ],
+      "parameters": {
+        "errorMessage": "Unexpected or missing Invoice Obj"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "927c4bbd-5a57-4929-aebb-b187690108ac",
+      "name": "ENV*",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -500,
+        900
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b2927be9-2b00-4ab8-8938-56b1a0c2e134",
+              "name": "year",
+              "type": "number",
+              "value": "={{ $now.minus(1,\"month\").format(\"yyyy\") }}"
+            },
+            {
+              "id": "89e0c6ee-7b67-405a-b933-5a511cdea94b",
+              "name": "month",
+              "type": "number",
+              "value": "={{ $now.minus(1,\"month\").format(\"MM\") }}"
+            },
+            {
+              "id": "35a218d2-cd20-4388-8bc6-926752289df5",
+              "name": "subFolder",
+              "type": "string",
+              "value": "invoices"
+            },
+            {
+              "id": "7d18829a-018d-4814-987e-cdbee04896b3",
+              "name": "bucketName",
+              "type": "string",
+              "value": "myBucket"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "dd75af83-6e0a-4685-a3bd-1622e2c800de",
+      "name": "Download Invoice PDF from Stripe",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        580,
+        640
+      ],
+      "parameters": {
+        "url": "={{ $json.invoice_pdf }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "30c4090d-043c-4b3b-b86c-df1e10544b2e",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -600,
+        802.3086136912689
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 305.7072653471566,
+        "height": 670.9306322684054,
+        "content": "## 👇  Configure here\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n`folderName` *(optional)* = Subfolder for your Invoices, otherwise it will create in root. e.g: \"invoices\"\n\n`bucketName` *(required)* = the S3 Bucket Name, where invoices will be synced in\n\n`year` (automatic or hardcore) = \nthe expression makes sure it will be exporting \"last month\". Or define a custom year for manual export.\n\n`month` (automatic or hardcore) = \nthe expression makes sure it will be exporting \"last month\". Or define a custom month for manual export.\n\n\n**EVERYTHING** greater then the **provided date** will be exported. The Day will be always the first of month."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4134f369-84de-4019-a014-1d823ec77668",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        780,
+        480
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 362.3514596119466,
+        "height": 336.03175807685056,
+        "content": "## Build Pathes\n\n*yourFolder/invoiceYear/invoiceMonth/fileName*\n\ne.g.: invoices/2024/12/invoice-number-123.pdf"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c8ecef82-ef73-4920-b9fa-16220009f7d9",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1203.398651655887,
+        482.2657677705912
+      ],
+      "parameters": {
+        "width": 283.04958764124035,
+        "height": 329.9325827943702,
+        "content": "## Upload to Bucket\n\n**⚠️ You might want to check Storage Class, ACL, etc.**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a0505cc0-8312-46f2-970d-bfabff881ced",
+      "name": "Every Month the First Day of the Month",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -900,
+        1102.3086136912689
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "53ee7468-f478-4c10-8767-1aa7967b3225",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -100,
+        820
+      ],
+      "parameters": {
+        "width": 232,
+        "height": 256,
+        "content": "### Use Stripe Predefined Credential"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6055b93d-0462-4d1a-974a-7d31143e6b79",
+      "name": "Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1360,
+        780
+      ],
+      "parameters": {
+        "width": 367.15098241985504,
+        "height": 485.66522445338995,
+        "content": "## Instructions\n\nThis automation syncs monthly your Invoice PDF from Stripe to a (AWS) S3 Bucket of your choice with the following subPaths (Key):\n\n*yourFolder/invoiceYear/invoiceMonth/fileName*\n\n\nFill in your **Credentials and Settings** in the Nodes marked with _\"*\"_.\n\nYou can adjust this Workflow to your needs. You can also override the `year`and `month` in the ENV* Node for manual syncs.\n\n![Image](https://let-the-work-flow.com/logo-64.png)\nEnjoy the Workflow! ❤️ \nhttps://let-the-work-flow.com\nWorkflow Automation & Development"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c5e5946c-c74f-435f-9664-491bbbca00f2",
+      "name": "Get all Invoices*",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -40,
+        900
+      ],
+      "parameters": {
+        "url": "https://api.stripe.com/v1/invoices",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "predefinedCredentialType",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "created[gte]",
+              "value": "={{ DateTime.fromISO($json.year+\"-\"+$json.month+\"-01T00:00:00\").toSeconds() }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "stripeApi"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5ed183d2-3001-40ef-9dc6-897c6789209a",
+      "name": "Upload to S3 Bucket*",
+      "type": "n8n-nodes-base.awsS3",
+      "position": [
+        1280,
+        640
+      ],
+      "parameters": {
+        "fileName": "={{ $json._s3_path }}",
+        "operation": "upload",
+        "bucketName": "={{ $(\"Clean and Escape ENV\").first().json.bucketName }}",
+        "additionalFields": {
+          "storageClass": "intelligentTiering"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "04b57622-64b2-4c62-b84b-61d49c3171fb",
+      "name": "Clean and Escape ENV",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -240,
+        900
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2d053eee-92a2-44ee-ad34-b1ad87728285",
+              "name": "bucketName",
+              "type": "string",
+              "value": "={{ $json.bucketName.trim().replace(/\\\\/g, '')  }}"
+            },
+            {
+              "id": "ccd36bf6-91f3-44af-8b57-3002041c9829",
+              "name": "subFolder",
+              "type": "string",
+              "value": "={{ $json.subFolder.trim().replace(/\\\\/g, '')  }}"
+            },
+            {
+              "id": "0fb9451f-afc1-4b70-9ec3-f3ac7187c2db",
+              "name": "month",
+              "type": "string",
+              "value": "={{ $json.month.toString().padStart(2,\"0\") }}"
+            },
+            {
+              "id": "eda1110d-329b-4d12-a089-253ac189aea4",
+              "name": "year",
+              "type": "number",
+              "value": "={{ parseInt($json.year) }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "ENV*": {
+      "main": [
+        [
+          {
+            "node": "Clean and Escape ENV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set-Subpath": {
+      "main": [
+        [
+          {
+            "node": "Upload to S3 Bucket*",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Invoices": {
+      "main": [
+        [
+          {
+            "node": "We do only Invoice Objects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all Invoices*": {
+      "main": [
+        [
+          {
+            "node": "List Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject s3 Subpath": {
+      "main": [
+        [
+          {
+            "node": "Set-Subpath",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean and Escape ENV": {
+      "main": [
+        [
+          {
+            "node": "Get all Invoices*",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "We do only Invoice Objects": {
+      "main": [
+        [
+          {
+            "node": "Download Invoice PDF from Stripe",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "It shouldn't be something else",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Invoice PDF from Stripe": {
+      "main": [
+        [
+          {
+            "node": "Inject s3 Subpath",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "ENV*",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Month the First Day of the Month": {
+      "main": [
+        [
+          {
+            "node": "ENV*",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

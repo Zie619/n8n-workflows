@@ -1,0 +1,1115 @@
+{
+  "id": "ZeSJSbwXI593H1Qj",
+  "meta": {
+    "instanceId": "8e1a7e3413df437923cda0e92c098469371d84f7001856e525beaff17be8b941",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Social Media AI Agent - Telegram",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "814303e0-5fe9-474e-a4ed-e4a728fd4acf",
+      "name": "Crawl HN Home",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -1540,
+        1640
+      ],
+      "parameters": {
+        "url": "https://news.ycombinator.com/",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 4.2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "32e20b1d-b3f1-4ed2-acbf-4d5bd56b0d8b",
+      "name": "Extract Meta",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1260,
+        1720
+      ],
+      "parameters": {
+        "language": "python",
+        "pythonCode": "# Import necessary modules\nimport asyncio\nimport micropip\n\n# Define an asynchronous function to install packages\nasync def install_packages():\n await micropip.install(\"beautifulsoup4\")\n await micropip.install(\"simplejson\")\n\n# Run the asynchronous package installation\nasyncio.get_event_loop().run_until_complete(install_packages())\n\n# Now, import the installed packages\nimport simplejson as json\nfrom bs4 import BeautifulSoup\n\n# Retrieve the HTML content from the first item in the input\n# Assuming n8n passes data as a list of items, each with a 'json' key\nhtml_content = items[0].get('json', {}).get('data', '')\n\n# Initialize BeautifulSoup with the HTML content\nsoup = BeautifulSoup(html_content, 'html.parser')\n\n# Initialize a list to store metadata of GitHub posts\ngithub_posts = []\n\n# Find all 'tr' elements with class 'athing submission'\nposts = soup.find_all('tr', class_='athing submission')\n\nfor post in posts:\n post_id = post.get('id')\n title_line = post.find('span', class_='titleline')\n if not title_line:\n continue # Skip if titleline is not found\n\n # Extract the title and URL\n title_tag = title_line.find('a')\n if not title_tag:\n continue # Skip if title tag is not found\n\n title = title_tag.get_text(strip=True)\n url = title_tag.get('href', '')\n\n # Check if the URL is a GitHub link\n if 'github.com' not in url.lower():\n continue # Skip if not a GitHub link\n\n # Extract the site domain (e.g., github.com/username/repo)\n site_bit = title_line.find('span', class_='sitebit comhead')\n site = site_bit.find('span', class_='sitestr').get_text(strip=True) if site_bit else ''\n\n # The subtext is in the next 'tr' element\n subtext_tr = post.find_next_sibling('tr')\n if not subtext_tr:\n continue # Skip if subtext row is not found\n\n subtext_td = subtext_tr.find('td', class_='subtext')\n if not subtext_td:\n continue # Skip if subtext td is not found\n\n # Extract score\n score_span = subtext_td.find('span', class_='score')\n score = score_span.get_text(strip=True) if score_span else '0 points'\n\n # Extract author\n author_a = subtext_td.find('a', class_='hnuser')\n author = author_a.get_text(strip=True) if author_a else 'unknown'\n\n # Extract age\n age_span = subtext_td.find('span', class_='age')\n age_a = age_span.find('a') if age_span else None\n age = age_a.get_text(strip=True) if age_a else 'unknown'\n\n # Extract comments\n comments_a = subtext_td.find_all('a')[-1] if subtext_td.find_all('a') else None\n comments_text = comments_a.get_text(strip=True) if comments_a else '0 comments'\n\n # Construct the Hacker News URL\n hn_url = f\"https://news.ycombinator.com/item?id={post_id}\"\n\n # Compile the metadata\n post_metadata = {\n 'Post': post_id,\n 'title': title,\n 'url': url,\n 'site': site,\n 'score': score,\n 'author': author,\n 'age': age,\n 'comments': comments_text,\n 'hn_url': hn_url\n }\n\n # Append to the list of GitHub posts\n github_posts.append(post_metadata)\n\n# Prepare the output for n8n\noutput = [{'json': post} for post in github_posts]\n\n# Return the output\nreturn output\n"
+      },
+      "executeOnce": true,
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b54cf663-b823-4613-a812-764942b95b9d",
+      "name": "Filter Unposted Items",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -680,
+        1640
+      ],
+      "parameters": {
+        "jsCode": "const items = [];\n\n// Step 1: Collect all Post IDs from input1 items (those with 'id')\nconst processedPosts = new Set(\n $input.all()\n .filter(item => item.json.id)\n .map(item => item.json.Post)\n);\n\n// Step 2: Iterate over all items and filter out duplicates\nfor (const item of $input.all()) {\n \n // Only process items without 'id' (input2 items)\n if(!item.json.id){\n \n // Check if the Post ID is already processed\n if(!processedPosts.has(item.json.Post) && item.json.Post!=undefined){\n items.push(item);\n }\n }\n}\n\nreturn items;\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d7ac7121-8da7-4e45-9b74-daf07fbf15fb",
+      "name": "Visit GH Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -420,
+        1420
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "f156ca8e-7963-42b9-9612-9ab5efc53be4",
+      "name": "Convert HTML To Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        -240,
+        1700
+      ],
+      "parameters": {
+        "html": "={{ $json.data }}",
+        "options": {}
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "86221ed0-29fa-4775-ba36-8ffdf614977c",
+      "name": "Filter Errored",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        380,
+        1440
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "7776cb97-e02d-418e-a168-612bf92d4160",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.error }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "f08c4f61-17a5-4899-ab3d-4e3ff5d1b8b7",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1760,
+        1540
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "48856b3b-a951-4e7f-a0b8-410a71e9b0a7",
+      "name": "Update X Status",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        1500,
+        1400
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "app7fh2kmMzPKS4RZ",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ",
+          "cachedResultName": "Twitter Agent"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblf0cODJFdvDj7vU",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ/tblf0cODJFdvDj7vU",
+          "cachedResultName": "My Tweets"
+        },
+        "columns": {
+          "value": {
+            "id": "={{ $('Create Item').item.json.id }}",
+            "TDone": true
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": true,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true
+            },
+            {
+              "id": "Post",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Post",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Url",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Url",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tweet",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Tweet",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "LinkedIn",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Modified",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Last Modified",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TDone",
+              "type": "boolean",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "TDone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LDone",
+              "type": "boolean",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "LDone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ]
+        },
+        "options": {
+          "typecast": true
+        },
+        "operation": "update"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "BxLldDZTAZvuWVbr",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "c31bb906-2a0d-406a-a7cd-6fc4adfcb67b",
+      "name": "LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "position": [
+        1200,
+        1820
+      ],
+      "parameters": {
+        "text": "={{ $('Filter Errored').item.json.message.content.linkedin }}",
+        "person": "afi4Hy9wlI",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "S7G2oyLAmzhWuYFQ",
+          "name": "LinkedIn account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4aab4cc2-4a51-432a-aa21-ba469c027ac6",
+      "name": "Update L Status",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        1520,
+        1680
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "app7fh2kmMzPKS4RZ",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ",
+          "cachedResultName": "Twitter Agent"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblf0cODJFdvDj7vU",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ/tblf0cODJFdvDj7vU",
+          "cachedResultName": "My Tweets"
+        },
+        "columns": {
+          "value": {
+            "id": "={{ $('Create Item').item.json.id }}",
+            "LDone": true
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": true,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true
+            },
+            {
+              "id": "Post",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Post",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Url",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Url",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tweet",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Tweet",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "LinkedIn",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Modified",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Last Modified",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TDone",
+              "type": "boolean",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "TDone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LDone",
+              "type": "boolean",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "LDone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ]
+        },
+        "options": {
+          "typecast": true
+        },
+        "operation": "update"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "BxLldDZTAZvuWVbr",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "72dd9714-c11d-4417-8710-89e416ac44c9",
+      "name": "Search Item",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        -1100,
+        1240
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "app7fh2kmMzPKS4RZ",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ",
+          "cachedResultName": "Twitter Agent"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblf0cODJFdvDj7vU",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ/tblf0cODJFdvDj7vU",
+          "cachedResultName": "My Tweets"
+        },
+        "options": {
+          "fields": [
+            "Title",
+            "Url",
+            "Tweet",
+            "Date",
+            "Post"
+          ]
+        },
+        "operation": "search",
+        "filterByFormula": "={Post}= {{ $json.Post }}"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "BxLldDZTAZvuWVbr",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "f89fbada-0e53-44f0-a09b-119869fabd10",
+      "name": "Create Item",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        580,
+        1660
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "app7fh2kmMzPKS4RZ",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ",
+          "cachedResultName": "Twitter Agent"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblf0cODJFdvDj7vU",
+          "cachedResultUrl": "https://airtable.com/app7fh2kmMzPKS4RZ/tblf0cODJFdvDj7vU",
+          "cachedResultName": "My Tweets"
+        },
+        "columns": {
+          "value": {
+            "Url": "={{ $('Filter Unposted Items').item.json.url }}",
+            "Post": "={{ $('Filter Unposted Items').item.json.Post }}",
+            "Title": "={{ $('Filter Unposted Items').item.json.title }}",
+            "Tweet": "={{ $json.message.content.twitter }}",
+            "LinkedIn": "={{ $json.message.content.linkedin }}"
+          },
+          "schema": [
+            {
+              "id": "Post",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Post",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Title",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Url",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Url",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tweet",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Tweet",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LinkedIn",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "LinkedIn",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": []
+        },
+        "options": {},
+        "operation": "create"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "BxLldDZTAZvuWVbr",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "51a2c3d3-3e75-4375-b2b6-4bb86fa71855",
+      "name": "X",
+      "type": "n8n-nodes-base.twitter",
+      "onError": "continueRegularOutput",
+      "position": [
+        1180,
+        1380
+      ],
+      "parameters": {
+        "text": "={{ $('Filter Errored').item.json.message.content.twitter }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "YQyS9lQTpZtZkefS",
+          "name": "X account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 2
+    },
+    {
+      "id": "58869c5b-9fb2-4f76-8788-68056cda45b0",
+      "name": "Validate Generate Content",
+      "type": "n8n-nodes-base.code",
+      "onError": "continueRegularOutput",
+      "position": [
+        180,
+        1680
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "if ($json.message.content.twitter && $json.message.content.linkedin) {\n \n return $json;\n} else {\n\n const parsedContent = JSON.parse($json.message.content);\n if ($json.message.content.twitter && $json.message.content.linkedin) {\n return parsedContent;\n }\n\n console.log(\"Invalid formatting\")\n return {}\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "527fd640-8bc8-4043-92a6-52fbea8de63f",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -1780,
+        1640
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "f00c1de5-d5bd-4d78-8717-d26dd739adc7",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        -840,
+        1420
+      ],
+      "parameters": {},
+      "typeVersion": 3,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "3529fba4-173c-4378-ae69-43a3bae0813f",
+      "name": "Generate Content",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        -120,
+        1440
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "options": {},
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an AI-powered social media assistant specialized in crafting short-form, engaging posts for Twitter and LinkedIn. Your tone should blend the enthusiasm of a Tech Evangelist with the narrative depth of a Storyteller. The goal is to highlight technological and open-source projects in a friendly, forward-thinking manner, connecting them to real-world use cases. \n\nGuidelines:\n1. Output must be in JSON with separate fields for \u201ctwitter\u201d and \u201clinkedin.\u201d\n2. Do not include emojis or marketing buzzwords (\u201ccutting-edge,\u201d \u201cdisruptive,\u201d etc.).\n3. Write naturally and concisely. Avoid overly formal or robotic language.\n4. Twitter posts must be under 280 characters (including spaces and URL).\n5. LinkedIn posts should be slightly longer, yet still succinct, and focus on storytelling and real-world applications.\n6. Provide a single call-to-action in each post.\n7. Do not imply ownership of the project unless explicitly stated.\n8. Maintain a professional yet approachable tone in both outputs.\n"
+            },
+            {
+              "content": "=Using the following details, generate two posts\u2014one for Twitter and one for LinkedIn\u2014incorporating an enthusiastic yet narrative-driven style:\n\nTitle: {{ $('Filter Unposted Items').item.json.title }}\nDetails in markdown: {{ $json.data }}\nRepository Link: {{ $('Filter Unposted Items').item.json.url }} (this is the actual link you want to be inserted)\n\nConstraints:\n- No emojis.\n- Keep the Twitter post under 280 characters (including the link).\n- Use a friendly, forward-thinking tone that weaves in a short narrative where possible.\n- Highlight how the project solves a real problem or benefits the user.\n- End each post with one clear CTA (e.g., \u201cCheck it out!\u201d or \u201cLearn more.\u201d).\n- **Ensure the tone is neutral and does not imply personal involvement** (e.g., avoid phrases like \"my journey\" or \"I found it fascinating\").\n- **LinkedIn post should be more detailed**: Provide context, explain the key features, highlight how it can be useful to different audiences, and elaborate on the problem it solves or the impact it can have.\n- Output your response in JSON with the structure:\n```json\n{\n \"twitter\": \"Your Twitter post here\",\n \"linkedin\": \"Your LinkedIn post here\"\n}\n"
+            }
+          ]
+        },
+        "jsonOutput": true
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "IfJo4dG8AUORk6f0",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.7,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "2dfd7849-877c-4bd3-b248-94140a1fe209",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        960
+      ],
+      "parameters": {
+        "width": 619.8433261701165,
+        "height": 97.20332107671479,
+        "content": "Automate the curation and sharing of trending GitHub discussions from Hacker News to Twitter and LinkedIn. This workflow leverages AI to generate engaging posts, streamlining your social media content creation and distribution.\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "20704a99-1234-46dc-b8c8-860b051b3b85",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1620,
+        1520
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 524.8824946275869,
+        "height": 420.37647358435385,
+        "content": "I crawl Hacker News and extract Github links."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5cfa2c30-6c88-429a-8b5f-0034d2352cc2",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -480,
+        1280
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 828.144505037599,
+        "height": 670.031562962293,
+        "content": "This is where the magic happens. I use the Github url extracted earlier and visit Github page to get more insights in the project being shared. Then I ask Chat GPT very nicely to help me get a Tweet and a LinkedIn post"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "caec3df6-ddcc-4959-94e1-18163cf3128f",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1100,
+        1280
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 285.9487894560623,
+        "height": 751.2077576680031,
+        "content": "One last magic trick, Send the generated Tweet and the post to the respective platforms."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "89c8472d-3329-4f94-a656-2539e061eeb0",
+      "name": "Ping Me",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        720,
+        1420
+      ],
+      "parameters": {
+        "text": "=Hi There, here is your readymade tweet - \n\n {{ $json.fields.Tweet }}\n\nAnd your readymade LinkedIn post -\n\n {{ $json.fields.LinkedIn }}\n\n",
+        "chatId": "1297549992",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "1RZApQ3BwJxFn9jp",
+          "name": "Telegram account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "b1444e6d-0cab-4082-af42-a8decc97d9b4",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        640,
+        1300
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 264.5060210432334,
+        "height": 307.03612625939974,
+        "content": "Just pinging the owner that something is about to be posted and wait for 5 mins before final posting."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "01c2f7ff-ff6c-4a60-9581-f8c5f3985792",
+      "name": "Wait for 5 mins before posting",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        880,
+        1660
+      ],
+      "webhookId": "0c7ee388-30cf-4a99-9bb0-0fd85171c794",
+      "parameters": {
+        "unit": "minutes"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "909c7e7d-ea84-4612-a322-b1fa889b2efb",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -920,
+        1380
+      ],
+      "parameters": {
+        "width": 400.8207630962184,
+        "height": 392.80719991071624,
+        "content": "CHORE"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "04ab5b63-8def-4d49-9360-596261eb051c",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1140,
+        1140
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 195.58283685913963,
+        "height": 285.5933578465706,
+        "content": "Make sure we don't post the same content again."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {
+    "Schedule Trigger": [
+      {
+        "json": {
+          "Hour": "18",
+          "Year": "2024",
+          "Month": "December",
+          "Minute": "00",
+          "Second": "17",
+          "Timezone": "America/New_York (UTC-05:00)",
+          "timestamp": "2024-12-27T18:00:17.035-05:00",
+          "Day of week": "Friday",
+          "Day of month": "27",
+          "Readable date": "December 27th 2024, 6:00:17 pm",
+          "Readable time": "6:00:17 pm"
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4c28d47d-811e-4b89-adeb-47da12abd378",
+  "connections": {
+    "X": {
+      "main": [
+        [
+          {
+            "node": "Update X Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Filter Unposted Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping Me": {
+      "main": [
+        [
+          {
+            "node": "Wait for 5 mins before posting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Update L Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Item": {
+      "main": [
+        [
+          {
+            "node": "Ping Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Item": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Meta": {
+      "main": [
+        [
+          {
+            "node": "Search Item",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Crawl HN Home": {
+      "main": [
+        [
+          {
+            "node": "Extract Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Visit GH Page": {
+      "main": [
+        [
+          {
+            "node": "Convert HTML To Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Errored": {
+      "main": [
+        [
+          {
+            "node": "Create Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update L Status": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update X Status": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Content": {
+      "main": [
+        [
+          {
+            "node": "Validate Generate Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Crawl HN Home",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Unposted Items": {
+      "main": [
+        [
+          {
+            "node": "Visit GH Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert HTML To Markdown": {
+      "main": [
+        [
+          {
+            "node": "Generate Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Generate Content": {
+      "main": [
+        [
+          {
+            "node": "Filter Errored",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for 5 mins before posting": {
+      "main": [
+        [
+          {
+            "node": "X",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

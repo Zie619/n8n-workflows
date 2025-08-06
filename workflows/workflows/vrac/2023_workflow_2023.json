@@ -1,0 +1,492 @@
+{
+  "meta": {
+    "instanceId": "cb484ba7b742928a2048bf8829668bed5b5ad9787579adea888f05980292a4a7"
+  },
+  "nodes": [
+    {
+      "id": "bd34c2fb-9892-408e-be1f-a25f6f9970ad",
+      "name": "Add your competitors here",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1260,
+        800
+      ],
+      "parameters": {
+        "jsCode": "return [\n  {\"competitor\":\"zendesk\"},\n  {\"competitor\":\"intercom\"},\n  {\"competitor\":\"dixa\"}\n]"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ec726fe0-e85f-47b3-8cd9-05b94fc5f8ab",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1400,
+        600
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 235.65210573476693,
+        "height": 396.04301075268825,
+        "content": "Add your API key here\n\n1. Sign up here\nhttps://app.scrapingbee.com/\n\n2. Get your API key\n\n3. Paste it the node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fd7b88e5-ef30-488e-803e-aec43334c41b",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        460
+      ],
+      "parameters": {
+        "width": 465,
+        "height": 342.8125,
+        "content": "# Read me\nThis workflow monitor G2 reviews URLS. \n\nWhen a new review is published, it will: \n- trigger a Slack notification \n- record the review in Google Sheets\n\n\nTo install it, you'll need access to Slack, Google Sheets and ScrapingBee\n\n### Full guide here: https://lempire.notion.site/Scrape-G2-reviews-with-n8n-3f46e280e8f24a68b3797f98d2fba433?pvs=4"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "925c9ce9-1691-47bd-b184-5532cfa85da5",
+      "name": "Execute workflow every day",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        980,
+        560
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2dc9997d-fd94-4beb-b5be-8ec16b70f060",
+      "name": "Get G2 data with ScrapingBee",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1460,
+        800
+      ],
+      "parameters": {
+        "url": "https://app.scrapingbee.com/api/v1",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3
+            }
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "YOUR_API_KEY"
+            },
+            {
+              "name": "url",
+              "value": "=https://www.g2.com/products/{{ $json.competitor }}/reviews?utf8=%E2%9C%93&order=most_recent "
+            },
+            {
+              "name": "premium_proxy",
+              "value": "true"
+            },
+            {
+              "name": "country_code",
+              "value": "us"
+            },
+            {
+              "name": "stealth_proxy",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "b7472e8d-5abb-489b-bf32-5d36e7bce5cc",
+      "name": "Get review section HTML",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        1680,
+        800
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "divs",
+              "cssSelector": "div.paper.paper--white.paper--box.mb-2.position-relative.border-bottom",
+              "returnArray": true,
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9ad1fb30-c388-4ad9-a299-9fb508b01a57",
+      "name": "Iterate on reviews",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        1840,
+        800
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "divs"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "cb25b05d-2543-4d42-9c7e-2db5f534db2a",
+      "name": "Extract structured data",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        2020,
+        800
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "divs",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "date",
+              "cssSelector": "div.d-f.mb-1"
+            },
+            {
+              "key": "reviewHtml",
+              "cssSelector": "div[itemprop=reviewBody]",
+              "returnValue": "html"
+            },
+            {
+              "key": "user_profile",
+              "attribute": "href",
+              "cssSelector": "a.td-n",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "rating",
+              "attribute": "content",
+              "cssSelector": "meta[itemprop=ratingValue]",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "reviewUrl",
+              "attribute": "href",
+              "cssSelector": "a.pjax",
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4b2d088c-afc8-4bd9-80e1-0ef78fe94597",
+      "name": "Convert Review HTML to Markdown",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        2200,
+        800
+      ],
+      "parameters": {
+        "html": "={{ $json.reviewHtml }}",
+        "options": {},
+        "destinationKey": "review"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0c03c9a2-0ee8-4700-bf9d-f07b01fd9590",
+      "name": "Get all past reviews",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1260,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Khbjjt_Dw0LdggwEE6sj300McXelmSR1ttoG8UNojyY/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1Khbjjt_Dw0LdggwEE6sj300McXelmSR1ttoG8UNojyY/edit#gid=0"
+        }
+      },
+      "typeVersion": 4
+    },
+    {
+      "id": "27d41c8f-694b-49bf-9ea7-24964e00b9b4",
+      "name": "Continue only if review is new",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2420,
+        480
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "joinMode": "keepNonMatches",
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "reviewUrl",
+              "field2": "reviewUrl"
+            }
+          ]
+        },
+        "outputDataFrom": "input2"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "f4574136-c4ab-44ce-bf06-17b3c487867c",
+      "name": "Send new review to Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        2760,
+        480
+      ],
+      "parameters": {
+        "text": "=🚨 New review in G2\n\nRating: {{ $json[\"rating\"] }}\n<{{ $json[\"user_profile\"]}}|See user in G2>\n<{{$json[\"reviewUrl\"]}}|See review in G2>\n\nReview Content:\n{{ $json.review }}",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "g2_reviews"
+        },
+        "otherOptions": {
+          "botProfile": {
+            "imageValues": {
+              "icon_url": "https://upload.wikimedia.org/wikipedia/en/thumb/3/38/G2_Crowd_logo.svg/640px-G2_Crowd_logo.svg.png",
+              "profilePhotoType": "image"
+            }
+          },
+          "includeLinkToWorkflow": false
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "09076f69-32a4-4ddf-a662-10c0c0e35e7f",
+      "name": "Add new review to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2760,
+        700
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "date": "={{ $json.date }}",
+            "rating": "={{ $json.rating }}",
+            "review": "={{ $json.review }}",
+            "reviewUrl": "={{ $json.reviewUrl }}",
+            "user_profile": "={{ $json.user_profile }}"
+          },
+          "schema": [
+            {
+              "id": "date",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rating",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "rating",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "review",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "review",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_profile",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "user_profile",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reviewUrl",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "reviewUrl",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "reviewUrl"
+          ]
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Khbjjt_Dw0LdggwEE6sj300McXelmSR1ttoG8UNojyY/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1Khbjjt_Dw0LdggwEE6sj300McXelmSR1ttoG8UNojyY/edit#gid=0"
+        }
+      },
+      "typeVersion": 4
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Iterate on reviews": {
+      "main": [
+        [
+          {
+            "node": "Extract structured data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all past reviews": {
+      "main": [
+        [
+          {
+            "node": "Continue only if review is new",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract structured data": {
+      "main": [
+        [
+          {
+            "node": "Convert Review HTML to Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get review section HTML": {
+      "main": [
+        [
+          {
+            "node": "Iterate on reviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add your competitors here": {
+      "main": [
+        [
+          {
+            "node": "Get G2 data with ScrapingBee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute workflow every day": {
+      "main": [
+        [
+          {
+            "node": "Get all past reviews",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add your competitors here",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get G2 data with ScrapingBee": {
+      "main": [
+        [
+          {
+            "node": "Get review section HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue only if review is new": {
+      "main": [
+        [
+          {
+            "node": "Add new review to Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send new review to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Review HTML to Markdown": {
+      "main": [
+        [
+          {
+            "node": "Continue only if review is new",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  }
+}

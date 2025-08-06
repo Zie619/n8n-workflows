@@ -1,0 +1,406 @@
+{
+  "meta": {
+    "instanceId": "26ba763460b97c249b82942b23b6384876dfeb9327513332e743c5f6219c2b8e"
+  },
+  "nodes": [
+    {
+      "id": "c92e3d01-4385-4e99-a9a7-77279b3d9cb3",
+      "name": "Local File Trigger",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "position": [
+        720,
+        120
+      ],
+      "parameters": {
+        "path": "/home/node/host_mount/shared_drive",
+        "events": [
+          "add"
+        ],
+        "options": {
+          "awaitWriteFinish": true
+        },
+        "triggerOn": "folder"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a08f5acc-ee46-49e7-be4d-99edc95ab41f",
+      "name": "Get Files and Folders",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [
+        1200,
+        120
+      ],
+      "parameters": {
+        "command": "=ls -p {{ $json.directory }} | grep -v / || true; \\\necho \"===\"; \\\nls -p {{ $json.directory }} | grep / || true;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f3ab100a-986d-49bc-aeb5-979f16b2fd46",
+      "name": "Files and Folders to Array",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1380,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ad893795-cae8-4418-99e0-2c68126337d3",
+              "name": "files",
+              "type": "array",
+              "value": "={{ $json.stdout.split('===')[0].split('\\n').filter(item => !item.endsWith('Zone.Identifier')).compact() }}"
+            },
+            {
+              "id": "0e7e8571-6b86-481d-a20c-3a7c621c562f",
+              "name": "folders",
+              "type": "array",
+              "value": "={{ $json.stdout.split('===')[1].split('\\n').compact() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "56c4a8b4-c5b0-4e2f-806b-fef5fb5260b5",
+      "name": "Mistral Cloud Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "position": [
+        1860,
+        240
+      ],
+      "parameters": {
+        "model": "mistral-small-2402",
+        "options": {}
+      },
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "EIl2QxhXAS9Hkg37",
+          "name": "Mistral Cloud account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0d586481-904d-4fbd-9b53-77bc2faf08dd",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        2040,
+        240
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"array\",\n\t\"items\": {\n \t\"type\": \"object\",\n \"properties\": {\n \"folder\": { \"type\": \"string\" },\n \"files\": {\n \"type\": \"array\",\n \"items\": { \"type\": \"string\" }\n }\n\t\t}\n }\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "86025668-aac9-49a2-92ff-ce15df16488c",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        940,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "35ea70c4-8669-4975-a68d-bbaa094713c0",
+              "name": "directory",
+              "type": "string",
+              "value": "={{ $('Local File Trigger').params.path }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "457bfd30-5cca-417a-88d3-666afe567fd5",
+      "name": "Move Files into Folders",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [
+        2560,
+        140
+      ],
+      "parameters": {
+        "command": "=directory=\"{{ $('Set Variables').item.json.directory }}\"\nsubdirectory=\"$directory/{{ $json.folder }}\";\nfile_list=\"{{ $json.files.join(' ') }}\";\n\n# create subdirectory if not exists\nmkdir -p $subdirectory;\n\n# for each suggestion, move the file into the subdirectory.\n# If the file in the subdirectory exists, then we'll rename the current file by adding a small random string to the end of the filename.\nfor filename in $file_list; do\n if [ -e \"$subdirectory/$filename\" ]; then\n mv \"$directory/$filename-$RANDOM\" -t $subdirectory;\n else\n mv \"$directory/$filename\" -t $subdirectory;\n fi\ndone",
+        "executeOnce": false
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e9a610bf-b2ae-4b98-870a-2e63790a3b5f",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        635.4233386400999,
+        -161.84747801133517
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 483.7926535356806,
+        "height": 501.2939838391483,
+        "content": "## Step 1. Select the target folder\n[Read more about local file trigger](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.localfiletrigger)\n\nIn this workflow, we'll monitor a specific folder on disk that n8n has access to. Since we're using docker, we can either use the n8n volume or mount a folder from the host machine.\n\nThe local file trigger is useful to execute the workflow whenever changes are made to our target folder."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c8961322-a6da-4fc0-a46d-6119c5eac2b0",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1140,
+        -54.28207683557787
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 583.2857596176409,
+        "height": 391.527066537946,
+        "content": "## Step 2. Identify files that need to be organised\n[Read more about Execute Command node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand)\n\nFor all Files in the root level of our selected target folder, we want them to be sorted and moved into categorised subdirectories. In this step, we'll use linux commands to get a list of files and folders currently present in the target folder."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6e31b2d1-288c-479b-8dd8-a171ecd03dea",
+      "name": "If Has Target Files...",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1560,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9be5a175-e7aa-4d68-9ddc-8b43b43e2d37",
+              "operator": {
+                "type": "array",
+                "operation": "lengthGte",
+                "rightType": "number"
+              },
+              "leftValue": "={{ $json.files }}",
+              "rightValue": "={{ 1 }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "07fd70ca-9126-4846-a2b0-4f3a8fc5eb69",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1760,
+        -107.13740439436373
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 631.2649908751414,
+        "height": 506.8242545618477,
+        "content": "## Step 3. Using Mistral AI to organise our target folder\n[Read more about Mistral AI](https://docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.lmchatmistralcloud)\n\nUsing Mistral AI as our AI file manager, it can help us suggest which files go into which categorised subdirectory. If the subdirectory doesn't exist, Mistral can also suggest one to be created."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2ca9a56c-ed1b-4f16-b207-7229c8d90b76",
+      "name": "Get Suggestions to List",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        2200,
+        80
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "output"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "29d425df-e513-429a-802f-02ad3ad86344",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2420,
+        -62.701160902940615
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 401.0065589583014,
+        "height": 374.8503908496576,
+        "content": "## Step 4. Move the files into subdirectories\n[Read more about Execute Command node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.executecommand)\n\nFor this step, we'll use the execute command node to execute a shellscript to move the files into their respective subdirectories."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a2ee79ea-6b0d-46c0-876f-8cfe12130a62",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        240,
+        -160
+      ],
+      "parameters": {
+        "width": 372.51107341403605,
+        "height": 422.70324544339167,
+        "content": "## Try It Out!\n### This workflow does the following:\n* Monitors a target folder for changes using the local file trigger\n* identifies all files and subdirectories in the target folder and passes this to Mistral AI\n* Mistral AI suggests where to move top level files into which subdirectories. It can also suggest subdirectories tp create if none are suitable.\n* Finally, we take the AI's suggestions are perform the move operations using the execute command node.\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Hacking!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a0db31b1-10e2-40bb-9ec6-b91569bf1072",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        174.82571715185748,
+        280
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 438.23697639546396,
+        "height": 97.88076166036412,
+        "content": "### \ud83d\udea8 Warning! Potential destructive operations ahead!\nThis workflow manipulates the filesystem. Always make backups of your files before running local workflows."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c932813c-913c-47bd-a4ba-79056bc6dfd7",
+      "name": "AI File Manager",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1860,
+        80
+      ],
+      "parameters": {
+        "text": "=Here is the list of current files in the directory:\n{{ $json.files.map(file => `* ${file}`).join('\\n') }}\n\nHere is the list of current folders in the directory:\n{{ $json.folders.length ? $json.folders.map(item => `* ${item}`).join('\\n') : 'There are currently no directories' }}\n\nGroup the current files using the filename as a hint and decide which of the current folders should they be moved to. If there are no current folders, then suggest a folder to be created.\n\nIf you can't decide which folder to put the file in, the file should be moved to the misc folder.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You manage a linux directory on behalf of the user."
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.4
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Get Files and Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI File Manager": {
+      "main": [
+        [
+          {
+            "node": "Get Suggestions to List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local File Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Files and Folders": {
+      "main": [
+        [
+          {
+            "node": "Files and Folders to Array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Target Files...": {
+      "main": [
+        [
+          {
+            "node": "AI File Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Suggestions to List": {
+      "main": [
+        [
+          {
+            "node": "Move Files into Folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI File Manager",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI File Manager",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Files and Folders to Array": {
+      "main": [
+        [
+          {
+            "node": "If Has Target Files...",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

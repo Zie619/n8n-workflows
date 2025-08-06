@@ -1,0 +1,1023 @@
+{
+  "id": "3tJcVzt2OqeyjfnH",
+  "meta": {
+    "instanceId": "03e9d14e9196363fe7191ce21dc0bb17387a6e755dcc9acc4f5904752919dca8"
+  },
+  "name": "Analyze_email_headers_for_IPs_and_spoofing__3",
+  "tags": [
+    {
+      "id": "GCHVocImoXoEVnzP",
+      "name": "🛠️ In progress",
+      "createdAt": "2023-10-31T02:17:21.618Z",
+      "updatedAt": "2023-10-31T02:17:21.618Z"
+    },
+    {
+      "id": "QPJKatvLSxxtrE8U",
+      "name": "Secops",
+      "createdAt": "2023-10-31T02:15:11.396Z",
+      "updatedAt": "2023-10-31T02:15:11.396Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "a2dca82d-f2b4-41f7-942a-2713a5ae012e",
+      "name": "Receive Headers",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -320,
+        740
+      ],
+      "webhookId": "1bde44ab-1360-48b3-9b2f-260a82629bfa",
+      "parameters": {
+        "path": "90e9e395-1d40-4575-b2a0-fbf52c534167",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8cb2e9f4-6954-4812-a443-47cc83e7db0a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2900,
+        420
+      ],
+      "parameters": {
+        "width": 528.410729274179,
+        "height": 545.969373616973,
+        "content": "## Output\nReturns output like:\n```\n[\n    {\n        \"ipAnalysis\": [\n            {\n                \"IP\": \"104.245.209.248\",\n                \"fraud_score\": 87,\n                \"recent_abuse\": true,\n                \"Organization\": \"Deft Hosting\",\n                \"tor\": false,\n                \"ISP\": \"Server Central Network\",\n                \"recent_spam_activity\": \"Identified spam in the past 24-48 hours\",\n                \"ip_sender_reputation\": \"Bad\"\n            },\n            {\n                \"IP\": \"09.06.05.41\",\n                \"recent_spam_activity\": \"unknown\",\n                \"ip_sender_reputation\": \"unknown\"\n            }\n        ]\n    },\n    {\n        \"spf\": \"pass\",\n        \"dkim\": \"pass\",\n        \"dmarc\": \"pass\"\n    }\n]\n```"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2464403b-5cb9-4090-b923-912bb8af673a",
+      "name": "Fraud Score",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1340,
+        560
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let recentSpamActivity = \"undefined\";\nlet ipSenderReputation = \"undefined\";\n\ntry {\n  if ($('IP Quality Score')) {\n    const fraudScore = $('IP Quality Score').item.json.fraud_score;\n\n    recentSpamActivity = \"Not associated with recent spam activity\";\n    \n    if( fraudScore >= 85 ) {\n      recentSpamActivity = \"Identified spam in the past 24-48 hours\";\n    } else if( fraudScore >= 75 ) {\n      recentSpamActivity = \"Identified spam in the past month\";\n    }\n\n    if(!fraudScore) recentSpamActivity = \"unknown\";\n    \n    ipSenderReputation = \"unknown\";\n    \n    if( fraudScore >= 85 ) {\n      ipSenderReputation = \"Bad\";\n    } else if( fraudScore >= 75 ) {\n      ipSenderReputation = \"Poor\";  \n    } else if( fraudScore >= 50 ) {\n      ipSenderReputation = \"Suspicious\";  \n    } else if( fraudScore >= 11 ) {\n      ipSenderReputation = \"OK\";  \n    } else if( fraudScore <= 10 ) {\n      ipSenderReputation = \"Good\";  \n    }\n  }\n} catch (error) {\n  return {\n    \"recent_spam_activity\": recentSpamActivity,\n    \"ip_sender_reputation\": ipSenderReputation\n  };\n}\n\nreturn {\n  \"recent_spam_activity\": recentSpamActivity,\n  \"ip_sender_reputation\": ipSenderReputation\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "70e3e88a-001a-40fc-a771-ace7696f54eb",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        2680,
+        760
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "text",
+        "responseBody": "={{ $json.result }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4e16523d-a7e1-44d1-840a-3df3a44bd034",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        -39.5
+      ],
+      "parameters": {
+        "width": 628.6931617686989,
+        "height": 834.0576186324413,
+        "content": "![ipqualityscore](https://i.imgur.com/CQRV2uV.png)\n## IP Reputation and Email Security Analysis\nThis critical part of the workflow specializes in fortifying email security by extracting IP addresses from received headers. With a refined process, it analyzes the extracted IPs against the IP Quality Score API, assessing potential risks and preventing fraudulent activities.\n\nThe `Extract IPs from \"received\"` node initiates the process by isolating IP addresses from email headers, demonstrating n8n's capacity to dissect and parse complex data. The `Split Out IPs` node then prepares these IPs for individual scrutiny, showcasing the flexibility of n8n to handle data at granular levels. Finally, the `IP Quality Score` node queries an external API to evaluate each IP, reinforcing the security parameters by providing detailed risk assessments.\n\n### Authentication - Free Tier Available (5000 credits/month)\n\nIP Quality Score uses the API key as part of the website URL. Since n8n does not currently allow for exposing credentials in the URL, you will need to hardcode your API key in the fake expression snippet in the `IP Quality Score` node.\n\nThe API key can be found by [visiting their documentation here](https://www.ipqualityscore.com/documentation/proxy-detection-api/overview), logging in, and then scrolling down to the Private Key. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2e8ead40-a97a-4c7e-953c-33546b83eaf6",
+      "name": "Explode Email Header",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        80,
+        740
+      ],
+      "parameters": {
+        "jsCode": "// Takes the Header string and splits it into various items for analysis.\nlet returnArray = [];\n\nfor (const item of $input.all()) {\n  const headerStr = item.json.header;\n  const headerLines = headerStr.split('\\n');\n    const headerObj = {};\n\n    let currentKey = null;\n    let currentValue = '';\n\n    headerLines.forEach((line) => {\n        const match = line.match(/^([\\w-]+):\\s*(.*)/);\n\n        if (match) {\n            if (currentKey) {\n                if (!headerObj[currentKey]) headerObj[currentKey] = [];\n                headerObj[currentKey].push({ [`${currentKey}`]: currentValue });\n            }\n\n            currentKey = match[1].toLowerCase();\n            currentValue = match[2];\n        } else {\n            currentValue += ' ' + line.trim();\n        }\n    });\n\n    if (currentKey) {\n        if (!headerObj[currentKey]) headerObj[currentKey] = [];\n        headerObj[currentKey].push({ [`${currentKey}Item`]: currentValue });\n    }\n  returnArray.push({\"header\":headerObj});\n}\n\nreturn returnArray;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "1118176d-a315-439d-a3b6-fe4d40c900c6",
+      "name": "Split Out IPs",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        740,
+        560
+      ],
+      "parameters": {
+        "options": {
+          "destinationFieldName": "ip"
+        },
+        "fieldToSplitOut": "ips"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ef118900-11a6-418a-b1b3-159933d62cbf",
+      "name": "Extract IPs from \"received\"",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        540,
+        560
+      ],
+      "parameters": {
+        "jsCode": "let ips = []\n\nfor (const item of $input.all()) {\n  const header = JSON.stringify(item.json.header.received);\n  console.log(header)\n  const ipRegex = /\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b/g;\n  const ipAddresses = header.match(ipRegex) || [];\n  ips.push(...ipAddresses);\n}\n\nreturn [\n  {\n    ips: ips\n  }\n];"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ffefc1e2-214c-47d7-a7a3-104fefdccda1",
+      "name": "IP Quality Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        920,
+        560
+      ],
+      "parameters": {
+        "url": "=https://ipqualityscore.com/api/json/ip/{{ Replace me with your API key, it can be found inside the api documentation, leave json.ip alone }}/{{ $json.ip }}?strictness=1&allow_public_access_points=true&lighter_penalties=true",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "2f1c5b30-950c-4e0d-81a6-bf4c2c64f968",
+      "name": "IP-API",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1140,
+        560
+      ],
+      "parameters": {
+        "url": "=http://ip-api.com/json/{{ $('Split Out IPs').item.json.ip }}",
+        "method": "POST",
+        "options": {}
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "c9cae845-63e8-475a-bc08-ba0552712394",
+      "name": "Collect interesting data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1520,
+        560
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "IP",
+              "value": "={{ $('Split Out IPs').item.json.ip }}"
+            },
+            {
+              "name": "fraud_score",
+              "value": "={{ $('IP Quality Score').item.json.fraud_score }}"
+            },
+            {
+              "name": "recent_abuse",
+              "value": "={{ $('IP Quality Score').item.json.recent_abuse }}"
+            },
+            {
+              "name": "Organization",
+              "value": "={{ $('IP Quality Score').item.json.organization }}"
+            },
+            {
+              "name": "tor",
+              "value": "={{ $('IP Quality Score').item.json.tor }}"
+            },
+            {
+              "name": "ISP",
+              "value": "={{ $('IP-API').item.json.isp }}"
+            },
+            {
+              "name": "recent_spam_activity",
+              "value": "={{ $json.recent_spam_activity }}"
+            },
+            {
+              "name": "ip_sender_reputation",
+              "value": "={{ $json.ip_sender_reputation }}"
+            }
+          ]
+        },
+        "options": {
+          "dotNotation": true
+        },
+        "keepOnlySet": true
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "01b33cc9-b7b3-44e6-b683-b753e6daa2dc",
+      "name": "SPF/DKIM/DMARC from \"authentication-results\"",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        520,
+        1160
+      ],
+      "parameters": {
+        "jsCode": "let mailAuth = [];\n\nfor (const item of $input.all()) {\n  // SPF\n  let spf = \"unknown\";\n  if( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"spf=pass\") ) {\n    spf = \"pass\";\n  } else if ( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"spf=fail\") ) {\n    spf = \"fail\";    \n  } else if ( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"spf=neutral\") ) {\n    spf = \"neutral\";\n  }\n\n  // DKIM\n  let dkim = \"unknown\";\n  if( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"dkim=pass\") ) {\n    dkim = \"pass\";\n  } else if ( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"dkim=fail\") ) {\n    dkim = \"fail\";    \n  } else if ( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"dkim=temperror\") ) {\n    dkim = \"error\";\n  }\n\n  // DMARC\n  let dmarc = \"unknown\";\n  if( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"dmarc=pass\") ) {\n    dmarc = \"pass\";\n  } else if ( JSON.stringify(item.json.header[\"authentication-results\"]).includes(\"dmarc=fail\") ) {\n    dmarc = \"fail\";    \n  }\n  \n  mailAuth.push({\n    \"spf\": spf,\n    \"dkim\": dkim,\n    \"dmarc\": dmarc\n  });\n}\n\nreturn mailAuth;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "33923ec2-10db-4799-9b5e-a369cdd74640",
+      "name": "SPF from \"received-spf\"",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        500,
+        1858
+      ],
+      "parameters": {
+        "jsCode": "let spfArray = [];\n\nfor (const item of $('Authentication Results Present?').all()) {\n    const spfList = item.json.header[\"received-spf\"];\n\n    if (!spfList || spfList.length == 0) {\n        spfArray.push(\"not-found\");\n    } else {\n        for (const spfItem of spfList) {\n            if (spfItem[\"received-spf\"].toLowerCase().includes(\"fail\")) {\n                spfArray.push(\"fail\");\n            } else if (spfItem[\"received-spf\"].toLowerCase().includes(\"pass\")) {\n                spfArray.push(\"pass\");\n            } else {\n                spfArray.push(\"found\");\n            }\n        }\n    }\n}\nreturn [{spf:spfArray.join(\",\")}];\n"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "9cec1f09-3887-46ec-aa25-b03a0ab34190",
+      "name": "DKIM from \"dkim-signature\"",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        760,
+        1858
+      ],
+      "parameters": {
+        "jsCode": "let dkimArray = [];\n\nfor (const item of $('Authentication Results Present?').all()) {\n    const dkimList = item.json.header[\"dkim-signature\"];\n\n    if (!dkimList || dkimList.length == 0) { dkimArray.push(\"not-found\") } else {\n        dkimArray.push(\"found\");\n        return dkimArray;\n    }\n\n}\nreturn [{dkim:dkimArray.join(\",\")}];\n"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0f856808-c044-4547-bc81-5e6d1208d9ad",
+      "name": "DMARC from \"received-dmarc\"",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1020,
+        1858
+      ],
+      "parameters": {
+        "jsCode": "let dmarcArray = [];\n\nfor (const item of $('Authentication Results Present?').all()) {\n    const dmarcList = item.json.header[\"received-dmarc\"];\n\n    if (!dmarcList || dmarcList.length == 0) {\n        dmarcArray.push(\"not-found\");\n    } else {\n        for (const dmarcItem of dmarcList) {\n            if (dmarcItem[\"received-dmarc\"].toLowerCase().includes(\"fail\")) {\n                dmarcArray.push(\"fail\");\n            } else if (dmarcItem[\"received-dmarc\"].toLowerCase().includes(\"pass\")) {\n                dmarcArray.push(\"pass\");\n            } else {\n                dmarcArray.push(\"found\");\n            }\n        }\n    }\n}\nreturn [{dmarc:dmarcArray.join(\",\")}];"
+      },
+      "typeVersion": 2,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "0780dc59-8a4c-4355-9cdc-35b2505043a6",
+      "name": "DKIM",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1260,
+        2718
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "spf=pass",
+              "operation": "contains"
+            },
+            {
+              "output": 1,
+              "value2": "spf=fail",
+              "operation": "contains"
+            },
+            {
+              "output": 2,
+              "value2": "spf=neutral",
+              "operation": "contains"
+            }
+          ]
+        },
+        "value1": "={{ $('Authentication Results Present?').item.json.header['authentication-results'] }}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b0be02f9-ae6c-460e-9e1c-0be8f878f81b",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -359.7001600000003,
+        -46.60400000000038
+      ],
+      "parameters": {
+        "width": 811.1951544353835,
+        "height": 1042.0833160085729,
+        "content": "![webhook](https://i.imgur.com/D6SP9P0.png)\n## Workflow Overview\nThis n8n workflow is adept at dissecting email headers to assess security risks. It employs a webhook to receive data, then diverges into two thorough investigative paths based on specific header contents. For emails with `received` headers, it extracts IP details and consults the IP Quality Score API for comprehensive risk assessments, including potential fraud or abuse and geolocation insights via the IP-API.\n\nConversely, when `authentication-results` headers are present, it meticulously evaluates SPF, DKIM, and DMARC verifications, categorizing each email based on the authentication checks.\n\nFinally, the workflow converges the data from both paths to provide a cohesive analysis, which is then relayed back through the webhook, furnishing a detailed report on IP reputation and email authentication status.\n\n`Please note that the workflow is not yet complete, but should still work without the DKIM analysis.`\n\n## Triggered Via Webhook\nThe workflow is triggered on-demand by incoming webhook queries or can be used inside of the `Execute Workflow` node by replacing the `webhook trigger` with an `Execute Workflow Trigger` and the `respond to webhook` node with a `Set node` set to only keep the set node data. This allows you to use it as part of a larger workflow, in which this portion handles the header analysis. Simply add the  Example input looks like:\n\n```\n[\n  {\n    \"headers\": {\n      \"host\": \"internal.users.n8n.cloud\"\n    },\n    \"params\": {},\n    \"query\": {},\n    \"body\": \"Delivered-To: g.andreini@gmail.com\\nReceived: by 2002:a05:7412:be08:b0:df:2c3c:4cc with SMTP id la8csp2349351rdb;\\n        Tue, 5 Sep 2023 15:06:08 -0700 (PDT)\\nX-Google-Smtp-Source: AGHT+IEHz2WAE5kssnJSpwJyhbuq3ZjNQTqZfo6OFeCd5w2EKOdnF3nICb1zIL4Y1tahQpr5xY6+\\nX-Received: by 2002:a17:907:78c3:b0:9a1:f2d3:ade9 with SMTP id kv3-20020a17090778c300b009a1f2d3ade9mr802685ejc.42.1693951567785;\\n        Tue, 05 Sep 2023 15:06:07 -0700 (PDT)\\nARC-Seal: i=1; a=rsa-sha256; t=1693951567; cv=none;\\n        d=google.com; s=arc-20160816;\\n        b=zsD04giTt/gbOxX6IW6/ETi7zkiuLYPaM6nYtckkcCfhqz5H7qvNN1NkDrlbnsXEr2\\n         3jVLDlhAZCXVg4qGNEWTjfzLwn5eQoUdW7iy//8XZU3Xy2xtORLBKKWs+Pjzx2sBP9KS\\n         zsy0Tg+rlAqi/aOH8+D+ANC0dCibsPau92zLS6GIvil700hvAJ7KB9fw0s/Ntx4z8VGv\\n         0P+BodOQDO9kdHtuMkgu/waF86Xe0ImcxtvMHQ/mNjbTSRDTa0d04+X7ILVf4q0B5gFg\\n         tnykE51GIS8Ey8ElAd4z/it1E/ffMJ7QAgiDSO0tZRc2NnM0QQ1oYrO9IL0cNuW1P33Q\\n         PfNA==\\nARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20160816;\\n        h=mime-version:date:subject:to:from:reply-to:message-id;\\n        bh=f9tT4LpRqlQSioyOCLufJC57T1y2rwgsPezOJPbokDM=;\\n        fh=syfPZFOxHm03Bg8T666hpPsY3BFS1EZPTr8jKyQ7bFk=;\\n        b=fsZErxdmb95VXJpAyI8Pff38Ifu47WaONvSwpYaSstYbRoKDZSS3SH247NHt/+uyq+\\n         7UUF37XenbcZif1p3iOa96JxcYBtLLp3cI9pe8NRQjJtceXQk70PVcCGNXORiAxoCGT+\\n         iCMzUoFjTAfhK729rSldyFJ+I+WU3k+W/CjL1+geJkU5fEmg+eBEo8hDifqW3Iv73auq\\n         uDnxkLZ55yX9W2ARwv/204qqqxYHKfdXDIWGDyeXE10NHLTr/GAR8DWVx6qD8b4U0Zc3\\n         MC+SZxGsIcSCr5ouXIovuQBYcdmqDgDxAaN9VTfYdnXobblN6bo3OcC0rqiiyVJnV3ZA\\n         BYoQ==\\nARC-Authentication-Results: i=1; mx.google.com;\\n       spf=fail (google.com: domain of eljyzxd@molkase.de does not designate 89.31.72.29 as permitted sender) smtp.mailfrom=eljyzxd@molkase.de\\nReturn-Path: <eljyzxd@molkase.de>\\nReceived: from mail19.interhost.it (mail19.interhost.it. [89.31.72.29])\\n        by mx.google.com with ESMTPS id k15-20020a170906578f00b00992aaed9f81si7955121ejq.356.2023.09.05.15.06.07\\n        for <g.andreini@gmail.com>\\n        (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);\\n        Tue, 05 Sep 2023 15:06:07 -0700 (PDT)\\nReceived-SPF: fail (google.com: domain of eljyzxd@molkase.de does not designate 89.31.72.29 as permitted sender) client-ip=89.31.72.29;\\nAuthentication-Results: mx.google.com;\\n       spf=fail (google.com: domain of eljyzxd@molkase.de does not designate 89.31.72.29 as permitted sender) smtp.mailfrom=eljyzxd@molkase.de\\nReceived: from mailfront2.interhost.it (mailfront2.interhost.it [89.31.72.21]) (using TLSv1.2 with cipher ADH-AES256-GCM-SHA384 (256/256 bits)) (No client certificate requested) by mail19.interhost.it (Postfix) with ESMTPS id 7BA73561D21 for <info@thepund.it>; Wed,\\n  6 Sep 2023 00:06:06 +0200 (CEST)\\nReceived: from mailfront2.interhost.it (localhost [127.0.0.1]) by mailfront2.interhost.it (Postfix) with ESMTP id 5AEE1835B2 for <info@thepund.it>; Wed,\\n  6 Sep 2023 00:06:06 +0200 (CEST)\\nReceived-SPF: Pass (mailfrom) identity=mailfrom; client-ip=62.173.139.164; helo=mail.molkase.de; envelope-from=eljyzxd@molkase.de; receiver=<UNKNOWN>\\nReceived: from mail.molkase.de (mail.molkase.de [62.173.139.164]) by mailfront2.interhost.it (Postfix) with ESMTP id A8BC3835B5 for <info@thepund.it>; Wed,\\n  6 Sep 2023 00:06:05 +0200 (CEST)\\nReceived: from molkase.de (mail.molkase.de [62.173.139.164]) by mail.molkase.de (Postfix) with ESMTPA id A561D80FB872; Tue,\\n  5 Sep 2023 23:08:50 +0300 (EEST)\\nMessage-ID: <15404342A12424728J51235153O87748181D@ideljyzxd>\\nReply-To: Legal Casino <eljyzxd@molkase.de>\\nFrom: Legal Casino <eljyzxd@molkase.de>\\nTo: <info@tevassociati.it>\\nSubject: Bonus for all European residents\\nDate: Tue, 05 Sep 2023 23:08:55 +0300\\nMIME-Version: 1.0\\nContent-Type: multipart/related; type=\\\"multipart/alternative\\\"; boundary=\\\"----=_NextPart_000_0018_01D9E04D.79971B70\\\"\\nX-Virus-Scanned: ClamAV using ClamSMTP\"\n  }\n]\n```"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3c8fe0f3-0b65-4366-9c1e-a2a7bcc35ed5",
+      "name": "Extract Email Header from webhook",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -99,
+        740
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "header",
+              "value": "={{ $json.body }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4eef6457-27cf-442f-bccf-75663170401b",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1100,
+        20
+      ],
+      "parameters": {
+        "width": 610.1426815377504,
+        "height": 772.7590323462559,
+        "content": "![ipapi](https://i.imgur.com/OMhn14b.png)\n## IP Reputation and Fraud Analysis\nThis workflow section performs an in-depth reputation assessment of each IP address. The `IP-API` node retrieves geolocation data, while the `Fraud Score` node evaluates the risk associated with the IP, flagging any potential spam or abuse activities.\n\n### Consolidation of Findings\nKey data points such as fraud scores and ISP information are synthesized by the `Collect interesting data` node, providing a clear profile of each IP for informed decision-making.\n\n### Authentication - Free Tier Available (45 requests/min)\nThis endpoint is limited to `45 requests per minute from an IP address`.\n\nIf you go over the limit your requests will be throttled `(HTTP 429)` until your rate limit window is reset. If you constantly go over the limit your IP address will be banned for 1 hour.\n\nNo authentication needed, [Click here to view documentation.](https://ip-api.com/docs)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "764de66e-8e40-44d1-8c09-fb099753d800",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1720,
+        141.75
+      ],
+      "parameters": {
+        "width": 1153.9919748350057,
+        "height": 818.3738794326835,
+        "content": "![n8n](https://i.imgur.com/lKnBNnH.png)\n## Analyze and Respond to Email Header Analysis\nThe concluding segment of the `Analyze Email Headers For IPs and Spoofing` workflow integrates sophisticated data processing to analyze and respond to the collected email header information. This part of the workflow is crucial as it synthesizes the data gathered from email headers and prepares it for actionable insights.\n\n- `Data Aggregation and Merging:` The nodes `Merge1` and Item `Lists2` are pivotal for aggregating the data from previous steps. These nodes effectively concatenate various items and compile the IP analysis data. This operation is essential for creating a comprehensive view of the email headers, focusing particularly on IPs and potential spoofing indicators.\n\n- `Further Merging and Response Preparation:` Another merge operation is performed by `Merge3`, which prepares the data for the final output. Following this, Item Lists3 further concatenates items to form a single, coherent result. This step ensures that all the relevant information is accurately compiled and ready for the final response.\n\n- `Final Response to Webhook:` The Respond to Webhook node serves as the endpoint of this workflow. It is configured to respond with the analyzed data, encapsulated in a text format. The response is set to return a 200 HTTP status code, signaling a successful operation. This node exemplifies n8n's capability in not just processing and analyzing data, but also in seamlessly communicating results back to a designated receiver, be it a webhook or any other endpoint.\n\n\nBy the end of this workflow, you have a structured and detailed analysis of email headers, specifically tailored to identify IPs and potential spoofing threats. This underscores n8n's effectiveness as a cybersecurity tool, providing not just data processing capabilities but also actionable insights crucial for maintaining email security."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2fa3c912-f478-48a1-9b2e-5e3f51c6a363",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        800
+      ],
+      "parameters": {
+        "width": 630.5819800503231,
+        "height": 535.80387776221,
+        "content": "![nodejs](https://i.imgur.com/OqjRFGZ.png)\n## Authentication Analysis\n\nThis section assesses the presence and validity of SPF, DKIM, and DMARC records within email headers to confirm authentication. `SPF/DKIM/DMARC from \"authentication-results\"` node evaluates the authentication results, ensuring that emails meet the set security standards for sender verification. \n\nThe n8n code nodes use either a version of `Javascript` called `node.js` or a version of `Python` called `Pyodide`. In this case we are using Javascript."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5297e5a0-f2d1-4ee3-b931-9b1abe75b2cc",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        2038
+      ],
+      "parameters": {
+        "width": 983.9576126829675,
+        "height": 1039.0141642262715,
+        "content": "![n8n](https://i.imgur.com/yz109RJ.png)\n## SPF and DKIM Authentication Routing\nThis group of nodes orchestrates the authentication status routing for SPF and DKIM records found in email headers.\n\nSPF Validation Decision-Making\nThe `SPF` switch node evaluates the SPF results from the email header, directing the flow to different paths based on whether SPF passes, fails, or is neutral. The `\"Set1,\" \"Set2,\" and \"Set4\"` nodes then assign the respective SPF authentication statuses, marking emails for further processing based on their security verification.\n\nDKIM Evaluation Handling\nAlthough not explicitly processing DKIM, the `\"DKIM\" switch node` is likely misnamed and should be adjusted to reflect its role correctly. It seems to be set up for similar routing logic as the SPF node, which suggests it should handle DKIM results. If it's indeed for DKIM, ensure it's checking for `\"dkim=pass/fail/neutral\"` within the authentication results.\n\nUnknown SPF Status Assignment\nFinally, the `\"Set5\"` node appears to handle cases where SPF results are not found or are indeterminate, setting the status to `\"unknown.\"`"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f6c06bc5-048c-433e-9bfa-f155ca6735e4",
+      "name": "Received Headers Present?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        300,
+        660
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.header.received.length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a92ef09c-0cc6-469c-98ff-8c6172615a4b",
+      "name": "Authentication Results Present?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        300,
+        820
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.header[\"authentication-results\"].length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "aef7f739-dfef-40b1-b01f-29adad4a9bda",
+      "name": "Aggregate Authentication Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1280,
+        1858
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "spf",
+              "value": "={{ $('SPF from \"received-spf\"').all() }}"
+            },
+            {
+              "name": "dkim",
+              "value": "={{ $('DKIM from \"dkim-signature\"').all() }}"
+            },
+            {
+              "name": "dmarc",
+              "value": "={{ $('DMARC from \"received-dmarc\"').all() }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "5d7ce661-3bdf-45e5-a1e2-335602e62b5d",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        1349.3807407407407
+      ],
+      "parameters": {
+        "width": 984.4210239195738,
+        "height": 672.6925241611406,
+        "content": "![nodejs](https://i.imgur.com/OqjRFGZ.png)\n## Email Authentication Assessment\nThis set of nodes is dedicated to evaluating the authentication of email headers, specifically focusing on SPF, DKIM, and DMARC validations.\n\n### SPF, DKIM, and DMARC Extraction\nStarting with `SPF from 'received-spf',` this node analyzes the email's SPF records for compliance. Following this, `DKIM from 'dkim-signature'` examines the DKIM signatures to verify their presence and status. Next, `DMARC from 'received-dmarc'` checks DMARC records for alignment with expected security practices.\n\n### Data Aggregation\nOnce the assessments are complete, `Aggregate Authentication Data` compiles the findings into a cohesive dataset, providing clear indicators of each email's authentication status.\n\n### Key Focus\nThese nodes are essential in filtering out potentially harmful emails by verifying their authenticity, a key step in protecting against phishing and spoofing attempts.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "88888a82-815b-423a-85d3-8c86756d10cd",
+      "name": "IP Data Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1800,
+        660
+      ],
+      "parameters": {},
+      "typeVersion": 2.1
+    },
+    {
+      "id": "b7add244-9759-450f-8b01-6ec4555a5971",
+      "name": "Merge Security Data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2171,
+        760
+      ],
+      "parameters": {},
+      "typeVersion": 2.1
+    },
+    {
+      "id": "ef679cda-9420-44fd-90cc-23be1b166e2c",
+      "name": "Join IP Analysis into one JSON object",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        1960,
+        660
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData",
+        "operation": "concatenateItems",
+        "destinationFieldName": "ipAnalysis"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "1e5ae57b-948c-40c8-8248-fcbda80264e2",
+      "name": "Join results into one JSON object",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        2391,
+        760
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData",
+        "operation": "concatenateItems",
+        "destinationFieldName": "result"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "7fef7675-1350-4886-b184-f907dacf08b1",
+      "name": "SPF Authentication Checker",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        500,
+        2718
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "spf=pass",
+              "operation": "contains"
+            },
+            {
+              "output": 1,
+              "value2": "spf=fail",
+              "operation": "contains"
+            },
+            {
+              "output": 2,
+              "value2": "spf=neutral",
+              "operation": "contains"
+            }
+          ]
+        },
+        "value1": "={{ JSON.stringify($json.header[\"authentication-results\"]) }}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "410ccb8c-a551-45a3-a487-b0ce15a56882",
+      "name": "Set SPF Pass Status",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        920,
+        2518
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "spf",
+              "value": "pass"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "127c0c91-162c-4cbb-b692-eb0675a55c42",
+      "name": "Set SPF Fail Status",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        920,
+        2658
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "spf",
+              "value": "fail"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "7a15ae91-012f-4fc8-9075-7f855b15d979",
+      "name": "Set SPF Neutral Status",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        920,
+        2798
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "spf",
+              "value": "neutral"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2ac1e5ce-83a4-4205-9774-76506f06108e",
+      "name": "Set SPF UnknownStatus",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        920,
+        2938
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "spf",
+              "value": "unknown"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "Receive Headers": [
+      {
+        "json": {
+          "body": "Delivered-To: g.andreini@gmail.com\nReceived: by 2002:a05:7412:be08:b0:df:2c3c:4cc with SMTP id la8csp2349351rdb;\n        Tue, 5 Sep 2023 15:06:08 -0700 (PDT)\nX-Google-Smtp-Source: AGHT+IEHz2WAE5kssnJSpwJyhbuq3ZjNQTqZfo6OFeCd5w2EKOdnF3nICb1zIL4Y1tahQpr5xY6+\nX-Received: by 2002:a17:907:78c3:b0:9a1:f2d3:ade9 with SMTP id kv3-20020a17090778c300b009a1f2d3ade9mr802685ejc.42.1693951567785;\n        Tue, 05 Sep 2023 15:06:07 -0700 (PDT)\nARC-Seal: i=1; a=rsa-sha256; t=1693951567; cv=none;\n        d=google.com; s=arc-20160816;\n        b=zsD04giTt/gbOxX6IW6/ETi7zkiuLYPaM6nYtckkcCfhqz5H7qvNN1NkDrlbnsXEr2\n         3jVLDlhAZCXVg4qGNEWTjfzLwn5eQoUdW7iy//8XZU3Xy2xtORLBKKWs+Pjzx2sBP9KS\n         zsy0Tg+rlAqi/aOH8+D+ANC0dCibsPau92zLS6GIvil700hvAJ7KB9fw0s/Ntx4z8VGv\n         0P+BodOQDO9kdHtuMkgu/waF86Xe0ImcxtvMHQ/mNjbTSRDTa0d04+X7ILVf4q0B5gFg\n         tnykE51GIS8Ey8ElAd4z/it1E/ffMJ7QAgiDSO0tZRc2NnM0QQ1oYrO9IL0cNuW1P33Q\n         PfNA==\nARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20160816;\n        h=mime-version:date:subject:to:from:reply-to:message-id;\n        bh=f9tT4LpRqlQSioyOCLufJC57T1y2rwgsPezOJPbokDM=;\n        fh=syfPZFOxHm03Bg8T666hpPsY3BFS1EZPTr8jKyQ7bFk=;\n        b=fsZErxdmb95VXJpAyI8Pff38Ifu47WaONvSwpYaSstYbRoKDZSS3SH247NHt/+uyq+\n         7UUF37XenbcZif1p3iOa96JxcYBtLLp3cI9pe8NRQjJtceXQk70PVcCGNXORiAxoCGT+\n         iCMzUoFjTAfhK729rSldyFJ+I+WU3k+W/CjL1+geJkU5fEmg+eBEo8hDifqW3Iv73auq\n         uDnxkLZ55yX9W2ARwv/204qqqxYHKfdXDIWGDyeXE10NHLTr/GAR8DWVx6qD8b4U0Zc3\n         MC+SZxGsIcSCr5ouXIovuQBYcdmqDgDxAaN9VTfYdnXobblN6bo3OcC0rqiiyVJnV3ZA\n         BYoQ==\nARC-Authentication-Results: i=1; mx.google.com;\n       spf=fail (google.com: domain of eljyzxd@molkase.de does not designate 89.31.72.29 as permitted sender) smtp.mailfrom=eljyzxd@molkase.de\nReturn-Path: <eljyzxd@molkase.de>\nReceived: from mail19.interhost.it (mail19.interhost.it. [89.31.72.29])\n        by mx.google.com with ESMTPS id k15-20020a170906578f00b00992aaed9f81si7955121ejq.356.2023.09.05.15.06.07\n        for <g.andreini@gmail.com>\n        (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);\n        Tue, 05 Sep 2023 15:06:07 -0700 (PDT)\nReceived-SPF: fail (google.com: domain of eljyzxd@molkase.de does not designate 89.31.72.29 as permitted sender) client-ip=89.31.72.29;\nAuthentication-Results: mx.google.com;\n       spf=fail (google.com: domain of eljyzxd@molkase.de does not designate 89.31.72.29 as permitted sender) smtp.mailfrom=eljyzxd@molkase.de\nReceived: from mailfront2.interhost.it (mailfront2.interhost.it [89.31.72.21]) (using TLSv1.2 with cipher ADH-AES256-GCM-SHA384 (256/256 bits)) (No client certificate requested) by mail19.interhost.it (Postfix) with ESMTPS id 7BA73561D21 for <info@thepund.it>; Wed,\n  6 Sep 2023 00:06:06 +0200 (CEST)\nReceived: from mailfront2.interhost.it (localhost [127.0.0.1]) by mailfront2.interhost.it (Postfix) with ESMTP id 5AEE1835B2 for <info@thepund.it>; Wed,\n  6 Sep 2023 00:06:06 +0200 (CEST)\nReceived-SPF: Pass (mailfrom) identity=mailfrom; client-ip=62.173.139.164; helo=mail.molkase.de; envelope-from=eljyzxd@molkase.de; receiver=<UNKNOWN>\nReceived: from mail.molkase.de (mail.molkase.de [62.173.139.164]) by mailfront2.interhost.it (Postfix) with ESMTP id A8BC3835B5 for <info@thepund.it>; Wed,\n  6 Sep 2023 00:06:05 +0200 (CEST)\nReceived: from molkase.de (mail.molkase.de [62.173.139.164]) by mail.molkase.de (Postfix) with ESMTPA id A561D80FB872; Tue,\n  5 Sep 2023 23:08:50 +0300 (EEST)\nMessage-ID: <15404342A12424728J51235153O87748181D@ideljyzxd>\nReply-To: Legal Casino <eljyzxd@molkase.de>\nFrom: Legal Casino <eljyzxd@molkase.de>\nTo: <info@tevassociati.it>\nSubject: Bonus for all European residents\nDate: Tue, 05 Sep 2023 23:08:55 +0300\nMIME-Version: 1.0\nContent-Type: multipart/related; type=\"multipart/alternative\"; boundary=\"----=_NextPart_000_0018_01D9E04D.79971B70\"\nX-Virus-Scanned: ClamAV using ClamSMTP",
+          "query": {},
+          "params": {},
+          "headers": {
+            "host": "internal.users.n8n.cloud",
+            "accept": "*/*",
+            "x-real-ip": "10.255.0.2",
+            "user-agent": "PostmanRuntime/7.32.3",
+            "content-type": "text/plain",
+            "authorization": "1234567890",
+            "postman-token": "8701ef86-2136-4c79-941a-bc8ed79bcc9e",
+            "content-length": "3900",
+            "accept-encoding": "gzip, deflate, br",
+            "x-forwarded-for": "10.255.0.2",
+            "x-forwarded-host": "internal.users.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "e591fa1c2d01"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6e01f4f9-d42b-4168-91a1-0bfe850c43ea",
+  "connections": {
+    "IP-API": {
+      "main": [
+        [
+          {
+            "node": "Fraud Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fraud Score": {
+      "main": [
+        [
+          {
+            "node": "Collect interesting data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IP Data Merge": {
+      "main": [
+        [
+          {
+            "node": "Join IP Analysis into one JSON object",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out IPs": {
+      "main": [
+        [
+          {
+            "node": "IP Quality Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Headers": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Header from webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IP Quality Score": {
+      "main": [
+        [
+          {
+            "node": "IP-API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Security Data": {
+      "main": [
+        [
+          {
+            "node": "Join results into one JSON object",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set SPF Fail Status": {
+      "main": [
+        [
+          {
+            "node": "DKIM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set SPF Pass Status": {
+      "main": [
+        [
+          {
+            "node": "DKIM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explode Email Header": {
+      "main": [
+        [
+          {
+            "node": "Received Headers Present?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Authentication Results Present?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set SPF UnknownStatus": {
+      "main": [
+        [
+          {
+            "node": "DKIM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set SPF Neutral Status": {
+      "main": [
+        [
+          {
+            "node": "DKIM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SPF from \"received-spf\"": {
+      "main": [
+        [
+          {
+            "node": "DKIM from \"dkim-signature\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect interesting data": {
+      "main": [
+        [
+          {
+            "node": "IP Data Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Received Headers Present?": {
+      "main": [
+        [
+          {
+            "node": "Extract IPs from \"received\"",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IP Data Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "DKIM from \"dkim-signature\"": {
+      "main": [
+        [
+          {
+            "node": "DMARC from \"received-dmarc\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SPF Authentication Checker": {
+      "main": [
+        [
+          {
+            "node": "Set SPF Pass Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set SPF Fail Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set SPF Neutral Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set SPF UnknownStatus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DMARC from \"received-dmarc\"": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Authentication Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract IPs from \"received\"": {
+      "main": [
+        [
+          {
+            "node": "Split Out IPs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Authentication Data": {
+      "main": [
+        [
+          {
+            "node": "Merge Security Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Authentication Results Present?": {
+      "main": [
+        [
+          {
+            "node": "SPF/DKIM/DMARC from \"authentication-results\"",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SPF Authentication Checker",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SPF from \"received-spf\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Header from webhook": {
+      "main": [
+        [
+          {
+            "node": "Explode Email Header",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join results into one JSON object": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join IP Analysis into one JSON object": {
+      "main": [
+        [
+          {
+            "node": "Merge Security Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SPF/DKIM/DMARC from \"authentication-results\"": {
+      "main": [
+        [
+          {
+            "node": "Merge Security Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  }
+}

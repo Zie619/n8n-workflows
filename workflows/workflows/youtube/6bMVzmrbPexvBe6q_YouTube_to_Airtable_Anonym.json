@@ -1,0 +1,609 @@
+{
+  "id": "6bMVzmrbPexvBe6q",
+  "meta": {
+    "instanceId": "558d88703fb65b2d0e44613bc35916258b0f0bf983c5d4730c00c424b77ca36a",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "YouTube to Airtable Anonym",
+  "tags": [
+    {
+      "id": "1iR8rLF2nlFdk8Iy",
+      "name": "Tool",
+      "createdAt": "2025-04-10T20:38:51.198Z",
+      "updatedAt": "2025-04-10T20:38:51.198Z"
+    },
+    {
+      "id": "kY9rLUshnq9TIJVU",
+      "name": "Freebie",
+      "createdAt": "2025-04-11T17:35:46.605Z",
+      "updatedAt": "2025-04-11T17:35:46.605Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "eb18fe74-8812-48ab-b977-41f5cedf9a76",
+      "name": "Get video transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "url": "https://youtube-video-summarizer-gpt-ai.p.rapidapi.com/api/v1/get-transcript-v2",
+        "options": {},
+        "sendQuery": true,
+        "sendHeaders": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "video_id",
+              "value": "={{ $json.videoId }}"
+            },
+            {
+              "name": "platform",
+              "value": "youtube"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Rapidapi-Key",
+              "value": "{YOUR-API-KEY}"
+            },
+            {
+              "name": "X-Rapidapi-Host",
+              "value": "youtube-video-summarizer-gpt-ai.p.rapidapi.com"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "7a672f41-646f-46bf-be8b-96a84c1b0dd7",
+      "name": "Get Video ID",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Loop over input items\nfor (const item of $input.all()) {\n    // Extract the YouTube video ID using a regular expression\n    const Source = item.json.Source;\n    const videoIdMatch = Source.match(/(?:v=|\\/)([a-zA-Z0-9_-]{11})/);\n\n    const videoId = videoIdMatch ? videoIdMatch[1] : null; // Extracted video ID or null if not found\n\n    // Add the video ID to the JSON\n    item.json.videoId = videoId;\n}\n\n// Return all items with the new videoId field\nreturn $input.all();\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4b026bcf-7563-4444-8ce1-9e9a89eef56d",
+      "name": "Combine Transcripts",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Initialize an empty string to hold the concatenated transcript\nlet Transcript = \"\";\n\n// Safeguard against undefined paths and ensure required properties exist\nif ($json.data && $json.data.transcripts) {\n    // Loop through all transcript objects\n    for (const key in $json.data.transcripts) {\n        if ($json.data.transcripts[key].custom) {\n            const customArray = $json.data.transcripts[key].custom;\n\n            // Extract and append text from each transcript entry\n            for (const item of customArray) {\n                if (item.text) {\n                    Transcript += item.text + \" \"; // Add a space between texts\n                }\n            }\n        }\n    }\n}\n\n// Return the combined transcript as a new field\nreturn [\n    {\n        json: {\n            Transcript: Transcript.trim(), // Trim to clean up extra spaces\n        },\n    },\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "693ab15f-307e-4fdf-9752-2cc64a80307d",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "1df795e2-ac7e-42a8-a1f4-2c292b704613",
+      "name": "Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "appgNpFtbtaGHM4g0",
+          "cachedResultUrl": "https://airtable.com/appgNpFtbtaGHM4g0",
+          "cachedResultName": "Content Hub"
+        },
+        "limit": 1,
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblwBVudDpOMkUGKL",
+          "cachedResultUrl": "https://airtable.com/appgNpFtbtaGHM4g0/tblwBVudDpOMkUGKL",
+          "cachedResultName": "Ideas"
+        },
+        "options": {},
+        "operation": "search",
+        "returnAll": false,
+        "filterByFormula": "AND(     {Status} = \"\",     {Type} = \"Youtube Video\" )"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "g540vJVYsNT8ZS11",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "8b2cfd44-4897-403c-9393-5cc917baa673",
+      "name": "Get Full Transcript",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2eaa3e02-95f7-47d9-a27d-64974f9c1a7b",
+              "name": "Transcript",
+              "type": "string",
+              "value": "={{ $json.Transcript }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "8ea3c1a7-d428-467f-aff2-9b3f572f911f",
+      "name": "Get All Transcripts",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "01fb3072-61c6-47f6-b6dd-7cbf817f5b4a",
+              "name": "data.transcripts",
+              "type": "object",
+              "value": "={{ $json.data.transcripts }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "6cff40d0-18ba-4ae0-a1c9-070d8fb39347",
+      "name": "Get Main Idea & Key Takeaways",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2120,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e9b7f303-562b-40bd-8c3c-8c7138bd4329",
+              "name": "Main Idea",
+              "type": "string",
+              "value": "={{ $json.output.MainIdea }}"
+            },
+            {
+              "id": "572627f4-b9b3-4c59-a570-5bd810f68825",
+              "name": "Key Takeaways",
+              "type": "array",
+              "value": "={{ $json.output['Key Takeaways'] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "1e71d56b-3140-4dd8-b4d8-cdbe9eb24bde",
+      "name": "Extract detailed summary",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "text": "=Your job is to generate detailed summary of \"{{ $json.Transcript }}\".\n\nAlways output your answer in the following format:\n\n- Main Idea\n- Takeaways",
+        "options": {},
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n\t\"MainIdea\": \"The video provides a step-by-step guide on how to build an MCP (Model Context Protocol) server to connect agents to various data sources, specifically focusing on retrieving stock prices from Yahoo Finance. It explains the setup process, including creating functions, integrating with agents, and connecting to other tools.\",\n\t\"Key Takeaways\": [\"1. **MCP Overview**: MCP allows AI engineers to define tools once and reuse them across different frameworks, simplifying the integration process. 2. **Building the Server**: The video demonstrates how to create a Python function to fetch stock prices using the Y Finance library, and how to wrap this function into an MCP server. 3. **Testing the Server**: It shows how to use a visual inspector to test the MCP server before deploying it. 4. **Connecting to Agents**: The tutorial covers how to connect the MCP server to agents using HuggingFace's smaller agents library, enabling the retrieval of stock prices through prompts. 5. **Adding More Tools**: Viewers learn how to expand the server's capabilities by adding additional tools for stock information and income statements. 6. **Integration with Other Platforms**: The video explains how to integrate the MCP server with platforms like Cursor and Langflow, showcasing the flexibility of the MCP setup. 7. **Advanced Features**: It touches on additional MCP capabilities such as storing prompts and creating resources for data access, enhancing the server's functionality.\"]\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "942a77e1-5773-4657-a38c-2b1013af6544",
+      "name": "Update Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        2320,
+        0
+      ],
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "appgNpFtbtaGHM4g0",
+          "cachedResultUrl": "https://airtable.com/appgNpFtbtaGHM4g0",
+          "cachedResultName": "Content Hub"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "tblwBVudDpOMkUGKL",
+          "cachedResultUrl": "https://airtable.com/appgNpFtbtaGHM4g0/tblwBVudDpOMkUGKL",
+          "cachedResultName": "Ideas"
+        },
+        "columns": {
+          "value": {
+            "id": "={{ $('Airtable').item.json.id }}",
+            "Status": true,
+            "Main Idea": "={{ $json['Main Idea'] }}",
+            "Takeaways": "={{ $json['Key Takeaways'] }}"
+          },
+          "schema": [
+            {
+              "id": "id",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": true,
+              "required": false,
+              "displayName": "id",
+              "defaultMatch": true
+            },
+            {
+              "id": "Title",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Description",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Description",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Main Idea",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Main Idea",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Takeaways",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Takeaways",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "type": "boolean",
+              "display": true,
+              "removed": false,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Source",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Type",
+              "type": "options",
+              "display": true,
+              "options": [
+                {
+                  "name": "Youtube Video",
+                  "value": "Youtube Video"
+                },
+                {
+                  "name": "Web Article",
+                  "value": "Web Article"
+                },
+                {
+                  "name": "Own Notes",
+                  "value": "Own Notes"
+                },
+                {
+                  "name": "E-Book",
+                  "value": "E-Book"
+                },
+                {
+                  "name": "Twitter",
+                  "value": "Twitter"
+                },
+                {
+                  "name": "Linkedin",
+                  "value": "Linkedin"
+                }
+              ],
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Draft",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Draft",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Attachment - Video",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Attachment - Video",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Attachment - Image",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": false,
+              "required": false,
+              "displayName": "Attachment - Image",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Created",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Modified",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "Last Modified",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "id"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        },
+        "operation": "update"
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "g540vJVYsNT8ZS11",
+          "name": "Airtable Personal Access Token account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "4cc08263-7293-4c2b-8684-d15a67a61d33",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        760,
+        -580
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 200,
+        "content": "## 📝 Description\n\nAutomatically turn YouTube videos into clear, structured content ideas stored in Airtable. This workflow pulls new video links from Airtable, extracts transcripts using a RapidAPI service, summarizes them with your favourite LLM, and logs the main idea and key takeaways—keeping your content pipeline fresh with minimal effort."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "299c6f10-c4a1-4da7-a198-121b054c8882",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        760,
+        -340
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 220,
+        "content": "## ⚙️ What It Does\n- **Scans** Airtable for new YouTube video links every 5 minutes..\n- **Extracts** the transcript of the video using a third-party API via RapidAPI.\n- **Summarizes** the content to generate a main idea and takeaways.\n- **Updates** the original Airtable entry with the insights and marks it as completed."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "48d11dd7-556d-4154-b580-396c55aa5645",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1300,
+        -580
+      ],
+      "parameters": {
+        "width": 500,
+        "height": 460,
+        "content": "## 🧰 Setup Instructions\n1. Clone this template into your n8n workspace.\n2. Open the Get YouTube Sources node and configure your Airtable credentials.\n3. In the Get video transcript node:\n   - Enter your X-RapidAPI-Key under headers.\n   - The API endpoint is pre-configured.\n4. Connect your LLM credentials to the Extract detailed summary node.\n\n5. (Optional) Adjust the summarization prompt in the LangChain node to better suit your tone.\n6. Set your preferred schedule in the Trigger node.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1f4b0e52-7589-4c9c-8102-9105e296577b",
+  "connections": {
+    "Airtable": {
+      "main": [
+        [
+          {
+            "node": "Get Video ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video ID": {
+      "main": [
+        [
+          {
+            "node": "Get video transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Transcripts": {
+      "main": [
+        [
+          {
+            "node": "Get Full Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Transcripts": {
+      "main": [
+        [
+          {
+            "node": "Combine Transcripts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Full Transcript": {
+      "main": [
+        [
+          {
+            "node": "Extract detailed summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get video transcript": {
+      "main": [
+        [
+          {
+            "node": "Get All Transcripts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract detailed summary": {
+      "main": [
+        [
+          {
+            "node": "Get Main Idea & Key Takeaways",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Main Idea & Key Takeaways": {
+      "main": [
+        [
+          {
+            "node": "Update Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

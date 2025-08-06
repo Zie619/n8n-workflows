@@ -1,0 +1,163 @@
+{
+  "nodes": [
+    {
+      "name": "emitirEtiqueta",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        440,
+        1290
+      ],
+      "webhookId": "4431a14c-62c6-4602-8e20-e661f1d3d706",
+      "parameters": {
+        "path": "emitirEtiqueta",
+        "options": {},
+        "httpMethod": "POST",
+        "responseData": "allEntries",
+        "responseMode": "lastNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "dadosProduto",
+      "type": "n8n-nodes-base.mySql",
+      "position": [
+        1270,
+        1440
+      ],
+      "parameters": {
+        "query": "=-- CONSULTA DO PRODUTO GRADE\nWITH pg as (\n\tSELECT\n\t\tid,\n\t\tid_produto,\n\t\tid_gradex,\n\t\tid_gradey,\n\t\tcodigo \n\tFROM\n\t\tproduto_grade \n\tWHERE\n\t\tid = '{{$node[\"emitirEtiqueta\"].json[\"body\"][\"id_produto_grade\"]}}'\n),\n\n-- CONSULTA DO PRODUTO\np as (\n\tSELECT * FROM produto \n\tWHERE id IN ( SELECT id_produto  FROM pg)\n\tAND situacao = 'ATIVO'\n),\n\n-- CONSULTA TECIDO\nt as (\n\tSELECT\n\t\ttoken,\n\t\t JSON_UNQUOTE(json_extract( objeto, '$.largura')) AS largura\n\tFROM\n\t\t`{{$node[\"PegarConfiguracaoImpressao\"].json[\"params\"][\"bancoRelatorio\"]}}`.`i_objeto` \n\tWHERE\n\t\tmodulo = 'produto_grade_tecido'\n\t\tand token in (select id from pg)\n\t\tand situacao = 'ATIVO'\n),\n\n\n-- CONSULTA COMPOSICAO\ncp as (\n\t\n\tSELECT\n\t  token,\n    group_concat(concat(cps.participacao,'% ',cps.descricao)) as composicao\n\tFROM\n\t\t`{{$node[\"PegarConfiguracaoImpressao\"].json[\"params\"][\"bancoRelatorio\"]}}`.`i_objeto`,\n\t\tJSON_TABLE (\n\t\t\t\t\t\t\t\t\tobjeto,\n\t\t\t\t\t\t\t\t\t\t\t'$[*]' COLUMNS (  \n\t\t\t\t\t\t\t\t\t\t\t\t\tparticipacao INT path '$.participacao',\n\t\t\t\t\t\t\t\t\t\t\t\t\tdescricao TEXT path '$.descricao'\n\t\t\t\t\t\t\t\t\t\t\t)\n\t\t\t\t\t\t\t) AS cps \n\t\tWHERE modulo = 'produto_grade_tecido_composicao'\n\t\tAND token in (select id from pg)\n\t\tAND situacao = 'ATIVO'\n\t\tAND cps.participacao > 0\n\t\tGROUP BY token\n\t\tORDER BY participacao desc\n\t\t\n)\n\n\n-- CONSULTA RELATORIO\nSELECT\n{{$node[\"emitirEtiqueta\"].json[\"body\"][\"id_movimentacao_detalhe\"]}} as id_movimentacao_detalhe ,\n     pg.id, \n\tpg.codigo,\n\tp.descricao,\n\tm.nome as marca,\n\tgx.nome as gradex,\n\tgy.nome as gradey,\n\tcurdate() as data_entrada,\n  t.largura,\n\tcp.composicao\nFROM\n\tpg inner join p on (p.id = pg.id_produto)\n\tinner join marca m on(m.id = p.id_marca)\n\tleft join grade gx on (gx.id = pg.id_gradex)\n\tleft join grade gy on (gy.id = pg.id_gradey)\n\tleft join t on (t.token = pg.id)\n\tleft join cp on (cp.token = pg.id)",
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "mySql": {
+          "id": "2",
+          "name": "illi"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "PegarConfiguracaoImpressao",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        730,
+        1290
+      ],
+      "parameters": {
+        "url": "http://localhost:1337/parse/config",
+        "options": {},
+        "jsonParameters": true,
+        "headerParametersJson": "{\"X-Parse-Application-Id\": \"iwms\"}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "dadosRolo",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1260,
+        1220
+      ],
+      "parameters": {
+        "query": "=select * from \"tecido_rolo\"\nwhere \"objectId\" in ('{{$json[\"idRolos\"].join(\"','\")}}')",
+        "operation": "executeQuery",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Postgres account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "trataRetorno",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1010,
+        1220
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run only once, no matter how many input items there are.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.function\n\n\n// var produto = items[0].json;\n\n\nvar rolos = $node[\"emitirEtiqueta\"].json[\"body\"][\"rolos\"];\n\n\nvar idRolos = rolos.map(\n    function(rolo){\n        return rolo.objectId\n    });\n    \nvar retorno = [];\n\nretorno.push({json:{\n   // produto:produto,\n    idRolos:idRolos \n}})\n\nreturn retorno;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "roloProduto",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1640,
+        1330
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "id_movimentacao_detalhe",
+        "propertyName2": "id_movimentacao_detalhe"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "dadosRolo": {
+      "main": [
+        [
+          {
+            "node": "roloProduto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dadosProduto": {
+      "main": [
+        [
+          {
+            "node": "roloProduto",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "trataRetorno": {
+      "main": [
+        [
+          {
+            "node": "dadosRolo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "emitirEtiqueta": {
+      "main": [
+        [
+          {
+            "node": "PegarConfiguracaoImpressao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PegarConfiguracaoImpressao": {
+      "main": [
+        [
+          {
+            "node": "dadosProduto",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "trataRetorno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

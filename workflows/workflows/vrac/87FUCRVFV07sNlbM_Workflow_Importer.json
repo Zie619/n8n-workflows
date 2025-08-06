@@ -1,0 +1,1462 @@
+{
+  "id": "87FUCRVFV07sNlbM",
+  "meta": {
+    "instanceId": "505c2bdb4483cbbca32871c0acd4b60c83809f177e47e2864f71c1c1760a9b2a",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Workflow Importer",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "eb3d4912-09c3-4c17-8e2b-94dd15e145f4",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        2960,
+        440
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "fromJson",
+        "destinationKey": "workflowData",
+        "binaryPropertyName": "Workflow_File"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "56b7a01f-47a0-4884-9200-5f5f695ab355",
+      "name": "Export Credentials",
+      "type": "n8n-nodes-base.executeCommand",
+      "position": [
+        3180,
+        620
+      ],
+      "parameters": {
+        "command": "n8n export:credentials --all --pretty --decrypted --output=/tmp/cred"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "85de1146-4d61-45bf-b225-956d3d16e84b",
+      "name": "Get Credentials Data",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        3400,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "/tmp/cred"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "187f1f50-472f-41ac-96e8-9c2f17fa3c00",
+      "name": "Binary to JSON",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        3620,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "fromJson"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "85d79317-786a-49eb-ade4-f9d0949c5bf4",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        4060,
+        500
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {
+          "includeUnpaired": true
+        },
+        "combineBy": "combineByPosition"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "6976901c-a052-47fa-a754-217fd5d0f58e",
+      "name": "Collect Credentials to Replace",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        3040,
+        1120
+      ],
+      "parameters": {},
+      "typeVersion": 3
+    },
+    {
+      "id": "c5b7ab56-c833-4405-913a-1a484094a6ff",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        980,
+        620
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8a5d50fc-95dc-40b3-a3f2-293521bab29a",
+              "name": "remoteInstances",
+              "type": "array",
+              "value": "="
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a9287c9a-ddf4-4023-b997-bb7b12e2d0ee",
+      "name": "Prepare Request Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1640,
+        620
+      ],
+      "parameters": {
+        "jsCode": "output = {};\n\nfor (const instance of $('Settings').first().json.remoteInstances) {\n  if (instance.name == $('Choose Instance').first().json.Source) {\n    output.instance = instance;\n  }\n}\n\nreturn output;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "85ccc4bf-a465-49bf-ac17-9933f1b9d46d",
+      "name": "Get Workflows",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueErrorOutput",
+      "position": [
+        1860,
+        620
+      ],
+      "parameters": {
+        "url": "={{ $json.instance.baseUrl }}/workflows",
+        "options": {},
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "250"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "={{ $json.instance.apiKey }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "2d86c12d-f308-4cdc-96a4-ab4cbecd39ad",
+      "name": "No Operation",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        3180,
+        440
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "8ef0f34d-2468-450e-8a3c-e3d9ad9e371b",
+      "name": "Determine Workflow Source",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        760,
+        500
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f1d93a30-01c9-4141-85b2-8ceb762b9e86",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.Source }}",
+              "rightValue": "File Upload"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "3ff270a7-5837-40b5-85b4-da3b28ae6147",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        920,
+        520
+      ],
+      "parameters": {
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "## Setup instances\nEach instnce requires a name, apiKey and baseURL"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4d0d4684-5ffc-4e12-8d05-55245339fd96",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        680
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 535.6419634856759,
+        "height": 223.19907940161124,
+        "content": "## Instances config example\n```\n[\n  {\n    \"name\": \"n8n-test\",\n    \"apiKey\": \"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\",\n    \"baseUrl\": \"https://n8n-test.example.com/api/v1\"\n  },\n  {\n    ...\n  }\n]\n```"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e76e291e-511b-4612-836f-ae6f7af1d3de",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        400
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "A form which collects the source option.\n*Consider securing the form using Basic Auth.*"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "38ecbde8-9081-4509-9fa3-c5b2d568ebad",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        700,
+        400
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "Switch between the available options"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "efa893aa-fce5-45ff-a234-6e73235a33ea",
+      "name": "Error1",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        3700,
+        1220
+      ],
+      "webhookId": "5c7933f0-f09a-4bc6-9e68-cf73e8fb5813",
+      "parameters": {
+        "options": {},
+        "operation": "completion",
+        "completionTitle": "⚠️ Import failed",
+        "completionMessage": "=Please check the workflow settings"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e5edd30e-6396-407a-bd3b-a5e0f66c7e3a",
+      "name": "Error",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        2080,
+        700
+      ],
+      "webhookId": "5c7933f0-f09a-4bc6-9e68-cf73e8fb5813",
+      "parameters": {
+        "options": {},
+        "operation": "completion",
+        "completionTitle": "⚠️ Failed retrieving workflows",
+        "completionMessage": "=Please check the workflow settings"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c410045e-4adf-4304-910a-7cd5868892d3",
+      "name": "Split Out Workflows",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        2080,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5fafa399-0c6b-4db0-9b01-319a02368eee",
+      "name": "Get Workflow Names",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2520,
+        540
+      ],
+      "parameters": {
+        "jsCode": "dropDownValues = [];\n\nfor (const workflow of $input.all()) {\n  dropDownValues.push({\"option\": workflow.json.name});\n}\n\nreturn { \"options\": JSON.stringify(dropDownValues) };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b7408a47-97ff-45da-b8e7-bb2380f61155",
+      "name": "Sort by updatedAt DESC",
+      "type": "n8n-nodes-base.sort",
+      "position": [
+        2300,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "order": "descending",
+              "fieldName": "updatedAt"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "74741a71-79b8-4479-9dac-826db7984620",
+      "name": "No Operation1",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        4280,
+        680
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "89657c6f-a703-4145-b690-7234583bbe7a",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1500,
+        1240
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 294.9905826938254,
+        "content": "## Map Credentials\nBeing mapped by name since one workflow can have multiple credentials of the same type."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a2d21bb5-5118-4ea2-920b-1c05570da610",
+      "name": "Rename Keys",
+      "type": "n8n-nodes-base.renameKeys",
+      "position": [
+        3840,
+        620
+      ],
+      "parameters": {
+        "keys": {
+          "key": [
+            {
+              "newKey": "allCredentials",
+              "currentKey": "data"
+            }
+          ]
+        },
+        "additionalOptions": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d756edc6-cf0d-4a35-b29c-99e5ec41c4db",
+      "name": "Create Workflow",
+      "type": "n8n-nodes-base.n8n",
+      "onError": "continueErrorOutput",
+      "position": [
+        3480,
+        1120
+      ],
+      "parameters": {
+        "operation": "create",
+        "requestOptions": {},
+        "workflowObject": "={{ $json.toJsonString() }}"
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "taiQiy4KxXUI20Af",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4d75a5b1-5227-41a4-87cc-67a5a8074f37",
+      "name": "Upload File",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        1420,
+        440
+      ],
+      "webhookId": "b9850dfc-ecf9-45c8-ae68-39327c6a0143",
+      "parameters": {
+        "options": {
+          "formTitle": "Upload File",
+          "formDescription": "Choose an n8n workflow file"
+        },
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "file",
+              "fieldLabel": "Workflow File",
+              "requiredField": true,
+              "acceptFileTypes": ".json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5e5e3ece-00b3-4790-89e0-35d3c8d03b7d",
+      "name": "Choose Workflow",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        2740,
+        540
+      ],
+      "webhookId": "100af69b-5203-48d3-8e90-1e846d0752d4",
+      "parameters": {
+        "options": {
+          "formTitle": "Choose Workflow",
+          "formDescription": "Choose the remote workflow which should be imported"
+        },
+        "defineForm": "json",
+        "jsonOutput": "=[\n   {\n      \"fieldLabel\": \"Workflow\",\n      \"fieldType\": \"dropdown\",\n      \"requiredField\": true,\n      \"fieldOptions\": {\n        \"values\": {{ $json.options }}\n      }\n   }\n]"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7fcc236c-dd97-4a1e-bf3d-d85aba520938",
+      "name": "Success",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        3700,
+        1020
+      ],
+      "webhookId": "5c7933f0-f09a-4bc6-9e68-cf73e8fb5813",
+      "parameters": {
+        "options": {},
+        "operation": "completion",
+        "completionTitle": "✅ Import completed",
+        "completionMessage": "=The workflow has been created successfully. {{ $if($('Get Missing Credentials').all().length > 0, \"Please head over to your credentials and update all new entries with a trailing ⚠️ symbol.\", \"\") }} "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "27736a52-af15-47f8-8186-d486b2968256",
+      "name": "Choose Instance",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        1420,
+        620
+      ],
+      "webhookId": "2a40fe8d-7b6b-4695-845c-2d278f5bf93e",
+      "parameters": {
+        "options": {
+          "formTitle": "Select Source Instance",
+          "formDescription": "Choose the n8n instance where to retrieve workflows from"
+        },
+        "defineForm": "json",
+        "jsonOutput": "=[\n   {\n      \"fieldLabel\": \"Source\",\n      \"fieldType\": \"dropdown\",\n      \"requiredField\": true,\n      \"fieldOptions\": {\n        \"values\": {{ $json.options }}\n      }\n   }\n]"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9b83c34d-0b0b-47bc-b4a7-27eed0e796fb",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        540,
+        500
+      ],
+      "webhookId": "2c9b2fa1-3235-4b73-a6e0-73392dcb9ed0",
+      "parameters": {
+        "options": {
+          "buttonLabel": "Continue",
+          "appendAttribution": false
+        },
+        "formTitle": "Workflow Import",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "dropdown",
+              "fieldLabel": "Source",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "File Upload"
+                  },
+                  {
+                    "option": "Remote Instance"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "formDescription": "This tool allows importing an n8n workflow from a file or another n8n instance\n\nKeep in mind that your destination n8n instance (this environment) should always run on an equal or newer version then compared to the source."
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "f6d45cd9-a091-4c8b-8ef0-6815a1adb0f1",
+      "name": "Generate Instance Options",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1200,
+        620
+      ],
+      "parameters": {
+        "jsCode": "dropDownValues = [];\n\nfor (const instance of $input.first().json.remoteInstances) {\n  dropDownValues.push({\"option\": instance.name});\n}\n\nreturn { \"options\": JSON.stringify(dropDownValues) };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "73717c97-4579-4e49-ac33-4aada3bcaf55",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1140,
+        520
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "Prepare a list of options for the next form"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0537d195-3885-4903-8a41-56915f7b64de",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1360,
+        360
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 416.4415465717213,
+        "content": "Request more input from the user"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "43ee5820-e236-49f9-b89b-e4c5d4dd4188",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1580,
+        520
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 435.59135570107514,
+        "height": 255.86856541619233,
+        "content": "Map Settings to selected instance and retrieve all workflows from it"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "53a42c23-af05-4e21-a936-14d2419b4530",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2020,
+        440
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 656.1389569291234,
+        "height": 255.86856541619233,
+        "content": "Prepare a list of options for the next form"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fd103846-04a6-4fb0-aba4-6230a85a7555",
+      "name": "Sticky Note13",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2680,
+        440
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "Let the user choose a workflow from a list"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e58bdf1e-fcda-4b68-9798-24de0c7c6bd9",
+      "name": "Sticky Note14",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3120,
+        560
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 875.9451799951569,
+        "height": 216.1478580797073,
+        "content": "Retrieve all credentials from this instance and convert the data to the final JSON format"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "08855416-ca33-4344-b96b-4564d9841dfd",
+      "name": "Get Selected Workflow",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2960,
+        620
+      ],
+      "parameters": {
+        "jsCode": "for (const workflow of $('Get Workflows').first().json.data) {\n  if (workflow.name == $input.first().json.Workflow) {\n    \n    return { \"workflowData\": workflow };\n  }\n}\n\nreturn false;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9a09a6b5-2b8d-461e-b63f-91100c3e7974",
+      "name": "Sticky Note15",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2900,
+        360
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 416.4415465717213,
+        "content": "Convert the retrieved workflow into the final JSON format"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "269c32c3-224b-42df-bd27-7718374cb343",
+      "name": "Sticky Note16",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        4000,
+        420
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "Combine the workflow and credential data to one item"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c9bbc713-3ac7-42d7-85c3-0c8aa22201d4",
+      "name": "Split Out Nodes",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1060,
+        1020
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "workflowData.nodes"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e4c37af5-64de-4d40-9ff1-3a622ea40b86",
+      "name": "Filter Out Nodes Having Credentials",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1280,
+        1020
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b14ec02c-c52c-4907-8f55-ebb168a8b10e",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.credentials }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "bdb20dfd-1b47-4b50-a938-19f7790d180b",
+      "name": "Extract Credentials",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1500,
+        1020
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b37508a3-188e-4e6e-b251-b6a34ac193be",
+              "name": "type",
+              "type": "string",
+              "value": "={{ $json.credentials.keys()[0] }}"
+            },
+            {
+              "id": "fc308784-91ec-4b6b-8bca-2c01472574a7",
+              "name": "name",
+              "type": "string",
+              "value": "={{ $json.credentials[$json.credentials.keys()[0]].name }}"
+            },
+            {
+              "id": "a3142dc0-021d-4191-815b-d5cf6d9fe6a8",
+              "name": "id",
+              "type": "string",
+              "value": "={{ $json.credentials[$json.credentials.keys()[0]].id }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "554e0ee3-e722-4dcf-b82b-ea1ea59a037e",
+      "name": "Remove Duplicate Credentials by Name",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "position": [
+        1720,
+        1020
+      ],
+      "parameters": {
+        "compare": "selectedFields",
+        "options": {},
+        "fieldsToCompare": "name"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "0da2c486-ea7a-465b-b3cd-88e09e63c06b",
+      "name": "Map Credentials",
+      "type": "n8n-nodes-base.form",
+      "position": [
+        2160,
+        1020
+      ],
+      "webhookId": "5aca5fbe-cbff-4824-8586-cd59967dd154",
+      "parameters": {
+        "options": {
+          "formTitle": "Map Credentials",
+          "buttonLabel": "Import Workflow",
+          "formDescription": "Each option is labeled with the name of the original credential. Select the according credential for each item.\n\nYou can also choose to create a new credential. It will then create an empty credential, using the name of the original one, which you can configure afterwards."
+        },
+        "defineForm": "json",
+        "jsonOutput": "={{ $json.options }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8b92114e-6aa6-4404-a7f1-6224a45acdae",
+      "name": "Get Selected Credentials",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2380,
+        1220
+      ],
+      "parameters": {
+        "jsCode": "function capitalizeFirstLetter(val) {\n    return String(val).charAt(0).toUpperCase() + String(val).slice(1);\n}\n\nlet missingCredentials = [];\nfor (const credential of $('Remove Duplicate Credentials by Name').all()) {\n  let type = credential.json.type;\n  let oldName = credential.json.name;\n  let name = $('Map Credentials').first().json[credential.json.name];\n  if (name != \"[create new]\") {\n    for (const credentialData of $('Merge').first().json.allCredentials) {\n      if (credentialData.name == name) {\n        id = credentialData.id;\n        continue;\n      }\n    }\n    missingCredentials.push({\n      \"oldName\": oldName,\n      \"name\": name,\n      \"type\": type,\n      \"id\": id\n    });\n  }\n}\n\nreturn missingCredentials;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "bafcb91c-f441-40de-a1fd-7435206d991e",
+      "name": "Add Old Names",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2820,
+        1020
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "19847be5-420a-4dd7-8a45-fed1a1cbc0b8",
+              "name": "oldName",
+              "type": "string",
+              "value": "={{ $json.name.replace(\" ⚠️\", \"\") }}"
+            }
+          ]
+        },
+        "includeOtherFields": true
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "8da7f198-5e85-4d88-907e-1e35a55bdb96",
+      "name": "Replace Credentials in Workflow",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3260,
+        1120
+      ],
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nlet workflowData = $('Merge').first().json.workflowData;\nfor (const credential of $input.all()) {  \n  for (const nodes of workflowData.nodes) {\n    if (nodes.credentials \n        && nodes.credentials[credential.json.type] !== undefined \n        && nodes.credentials[credential.json.type].name == credential.json.oldName) {\n      nodes.credentials[credential.json.type].id = credential.json.id;\n      nodes.credentials[credential.json.type].name = credential.json.name;\n    }\n  }\n}\n\nreturn workflowData;\n\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f370d4fb-229e-4604-a1b1-c7c0cab8a32d",
+      "name": "Sticky Note17",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1000,
+        920
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 875.6296366281999,
+        "height": 257.0479807900252,
+        "content": "Extract a list of all credentials from the workflow. The reference will be the old/existing name of the credential, since one workflow can contain multiple credentials of the same type."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "31c0d4b7-4682-4db1-a453-0f1d69c58665",
+      "name": "Sticky Note18",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2100,
+        920
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "Let the user map every credential or create new ones"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d3c5edb1-74dc-4168-a987-84cdd54714cd",
+      "name": "Generate Credential Options",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1940,
+        1020
+      ],
+      "parameters": {
+        "jsCode": "function capitalizeFirstLetter(val) {\n    return String(val).charAt(0).toUpperCase() + String(val).slice(1);\n}\n\nformOptions = [];\nfor (const item of $input.all()) {\n  dropDownValues = [];\n  for (const credential of $('Merge').first().json.allCredentials) {\n    if (credential.type == item.json.type) {\n      dropDownValues.push({\"option\": credential.name});\n    }\n  }\n  dropDownValues.push({\"option\": \"[create new]\"});\n  formOptions.push({\n      \"fieldLabel\": item.json.name,\n      \"fieldType\": \"dropdown\",\n      \"requiredField\": true,\n      \"fieldOptions\": {\n        \"values\": dropDownValues\n      }\n  });\n}\n\nreturn { \"options\": JSON.stringify(formOptions) };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "255ff6ab-d360-49dd-b63f-9f0d99278ae4",
+      "name": "Sticky Note19",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1880,
+        920
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 255.86856541619233,
+        "content": "Prepare a list of options for the next form"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ae074b5a-d76a-4529-ba59-0d201dbd4e9e",
+      "name": "Sticky Note20",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2320,
+        920
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 456.12289999575364,
+        "content": "Split mapped credentials into two streams, depending on wether they exist or not"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1b6d26af-9d6b-4865-bd81-8a5de49bc741",
+      "name": "Sticky Note21",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2540,
+        919.7999999999997
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 435.95830414662703,
+        "height": 276.068565416192,
+        "content": "Create empty credentials if the option \"[create credential]\" was selected. and add the name of the originally assigned credential for future reference"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5ba8987a-7558-4fb8-94ef-ac2b81df5536",
+      "name": "Create Empty Credentials",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        2600,
+        1020
+      ],
+      "parameters": {
+        "data": "={{ $json.data.toJsonString() }}",
+        "name": "={{ $json.name }}",
+        "resource": "credential",
+        "requestOptions": {},
+        "credentialTypeName": "={{ $json.type }}"
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "taiQiy4KxXUI20Af",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7efa8f88-f5a0-47c8-8d12-2cb8c9b0e0c7",
+      "name": "Get Missing Credentials",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2380,
+        1020
+      ],
+      "parameters": {
+        "jsCode": "function capitalizeFirstLetter(val) {\n    return String(val).charAt(0).toUpperCase() + String(val).slice(1);\n}\n\nlet missingCredentials = [];\nfor (const credential of $('Remove Duplicate Credentials by Name').all()) {\n  let type = credential.json.type;\n  let name = $('Map Credentials').first().json[credential.json.name];\n  if (name == \"[create new]\") {\n    data = {};\n    if (type.includes(\"OAuth\")) {\n      data = { \"clientId\": \"\", \"clientSecret\": \"\" };\n    }\n    missingCredentials.push({\n      \"name\": credential.json.name + \" ⚠️\",\n      \"type\": type,\n      \"data\": data\n    });\n  }\n}\n\nreturn missingCredentials;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2394952f-c6db-4c6e-8f62-080c952734c9",
+      "name": "Sticky Note22",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2980,
+        1020
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 435.95830414662703,
+        "height": 276.068565416192,
+        "content": "Gather all new credential data and update the workflow accordingly. The oldName is being used as a reference during the search. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4ee2a621-29c9-4d23-b222-0b31ff1cc903",
+      "name": "Sticky Note23",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3420,
+        1020
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 275.841854198618,
+        "content": "Create the updated workflow on this instance"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e041c560-e847-472e-888e-0b6b3edb8998",
+      "name": "Sticky Note24",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3640,
+        920
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.47293010628914,
+        "height": 456.12289999575364,
+        "content": "Provide feedback to the user wether the process was successful or not"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5ee2c284-b417-4ab6-b0bf-effa25225dbf",
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "No Operation1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Generate Instance Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rename Keys": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Upload File": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Old Names": {
+      "main": [
+        [
+          {
+            "node": "Collect Credentials to Replace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Workflows": {
+      "main": [
+        [
+          {
+            "node": "Split Out Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation1": {
+      "main": [
+        [
+          {
+            "node": "Split Out Nodes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Binary to JSON": {
+      "main": [
+        [
+          {
+            "node": "Rename Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Instance": {
+      "main": [
+        [
+          {
+            "node": "Prepare Request Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choose Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Selected Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Workflow": {
+      "main": [
+        [
+          {
+            "node": "Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Credentials": {
+      "main": [
+        [
+          {
+            "node": "Get Missing Credentials",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Selected Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Nodes": {
+      "main": [
+        [
+          {
+            "node": "Filter Out Nodes Having Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Export Credentials",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "No Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Credentials": {
+      "main": [
+        [
+          {
+            "node": "Get Credentials Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Workflow Names": {
+      "main": [
+        [
+          {
+            "node": "Choose Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Determine Workflow Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Credentials": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicate Credentials by Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Workflows": {
+      "main": [
+        [
+          {
+            "node": "Sort by updatedAt DESC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Credentials Data": {
+      "main": [
+        [
+          {
+            "node": "Binary to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Request Data": {
+      "main": [
+        [
+          {
+            "node": "Get Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Selected Workflow": {
+      "main": [
+        [
+          {
+            "node": "Export Credentials",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "No Operation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort by updatedAt DESC": {
+      "main": [
+        [
+          {
+            "node": "Get Workflow Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Missing Credentials": {
+      "main": [
+        [
+          {
+            "node": "Create Empty Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Empty Credentials": {
+      "main": [
+        [
+          {
+            "node": "Add Old Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Selected Credentials": {
+      "main": [
+        [
+          {
+            "node": "Collect Credentials to Replace",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Determine Workflow Source": {
+      "main": [
+        [
+          {
+            "node": "Upload File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Instance Options": {
+      "main": [
+        [
+          {
+            "node": "Choose Instance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Credential Options": {
+      "main": [
+        [
+          {
+            "node": "Map Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Credentials to Replace": {
+      "main": [
+        [
+          {
+            "node": "Replace Credentials in Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Credentials in Workflow": {
+      "main": [
+        [
+          {
+            "node": "Create Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Out Nodes Having Credentials": {
+      "main": [
+        [
+          {
+            "node": "Extract Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicate Credentials by Name": {
+      "main": [
+        [
+          {
+            "node": "Generate Credential Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

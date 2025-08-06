@@ -1,0 +1,356 @@
+{
+  "id": "6FSx5OMVxp8Ldg8A",
+  "meta": {
+    "instanceId": "fb924c73af8f703905bc09c9ee8076f48c17b596ed05b18c0ff86915ef8a7c4a"
+  },
+  "name": "Prepare CSV files with GPT-4",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "5b43e57d-1fe1-4ea6-bf3d-661f7e5fc4b0",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        960,
+        240
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "291466e8-1592-4080-a675-5e9f486d0d05",
+      "name": "OpenAI",
+      "type": "n8n-nodes-base.openAi",
+      "position": [
+        1160,
+        240
+      ],
+      "parameters": {
+        "model": "gpt-4",
+        "prompt": {
+          "messages": [
+            {
+              "content": "=please create a list of 10 random users. Return back ONLY a JSON array. Character names of famous fiction characters. Make Names and Surnames start with the same letter. Name and Surname can be from different characters. If subscribed is false then make date_subscribed empty. If date_subscribed is not empty then make it random and no later then 2023-10-01. Make JSON in a single line, avoid line breaks. Here's an example: [{\"user_name\": \"Jack Jones\", \"user_email\":\"jackjo@yahoo.com\",\"subscribed\": true, \"date_subscribed\":\"2023-10-01\" },{\"user_name\": \"Martin Moor\", \"user_email\":\"mmoor@gmail.com\",\"subscribed\": false, \"date_subscribed\":\"\" }]"
+            }
+          ]
+        },
+        "options": {
+          "n": 3,
+          "maxTokens": 2500,
+          "temperature": 1
+        },
+        "resource": "chat"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "63",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "edd5bed7-a8a1-4298-b026-3b0061c5064a",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1340,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 1
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f0e414e6-741a-42db-86eb-ba95e220f9ef",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        940,
+        80
+      ],
+      "parameters": {
+        "width": 600,
+        "height": 126,
+        "content": "## This is a helper workflow to create 3 CSV files\n### Feel free to adapt as needed\n### Some mock data from GPT is pinned for convenience"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f1c2891f-5110-423c-9fb4-37e0a0d0f750",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1520,
+        240
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "content",
+              "type": "arrayValue",
+              "arrayValue": "={{JSON.parse($json.message.content)}}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ce59d3e1-3916-48ad-a811-fa19ad66284a",
+      "name": "Make JSON Table",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        1700,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "content"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "8b1fda14-6593-4cc2-ab74-483b7aa4d84a",
+      "name": "Convert to CSV",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "position": [
+        1880,
+        240
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "=funny_names_{{ $('Split In Batches').item.json.index+1 }}.{{ $parameter[\"fileFormat\"] }}",
+          "headerRow": true
+        },
+        "operation": "toFile",
+        "fileFormat": "csv"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d2a621e0-88df-4642-91ab-772f062c8682",
+      "name": "Save to Disk",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "position": [
+        2420,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "fileName": "=./.n8n/{{ $binary.data.fileName }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "20f60bb0-0527-44c4-85d5-a95c20670893",
+      "name": "Strip UTF BOM bytes",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "position": [
+        2060,
+        240
+      ],
+      "parameters": {
+        "options": {
+          "encoding": "utf8",
+          "stripBOM": true,
+          "jsonParse": false,
+          "keepSource": false
+        },
+        "setAllData": false
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bda91493-df5d-4b8c-b739-abca6045faf9",
+      "name": "Create valid binary",
+      "type": "n8n-nodes-base.moveBinaryData",
+      "position": [
+        2240,
+        240
+      ],
+      "parameters": {
+        "mode": "jsonToBinary",
+        "options": {
+          "addBOM": false,
+          "encoding": "utf8",
+          "fileName": "=funny_names_{{ $('Split In Batches').item.json.index+1 }}.{{ $('Convert to CSV').first().binary.data.fileExtension }}",
+          "mimeType": "text/csv",
+          "keepSource": false,
+          "useRawData": true
+        },
+        "convertAllData": false
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e1b54e0d-56a5-43e7-82b4-aaead2875a9d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2007,
+        140
+      ],
+      "parameters": {
+        "width": 394,
+        "height": 254,
+        "content": "### These 2 nodes fix an issue with BOM bytes in the beginning of the file.\nWithout them reading the CSV file back becomes tricky"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "OpenAI": [
+      {
+        "json": {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "[{\"user_name\": \"Harry Holmes\", \"user_email\": \"harryholmes@gmail.com\", \"subscribed\": true, \"date_subscribed\": \"2022-08-15\"}, {\"user_name\": \"Frodo Fawkes\", \"user_email\": \"frodo.fawks01@gmail.com\", \"subscribed\": false, \"date_subscribed\": \"\"}, {\"user_name\": \"Luke Longbottom\", \"user_email\": \"lukeLongbottom@gmail.com\", \"subscribed\": true, \"date_subscribed\": \"2023-09-25\"}, {\"user_name\": \"Perry Potter\", \"user_email\": \"perry_potter@yahoo.com\", \"subscribed\": false, \"date_subscribed\": \"\"}, {\"user_name\": \"James Joyce\", \"user_email\": \"jjoyce@gmail.com\", \"subscribed\": true, \"date_subscribed\": \"2023-06-12\"}, {\"user_name\": \"Bilbo Baggins\", \"user_email\": \"bilbobaggins@gmail.com\", \"subscribed\": true, \"date_subscribed\": \"2023-03-12\"}, {\"user_name\": \"Tom Tompkins\", \"user_email\": \"tompkins.tom@outlook.com\", \"subscribed\": false, \"date_subscribed\": \"\"}, {\"user_name\": \"Ronald Reagan\", \"user_email\": \"ronald.reagan@gmail.com\", \"subscribed\": true, \"date_subscribed\": \"2023-01-05\"}, {\"user_name\": \"Mary Morstan\", \"user_email\": \"maryMorstan@gmail.com\", \"subscribed\": false, \"date_subscribed\": \"\"}, {\"user_name\": \"Arthur Arthur\", \"user_email\": \"arthur.arthur@aol.com\", \"subscribed\": true, \"date_subscribed\": \"2023-04-17\"}]"
+          },
+          "finish_reason": "stop"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "index": 1,
+          "message": {
+            "role": "assistant",
+            "content": "[{\"user_name\": \"Harry Holmes\", \"user_email\":\"hholmes@email.com\", \"subscribed\": true, \"date_subscribed\":\"2021-12-15\"}, {\"user_name\": \"James Jasper\", \"user_email\":\"jjasper@yahoo.com\", \"subscribed\": false, \"date_subscribed\":\"\"}, {\"user_name\": \"Frodo Fenton\", \"user_email\":\"frodonot@gmail.com\", \"subscribed\": true, \"date_subscribed\":\"2022-07-09\"}, {\"user_name\": \"Katniss Kennedy\", \"user_email\":\"kennedy@hotmail.com\", \"subscribed\": false, \"date_subscribed\":\"\"}, {\"user_name\": \"Bilbo Brandy\", \"user_email\":\"bbrandy@gmail.net\",\"subscribed\": true, \"date_subscribed\":\"2022-02-20\"}, {\"user_name\": \"Percy Pepper\", \"user_email\":\"percy@gmail.com\", \"subscribed\": false, \"date_subscribed\":\"\"}, {\"user_name\": \"Samwise Sprint\", \"user_email\":\"ssprint@outlook.com\", \"subscribed\": true, \"date_subscribed\":\"2021-06-01\"}, {\"user_name\": \"Gandalf Gatsby\", \"user_email\":\"gandalfg@gmail.com\", \"subscribed\": true, \"date_subscribed\":\"2023-01-22\"}, {\"user_name\": \"Dumbledore Dane\", \"user_email\":\"ddane@gmail.com\",\"subscribed\": false, \"date_subscribed\":\"\"}, {\"user_name\": \"Tommy Torrance\", \"user_email\":\"ttorrance@hotmail.com\", \"subscribed\": true, \"date_subscribed\":\"2023-08-15\"}]"
+          },
+          "finish_reason": "stop"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "index": 2,
+          "message": {
+            "role": "assistant",
+            "content": "[{\"user_name\": \"Harry Holmes\", \"user_email\":\"harryholmes@hotmail.com\", \"subscribed\": true, \"date_subscribed\":\"2023-01-09\"}, {\"user_name\": \"Sam Spade\", \"user_email\":\"samspade@gmail.com\", \"subscribed\": false, \"date_subscribed\":\"\"}, {\"user_name\": \"Tom Sawyer\", \"user_email\":\"tomsawyer@yahoo.com\", \"subscribed\": true, \"date_subscribed\":\"2022-12-12\"}, {\"user_name\": \"Frodo Fawkes\", \"user_email\":\"frodofawkes@gmail.com\", \"subscribed\": true, \"date_subscribed\":\"2023-09-30\"}, {\"user_name\": \"Bruce Bond\", \"user_email\":\"brucebond@gmail.com\", \"subscribed\": true, \"date_subscribed\":\"2023-08-15\"}, {\"user_name\": \"Peter Pan\", \"user_email\":\"peterpan@gmail.com\", \"subscribed\": false, \"date_subscribed\":\"\"}, {\"user_name\": \"Hermione Holmes\", \"user_email\":\"hermioneholmes@yahoo.com\", \"subscribed\": true, \"date_subscribed\":\"2023-02-21\"}, {\"user_name\": \"Walter White\", \"user_email\":\"walterwhite@hotmail.com\", \"subscribed\": false, \"date_subscribed\":\"\"}, {\"user_name\": \"Tony Twist\", \"user_email\":\"tonytwist@gmail.com\", \"subscribed\": true, \"date_subscribed\":\"2023-04-27\"}, {\"user_name\": \"Ron Ranger\", \"user_email\":\"ronranger@yahoo.com\", \"subscribed\": true, \"date_subscribed\":\"2023-07-13\"}]"
+          },
+          "finish_reason": "stop"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "91f77342-1d0f-4033-b09a-3e3c8791107e",
+  "connections": {
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Make JSON Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Disk": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to CSV": {
+      "main": [
+        [
+          {
+            "node": "Strip UTF BOM bytes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make JSON Table": {
+      "main": [
+        [
+          {
+            "node": "Convert to CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create valid binary": {
+      "main": [
+        [
+          {
+            "node": "Save to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strip UTF BOM bytes": {
+      "main": [
+        [
+          {
+            "node": "Create valid binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

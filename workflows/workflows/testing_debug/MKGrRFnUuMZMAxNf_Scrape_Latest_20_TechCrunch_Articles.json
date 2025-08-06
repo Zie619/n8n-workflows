@@ -1,0 +1,341 @@
+{
+  "id": "MKGrRFnUuMZMAxNf",
+  "meta": {
+    "instanceId": "0b0f5302e78710cf1b1457ee15a129d8e5d83d4e366bd96d14cc37da6693e692"
+  },
+  "name": "Scrape Latest 20 TechCrunch Articles",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "f757df19-a2b0-42c5-b75e-e4af51696059",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -400,
+        160
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "1311d3be-cf2e-42ca-ae69-8ebfeb71eefb",
+      "name": "Request Techcrunsh Latest Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -220,
+        160
+      ],
+      "parameters": {
+        "url": "=https://techcrunch.com/latest/0",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "c7807fdf-3b0b-40f8-b912-214475501861",
+      "name": "Parse a posts box",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        -40,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "box",
+              "cssSelector": "ul.wp-block-post-template",
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "4f6720e2-32ee-41dd-a369-a05bb06b4441",
+      "name": "Parse all posts",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        120,
+        160
+      ],
+      "parameters": {
+        "options": {
+          "trimValues": true
+        },
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "box",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "posts",
+              "cssSelector": "li.wp-block-post",
+              "returnArray": true,
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "2d4f5589-1c27-4fa0-9c64-34d02fb091cf",
+      "name": "split out the posts",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        300,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "posts"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bf35ac63-554a-4039-9636-78016110f615",
+      "name": "Parse each post in detail",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        520,
+        160
+      ],
+      "parameters": {
+        "options": {
+          "trimValues": true
+        },
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "posts",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "image",
+              "attribute": "src",
+              "cssSelector": "img",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "title",
+              "cssSelector": "h3.loop-card__title"
+            },
+            {
+              "key": "url",
+              "attribute": "data-destinationlink",
+              "cssSelector": "h3>a",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "created_at",
+              "attribute": "datetime",
+              "cssSelector": "time",
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "2aedd43b-5c04-410e-be37-7e84b798e551",
+      "name": "Request a post detail page",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        720,
+        160
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "e0d9eb9c-096c-47de-b39a-d72083d403de",
+      "name": "Parse a post's content and metadata",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        940,
+        160
+      ],
+      "parameters": {
+        "options": {
+          "trimValues": true,
+          "cleanUpText": true
+        },
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "content",
+              "cssSelector": "div.entry-content"
+            },
+            {
+              "key": "title",
+              "cssSelector": "h1.wp-block-post-title"
+            },
+            {
+              "key": "thumbnail",
+              "attribute": "src",
+              "cssSelector": "img.attachment-post-thumbnail",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "created_at",
+              "attribute": "datetime",
+              "cssSelector": "time",
+              "returnValue": "attribute"
+            }
+          ]
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "513c616e-9362-4246-a420-70c93863ad6e",
+      "name": "Save the values",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1120,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "411666fc-c934-4cfe-93c8-dd2ba426fa46",
+              "name": "url",
+              "type": "string",
+              "value": "={{ $('Parse each post in detail').item.json.url }}"
+            },
+            {
+              "id": "251700fe-bfee-46a6-b157-c0d029edb594",
+              "name": "created_at",
+              "type": "string",
+              "value": "={{ $('Parse each post in detail').item.json.created_at }}"
+            },
+            {
+              "id": "296f4201-06a3-4d81-b85f-5d0b045e09bd",
+              "name": "image",
+              "type": "string",
+              "value": "={{ $('Parse each post in detail').item.json.image }}"
+            },
+            {
+              "id": "1af47c5f-1b6e-4894-b7c5-9a037a328a0d",
+              "name": "content",
+              "type": "string",
+              "value": "={{ $json.content }}"
+            },
+            {
+              "id": "5595be9f-7d2a-43c5-8b40-839f787e9ace",
+              "name": "title",
+              "type": "string",
+              "value": "={{ $json.title }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6f14b55f-11a9-46f6-ba96-4abdfd3fe2f8",
+  "connections": {
+    "Parse all posts": {
+      "main": [
+        [
+          {
+            "node": "split out the posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse a posts box": {
+      "main": [
+        [
+          {
+            "node": "Parse all posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split out the posts": {
+      "main": [
+        [
+          {
+            "node": "Parse each post in detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse each post in detail": {
+      "main": [
+        [
+          {
+            "node": "Request a post detail page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request a post detail page": {
+      "main": [
+        [
+          {
+            "node": "Parse a post's content and metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Techcrunsh Latest Page": {
+      "main": [
+        [
+          {
+            "node": "Parse a posts box",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Request Techcrunsh Latest Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse a post's content and metadata": {
+      "main": [
+        [
+          {
+            "node": "Save the values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

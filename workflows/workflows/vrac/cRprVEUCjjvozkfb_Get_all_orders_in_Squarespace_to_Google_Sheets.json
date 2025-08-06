@@ -1,0 +1,769 @@
+{
+  "id": "cRprVEUCjjvozkfb",
+  "meta": {
+    "instanceId": "e634e668fe1fc93a75c4f2a7fc0dad807ca318b79654157eadb9578496acbc76",
+    "templateId": "548",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Get all orders in Squarespace to Google Sheets",
+  "tags": [
+    {
+      "id": "oIxDbURnjwrJFwau",
+      "name": "Squarespace",
+      "createdAt": "2025-03-06T05:49:51.612Z",
+      "updatedAt": "2025-03-06T05:49:51.612Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "cafda066-7a13-4e0d-8e3d-288196b8297a",
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        340,
+        100
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "a1dcafad-6e82-4569-ba33-560d3286b08e",
+      "name": "Query Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        800,
+        180
+      ],
+      "parameters": {
+        "url": "=https://api.squarespace.com/{{ $json[\"api-version\"] }}/commerce/orders",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "cursor",
+                    "value": "={{ $response.body.pagination.nextPageCursor }}"
+                  }
+                ]
+              },
+              "maxRequests": "={{ $json.maxPage === -1 ? Infinity : $json.maxPage }}",
+              "limitPagesFetched": true,
+              "completeExpression": "={{ !$response.body.pagination.nextPageCursor }}",
+              "paginationCompleteWhen": "other"
+            }
+          }
+        },
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "modifiedAfter",
+              "value": "={{ $json.modifiedAfter }}"
+            },
+            {
+              "name": "=modifiedBefore",
+              "value": "={{ $json.modifiedBefore }}"
+            },
+            {
+              "name": "cursor",
+              "value": "={{ $json.cursor }}"
+            },
+            {
+              "name": "=fulfillmentStatus",
+              "value": "={{ $json.fulfillmentStatus }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "iiLmD473RYjGLbCA",
+          "name": "Squarespace API key - Apps script"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "a2c82b9f-cc73-4f0c-bec7-ebacdeb5787d",
+      "name": "Split Out Order ",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1020,
+        180
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "result"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e910c791-d8be-4a4a-8d91-b9ef78c7c287",
+      "name": "Squarespace Orders Spreadsheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1260,
+        180
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "Email": "={{ $json.customerEmail }}",
+            "Total": "={{ $json.grandTotal.value }}",
+            "Currency": "={{ $json.subtotal.currency }}",
+            "Order ID": "={{ $json.orderNumber }}",
+            "Subtotal": "={{ $json.subtotal.value }}",
+            "Billing Zip": "={{ $json.billingAddress.postalCode }}",
+            "Billing City": "={{ $json.billingAddress.city }}",
+            "Billing Name": "={{ $json.billingAddress.firstName }} {{ $json.billingAddress.lastName }}",
+            "Channel Name": "={{ $json.channel }}",
+            "Shipping Zip": "={{ $json.shippingAddress.postalCode }}",
+            "Billing Phone": "={{ $json.billingAddress.phone }}",
+            "Shipping City": "={{ $json.shippingAddress.city }}",
+            "Shipping Name": "={{ $json.shippingAddress.firstName }} {{ $json.shippingAddress.lastName }}",
+            "Shipping Phone": "={{ $json.shippingAddress.phone }}",
+            "Billing Country": "={{ $json.billingAddress.countryCode }}",
+            "Shipping Method": "={{ $json.shippingLines[0].method }}",
+            "Billing Address1": "={{ $json.billingAddress.address1 }}",
+            "Billing Address2": "={{ $json.billingAddress.address2 }}",
+            "Billing Province": "={{ $json.billingAddress.state }}",
+            "Financial Status": "=",
+            "Shipping Country": "={{ $json.shippingAddress.countryCode }}",
+            "Shipping Address1": "={{ $json.shippingAddress.address1 }}",
+            "Shipping Address2": "={{ $json.shippingAddress.address2 }}",
+            "Shipping Province": "={{ $json.shippingAddress.state }}",
+            "Fulfillment Status": "={{ $json.fulfillmentStatus }}"
+          },
+          "schema": [
+            {
+              "id": "Order ID",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "Order ID",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Email",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Financial Status",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Financial Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Paid at",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Paid at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fulfillment Status",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Fulfillment Status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fulfilled at",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Fulfilled at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Currency",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Currency",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subtotal",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Subtotal",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Taxes",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Taxes",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount Refunded",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Amount Refunded",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Total",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Discount Code",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Discount Code",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Discount Amount",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Discount Amount",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Method",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Method",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Created at",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Created at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem quantity",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem quantity",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem price",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem price",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem sku",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem sku",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem variant",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem variant",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem requires shipping",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem requires shipping",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem taxable",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem taxable",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lineitem fulfillment status",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Lineitem fulfillment status",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Address1",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing Address1",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Address2",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing Address2",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing City",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing City",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Zip",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing Zip",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Province",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing Province",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Country",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing Country",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Phone",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Billing Phone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Address1",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Address1",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Address2",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Address2",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping City",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping City",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Zip",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Zip",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Province",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Province",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Country",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Country",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Shipping Phone",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Shipping Phone",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Cancelled at",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Cancelled at",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Private Notes",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Private Notes",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Channel Type",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Channel Type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Channel Name",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Channel Name",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Channel Order Number",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Channel Order Number",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment Method",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Payment Method",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Payment Reference",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "Payment Reference",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Order ID"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "appendOrUpdate",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 2043293467,
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yf_RYZGFHpMyOvD3RKGSvIFY2vumvI4474Qm_1t4-jM/edit#gid=2043293467",
+          "cachedResultName": "squarespace_orders"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1yf_RYZGFHpMyOvD3RKGSvIFY2vumvI4474Qm_1t4-jM",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1yf_RYZGFHpMyOvD3RKGSvIFY2vumvI4474Qm_1t4-jM/edit?usp=drivesdk",
+          "cachedResultName": "Squarespace automation"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JgI9maibw5DnBXRP",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "83b65c0e-c7f2-460d-b9cc-cc0dbab62737",
+      "name": "Globals",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        580,
+        180
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7411b768-9861-414c-aeaa-2743b3d61a3b",
+              "name": "api-version",
+              "type": "string",
+              "value": "1.0"
+            },
+            {
+              "id": "6cf546c5-5737-4dbd-851b-17d68e0a3780",
+              "name": "modifiedAfter",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "452efa28-2dc6-4ea3-a7a2-c35d100d0382",
+              "name": "modifiedBefore",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "81c4dc54-86bf-4432-a23f-22c7ea831e74",
+              "name": "cursor",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "fa31a552-0d2d-4eb3-8476-44024e1fdc81",
+              "name": "fulfillmentStatus",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "489ff3e6-7bc3-4940-9312-e4ace8e1db9f",
+              "name": "maxPage",
+              "type": "number",
+              "value": -1
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "1626670d-6616-4d5a-84b7-d4d3948f4a99",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        520,
+        60
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 150,
+        "height": 80,
+        "content": "## Edit this node 👇"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "398082af-1188-46c9-8f71-a5029b3ff9d0",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        340,
+        320
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "2eedf012-59dc-42ca-a073-374faaac4cf9",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -20,
+        -20
+      ],
+      "parameters": {
+        "width": 320,
+        "height": 660,
+        "content": "## Get all Squarespace Orders\nRetrieves all Squarespace Orders and saves them into a Google Sheets spreadsheet using the Squarespace Commerce API\n\n### Setup\nOpen `Globals` node and update the values below 👇\n\n- **api-version** (string, required) – The current API version (see Squarespace Orders API documentation).\n- **modifiedAfter**={a-datetime} (string, conditional) – Fetch orders modified after a specific date (ISO 8601 format).\n- **modifiedBefore**={b-datetime} (string, conditional) – Fetch orders modified before a specific date (ISO 8601 format).\n- **cursor**={c} (string, conditional) – Used for pagination, cannot be combined with other filters.\n- **fulfillmentStatus**: PENDING, FULFILLED, or CANCELED.\n- **maxPage** – Set -1 to enables infinite pagination to fetch all available orders.\n\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fd8ca9c3-787d-40da-aa22-594a3e900f0d",
+  "connections": {
+    "Globals": {
+      "main": [
+        [
+          {
+            "node": "Query Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Orders": {
+      "main": [
+        [
+          {
+            "node": "Split Out Order ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Globals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Order ": {
+      "main": [
+        [
+          {
+            "node": "Squarespace Orders Spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Globals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Squarespace Orders Spreadsheet": {
+      "main": [
+        []
+      ]
+    }
+  }
+}

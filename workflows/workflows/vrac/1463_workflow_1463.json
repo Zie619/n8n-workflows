@@ -1,0 +1,169 @@
+{
+  "meta": {
+    "instanceId": "8c8c5237b8e37b006a7adce87f4369350c58e41f3ca9de16196d3197f69eabcd"
+  },
+  "nodes": [
+    {
+      "id": "9a0c7f24-a344-4955-8bdc-b129e5d8d619",
+      "name": "Check Result",
+      "type": "n8n-nodes-base.if",
+      "notes": "IF\ndeliverability is not good\nOR\nDomain is not valid\nOR\nEmail is Disposable",
+      "position": [
+        860,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"statusCode\"]}}",
+              "value2": "200"
+            }
+          ],
+          "boolean": []
+        },
+        "combineOperation": "any"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b4d3619e-1327-4b79-a81b-caed93efa5aa",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1060,
+        440
+      ],
+      "parameters": {
+        "text": "=:warning: New Company with suspicious domain :warning:\n*Name: * {{$node[\"Get company information\"].json[\"properties\"][\"name\"][\"value\"]}}\n*Domain: * {{$node[\"Get company information\"].json[\"properties\"][\"website\"][\"value\"]}}\n*ID: * {{$node[\"Get company information\"].json[\"companyId\"]}}",
+        "channel": "#hubspot-alerts",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "39",
+          "name": "Slack Access Token"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f0e82b09-8311-49c5-b295-694ea5147b50",
+      "name": "On new company created",
+      "type": "n8n-nodes-base.hubspotTrigger",
+      "position": [
+        320,
+        420
+      ],
+      "webhookId": "748453fc-65ef-48bc-bae9-a5a6d13ade54",
+      "parameters": {
+        "eventsUi": {
+          "eventValues": [
+            {
+              "name": "company.creation"
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "credentials": {
+        "hubspotDeveloperApi": {
+          "id": "44",
+          "name": "Hubspot Developer account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "81dd8835-e61f-44de-b650-23b35fbebb0d",
+      "name": "Get company information",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        500,
+        420
+      ],
+      "parameters": {
+        "resource": "company",
+        "companyId": "={{$json[\"companyId\"]}}",
+        "operation": "get",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "hubspotApi": {
+          "id": "43",
+          "name": "Hubspot account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "62017a8b-a6cd-452f-a8a4-576dbd10dc4e",
+      "name": "Try to load the domain",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        660,
+        420
+      ],
+      "parameters": {
+        "url": "={{$json[\"properties\"][\"domain\"][\"value\"]}}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "typeVersion": 3
+    }
+  ],
+  "connections": {
+    "Check Result": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On new company created": {
+      "main": [
+        [
+          {
+            "node": "Get company information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Try to load the domain": {
+      "main": [
+        [
+          {
+            "node": "Check Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get company information": {
+      "main": [
+        [
+          {
+            "node": "Try to load the domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

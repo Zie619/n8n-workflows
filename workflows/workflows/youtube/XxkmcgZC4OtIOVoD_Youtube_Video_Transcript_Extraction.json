@@ -1,0 +1,159 @@
+{
+  "id": "XxkmcgZC4OtIOVoD",
+  "meta": {
+    "instanceId": "b3c467df4053d13fe31cc98f3c66fa1d16300ba750506bfd019a0913cec71ea3"
+  },
+  "name": "Youtube Video Transcript Extraction",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "686e639a-650d-480d-9887-11bd4140f1fe",
+      "name": "YoutubeVideoURL",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        -20,
+        0
+      ],
+      "webhookId": "156a04c8-917d-4624-a46e-8fbcab89d16b",
+      "parameters": {
+        "options": {},
+        "formTitle": "Youtube Video Transcriber",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Youtube Video Url",
+              "requiredField": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "5384c4ed-a726-4253-8a88-d413124f80be",
+      "name": "cleanedTranscript",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        740,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7653a859-556d-4e00-bafa-6f70f90de0d7",
+              "name": "transcript",
+              "type": "string",
+              "value": "={{ $json.cleanedTranscript }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "83b6567f-c931-429c-8d7c-0b2549820ca1",
+      "name": "processTranscript",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "functionCode": "// Extract and process the transcript\nconst data = $input.first().json;\n\nif (!data.transcript && !data.text) {\n  return {\n    json: {\n      success: false,\n      message: 'No transcript available for this video',\n      videoUrl: $input.first().json.body?.videoUrl || 'Unknown'\n    }\n  };\n}\n\n// Process the transcript text\nlet transcriptText = '';\n\n// Handle different API response formats\nif (data.transcript) {\n  // Format for array of transcript segments\n  if (Array.isArray(data.transcript)) {\n    data.transcript.forEach(segment => {\n      if (segment.text) {\n        transcriptText += segment.text + ' ';\n      }\n    });\n  } else if (typeof data.transcript === 'string') {\n    transcriptText = data.transcript;\n  }\n} else if (data.text) {\n  // Format for single transcript object with text property\n  transcriptText = data.text;\n}\n\n// Clean up the transcript (remove extra spaces, normalize punctuation)\nconst cleanedTranscript = transcriptText\n  .replace(/\\s+/g, ' ')\n  .replace(/\\s([.,!?])/g, '$1')\n  .trim();\n\nreturn {\n  json: {\n    success: true,\n    videoUrl: $input.first().json.body?.videoUrl || 'From transcript',\n    rawTranscript: data.text || data.transcript,\n    cleanedTranscript,\n    duration: data.duration,\n    offset: data.offset,\n    language: data.lang\n  }\n};"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cebf0fd7-6b66-4287-bede-fab53061bed2",
+      "name": "extractTranscript",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "url": "https://youtube-transcript3.p.rapidapi.com/api/transcript",
+        "options": {},
+        "sendBody": true,
+        "sendQuery": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json['Youtube Video Url'] }}"
+            }
+          ]
+        },
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "videoId",
+              "value": "ZacjOVVgoLY"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-rapidapi-host",
+              "value": "youtube-transcript3.p.rapidapi.com"
+            },
+            {
+              "name": "x-rapidapi-key",
+              "value": "\"your_api_key\""
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "084b006b-36f9-46a7-8a0b-7656126b29cd",
+  "connections": {
+    "YoutubeVideoURL": {
+      "main": [
+        [
+          {
+            "node": "extractTranscript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extractTranscript": {
+      "main": [
+        [
+          {
+            "node": "processTranscript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "processTranscript": {
+      "main": [
+        [
+          {
+            "node": "cleanedTranscript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

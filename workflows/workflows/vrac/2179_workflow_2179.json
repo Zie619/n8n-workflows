@@ -1,0 +1,508 @@
+{
+  "nodes": [
+    {
+      "id": "fdb7302d-9319-4861-abab-557a3c1f1493",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2660,
+        340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 288.76295784381495,
+        "height": 795.272978576365,
+        "content": "### Available source and target languages`*`:\n\n`BG` - 🇧🇬 Bulgarian\n`CS` - 🇨🇿 Czech\n`DA` - 🇩🇰 Danish\n`DE` - 🇩🇪 German\n`EL` - 🇬🇷 Greek\n`EN-GB` - 🇬🇧 English (British)\n`EN-US` - 🇺🇸 English (American)\n`ES` - 🇪🇸 Spanish\n`ET` - 🇪🇪 Estonian\n`FI` - 🇫🇮 Finnish\n`FR` - 🇫🇷 French\n`HU` - 🇭🇺 Hungarian\n`ID` - 🇮🇩 Indonesian\n`IT` - 🇮🇹 Italian\n`JA` - 🇯🇵 Japanese\n`KO` - 🇰🇷 Korean\n`LT` - 🇱🇹 Lithuanian\n`LV` - 🇱🇻 Latvian\n`NB` - 🇳🇴 Norwegian (Bokmål)\n`NL` - 🇳🇱 Dutch\n`PL` - 🇵🇱 Polish\n`PT-BR` - 🇧🇷 Portuguese (Brazilian)\n`PT-PT` - 🇵🇹 Portuguese\n`RO` - 🇷🇴 Romanian\n`RU` - 🇷🇺 Russian\n`SK` - 🇸🇰 Slovak\n`SL` - 🇸🇮 Slovenian\n`SV` - 🇸🇪 Swedish\n`TR` - 🇹🇷 Turkish\n`UK` - 🇺🇦 Ukrainian\n`ZH` - 🇨🇳 Chinese (simplified)\n\n`*` For more up-to-date list, please consult the official DeepL [API documentation](https://www.deepl.com/docs-api/documents/translate-document)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9cad538a-0efb-4186-b588-ef4d764fdf4e",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        1100,
+        560
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "242d4895-5b02-46b8-9c87-07fd2e11c9ba",
+      "name": "Get files from specified folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        1780,
+        560
+      ],
+      "parameters": {
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "url",
+            "value": "={{ $json.folder_url }}"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "kind",
+            "id",
+            "name",
+            "mimeType"
+          ]
+        },
+        "resource": "fileFolder"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "6q7v3i91ZDHQOKx3",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "1660cf85-af39-4d70-a997-5f4ef2252370",
+      "name": "Use only PDF documents",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        2000,
+        560
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "098535fe-164e-4f58-9b35-0628b51ac5d0",
+              "operator": {
+                "type": "string",
+                "operation": "endsWith"
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": ".pdf"
+            },
+            {
+              "id": "a0bb0e8c-25e9-4ee0-a1fd-2d98a7328111",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "=-{{ $('⚙️ config').first().json.target_lang }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b7cc611e-81a3-4468-bcab-ca6de564fbeb",
+      "name": "Download files",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        2220,
+        560
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {},
+        "operation": "download"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "6q7v3i91ZDHQOKx3",
+          "name": "Google Drive account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 3
+    },
+    {
+      "id": "f6e2c1e6-b68d-47b3-8582-7772f8b1ee95",
+      "name": "Send translate request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2440,
+        560
+      ],
+      "parameters": {
+        "url": "https://api.deepl.com/v2/document",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "target_lang",
+              "value": "={{ $('⚙️ config').first().json.target_lang }}"
+            },
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "source_lang",
+              "value": "={{ $('⚙️ config').first().json.source_lang }}"
+            }
+          ]
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NcB0kuT7IJgHvWlC",
+          "name": "Deepl API Header auth"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "9fab53d1-dfa8-4b27-892f-884853df1e50",
+      "name": "Check translation status",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        820
+      ],
+      "parameters": {
+        "url": "=https://api.deepl.com/v2/document/{{ $json.document_id }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "document_key",
+              "value": "={{ $('Send translate request').item.json.document_key }}"
+            }
+          ]
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NcB0kuT7IJgHvWlC",
+          "name": "Deepl API Header auth"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "9d320d4c-8398-4af4-8582-bc60ca52b986",
+      "name": "Wait a bit",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        1540,
+        820
+      ],
+      "webhookId": "9fd126e3-203c-4f11-ad50-d00ff55301a2",
+      "parameters": {
+        "unit": "seconds",
+        "amount": 5
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "657758b1-a5f5-4b0b-bdd0-ef0cdb518863",
+      "name": "file translated?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1760,
+        820
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1a7ad415-3d30-4d51-b31e-7a0911391d21",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "done"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2018d45b-8922-4a9c-884b-27cc6903d464",
+      "name": "Wait between documents",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        2000,
+        800
+      ],
+      "webhookId": "877870bc-5b29-4ce0-82d6-3202d43e89fd",
+      "parameters": {
+        "unit": "seconds",
+        "amount": 2
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "717972fe-45fa-4bd4-acf9-9db2efb45c12",
+      "name": "Get translated document from deepL",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2240,
+        800
+      ],
+      "parameters": {
+        "url": "=https://api.deepl.com/v2/document/{{ $json.document_id }}/result",
+        "method": "POST",
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "document_key",
+              "value": "={{ $('Send translate request').item.json.document_key }}"
+            }
+          ]
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NcB0kuT7IJgHvWlC",
+          "name": "Deepl API Header auth"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "c9e9b000-8202-410d-9630-b08481ba4e39",
+      "name": "Uplad to original folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        2460,
+        800
+      ],
+      "parameters": {
+        "name": "={{ $('Download files').item.json.name.replace('.pdf', '--' + $('⚙️ config').first().json.target_lang) + '.pdf' }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('⚙️ config').first().json.folder_url }}"
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "6q7v3i91ZDHQOKx3",
+          "name": "Google Drive account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 3
+    },
+    {
+      "id": "698a33ce-8b33-4b33-8236-190b1013cb0d",
+      "name": "⚙️ config",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1440,
+        560
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "target_lang"
+            },
+            {
+              "name": "source_lang"
+            },
+            {
+              "name": "folder_url"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "aeee03fa-f4a6-48fd-b3ca-ff6a6dc20fb4",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        367.395398150649
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 444.71526152412946,
+        "height": 343.02803459456237,
+        "content": "### Configure your workflow here by setting these parameters:\n- `folder_url`: URL of your google drive folder\n- `target_lang`: The language into which the text should be translated\n- `source_lang`: Language of the text to be translated (optional, if not specified DeepL will try to auto-detect the source language)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait a bit": {
+      "main": [
+        [
+          {
+            "node": "file translated?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "⚙️ config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ config": {
+      "main": [
+        [
+          {
+            "node": "Get files from specified folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download files": {
+      "main": [
+        [
+          {
+            "node": "Send translate request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "file translated?": {
+      "main": [
+        [
+          {
+            "node": "Wait between documents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check translation status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send translate request": {
+      "main": [
+        [
+          {
+            "node": "Check translation status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use only PDF documents": {
+      "main": [
+        [
+          {
+            "node": "Download files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait between documents": {
+      "main": [
+        [
+          {
+            "node": "Get translated document from deepL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check translation status": {
+      "main": [
+        [
+          {
+            "node": "Wait a bit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get files from specified folder": {
+      "main": [
+        [
+          {
+            "node": "Use only PDF documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get translated document from deepL": {
+      "main": [
+        [
+          {
+            "node": "Uplad to original folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

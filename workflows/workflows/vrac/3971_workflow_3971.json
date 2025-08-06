@@ -1,0 +1,459 @@
+{
+  "meta": {
+    "instanceId": "408f9fb9940c3cb18ffdef0e0150fe342d6e655c3a9fac21f0f644e8bedabcd9",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "ee39f797-6f6f-4a62-9cf1-0c95b47baf23",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -160,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "c1b9fadc-586b-4edf-a19a-6995479d4de5",
+      "name": "Fetch Latest Channel Messages",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "position": [
+        60,
+        0
+      ],
+      "webhookId": "b36a534a-1bca-4c3d-ab25-777ca98fba1a",
+      "parameters": {
+        "teamId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=fc62d6a3-eaba-430f-b451-3c3107751ba0"
+        },
+        "resource": "channelMessage",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=19:NQuQMYvvtC9DcTEQs1Vul1Nm1xIXnRmznAwov7MuNZ81@thread.tacv2"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "microsoftTeamsOAuth2Api": {
+          "id": "AUH9lDgO5KTl2J6q",
+          "name": "Microsoft Teams account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "1be03962-5028-47a8-8deb-3c59c121df01",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        920,
+        140
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "04a75b1c-685f-4264-ade7-cb2778fc7d4f",
+      "name": "Team Member Weekly Report Agent",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        820,
+        0
+      ],
+      "parameters": {
+        "text": "=## User\nDisplayName: {{ $json.user.displayName }}\n\n## Messages\n{{\nArray.from($json.messages)\n.map(msg => {\n  return [\n    `Type: Message`,\n    `Posted: ${msg.createdDateTime}`,\n    `Message: ${msg.body.content.replaceAll('\\n', ' ')}`,\n    msg.parent ? `In Reply To: ${msg.parent.from.user.displayName} said \"${msg.parent.body.content.replace('\\n', ' ')}\"` : ''\n  ].join('\\n')\n}).join('---\\n')\n}}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Your are energetic assistant who produces weekly mini-reports on team members by analysing their slack messages from last week and posts these reports on the following Monday.\nThere has already been some work done to collect and summarise each thread made by the user within the last week.\nYour task is to summarize all the threads by this user and any interactions with other users involved and produce a mini report to share with other team members.\nFocus on wins and challenges.\nAim to motivate and call out any outstanding concerns where appropriate.\nWelcome any new team members who may have joined and say good bye to those who may have left."
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.6
+    },
+    {
+      "id": "919347aa-cd48-42ff-9504-dd66c5b18caa",
+      "name": "Merge Report With User Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "={{\n{\n  ...$('Groups to Items').item.json,\n  report: $json.text\n}\n}}"
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "67c23cf0-9af6-4a89-94c0-7a3e01230b2f",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1820,
+        140
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "65111f1b-42c7-4657-9512-e740d75bdbdc",
+      "name": "Reports to Single List",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        1500,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "82a90342-cc4d-4d80-9ff6-83cab22861f4",
+      "name": "Team Weekly Report Agent",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1720,
+        0
+      ],
+      "parameters": {
+        "text": "={{\n$input.first().json.data\n  .map(item =>\n`user: ${item.user.displayName} <${item.user.id}>\nmessage count: ${item.messages.length}\nreport: ${item.report.replaceAll('\\n', ' ')}`\n  )\n  .join('\\n---\\n')\n}}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Your are energetic assistant who produces a team-wide weekly report from all activity of all team members in the prior last week and posts this single report on the following Monday.\nThere has already been some work done to collect individual reports from team members.\nYour task is generate a report covering the team to prepare and motivate them for the upcoming week.\nFocus on wins and challenges if available.\nLook out for similar activities between members and make a connection if possible.\nAim to motivate and call out any outstanding concerns where appropriate.\nWelcome any new team members who may have joined and say good bye to those who may have left.\nFormat the report as markdown.\nDo not sign off on the report."
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.6
+    },
+    {
+      "id": "464a925f-eb06-4b59-a262-ca336506de15",
+      "name": "Markdown to HTML",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        2300,
+        0
+      ],
+      "parameters": {
+        "mode": "markdownToHtml",
+        "options": {},
+        "markdown": "={{ $json.text }}",
+        "destinationKey": "html"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ecb047a7-5d52-4e87-8d0e-c9c17489cddc",
+      "name": "Send Report to Channel",
+      "type": "n8n-nodes-base.microsoftTeams",
+      "position": [
+        2540,
+        0
+      ],
+      "webhookId": "b36a534a-1bca-4c3d-ab25-777ca98fba1a",
+      "parameters": {
+        "teamId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=fc62d6a3-eaba-430f-b451-3c3107751ba0",
+          "__regex": "^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"
+        },
+        "message": "={{ $json.html }}",
+        "options": {
+          "includeLinkToWorkflow": false
+        },
+        "resource": "channelMessage",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=19:NQuQMYvvtC9DcTEQs1Vul1Nm1xIXnRmznAwov7MuNZ81@thread.tacv2"
+        },
+        "contentType": "html"
+      },
+      "credentials": {
+        "microsoftTeamsOAuth2Api": {
+          "id": "AUH9lDgO5KTl2J6q",
+          "name": "Microsoft Teams account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e1d371c8-9069-4a33-a450-78055769931b",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -220,
+        -240
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 700,
+        "height": 540,
+        "content": "## 1. Fetch All Channel Messages from Last Week\n[Learn more about the MS Teams node](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.microsoftteams)\n\nWe'll start by fetching all activity in our team channel over the last 7 days and group them  by the message author. We can do this using the MS Teams node. This will give us the raw data to pick apart and analyse for reporting purposes."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "77aff845-5226-4023-a2da-afb2021a08ed",
+      "name": "Group Messages By UserId",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const messages = $input.all().map(item => item.json);\n\nconst groupByUserId = messages.reduce((acc,msg) => {\n  return {\n    ...acc,\n    [msg.from.user.id]: acc[msg.from.user.id]\n      ? acc[msg.from.user.id].concat(msg)\n      : [msg]\n  }\n}, {});\n\nconst output = Object.keys(groupByUserId).map(userId => {\n  const userMessages = groupByUserId[userId];\n  for (let i=0,j=userMessages.length;i<j;i++) {\n    if (userMessages[i].replyToId) {\n      userMessages[i].parent = messages.find(msg => msg.id === userMessages[i].replyToId);\n    }\n  }\n  return {\n    user: userMessages[0].from.user,\n    messages: userMessages\n  };\n});\n\nreturn { output };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ee415463-a7e2-43dd-abfa-4050cc230452",
+      "name": "Groups to Items",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "output"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8d4c7621-3c04-4fbe-bbee-b7dade2ab837",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        520,
+        -240
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 860,
+        "height": 540,
+        "content": "## 2. Generate Activity Reports for Each Team Member\n[Learn more about the Basic LLM node](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.chainllm)\n\nWith our summarized threads which are grouped per user, we can aggregate them and give them to the AI again to generate a weekly report for the team member. This could include their wins, challenges, learnings or decisions - it really is up to you as to what the report looks like. A fun part of this output is getting to decide the tone of voice and delivery of the report. Don't be a bore and consider adding some personality and flair!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "22f3e375-201d-4a66-b1e0-592bbeb12eac",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1420,
+        -240
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 680,
+        "height": 540,
+        "content": "## 3. Generate Final Report for Whole Team\n[Learn more about the Basic LLM node](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.chainllm)\n\nIn this step, we go one level higher and aggregate all individual team member reports together into a big team report. In this way, the overview can group similar activities and generalise activities in a broader sense. The message output will also be shorter which some may find easier to digest."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "873c2510-cf01-464b-b84e-936bd1c4d7a7",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2140,
+        -240
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 680,
+        "height": 540,
+        "content": "## 4. Post Report on Team Channel (on Monday Morning!)\n[Learn more about the Markdown node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.markdown)\n\nFinally, we can post the weekly report in the team channel. This is a great way to automate quick recaps for the team after the weekend break, get others back on track if they've been away or update client team who may pop in now and again to collaborate."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4882c210-fec8-4b8e-b114-0b6d889ed917",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -680,
+        -960
+      ],
+      "parameters": {
+        "width": 420,
+        "height": 1400,
+        "content": "## Try It Out!\n### This n8n template lets you summarize individual team member activity on MS Teams for the past week and generates a report.\n\nFor remote teams, chat is a crucial communication tool to ensure work gets done but with so many conversations happening at once and in multiple threads, ideas, information and decisions usually live in the moment and get lost just as quickly - and all together forgotten by the weekend!\n\nUsing this template, this doesn't have to be the case. Have AI crawl through last week's activity, summarize all messages and replies and generate a casual and snappy report to bring the team back into focus for the current week. A project manager's dream!\n\n### How it works\n* A scheduled trigger is set to run every Monday at 6am to gather all team channel messages within the last week.\n* Messages are grouped by user.\n* AI analyses the raw messages and replies to pull out interesting observations and highlights. This is referred to as the individual reports.\n* All individual reports are then combined and summarized together into what becomes the team weekly report. This allows understanding of group and similar activities.\n* Finally, the team weekly report is posted back to the channel. The timing is important as it should be the first message of the week and ready for the team to glance over coffee.\n\n### How to use\n* Ideally works best per project and where most of the comms happens on a single channel. Avoid combining channels and instead duplicate this workflow for more channels.\n* You may need to filter for specific team members if you want specific team updates.\n* Customise the report to suit your organisation, team or the channel. You may prefer to be more formal if clients or external stakeholders are also present.\n\n### Requirements\n* MS Teams for chat platform\n* OpenAI for LLM\n\n### Customising this workflow\n* If the teams channel is busy enough already, consider posting the final report to email.\n* Pull in project metrics to include in your report. As extra context, it may be interesting to tie the messages to production performance.\n* Use an AI Agent to query for knowledgebase or tickets relevant to the messages. This may be useful for attaching links or references to add context.\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Hacking!"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groups to Items": {
+      "main": [
+        [
+          {
+            "node": "Team Member Weekly Report Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown to HTML": {
+      "main": [
+        [
+          {
+            "node": "Send Report to Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Latest Channel Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Team Member Weekly Report Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Team Weekly Report Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reports to Single List": {
+      "main": [
+        [
+          {
+            "node": "Team Weekly Report Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group Messages By UserId": {
+      "main": [
+        [
+          {
+            "node": "Groups to Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Team Weekly Report Agent": {
+      "main": [
+        [
+          {
+            "node": "Markdown to HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Report With User Data": {
+      "main": [
+        [
+          {
+            "node": "Reports to Single List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Latest Channel Messages": {
+      "main": [
+        [
+          {
+            "node": "Group Messages By UserId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Team Member Weekly Report Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge Report With User Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,274 @@
+{
+  "id": "phqg5Kk3YowxoMHQ",
+  "meta": {
+    "instanceId": "3b02b4d565b70d8766b64aa225626d46b11a527d9f5fe390a8405f2a09e8b8a4"
+  },
+  "name": "Namesilo Bulk Domain Availability [Template]",
+  "tags": [
+    {
+      "id": "28jVdgW1S4XWqLH4",
+      "name": "Templates",
+      "createdAt": "2025-02-28T12:22:07.921Z",
+      "updatedAt": "2025-02-28T12:22:07.921Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "b1184b35-0ab4-42d8-a5b2-66ef926d7eed",
+      "name": "Set Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -240,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "05a34cf0-9462-4684-aac8-32b4b17e9ef0",
+              "name": "Domains",
+              "type": "string",
+              "value": "=domain1.com\ndomain2.com\ndomain3.com"
+            },
+            {
+              "id": "438830f9-27fe-4e89-bcb9-766483e2d9b1",
+              "name": "Namesilo API Key",
+              "type": "string",
+              "value": "YOUR_API_KEY"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "7fc40d31-a43b-4273-a6eb-d519fda815d4",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -800,
+        -340
+      ],
+      "parameters": {
+        "width": 580,
+        "height": 280,
+        "content": "## How-To\n1. Claim your free Namesilo API key here: https://www.namesilo.com/account/api-manager\n\n2. Set your API key and domains in \"Set Data\" node.\n\nThe workflow send up to 200 domains per loop until all domains are processed. The output is in Excel format.\n\nEnjoy!\n\nNote: Each loop wait 5min. This is required due to Namesilo rate limits."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a2137f76-9e08-4743-b914-b10bbebc9a13",
+      "name": "Convert & Split Domains",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -60,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Get domains from input JSON\nconst domains = $json.Domains.split(\"\\n\").map(domain => domain.trim()).filter(Boolean);\n\n// Define batch size\nconst batchSize = 200;\n\n// Split into batches of 200\nlet batches = [];\nfor (let i = 0; i < domains.length; i += batchSize) {\n    batches.push(domains.slice(i, i + batchSize).join(\",\"));\n}\n\n// Return batches as an array\nreturn batches.map(batch => ({ batchedDomains: batch }));"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "41140017-1f98-4ea9-ac97-9d48e5bdfda1",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        680,
+        -200
+      ],
+      "webhookId": "3ede79a2-7875-462f-b15a-1c74339e2a8a",
+      "parameters": {
+        "unit": "minutes"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "9aa9ddb5-9091-4726-917c-bce9d0f207c9",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        320,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// This re-maps each input item (if needed)\nconst newItems = items.map(item => ({\n  json: {\n    Domain: item.json.Domain,\n    Availability: item.json.Availability\n  }\n}));\n\nreturn newItems;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "bb2fd210-fd11-4712-94d0-fabb7060705c",
+      "name": "Loop Over Domains",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        120,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "5d97cd82-f7d5-4f98-a789-8c0fcf473f0f",
+      "name": "Namesilo Requests",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        320,
+        -200
+      ],
+      "parameters": {
+        "url": "=https://www.namesilo.com/apibatch/checkRegisterAvailability?version=1&type=json&key={{ $('Set Data').item.json['Namesilo API Key'] }}&domains={{ $json.batchedDomains }}",
+        "options": {}
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "c4f38893-636a-4293-9e10-395be30683d0",
+      "name": "Parse Data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        500,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "// Ensure input data exists\nif (!$json || !$json.data) {\n    throw new Error(\"Invalid input data format\");\n}\n\n// Parse the JSON string inside `data`\nlet parsedData;\ntry {\n    parsedData = JSON.parse($json.data);\n} catch (error) {\n    throw new Error(\"Error parsing JSON data: \" + error.message);\n}\n\n// Extract available and unavailable domains safely\nconst availableDomains = parsedData.reply?.available ? Object.values(parsedData.reply.available) : [];\nconst unavailableDomains = parsedData.reply?.unavailable ? Object.values(parsedData.reply.unavailable) : [];\n\n// Prepare the output array\nconst output = [];\n\n// Process available domains\navailableDomains.forEach(domainObj => {\n    if (domainObj && domainObj.domain) {\n        output.push({\n            Domain: domainObj.domain,\n            Availability: \"Available\"\n        });\n    }\n});\n\n// Process unavailable domains\nunavailableDomains.forEach(domain => {\n    if (typeof domain === \"string\") {\n        output.push({\n            Domain: domain,\n            Availability: \"Unavailable\"\n        });\n    } else if (typeof domain === \"object\" && domain.domain) {\n        output.push({\n            Domain: domain.domain,\n            Availability: \"Unavailable\"\n        });\n    }\n});\n\n// Return the structured data\nreturn output;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ec7b8311-65b7-45b0-85ae-b91d7c82e123",
+      "name": "Convert to Excel",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "options": {
+          "fileName": "domain_results.xlsx"
+        },
+        "operation": "xlsx",
+        "binaryPropertyName": "={{ $json.MergedDomains }}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "7d33c875-ce2d-404c-97a0-f551939d59f4",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -420,
+        0
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1a05d4b0-db0c-4554-8abf-0547130be16c",
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Set Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Data": {
+      "main": [
+        [
+          {
+            "node": "Convert & Split Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Data": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Convert to Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Domains": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Namesilo Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Namesilo Requests": {
+      "main": [
+        [
+          {
+            "node": "Parse Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert & Split Domains": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

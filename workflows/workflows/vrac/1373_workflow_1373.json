@@ -1,0 +1,440 @@
+{
+  "nodes": [
+    {
+      "name": "Extract Name and Email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        950,
+        130
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Name",
+              "value": "={{$json[\"body\"][\"name\"]}}"
+            },
+            {
+              "name": "Email",
+              "value": "={{$json[\"body\"][\"email\"]}}"
+            }
+          ],
+          "boolean": []
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Sign Up",
+      "type": "n8n-nodes-base.webhook",
+      "notes": "Example Input Data: {\"name\":\"John Doe\",\"email\":\"doe.j@northeastern.edu\"}",
+      "position": [
+        720,
+        130
+      ],
+      "webhookId": "6d60a1b4-6706-4f21-a5fb-bace13c24b53",
+      "parameters": {
+        "path": "sign-up",
+        "options": {
+          "responseData": ""
+        },
+        "httpMethod": "POST",
+        "authentication": "basicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "11",
+          "name": "Oasis Basic Auth Creds"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "If user exists",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1560,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [],
+          "boolean": [
+            {
+              "value1": "={{Object.keys($json).includes(\"id\") }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "name": "Create User",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1750,
+        240
+      ],
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": "27a30c5b-c418-4200-8f48-d7fb7b043fbe",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "title": "={{$json[\"Name\"]}}"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{$json[\"Email\"]}}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Oasis Hub Production"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Query for User",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1150,
+        230
+      ],
+      "parameters": {
+        "options": {
+          "filter": {
+            "singleCondition": {
+              "key": "Email|email",
+              "condition": "equals",
+              "emailValue": "={{$json[\"Email\"]}}"
+            }
+          }
+        },
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "27a30c5b-c418-4200-8f48-d7fb7b043fbe"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Oasis Hub Production"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "name": "Query Current Semester",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        2180,
+        -30
+      ],
+      "parameters": {
+        "options": {
+          "sort": {
+            "sortValue": [
+              {
+                "key": "created_time",
+                "direction": "descending",
+                "timestamp": true
+              }
+            ]
+          },
+          "filter": {
+            "singleCondition": {
+              "key": "Is Current?|checkbox",
+              "condition": "equals",
+              "checkboxValue": true
+            }
+          }
+        },
+        "resource": "databasePage",
+        "operation": "getAll",
+        "returnAll": true,
+        "databaseId": "2003319a-bc73-423a-9378-01999b4884fb"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Oasis Hub Production"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Select Semester ID",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2370,
+        -30
+      ],
+      "parameters": {
+        "values": {
+          "number": [],
+          "string": [
+            {
+              "name": "currentSemesterID",
+              "value": "={{$json[\"id\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Update Semester for User",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        3050,
+        110
+      ],
+      "parameters": {
+        "pageId": "={{$json[\"id\"]}}",
+        "resource": "databasePage",
+        "operation": "update",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Semesters|relation",
+              "relationValue": [
+                "={{$json[\"allSemesterIDs\"].join(',')}}"
+              ]
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Oasis Hub Production"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge Semester ID",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        2590,
+        110
+      ],
+      "parameters": {
+        "mode": "multiplex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Concatenate Semester IDs",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        2820,
+        110
+      ],
+      "parameters": {
+        "functionCode": "for (item of items) {\n  // Get the current semester ID\n  const currentSemesterID = item.json[\"currentSemesterID\"]\n  let allSemesterIDs = [currentSemesterID];\n\n  // Add semesters that the user is already associated with\n  if (item.json[\"Semesters\"]?.length > 0) {\n    allSemesterIDs = allSemesterIDs.concat(item.json[\"Semesters\"].filter(semesterID => semesterID !== currentSemesterID));\n  }\n\n  // Set allSemesterIDs which is used to update the relation\n  item.json[\"allSemesterIDs\"] = allSemesterIDs\n}\n\nreturn items;\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1340,
+        150
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "Email",
+        "propertyName2": "Email"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Query User",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1950,
+        130
+      ],
+      "parameters": {
+        "options": {
+          "filter": {
+            "singleCondition": {
+              "key": "Email|email",
+              "condition": "equals",
+              "emailValue": "={{$json[\"Email\"]}}"
+            }
+          }
+        },
+        "resource": "databasePage",
+        "operation": "getAll",
+        "returnAll": true,
+        "databaseId": "27a30c5b-c418-4200-8f48-d7fb7b043fbe"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "3",
+          "name": "Oasis Hub Production"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "If user exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Up": {
+      "main": [
+        [
+          {
+            "node": "Extract Name and Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query User": {
+      "main": [
+        [
+          {
+            "node": "Query Current Semester",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Semester ID",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Create User": {
+      "main": [
+        [
+          {
+            "node": "Query User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If user exists": {
+      "main": [
+        [
+          {
+            "node": "Query User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query for User": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Semester ID": {
+      "main": [
+        [
+          {
+            "node": "Concatenate Semester IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Semester ID": {
+      "main": [
+        [
+          {
+            "node": "Merge Semester ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Name and Email": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Query for User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Current Semester": {
+      "main": [
+        [
+          {
+            "node": "Select Semester ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concatenate Semester IDs": {
+      "main": [
+        [
+          {
+            "node": "Update Semester for User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

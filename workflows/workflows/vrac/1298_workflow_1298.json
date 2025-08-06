@@ -1,0 +1,149 @@
+{
+  "nodes": [
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        459,
+        371
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1109,
+        371
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "Votes",
+              "value": "={{$json[\"posts\"][\"node\"][\"votesCount\"]}}"
+            }
+          ],
+          "string": [
+            {
+              "name": "Name",
+              "value": "={{$json[\"posts\"][\"node\"][\"name\"]}}"
+            },
+            {
+              "name": "Description",
+              "value": "={{$json[\"posts\"][\"node\"][\"description\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "GraphQL",
+      "type": "n8n-nodes-base.graphql",
+      "position": [
+        700,
+        370
+      ],
+      "parameters": {
+        "query": "=query PostRanking{\n  posts(postedAfter:\"{{new Date(new Date(Date.now()).getTime() - (1000*60*60*1*24)).toUTCString()}}\", order:RANKING, first:5, postedBefore:\"{{new Date(Date.now()).toUTCString()}}\"){\n    edges {\n      node {\n        name\n        tagline\n        description\n        votesCount\n        reviewsRating\n      }\n    }\n  }\n}",
+        "endpoint": "https://api.producthunt.com/v2/api/graphql",
+        "requestFormat": "json",
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR-TOKEN"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Item Lists",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        900,
+        370
+      ],
+      "parameters": {
+        "options": {
+          "destinationFieldName": "posts"
+        },
+        "fieldToSplitOut": "data.posts.edges"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Discord",
+      "type": "n8n-nodes-base.discord",
+      "position": [
+        1310,
+        370
+      ],
+      "parameters": {
+        "text": "=Here are the top 5 PH projects:\n**Name:** {{$json[\"Name\"]}}\n**Description:** {{$json[\"Description\"]}}\n**Vote:** {{$json[\"Votes\"]}}\n-------",
+        "webhookUri": "DISCORD WEBHOOK URL"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "GraphQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GraphQL": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

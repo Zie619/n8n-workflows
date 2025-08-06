@@ -1,0 +1,1191 @@
+{
+  "id": "fW6PV9IaePKSMGbN",
+  "meta": {
+    "instanceId": "a4bfc93e975ca233ac45ed7c9227d84cf5a2329310525917adaf3312e10d5462",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Unique QRcode coupon assignment and validation for Lead Generation system",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "5ef4dd1d-39d6-487e-a48d-420b458ac1ee",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -420,
+        340
+      ],
+      "webhookId": "bb832325-8c58-4717-b866-41f8a9714cf2",
+      "parameters": {
+        "path": "bb832325-8c58-4717-b866-41f8a9714cf2",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a7102d60-d4bd-450d-92b3-a32e2304b4a9",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        40,
+        340
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "430aee2d-a788-4d7c-ab64-880c900f0058",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.qr }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "f9dfd28e-42b5-488a-acde-dbbff95cf72f",
+      "name": "Token SuiteCRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        700,
+        -320
+      ],
+      "parameters": {
+        "url": "=https://SUITECRMURL/Api/access_token",
+        "options": {},
+        "requestMethod": "POST",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            },
+            {
+              "name": "client_id",
+              "value": "CLIENTID"
+            },
+            {
+              "name": "client_secret",
+              "value": "CLIENTSECRET"
+            }
+          ]
+        },
+        "allowUnauthorizedCerts": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "0e5c7208-a90a-4612-a5eb-f962546320dc",
+      "name": "Create Lead SuiteCRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        940,
+        -320
+      ],
+      "parameters": {
+        "url": "https://SUITECRMURL/Api/V8/module",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "jsonBody": "={\"data\": \n  {\n  \"type\": \"Leads\",\n  \"attributes\": { \n  \"first_name\": \"{{ $('Form Fields').item.json.Name }}\",\n  \"last_name\": \"{{ $('Form Fields').item.json.Surname }}\",\n  \"email1\": \"{{ $('Form Fields').item.json.Email }}\",\n  \"phone_mobile\":\"{{ $('Form Fields').item.json.Phone }}\",\n  \"coupon_c\": \"{{ $('Get Coupon').item.json.COUPON }}\"\n  }\n  }\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$node[\"Token SuiteCRM\"].json[\"access_token\"]}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/vnd.api+json"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3
+    },
+    {
+      "id": "e9191ab8-4fb8-40bb-b676-89ac4e58b2dc",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "position": [
+        -420,
+        -420
+      ],
+      "webhookId": "63d1d84b-c41e-4d3d-961a-0aa2af830ceb",
+      "parameters": {
+        "options": {},
+        "formTitle": "Landing",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "placeholder": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Surname",
+              "placeholder": "Surname",
+              "requiredField": true
+            },
+            {
+              "fieldType": "email",
+              "fieldLabel": "Email",
+              "placeholder": "Email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone",
+              "placeholder": "Phone",
+              "requiredField": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "4f61d7df-aeb3-4e8d-b30b-8396944e93a3",
+      "name": "Duplicate Lead?",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        20,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "filtersUI": {
+          "values": [
+            {
+              "lookupValue": "={{ $json.Email }}",
+              "lookupColumn": "EMAIL"
+            }
+          ]
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit#gid=0",
+          "cachedResultName": "Foglio1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit?usp=drivesdk",
+          "cachedResultName": "Coupon"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JYR6a64Qecd6t8Hb",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "393372b3-3aaf-4500-a795-0c0f47ea9625",
+      "name": "Form Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -180,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "661d1475-f964-4a12-bfe7-88bf96851319",
+              "name": "Name",
+              "type": "string",
+              "value": "={{ $json.Name }}"
+            },
+            {
+              "id": "9991645d-c716-47db-80d6-850f3d64c782",
+              "name": "Surname",
+              "type": "string",
+              "value": "={{ $json.Surname }}"
+            },
+            {
+              "id": "c999afa6-2ec7-4f7f-bf3b-088a3597591c",
+              "name": "Email",
+              "type": "string",
+              "value": "={{ $json.Email }}"
+            },
+            {
+              "id": "f3faccdb-2412-4363-a0e3-f13b8f85b242",
+              "name": "Phone",
+              "type": "string",
+              "value": "={{ $json.Phone }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "40d47841-6fb6-4339-b101-a8e917791229",
+      "name": "Get Coupon",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        480,
+        -320
+      ],
+      "parameters": {
+        "options": {
+          "returnFirstMatch": true
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "ID LEAD"
+            }
+          ]
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit#gid=0",
+          "cachedResultName": "Foglio1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit?usp=drivesdk",
+          "cachedResultName": "Coupon"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JYR6a64Qecd6t8Hb",
+          "name": "Google Sheets account"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 4.5
+    },
+    {
+      "id": "16358f58-eb7c-4fe5-a0aa-960943a7bebd",
+      "name": "Update Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1180,
+        -320
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "DATE": "={{ $now.format('dd/LL/yyyy HH:mm:ss') }}",
+            "NAME": "={{ $json.data.attributes.first_name }}",
+            "EMAIL": "={{ $json.data.attributes.email1 }}",
+            "PHONE": "={{ $json.data.attributes.phone_mobile }}",
+            "COUPON": "={{ $('Get Coupon').item.json.COUPON }}",
+            "ID LEAD": "={{ $json.data.id }}",
+            "SURNAME": "={{ $json.data.attributes.last_name }}"
+          },
+          "schema": [
+            {
+              "id": "NAME",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "NAME",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SURNAME",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "SURNAME",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "EMAIL",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "EMAIL",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "PHONE",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "PHONE",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "COUPON",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "COUPON",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DATE",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "DATE",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ID LEAD",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "ID LEAD",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "row_number",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "COUPON"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "update",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit#gid=0",
+          "cachedResultName": "Foglio1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit?usp=drivesdk",
+          "cachedResultName": "Coupon"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JYR6a64Qecd6t8Hb",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "36025b8c-41cb-4827-bf0e-ec6f692c13df",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        220,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9e3a8422-14f1-453e-bfed-4feecff34662",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.EMAIL }}",
+              "rightValue": "={{ $('Form Fields').item.json.email }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "e2267b93-9396-4ebf-8307-f8c98c1c3d65",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -200,
+        -500
+      ],
+      "parameters": {
+        "width": 340,
+        "height": 240,
+        "content": "Check if the lead has already received the coupon"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a8af825a-4e26-4660-8a9e-f7ce3ba33b3a",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        440,
+        -380
+      ],
+      "parameters": {
+        "width": 180,
+        "height": 220,
+        "content": "Find the first available unassigned coupon"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "dd868852-5b0f-4b5b-922f-f70b8a6da01e",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        680,
+        -380
+      ],
+      "parameters": {
+        "width": 400,
+        "height": 220,
+        "content": "Enter the lead with the relative coupon on Suite CRM. Change SUITECRMURL, CLIENTSECRET and CLIENTID"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d2c26f3a-496e-47d6-b3f6-1aea5d0293fa",
+      "name": "Get QR",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1400,
+        -320
+      ],
+      "parameters": {
+        "url": "=https://quickchart.io/qr?text=https://n8n.n3witalia.com/webhook-test/bb832325-8c58-4717-b866-41f8a9714cf2?qr={{ $('Get Coupon').item.json.COUPON }}&size=250",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "371fa5e5-6f91-4236-83d4-81f579d7d2ab",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        1620,
+        -320
+      ],
+      "webhookId": "a84b051c-7d5f-4c17-bac6-68a9df9fa7c7",
+      "parameters": {
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Exclusive Discount Coupon</title>\n</head>\n<body style=\"font-family: Arial, sans-serif; text-align: center;\">\n    <h2>Get Your Exclusive Discount!</h2>\n    <p>Hi {{ $('On form submission').item.json.Name }},<br>\n    Scan the QR code below to claim your special discount.</p>\n    \n    <img src=\"https://quickchart.io/qr?text=https://n8n.n3witalia.com/webhook-test/bb832325-8c58-4717-b866-41f8a9714cf2?qr={{ $('Get Coupon').item.json.COUPON }}&size=250\" alt=\"Scan to get your discount\" style=\"margin: 20px;\">\n    \n    <p>Hurry, the offer is limited!</p>\n</body>\n</html>\n",
+        "options": {},
+        "subject": "[n8n] Exclusive Discount Coupon",
+        "toEmail": "={{ $('Form Fields').item.json.Email }}",
+        "fromEmail": "=EMAILFROM"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "hRjP3XbDiIQqvi7x",
+          "name": "SMTP info@n3witalia.com"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "5893bd1d-762d-4337-8392-6d358002845a",
+      "name": "Update Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1020,
+        100
+      ],
+      "parameters": {
+        "url": "=https://suitecrm.dev.n3witalia.com/Api/V8/module",
+        "method": "PATCH",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "jsonBody": "={\n  \"data\": {\n    \"type\": \"Leads\",\n    \"id\": \"{{ $('Not used?').item.json['ID LEAD'] }}\",\n    \"attributes\": {\n      \"coupon_used_c\": \"yes\"\n    }\n  }\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$node[\"Token SuiteCRM 1\"].json[\"access_token\"]}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/vnd.api+json"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 3
+    },
+    {
+      "id": "fd0a43f4-a3f1-4008-947c-f8208d2126f7",
+      "name": "Not used?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        540,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "50546d87-ab37-4c8a-b835-e1a60f3aa0dc",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json['USED COUPON?'] }}",
+              "rightValue": ""
+            },
+            {
+              "id": "025a42b8-fb90-44a8-951a-0e321b42c3b9",
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.row_number }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "0029c366-aec1-4305-aab5-2ab6845e2828",
+      "name": "Coupon OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1480,
+        100
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "text",
+        "responseBody": "Qr valid!"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "4c326412-0965-4f1c-9b77-2704d37a7151",
+      "name": "No coupon",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        320,
+        460
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "text",
+        "responseBody": "Coupon not valid"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "e18cf9e7-584d-4f49-88b8-4c3a513ff613",
+      "name": "Coupon KO",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        800,
+        320
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "text",
+        "responseBody": "Coupon already used"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "55a63a65-5472-4e50-8150-604c6bc9dd18",
+      "name": "Token SuiteCRM 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        800,
+        100
+      ],
+      "parameters": {
+        "url": "=https://SUITECRMURL/Api/access_token",
+        "options": {},
+        "requestMethod": "POST",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            },
+            {
+              "name": "client_id",
+              "value": "CLIENTID"
+            },
+            {
+              "name": "client_secret",
+              "value": "CLIENTSECRET"
+            }
+          ]
+        },
+        "allowUnauthorizedCerts": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "c843c9f2-9940-423c-bc9d-8530fb43f229",
+      "name": "Set coupon",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -180,
+        340
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4e9a4330-d654-410f-9b99-aa57545c2c80",
+              "name": "qr",
+              "type": "string",
+              "value": "={{ $json.query.qr }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9a2d877d-9016-460e-b376-ea27c59a492a",
+      "name": "Get Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        320,
+        240
+      ],
+      "parameters": {
+        "options": {
+          "returnFirstMatch": true
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupValue": "={{ $json.qr }}",
+              "lookupColumn": "COUPON"
+            }
+          ]
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit#gid=0",
+          "cachedResultName": "Foglio1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit?usp=drivesdk",
+          "cachedResultName": "Coupon"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JYR6a64Qecd6t8Hb",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "da2e62e5-898c-4024-8d85-517b18dcefc3",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -200,
+        280
+      ],
+      "parameters": {
+        "width": 360,
+        "height": 220,
+        "content": "Check if the QR code scan is valid"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "507dc2ab-a762-49b8-a13a-c9b20c7135d8",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        300,
+        180
+      ],
+      "parameters": {
+        "width": 360,
+        "height": 220,
+        "content": "Check if coupon is valid"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f44b5645-1611-4c16-83ac-ee8a4821970b",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        760,
+        40
+      ],
+      "parameters": {
+        "width": 420,
+        "height": 220,
+        "content": "Enter the lead with the relative coupon on Suite CRM. Change SUITECRMURL, CLIENTSECRET and CLIENTID"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ad0a5999-2616-4c7b-8108-6f13e573490b",
+      "name": "Update coupon used",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1240,
+        100
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "ID LEAD": "={{ $json.data.id }}",
+            "USED COUPON?": "yes"
+          },
+          "schema": [
+            {
+              "id": "NAME",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "NAME",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SURNAME",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "SURNAME",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "EMAIL",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "EMAIL",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "PHONE",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "PHONE",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "COUPON",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "COUPON",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DATE",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "DATE",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ID LEAD",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "ID LEAD",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "USED COUPON?",
+              "type": "string",
+              "display": true,
+              "required": false,
+              "displayName": "USED COUPON?",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "type": "string",
+              "display": true,
+              "removed": true,
+              "readOnly": true,
+              "required": false,
+              "displayName": "row_number",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "ID LEAD"
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "update",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit#gid=0",
+          "cachedResultName": "Foglio1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1lnRZodxZSOA0QSuzkAb7ZJcfFfNXpX7NcxMdckMTN90/edit?usp=drivesdk",
+          "cachedResultName": "Coupon"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JYR6a64Qecd6t8Hb",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.5
+    },
+    {
+      "id": "acd6a7fb-aeae-4baf-8f60-af16715a6de6",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1560,
+        -380
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 220,
+        "content": "Set the Webhook URL"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "091a00b6-34bd-4221-b2f1-4d55719a273a",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -480,
+        -900
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 680,
+        "height": 240,
+        "content": "## Coupon assignment and simple validation system\n\nThis workflow is designed to manage the assignment and validation of unique QR code coupons within a lead generation system. The process begins with a webhook that receives data from a user-filled form, containing information such as name, surname, email, and phone number. This data is then processed to check if the lead already exists in the system, preventing duplicates.\n\nDISCLAIMER: The system is very simple and basic but can be improved and made very efficient through specific controls and new implementations"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "00ea32a4-635c-41c0-a789-e7b45efdf193",
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No coupon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get QR": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set coupon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead": {
+      "main": [
+        [
+          {
+            "node": "Not used?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not used?": {
+      "main": [
+        [
+          {
+            "node": "Token SuiteCRM 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Coupon KO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Coupon": {
+      "main": [
+        [
+          {
+            "node": "Token SuiteCRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set coupon": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Fields": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead": {
+      "main": [
+        [
+          {
+            "node": "Update coupon used",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sheet": {
+      "main": [
+        [
+          {
+            "node": "Get QR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get Coupon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token SuiteCRM": {
+      "main": [
+        [
+          {
+            "node": "Create Lead SuiteCRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Lead?": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Token SuiteCRM 1": {
+      "main": [
+        [
+          {
+            "node": "Update Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Form Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update coupon used": {
+      "main": [
+        [
+          {
+            "node": "Coupon OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Lead SuiteCRM": {
+      "main": [
+        [
+          {
+            "node": "Update Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

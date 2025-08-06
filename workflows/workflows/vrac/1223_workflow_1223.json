@@ -1,0 +1,218 @@
+{
+  "nodes": [
+    {
+      "name": "create new contact",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        -300,
+        1200
+      ],
+      "parameters": {
+        "email": "={{$json[\"form_email\"]}}",
+        "resource": "contact",
+        "additionalFields": {
+          "industry": "={{$json[\"form_department\"]}}",
+          "lastName": "={{$json[\"form_lastname\"]}}",
+          "firstName": "={{$json[\"form_firstname\"]}}",
+          "companyName": "={{$json[\"form_companyname\"]}}"
+        }
+      },
+      "credentials": {
+        "hubspotApi": "hubspot_nodeqa"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "update lead stage",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        100,
+        1100
+      ],
+      "parameters": {
+        "email": "={{$node[\"create new contact\"].json[\"properties\"][\"email\"][\"value\"]}}",
+        "resource": "contact",
+        "additionalFields": {
+          "lifeCycleStage": "opportunity"
+        }
+      },
+      "credentials": {
+        "hubspotApi": "hubspot_nodeqa"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        100,
+        1300
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Set values",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -500,
+        1200
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "form_firstname",
+              "value": "={{$json[\"First up, what's your name?\"]}}"
+            },
+            {
+              "name": "form_lastname",
+              "value": "={{$json[\"And your surname, [field:fda1954c-f7a3-4fd3-a8dc-dcad5160bab5]?\"]}}"
+            },
+            {
+              "name": "form_department",
+              "value": "={{$json[\"And in which department do you work, [field:fda1954c-f7a3-4fd3-a8dc-dcad5160bab5]?\"]}}"
+            },
+            {
+              "name": "form_companyname",
+              "value": "={{$json[\"Great! Now what company are you from?\"]}}"
+            },
+            {
+              "name": "form_email",
+              "value": "={{$json[\"Just a couple more questions left! What's your email address?\"]}}"
+            }
+          ],
+          "boolean": [
+            {
+              "name": "form_interest",
+              "value": "={{$json[\"And are you currently looking to scale your visual content?\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Typeform Trigger",
+      "type": "n8n-nodes-base.typeformTrigger",
+      "position": [
+        -700,
+        1200
+      ],
+      "webhookId": "97eb74c8-156c-4329-8679-37b69533f709",
+      "parameters": {
+        "formId": "RPueloJC"
+      },
+      "credentials": {
+        "typeformApi": "typeform"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "lead interested",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -100,
+        1200
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Set values\"].json[\"form_interest\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "send information",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        300,
+        1100
+      ],
+      "parameters": {
+        "toList": [
+          "={{$json[\"properties\"][\"email\"][\"value\"]}}"
+        ],
+        "message": "=Hello {{$json[\"properties\"][\"firstname\"][\"value\"]}},\n\nI'm glad to hear you're interested in our services. You can schedule a call with me here: [calendly_link].\nUntil then, check out this presentation about how we can help your business: [presentation_link].\nLooking forward to talking to you!\n\nBest,\nTeam",
+        "subject": "So you're interested in growing your business",
+        "resource": "message",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "gmailOAuth2": "gmail"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Set values": {
+      "main": [
+        [
+          {
+            "node": "create new contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lead interested": {
+      "main": [
+        [
+          {
+            "node": "update lead stage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typeform Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update lead stage": {
+      "main": [
+        [
+          {
+            "node": "send information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create new contact": {
+      "main": [
+        [
+          {
+            "node": "lead interested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

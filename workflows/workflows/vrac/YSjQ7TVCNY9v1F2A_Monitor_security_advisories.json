@@ -1,0 +1,456 @@
+{
+  "id": "YSjQ7TVCNY9v1F2A",
+  "meta": {
+    "instanceId": "03e9d14e9196363fe7191ce21dc0bb17387a6e755dcc9acc4f5904752919dca8"
+  },
+  "name": "Monitor_security_advisories",
+  "tags": [
+    {
+      "id": "DlIeVDZxzko5ifNi",
+      "name": "createdBy:David",
+      "createdAt": "2023-10-31T02:21:50.700Z",
+      "updatedAt": "2023-10-31T02:21:50.700Z"
+    },
+    {
+      "id": "QPJKatvLSxxtrE8U",
+      "name": "Secops",
+      "createdAt": "2023-10-31T02:15:11.396Z",
+      "updatedAt": "2023-10-31T02:15:11.396Z"
+    },
+    {
+      "id": "oyHT7KfD0rdIizVw",
+      "name": "Pending",
+      "createdAt": "2023-11-10T23:19:06.319Z",
+      "updatedAt": "2023-11-10T23:19:06.319Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "62ef1311-a623-4a7d-b59a-6c0a0d7751d7",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        100,
+        200
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "808c1b88-69e9-4e96-bcfd-b93810740fda",
+      "name": "Get Palo Alto security advisories",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        400,
+        360
+      ],
+      "parameters": {
+        "url": "https://security.paloaltonetworks.com/rss.xml",
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "97f16fe1-c720-40e0-85ff-61fdbfb9a2c2",
+      "name": "GlobalProtect advisory?",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1240,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.title }}",
+              "value2": "GlobalProtect",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3602f7bb-87d3-49a2-9916-b9ab7d86f58b",
+      "name": "Traps advisory?",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1240,
+        380
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.title }}",
+              "value2": "Traps",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "97c108f0-bdf1-4ed9-a545-d52acb7c9cec",
+      "name": "Create Jira issue",
+      "type": "n8n-nodes-base.jira",
+      "position": [
+        1520,
+        240
+      ],
+      "parameters": {
+        "project": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "summary": "={{ $json.title.substring(14) }}",
+        "issueType": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "additionalFields": {
+          "priority": {
+            "mode": "list",
+            "value": ""
+          },
+          "description": "=Severity: {{ $json.title.split('(Severity:')[1].replace(')', '').trim() }}\nLink: {{ $json.link }}\nPublished: {{ $json.pubDate }} "
+        }
+      },
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "4",
+          "name": "Jira Ricardo"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "acb89eb0-c9e5-4fbb-a750-3607ae280670",
+      "name": "Get customers",
+      "type": "n8n-nodes-base.n8nTrainingCustomerDatastore",
+      "position": [
+        1960,
+        380
+      ],
+      "parameters": {
+        "operation": "getAllPeople",
+        "returnAll": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "babf1ce4-6ed4-4bd9-a1df-429a15fa6849",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -13.168003380834136,
+        -396.06737036843754
+      ],
+      "parameters": {
+        "width": 332.0284684971131,
+        "height": 926.523360092614,
+        "content": "![Shodan](https://i.imgur.com/PcOuvAL.png)\n## Workflow Overview\nThis n8n workflow is designed to streamline security oversight by fetching advisories from Palo Alto's feed and filtering out alerts not pertinent to your products. \n\nBy utilizing a dynamic filter system, it excludes unrelated advisories, ensuring that your team receives only relevant security updates. \n\nCoupled with a sample database of emails, this workflow offers a customizable solution to align with any corporate email directory, providing a strong foundation for your security information management strategy. \n\n## Execution Schedule\n\nScheduled to run every 24 hours at 1 am. If you change this timer, ensure to update the `Deduplicate Advisories` section to match. \n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "820112fc-e635-4d51-b152-8a2ee4de8f56",
+      "name": "Email customers",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2360,
+        380
+      ],
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "message": "=Dear {{ $json.name.split(' ')[0] }},\n\nWe wanted to let you know of a new security advisory:\n\n{{ $('GlobalProtect advisory?').item.json.title }}\n{{ $('GlobalProtect advisory?').item.json.link }}\n\nRegards,\n\nNathan",
+        "options": {},
+        "subject": "=New {{ $('Extract info').item.json.type }} security advisory "
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "198",
+          "name": "Gmail account (David)"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "06497e48-37ea-4c2a-a633-6b0f02d1da5f",
+      "name": "Extract info",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        600,
+        360
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "type",
+              "value": "={{ $json.title.match(/[^ ]* ([^:]*):/)[1].trim() }}"
+            },
+            {
+              "name": "subject",
+              "value": "={{ $json.title.match(/[^ ]* [^:]*: (.*)(?=\\(Severity:)/)[1].trim() }}"
+            },
+            {
+              "name": "severity",
+              "value": "={{ $json.title.split('Severity:')[1].replaceAll(')', '').trim().toLowerCase().toTitleCase() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "79a85d6e-2550-4351-9356-6f2f8c330693",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        340,
+        -54.852630774649356
+      ],
+      "parameters": {
+        "width": 419.37209302325573,
+        "height": 577.9223982165106,
+        "content": "![Shodan](https://i.imgur.com/weKPN2E.png)\n## Get Palo Alto security advisories\nAdaptable and efficient, this segment of the workflow retrieves Palo Alto security advisories directly through their RSS feed. \n\nYou can tailor the feed URL in the RSS node below to meet your needs and ensure the `Extract Info` node captures the correct information. \n\nThis flexibility allows the workflow to stay current with the latest advisories, making it a vital component in maintaining up-to-date security measures across your network infrastructure.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f2c5155d-28ab-4ae4-a402-5244ccac94e3",
+      "name": "Check if posted in last 24 hours",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        920,
+        360
+      ],
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{ $json.pubDate }}",
+              "value2": "={{$today.minus({days: 1})}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a3553ba4-3581-4844-abaf-e872cb6dc7ea",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1751,
+        -366.68188678732713
+      ],
+      "parameters": {
+        "width": 461.89918009735027,
+        "height": 893.2712326436663,
+        "content": "![n8n](https://i.imgur.com/lKnBNnH.png)\n## Query Company Email Directory\nThe workflow includes a sample node setup that queries a company email directory, allowing for dynamic distribution of advisories to relevant personnel. \n\nReplace the sample node with a connection to your corporate directory or a Google Sheet for an integrated approach. If you choose to go the google sheets route, create a column for `name` and a column for `email` and use the Google Sheets node to get the rows. \n\nThis ensures that every advisory reaches the appropriate individual, promoting a proactive security posture organization-wide.\n\nEnsure that the node you use outputs the json in this format:\n\n```\n[\n  {\n    \"name\": \"Jay Gatsby\",\n    \"email\": \"gatsby@west-egg.com\"\n  },\n  {\n    \"name\": \"José Arcadio Buendía\",\n    \"email\": \"jab@macondo.co\"\n  },\n  {\n    \"name\": \"Max Sendak\",\n    \"email\": \"info@in-and-out-of-weeks.org\"\n  }\n]\n```"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4c6a7aac-8aa3-480e-9691-bfa5472d3d91",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2240,
+        -113.74332300803701
+      ],
+      "parameters": {
+        "width": 324.2540832882642,
+        "height": 639.8357317519218,
+        "content": "![gmail](https://i.imgur.com/f6f6my0.png)\n## Email advisory information to your team\nOnce advisories are filtered and prepared, this final node uses Gmail to disseminate the information to your team, ensuring that those who need to be aware of security updates are informed in a timely manner. \n\nThis step is pivotal in the communication chain, turning advisories into actionable insights for your team, thereby promoting a culture of responsiveness and awareness regarding network security.\n\nYou can replace this with your preferred email provider by substituting the node and expressions in the Gmail node. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "75aae5d6-bcaf-4d69-9adf-f71075b16318",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1180,
+        -320
+      ],
+      "parameters": {
+        "width": 552.9069767441861,
+        "height": 844.9721583936011,
+        "content": "![Jira](https://i.imgur.com/Ko72Qxa.png)\n## Filter advisories based on Palo Alto Products used in your organization \nThis node enhances specificity by filtering advisories based on the Palo Alto products utilized within your organization. \n\nBy customizing the filter nodes to match your environment, you create a streamlined process that directs pertinent advisories to a Jira issue (or any incident management system that uses an API) for further investigation, ensuring your incident management process is both efficient and tailored to your specific security landscape.\n\n**Want to add a new filter?** Duplicate one of the `filter nodes` below and connect it to the `true output` of the date filter node, decide whether you wish to add an incident management node, and then connect to your email directory node.\n \n**Want to create a ticket for your team to investigate if an advisory is found for your filtered product/keyword?** Simply add the node for your favorite incident management platform if it exists, and an http request if it doesn't to integrate with any REST api.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4c34c8aa-3876-4248-9c5e-cd362ffb6833",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        780,
+        -176.24786257310654
+      ],
+      "parameters": {
+        "width": 382.81395348837174,
+        "height": 700.2899123297333,
+        "content": "![n8n](https://i.imgur.com/lKnBNnH.png)\n## Deduplicate Advisories\n### Filter advisories based on date \nTo maintain accuracy and avoid redundancy, this n8n node deduplicates advisories by date, ensuring that each security notice is unique and relevant. \n\nIt's programmed to sync with the scheduled trigger, preventing any overlap in data analysis. \n\nAdjustments can be made to alter the frequency and timing of the trigger, allowing for weekly or custom schedules, demonstrating n8n's versatile capability to adapt to your operational requirements.\n\nFor example if you preferred to change it to weekly, set the `Trigger Node` to run weekly, and adjust the expression in the `If` node below from `{{$today.minus({days: 1})}}` to `{{$today.minus({days: 7})}}`."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "518de294-2961-419b-b936-3519fc4bdcf8",
+      "name": "Ignore, stale advisory",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1220,
+        600
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "699ba4b3-ef02-4e7c-8894-c302566ac5e7",
+      "name": "Run workflow every 24 hours at 1am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        100,
+        360
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e64a6ec2-b231-4cb7-9d36-8933c844d482",
+  "connections": {
+    "Extract info": {
+      "main": [
+        [
+          {
+            "node": "Check if posted in last 24 hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get customers": {
+      "main": [
+        [
+          {
+            "node": "Email customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Traps advisory?": {
+      "main": [
+        [
+          {
+            "node": "Get customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Jira issue": {
+      "main": [
+        [
+          {
+            "node": "Get customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GlobalProtect advisory?": {
+      "main": [
+        [
+          {
+            "node": "Create Jira issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if posted in last 24 hours": {
+      "main": [
+        [
+          {
+            "node": "GlobalProtect advisory?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Traps advisory?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore, stale advisory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Get Palo Alto security advisories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Palo Alto security advisories": {
+      "main": [
+        [
+          {
+            "node": "Extract info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run workflow every 24 hours at 1am": {
+      "main": [
+        [
+          {
+            "node": "Get Palo Alto security advisories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

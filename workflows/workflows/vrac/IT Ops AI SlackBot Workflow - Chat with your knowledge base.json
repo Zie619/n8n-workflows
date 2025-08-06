@@ -1,0 +1,513 @@
+{
+  "meta": {
+    "instanceId": "cb484ba7b742928a2048bf8829668bed5b5ad9787579adea888f05980292a4a7"
+  },
+  "nodes": [
+    {
+      "id": "96ef3bfe-a493-4377-b090-6b2d02d87480",
+      "name": "Verify Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1420,
+        800
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        "respondWith": "json",
+        "responseBody": "={\"challenge\":\"{{ $json.body.challenge }}\"}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "38db6da6-13bf-47a1-b5cb-f06403b309ac",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        2120,
+        1220
+      ],
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "QpFZ2EiM3WGl6Zr3",
+          "name": "Marketing OpenAI"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "139b606d-29ae-480d-bde7-458ef45dba01",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1840,
+        700
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "64acd4c6-cd53-46e5-a29e-40884044b186",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        2800,
+        1220
+      ],
+      "parameters": {
+        "sessionKey": "={{ $('Receive DMs').item.json[\"body\"][\"event\"][\"channel\"] }}",
+        "sessionIdType": "customKey",
+        "contextWindowLength": 10
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e605864f-198e-4358-8333-50ed962d4e50",
+      "name": "Check if Bot",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1640,
+        800
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "89ed1b2a-5e42-4196-989d-f7f81df04b6d",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.body.event.user }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "8479c41e-b251-4f32-8daa-421969c4c8b3",
+      "name": "Send Initial Message",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        2140,
+        820
+      ],
+      "parameters": {
+        "text": "On it! Let me check Confluence to see if there are any relevant links to answer your question. ",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Receive DMs').item.json[\"body\"][\"event\"][\"channel\"] }}"
+        },
+        "otherOptions": {
+          "botProfile": {
+            "imageValues": {
+              "icon_url": "https://avatars.slack-edge.com/2024-08-30/7671440019297_d6ce97ff3ab5a3abf9c1_72.jpg",
+              "profilePhotoType": "image"
+            }
+          },
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "OfRxDxHFIqk1q44a",
+          "name": "helphub n8n labs auth"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "dcd325b1-1ee8-4133-9a6e-8b37bf20d056",
+      "name": "Delete Initial Message",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        2960,
+        760
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Receive DMs').item.json[\"body\"][\"event\"][\"channel\"] }}"
+        },
+        "operation": "delete",
+        "timestamp": "={{ $('Send Initial Message').item.json[\"message_timestamp\"] }}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "OfRxDxHFIqk1q44a",
+          "name": "helphub n8n labs auth"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "8d3ac15c-b0bc-459c-9523-685b7f498efb",
+      "name": "Send Message",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        3160,
+        760
+      ],
+      "parameters": {
+        "text": "={{ $('AI Agent').item.json.output.replace(/\\[(.+?)\\]\\((.+?)\\)/g, '<$2|$1>').replace(/\\*\\*(.+?)\\*\\*/g, '*$1*') }}",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Receive DMs').item.json[\"body\"][\"event\"][\"channel\"] }}"
+        },
+        "otherOptions": {
+          "botProfile": {
+            "imageValues": {
+              "icon_url": "https://avatars.slack-edge.com/2024-08-30/7671440019297_d6ce97ff3ab5a3abf9c1_72.jpg",
+              "profilePhotoType": "image"
+            }
+          },
+          "includeLinkToWorkflow": false
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "OfRxDxHFIqk1q44a",
+          "name": "helphub n8n labs auth"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "02afa6b3-c528-4925-8b92-7b708b10e7ca",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1160,
+        460
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 414.5626477541374,
+        "height": 516.5011820330969,
+        "content": "![Imgur](https://i.imgur.com/iKyMV0N.png)\n## Webhook Trigger\nThe first node receives all messages from Slack API via Subscription Events API. You can find more information about setting up the subscription events API by [clicking here](https://api.slack.com/apis/connections/events-api). The second node responds to the periodic security challenges that Slack sends to ensure the N8n webhook is still active. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a8caa088-80dd-44a8-8c61-7a03a37de386",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1600,
+        460
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 403.49881796690335,
+        "height": 517.6832151300242,
+        "content": "![n8n](https://i.imgur.com/lKnBNnH.png)\n## Check for Bot Responses\nIf the message received is from a Bot instead of a real user, it will ignore the message."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "17b51014-4f9d-4650-963b-8d8d944869ea",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2900,
+        460
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 430.54373522458616,
+        "height": 451.3947990543734,
+        "content": "![Slack](https://i.imgur.com/iKyMV0N.png)\n## Delete Receipt and Send Response \nOnce the AI response is generated in response to the slack message, n8n delete's it's original *Message Received* message to avoid cluttering up the user's DMs, and then sends the final Slack message back to the user. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "494a9ada-18e9-48a6-86a9-5e72cc797ddf",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2394.7517730496443,
+        460
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 488.1796690307332,
+        "height": 723.5460992907797,
+        "content": "![OpenAI](https://i.imgur.com/o89G0If.png)\n## Parse Response with AI Model \nThis workflow currently uses OpenAI to power it's responses, but you can open the AI Agent node below and set your own AI LLM using the n8n options offered. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "31bc923f-c981-45fd-827d-cede2ec3f3c3",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2020,
+        460
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 356.5484633569741,
+        "height": 516.5011820330968,
+        "content": "![Slack](https://i.imgur.com/iKyMV0N.png)\n## Response Received\nOnce N8n sees that the messaged received is from a user, it will respond right away to acknowledge a message was received. You can edit the message by opening the node below. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e81d6b07-9ac0-4848-ab7f-57a588103ce5",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2980,
+        1200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 951.1571908442271,
+        "height": 467.66775526888296,
+        "content": "![n8n](https://i.imgur.com/FWJX4km.png)\n## Build n8n workflow to query Knowledge Base\nBuilding your own tools for an AI Agent to use is simple and straightforward, but requires that you build a second workflow and then connect it to this one by inputting the workflow ID from the workflow URL in the *Custom n8n KB Tool* sub node. \n\nThis gives you the freedom to work with any tool, whether n8n has support for it or not. In this sample build, we have connected the AI agent to Confluence, which does not have a native built in n8n node. For this we use the HTTP request node and pointed it to Confluence's search api. It then returns a response that the AI agent uses to generate a final slack message response to the user. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "890aeb96-1721-4cb4-a609-5409b30d5f6c",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2320,
+        1200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 644.582152697438,
+        "height": 318.6662788502134,
+        "content": "![n8n](https://i.imgur.com/lKnBNnH.png)\n\n## Remembers the last 5 messages that a user sent\nBecause we are passing the channel ID of the user to the memory module, n8n is storing the last 5 slack messages sent to it per slack channel. This means that it will remember all your users conversations separately from one another and not get confused by different requests from different users. You can increase the memory storage by using a different storage medium and increase the number of prompts and responses it should remember. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1fa61c12-70d1-4d7e-8564-a2a574804243",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1660,
+        1200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 644.582152697438,
+        "height": 318.6662788502134,
+        "content": "![OpenAI](https://i.imgur.com/o89G0If.png)\n\n## Change the AI Agents LLM\nTo change the model used, simply delete the ChatGPT model and replace with a different supported model by hitting the plus sign under model in the AI Agent."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fecd81da-4723-4886-8d6f-9729623028a9",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        460
+      ],
+      "parameters": {
+        "width": 675.1724774900403,
+        "height": 994.2389415638766,
+        "content": "![n8n](https://i.imgur.com/lKnBNnH.png)\n# Streamline IT Inquiries with n8n & AI!\n\n## Introducing the IT Ops AI SlackBot Workflow---a sophisticated solution designed to automate and optimize the management of IT-related inquiries via Slack.\n\nWhen an employee messages the IT department slack app, the workflow kicks off with the \"Receive DMs\" node, which captures incoming messages and ensures a secure and active communication line by responding to Slack's webhook challenges.\n\n**How It Works:**\n\n- Verify Webhook: Responds to slacks challenge and respond requests to ensure is still active.\n- Check if bot: Checks whether the message sender is a bot to prevent unnecessary processing.\n- Send Initial Message: Sends a quick confirmation, like \"On it!\", to let the user know their query is being handled.\n- AI-Driven Responses: Employs the \"AI Agent\" node with OpenAI to craft relevant replies based on the conversation history maintained by the \"Window Buffer Memory\" node.\n- Knowledge Integration tool: Uses a custom Knowledge Base tool to fetch pertinent information from confluence, enhancing the quality of responses.\n- Cleanup and Reply: Deletes the initial acknowledgment to tidy up before sending the final detailed response back to the user.\n\n\n**Get Started:**\n- Ensure your [Slack](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.slack/?utm_source=n8n_app&utm_medium=node_settings_modal-credential_link&utm_campaign=n8n-nodes-base.slack) and [OpenAI](https://docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.lmchatopenai/?utm_source=n8n_app&utm_medium=node_settings_modal-credential_link&utm_campaign=@n8n/n8n-nodes-langchain.lmChatOpenAi) integrations are properly set up.\n- Customize the workflow to align with your IT department's protocols.\n\n\n**Need Help?**\n- Join the discussion on our Forum or check out resources on Discord!\n\n\nDeploy this workflow to improve response times and enhance the efficiency of your IT support services."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "16b79887-8218-4056-8add-39ebee6166bd",
+      "name": "Receive DMs",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        1200,
+        800
+      ],
+      "webhookId": "44c26a10-d54a-46ce-a522-5d83e8a854be",
+      "parameters": {
+        "path": "44c26a10-d54a-46ce-a522-5d83e8a854be",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "201b5399-6fff-48ca-81f0-a5cfc02c46d5",
+      "name": "Call Confluence Workflow Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        3380,
+        1280
+      ],
+      "parameters": {
+        "name": "confluence_kb_search",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Pxzc65WaCPn2yB5I",
+          "cachedResultName": "KB Tool - Confluence KB"
+        },
+        "description": "Call this tool to search n8n-labs confluence knowledge base. The input should be the user prompt reduced into 1 to 3 keywords to use for a KB search. These words should be words that are most likely to be contained in the text of a KB article that is helpful based on the user prompt. The words should be the only response and they should just be separated by a space."
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "41026e03-5844-4e57-86bf-fc7e586265a4",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2500,
+        820
+      ],
+      "parameters": {
+        "text": "={{ $('Receive DMs').item.json.body.event.text }}",
+        "options": {
+          "humanMessage": "TOOLS\n------\nAssistant can ask the user to use tools to look up information that may be helpful in answering the users original question. The tools the human can use are:\n\n{tools}\n\nIf no response is given for a given tool or the response is an error, then do not reference the tool results and instead ask for more context. \n\nThe tools currently search Notion and returns back a list of results. Please try to respond using the most relevant result URL to guide the user to the right answer. \n\nIf you are not sure, let the user know you were unable to find a notion page for them to help, but give them the top results that are relevant to their request.\n\nPlease summarize the results and return all the URLs exactly as you get them from the tool. Please format all links you send in this format: <url|name of url> \nAdditionally, here are other formatting layouts to use: \n_italic_ will produce italicized text\n*bold* will produce bold text\n~strike~ will produce strikethrough text\n\n{format_instructions}\n\nUSER'S INPUT\n--------------------\nHere is the user's input (remember to respond with a slack flavored (see above for more details) code snippet of a json blob with a single action, and NOTHING else):\n\n{{input}}\n",
+          "maxIterations": 2,
+          "systemMessage": "You are Knowledge Ninja, a specialized IT support tool developed to streamline interactions between employees and the IT department and the company knowledge base. \n\nDesigned with efficiency in mind, Knowledge Ninja is equipped to handle a variety of IT-related queries, from sales competition analysis to troubleshooting to more complex technical guidance.\n\nAs a dynamic knowledge tool, Knowledge Ninja utilizes a comprehensive internal knowledge base that can be tailored to your organization's specific IT infrastructure and policies. \n\nThis allows it to deliver precise and contextually relevant information swiftly, enhancing the support process.\n\nKnowledge Ninja is continuously updated to reflect the latest IT standards and practices, ensuring that the guidance it provides is both accurate and up-to-date. \n\nIts capabilities include understanding detailed queries, providing step-by-step troubleshooting instructions, and clarifying IT policies.\n\nPlease format all links you send in this format: <url|name of url> \nAdditionally, here are other formatting layouts to use: \n_italic_ will produce italicized text\n*bold* will produce bold text\n~strike~ will produce strikethrough text"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.5
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Delete Initial Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive DMs": {
+      "main": [
+        [
+          {
+            "node": "Verify Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Bot": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Initial Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check if Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Initial Message": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Initial Message": {
+      "main": [
+        [
+          {
+            "node": "Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Confluence Workflow Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

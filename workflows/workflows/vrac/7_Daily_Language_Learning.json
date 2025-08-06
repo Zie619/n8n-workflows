@@ -1,0 +1,219 @@
+{
+  "id": "7",
+  "name": "Daily Language Learning",
+  "nodes": [
+    {
+      "name": "Daily trigger",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        620,
+        750
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 8
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get top 3 articles",
+      "type": "n8n-nodes-base.hackerNews",
+      "position": [
+        820,
+        750
+      ],
+      "parameters": {
+        "limit": 3,
+        "resource": "all",
+        "additionalFields": {
+          "tags": [
+            "front_page"
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Extract words",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1020,
+        750
+      ],
+      "parameters": {
+        "functionCode": "const words = [];\nconst regex = /\\d/g;\nconst newItems = [];\n\n// Splits titles into words and removes numbers\n// using regular expressions\n\nfor(let i=0; i < items.length; i++) {\n  let split_titles = []; \n  split_titles = items[i].json.title.split(' ');\n  for(let j=0; j < split_titles.length; j++) {\n    if(regex.test(split_titles[j])) {\n      continue;\n    } else {\n      words.push(split_titles[j]);\n    }\n  }\n}\n\n// Removes all duplicate words by converting the\n// array into a set and then back into an array\n\nconst uniqueWords = [...new Set(words)];\n\n// Transform the array to the data structure expected\n// by n8n\n\nfor(let k=0; k < uniqueWords.length; k++) {\n  newItems.push({json: { words: uniqueWords[k] }});\n}\n\nreturn newItems;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Translate",
+      "type": "n8n-nodes-base.lingvaNex",
+      "position": [
+        1220,
+        750
+      ],
+      "parameters": {
+        "text": "={{$node[\"Extract words\"].json[\"words\"]}}",
+        "options": {},
+        "translateTo": "de_DE"
+      },
+      "credentials": {
+        "lingvaNexApi": "LingvaNex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Filter data ",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1420,
+        750
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "English word",
+              "value": "={{$node[\"Translate\"].json[\"source\"]}}"
+            },
+            {
+              "name": "Translated word",
+              "value": "={{$node[\"Translate\"].json[\"result\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Save today's words",
+      "type": "n8n-nodes-base.airtable",
+      "position": [
+        1620,
+        850
+      ],
+      "parameters": {
+        "table": "Table 1",
+        "options": {},
+        "operation": "append",
+        "application": "app4Y6qcCHIO1cYNB"
+      },
+      "credentials": {
+        "airtableApi": "Airtable"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Craft message",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1620,
+        650
+      ],
+      "parameters": {
+        "functionCode": "const number_of_words = 5;\nconst words = [];\n\n// Crafts the words to be sent in en_word : translated_word format\n// and adds them to an array\n\nfor(let i=0; i < number_of_words; i++) {\n  words.push(items[i].json['English word'] + ' : ' + items[i].json['Translated word']);\n}\n\n// Takes all the items from the array and converts them into a comma\n// separated string\n\nconst words_of_the_day = words.join(', ');\n\nreturn [{json: {words_of_the_day: words_of_the_day}}];"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.vonage",
+      "position": [
+        1820,
+        650
+      ],
+      "parameters": {
+        "to": "+4915225152610",
+        "from": "Vonage APIs",
+        "message": "=Good morning, here are your words for today\n{{$node[\"Craft message\"].json[\"words_of_the_day\"]}}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "vonageApi": "Vonage"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Translate": {
+      "main": [
+        [
+          {
+            "node": "Filter data ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter data ": {
+      "main": [
+        [
+          {
+            "node": "Craft message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save today's words",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Craft message": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily trigger": {
+      "main": [
+        [
+          {
+            "node": "Get top 3 articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract words": {
+      "main": [
+        [
+          {
+            "node": "Translate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get top 3 articles": {
+      "main": [
+        [
+          {
+            "node": "Extract words",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

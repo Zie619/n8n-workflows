@@ -1,0 +1,949 @@
+{
+  "meta": {
+    "instanceId": "257476b1ef58bf3cb6a46e65fac7ee34a53a5e1a8492d5c6e4da5f87c9b82833"
+  },
+  "nodes": [
+    {
+      "id": "e087fb9b-d299-441b-8508-a36a389acb0d",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        820,
+        360
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "daysInterval": 2,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "5d272d3d-7b35-4ac3-8646-28d7136b3e5b",
+      "name": "Get Deals",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1020,
+        360
+      ],
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/v3/objects/deals?properties=dealname,amount,hubspot_owner_id&associations=contacts",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotOAuth2Api"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "26862c28-fc42-41f5-9435-c69082282e8a",
+      "name": "Get contact for deals",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1600,
+        360
+      ],
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.associations.contacts.results[0].id }}?associations=company",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotOAuth2Api"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "d2281e4c-abaf-43da-9299-ea60eaf61d49",
+      "name": "Unassigned Deals",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1420,
+        360
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "2ad0a847-9729-4528-94d1-edf133f51c76",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.properties.hubspot_owner_id }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "aebd4001-6693-4b04-acc6-be27cb374f92",
+      "name": "Split out deals",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1220,
+        360
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "results"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1aeb829d-7683-429f-b806-1e223111d0b0",
+      "name": "Assign by Region",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        2000,
+        360
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "US",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.properties.country }}",
+                    "rightValue": "United States"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "DE",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "a6b1d56d-766e-44e1-9c8a-778205e67b6e",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.properties.country }}",
+                    "rightValue": "Germany"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "f795ab2e-14c8-4e7a-961e-035c877f627d",
+      "name": "Assign deal to John",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        2420,
+        -440
+      ],
+      "parameters": {
+        "dealId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Unassigned Deals').item.json.id }}"
+        },
+        "resource": "deal",
+        "operation": "update",
+        "updateFields": {
+          "dealOwner": {
+            "__rl": true,
+            "mode": "list",
+            "value": ""
+          }
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "212cc657-88df-406e-856d-00a797ac39eb",
+      "name": "Assign to Max",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        2420,
+        -260
+      ],
+      "parameters": {
+        "dealId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Unassigned Deals').item.json.id }}"
+        },
+        "resource": "deal",
+        "operation": "update",
+        "updateFields": {
+          "dealOwner": {
+            "__rl": true,
+            "mode": "list",
+            "value": 1265816794,
+            "cachedResultName": "niklas@n8n.io"
+          }
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "7daef91a-051b-495a-9122-d737fff97c04",
+      "name": "Assign to Eeden",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        2420,
+        -80
+      ],
+      "parameters": {
+        "dealId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Unassigned Deals').item.json.id }}"
+        },
+        "resource": "deal",
+        "operation": "update",
+        "updateFields": {
+          "dealOwner": {
+            "__rl": true,
+            "mode": "list",
+            "value": 1265816794,
+            "cachedResultName": "niklas@n8n.io"
+          }
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "aa310e68-4056-44b6-8074-a26ce5d2d21a",
+      "name": "Assign to Peter",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        2220,
+        780
+      ],
+      "parameters": {
+        "dealId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Unassigned Deals').item.json.id }}"
+        },
+        "resource": "deal",
+        "operation": "update",
+        "updateFields": {
+          "dealOwner": {
+            "__rl": true,
+            "mode": "list",
+            "value": 1265816794,
+            "cachedResultName": "niklas@n8n.io"
+          }
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e538b71d-fb97-479f-8b78-9705347aed82",
+      "name": "Get company of contact(s)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1800,
+        360
+      ],
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v3/objects/companies/{{ $json.associations.companies.results[0].id }}?properties=name,domain,city,country,numberofemployees",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotOAuth2Api"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "a8722ed3-8d75-4aa0-9b14-101279007c51",
+      "name": "Assign US deals by company size",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        2220,
+        -260
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "John",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    },
+                    "leftValue": "={{ $json.properties.numberofemployees }}",
+                    "rightValue": 50
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Max",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "2f8e57b1-2fce-49b4-8bae-cf6b0164d1f0",
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    },
+                    "leftValue": "={{ $json.properties.numberofemployees }}",
+                    "rightValue": 499
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Eeden",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "4357fb25-fbe5-4b19-85df-62db07d4443b",
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    },
+                    "leftValue": "={{ $json.properties.numberofemployees }}",
+                    "rightValue": 500
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "3b71b6c3-fa4c-49a5-9670-347790bff24d",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        440,
+        320
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 343.16392083375575,
+        "height": 209.46215382440343,
+        "content": "## Setup\n1. Add your **Hubspot** credentials\n2. Customize your criterias for assigning deals in the `Assign by Region` and the following `Assign` nodes\n3. Make sure deals are assigned to the right salesrep in the Hubspot nodes at the end\n4. Activate the workflow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "abb2a4d3-d636-4fca-b6ce-4e4f13601d11",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        260
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 150,
+        "height": 80,
+        "content": "👇 You can adjust the interval here."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4180a3b-4916-419d-aa6c-906660c7f2b7",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1980,
+        260
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 150,
+        "height": 80,
+        "content": "👇 Adjust this to your needs"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0e11d724-62fe-4b3e-b324-b63704c3ae64",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2160,
+        -480
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 423.7165713477844,
+        "height": 558.5236393851941,
+        "content": "Adjust this and make sure the right people are assigned for the criteria"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e6aec357-5faa-468f-8e33-020f5e280731",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2180,
+        140
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 423.7165713477844,
+        "height": 558.5236393851941,
+        "content": "Adjust this and make sure the right people are assigned for the criteria"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8c3a39ef-5263-4cc4-bbbe-54dfffde57b7",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2380,
+        780
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 175.43767910969322,
+        "height": 105.43767910969324,
+        "content": "👈 This is the fallback. You could also notify you on Slack or something instead"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "76029d66-9719-4f05-beb9-4ad33e17dbfd",
+      "name": "Assign deal to Edward",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        2420,
+        180
+      ],
+      "parameters": {
+        "dealId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Unassigned Deals').item.json.id }}"
+        },
+        "resource": "deal",
+        "operation": "update",
+        "updateFields": {
+          "dealOwner": {
+            "__rl": true,
+            "mode": "list",
+            "value": 1265816794,
+            "cachedResultName": "niklas@n8n.io"
+          }
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ef86d907-d226-484f-ae72-70a58e9c8710",
+      "name": "Assign to Michael",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        2420,
+        360
+      ],
+      "parameters": {
+        "dealId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Unassigned Deals').item.json.id }}"
+        },
+        "resource": "deal",
+        "operation": "update",
+        "updateFields": {
+          "dealOwner": {
+            "__rl": true,
+            "mode": "list",
+            "value": 1265816794,
+            "cachedResultName": "niklas@n8n.io"
+          }
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cf2a5259-5cdb-441b-a2f0-2a0d84e1595a",
+      "name": "Assign to Suka",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        2420,
+        540
+      ],
+      "parameters": {
+        "dealId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Unassigned Deals').item.json.id }}"
+        },
+        "resource": "deal",
+        "operation": "update",
+        "updateFields": {
+          "dealOwner": {
+            "__rl": true,
+            "mode": "list",
+            "value": 1265816794,
+            "cachedResultName": "niklas@n8n.io"
+          }
+        },
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "WEONgGVHLYPjIE6k",
+          "name": "HubSpot account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "bcc1e859-f1b2-4a9f-ac65-d20380fdee89",
+      "name": "Assign DE deals by company size",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        2220,
+        360
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "Michael",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    },
+                    "leftValue": "={{ $json.properties.numberofemployees }}",
+                    "rightValue": 100000
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Suka",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "2f8e57b1-2fce-49b4-8bae-cf6b0164d1f0",
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    },
+                    "leftValue": "={{ $json.properties.numberofemployees }}",
+                    "rightValue": 499
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "Eeden",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "4357fb25-fbe5-4b19-85df-62db07d4443b",
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    },
+                    "leftValue": "={{ $json.properties.numberofemployees }}",
+                    "rightValue": 500
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "typeVersion": 3
+    }
+  ],
+  "pinData": {
+    "Get Deals": [
+      {
+        "results": [
+          {
+            "id": "8978336453",
+            "archived": false,
+            "createdAt": "2023-09-19T16:45:21.309Z",
+            "updatedAt": "2023-09-19T16:47:41.086Z",
+            "properties": {
+              "amount": "100",
+              "dealname": "My test deal",
+              "createdate": "2023-09-19T16:45:21.309Z",
+              "hs_object_id": "8978336453",
+              "hubspot_owner_id": "1265816794",
+              "hs_lastmodifieddate": "2023-09-19T16:47:41.086Z"
+            }
+          },
+          {
+            "id": "11043508927",
+            "archived": false,
+            "createdAt": "2024-02-22T10:10:54.184Z",
+            "updatedAt": "2024-02-22T10:13:09.271Z",
+            "properties": {
+              "amount": "500",
+              "dealname": "My n8n deal",
+              "createdate": "2024-02-22T10:10:54.184Z",
+              "hs_object_id": "11043508927",
+              "hubspot_owner_id": "",
+              "hs_lastmodifieddate": "2024-02-22T10:13:09.271Z"
+            },
+            "associations": {
+              "contacts": {
+                "results": [
+                  {
+                    "id": "1",
+                    "type": "deal_to_contact"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "Get contact for deals": [
+      {
+        "id": "1",
+        "archived": false,
+        "createdAt": "2023-08-28T10:06:13.015Z",
+        "updatedAt": "2024-02-22T10:56:31.742Z",
+        "properties": {
+          "email": "emailmaria@hubspot.com",
+          "lastname": "Johnson (Sample Contact)",
+          "firstname": "Maria",
+          "createdate": "2023-08-28T10:06:13.015Z",
+          "hs_object_id": "1",
+          "lastmodifieddate": "2024-02-22T10:56:31.742Z"
+        },
+        "associations": {
+          "companies": {
+            "results": [
+              {
+                "id": "10209902291",
+                "type": "contact_to_company"
+              },
+              {
+                "id": "10209902291",
+                "type": "contact_to_company_unlabeled"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "Get company of contact(s)": [
+      {
+        "id": "10209902291",
+        "archived": false,
+        "createdAt": "2024-02-22T10:56:27.833Z",
+        "updatedAt": "2024-02-22T10:56:32.390Z",
+        "properties": {
+          "city": "San Francisco",
+          "name": "Stripe",
+          "domain": "stripe.com",
+          "country": "United States",
+          "createdate": "2024-02-22T10:56:27.833Z",
+          "hs_object_id": "10209902291",
+          "numberofemployees": "10000",
+          "hs_lastmodifieddate": "2024-02-22T10:56:32.390Z"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Get Deals": {
+      "main": [
+        [
+          {
+            "node": "Split out deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split out deals": {
+      "main": [
+        [
+          {
+            "node": "Unassigned Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign by Region": {
+      "main": [
+        [
+          {
+            "node": "Assign US deals by company size",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assign DE deals by company size",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assign to Peter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unassigned Deals": {
+      "main": [
+        [
+          {
+            "node": "Get contact for deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get contact for deals": {
+      "main": [
+        [
+          {
+            "node": "Get company of contact(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get company of contact(s)": {
+      "main": [
+        [
+          {
+            "node": "Assign by Region",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign DE deals by company size": {
+      "main": [
+        [
+          {
+            "node": "Assign deal to Edward",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assign to Michael",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assign to Suka",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign US deals by company size": {
+      "main": [
+        [
+          {
+            "node": "Assign deal to John",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assign to Max",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Assign to Eeden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

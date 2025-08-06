@@ -1,0 +1,305 @@
+{
+  "id": "aVienX696oMCH1DR",
+  "meta": {
+    "instanceId": "dce6d05169adc9f802863a06c3edb9925b178c4fce2360953cce9c1b509705cc"
+  },
+  "name": "Tiktok Downloader",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "4dc30078-c7df-4bcb-91ed-953cd6da4a13",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -280,
+        20
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "5598aa10-f667-4023-b9de-fe07e86badec",
+      "name": "Get TikTok Video Page Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        40,
+        20
+      ],
+      "parameters": {
+        "url": "https://www.tiktok.com/@randomspamvideos25/video/7251387037834595630",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/91.0.4472.124"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "734a5304-f67f-4ace-a1da-0d268664452c",
+      "name": "Scrape raw video URL",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        480,
+        20
+      ],
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data;\nconst headers = $input.first().json.headers || {};\nconst cookies = headers['set-cookie'] || [];\n\nif (!html) {\n  throw new Error(\"HTML body is undefined. Check the previous node's output.\");\n}\nconst regex = /<script id=\"__UNIVERSAL_DATA_FOR_REHYDRATION__\" type=\"application\\/json\">([\\s\\S]*?)<\\/script>/;\nconst match = html.match(regex);\n\nif (match) {\n  const jsonStr = match[1];\n  const data = JSON.parse(jsonStr);\n  const videoUrl = data?.__DEFAULT_SCOPE__?.[\"webapp.video-detail\"]?.itemInfo?.itemStruct?.video?.playAddr;\n  if (!videoUrl) {\n    throw new Error(\"Could not find video URL in the JSON data.\");\n  }\n  return [{ json: { videoUrl, cookies: cookies.join('; ') } }];\n} else {\n  throw new Error(\"Could not find __UNIVERSAL_DATA_FOR_REHYDRATION__ script in the HTML.\");\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f574ccb8-6f5f-4e55-a2d5-7ad775d3c4e5",
+      "name": "Output video file without watermark",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        900,
+        20
+      ],
+      "parameters": {
+        "url": "={{ $json.videoUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "allowUnauthorizedCerts": true
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            },
+            {
+              "name": "Referer",
+              "value": "https://www.tiktok.com/"
+            },
+            {
+              "name": "Accept",
+              "value": "video/mp4,video/webm,video/*;q=0.9,application/octet-stream;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.5"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "Cookie",
+              "value": "={{ $json.cookies }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "73d4ffa7-2264-4a84-9ab2-2004342e3039",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -140,
+        -180
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 460,
+        "height": 360,
+        "content": "## 1. Load the video page\nOpen this node and replace the URL with the one of the video you want to download without a watermark.\n\nA Tiktok video URL looks like: https://www.tiktok.com/@Username_here/video/Video_ID_Here\n\nOutputs the returned page HTML along with the session cookies\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "848fc04b-2620-4d83-8701-52c053f7c017",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        340,
+        -180
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 380,
+        "height": 360,
+        "content": "## 2. Find the raw video URL\nParses through all of the HTML and finds the section containing the video URL before the watermark is applied"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "40b3a2bd-5733-43a8-951c-d5fa26647615",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        -180
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 400,
+        "height": 360,
+        "content": "## 3. Output video file without watermark\nUsing the cookies from step 1, a request is made to access the original video file as shown on TikTok"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "36629265-f139-433f-9603-0670a08be1ed",
+      "name": "Upload to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        300,
+        360
+      ],
+      "parameters": {
+        "name": "={{ $node[\"Get TikTok Video Page Data\"].parameter[\"url\"].match(/\\/video\\/(\\d+)/)[1] + \".mp4\" }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultUrl": "https://drive.google.com/drive",
+          "cachedResultName": "/ (Root folder)"
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "ZvDuyVfbZJbDJXcS",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "94364c83-14ce-48c3-afe5-b7cd8addd2a0",
+      "name": "Set file permissions to public with link",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        560,
+        360
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {},
+        "operation": "share",
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "writer",
+            "type": "anyone",
+            "allowFileDiscovery": true
+          }
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "ZvDuyVfbZJbDJXcS",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "d37ad36c-0b7f-4c2c-9538-dc8bf75e997f",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        260,
+        200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 500,
+        "height": 320,
+        "content": "## (Optional) Upload video to Google Drive\nAn expression is used to save the file to your Google Drive as Video_ID.mp4\n\nNote: Must have Google Drive API enabled in [Google Cloud Console](https://console.cloud.google.com/apis/api/drive.googleapis.com/overview) OAuth ClientID and Client Secret credentials setup"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "70234bbb-ccaf-4291-a50b-063e07303678",
+  "connections": {
+    "Scrape raw video URL": {
+      "main": [
+        [
+          {
+            "node": "Output video file without watermark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Set file permissions to public with link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get TikTok Video Page Data": {
+      "main": [
+        [
+          {
+            "node": "Scrape raw video URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get TikTok Video Page Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output video file without watermark": {
+      "main": [
+        [
+          {
+            "node": "Upload to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

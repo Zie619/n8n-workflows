@@ -1,0 +1,500 @@
+{
+  "id": "sUIPemKdKqmUQFt6",
+  "meta": {
+    "instanceId": "558d88703fb65b2d0e44613bc35916258b0f0bf983c5d4730c00c424b77ca36a",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Extract text from PDF and image using Vertex AI (Gemini) into CSV",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "f60ef5f9-bc08-4cc9-804e-697ae6f88b9b",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        980,
+        920
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-1.5-pro-latest"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "hmNTKSKfppgtDbM5",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "81d3f7b8-20cb-4aac-82a9-d4e8e6581105",
+      "name": "Get PDF or Images",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "position": [
+        220,
+        420
+      ],
+      "parameters": {
+        "event": "fileCreated",
+        "options": {},
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1HOeRP5iwccg93UPUYmWYD7DyDmRREkhj",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1HOeRP5iwccg93UPUYmWYD7DyDmRREkhj",
+          "cachedResultName": "Actual Budget"
+        },
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "axkK6IN61bEAT6GM",
+          "name": "Google Service Account account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fe9a8228-7950-4e2c-8982-328e03725782",
+      "name": "Route based on PDF or Image",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        480,
+        420
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "application/pdf",
+              "outputKey": "pdf"
+            },
+            {
+              "value2": "image/",
+              "operation": "contains",
+              "outputKey": "image"
+            }
+          ]
+        },
+        "value1": "={{$json.mimeType}}",
+        "dataType": "string"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f62b71e5-af17-4f85-abff-7cee5100affc",
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        740,
+        320
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Get PDF or Images').item.json.id }}"
+        },
+        "options": {},
+        "operation": "download",
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "axkK6IN61bEAT6GM",
+          "name": "Google Service Account account"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 3
+    },
+    {
+      "id": "fa99fbcf-1353-410d-a0db-48cea1178a76",
+      "name": "Download Image",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        740,
+        740
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Get PDF or Images').item.json.id }}"
+        },
+        "options": {},
+        "operation": "download",
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "axkK6IN61bEAT6GM",
+          "name": "Google Service Account account"
+        }
+      },
+      "executeOnce": true,
+      "retryOnFail": false,
+      "typeVersion": 3,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e4979746-44bb-493e-b5eb-f9646b510888",
+      "name": "Extract data from PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        980,
+        320
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "pdf"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6549c335-e749-4b95-b77d-096a5e77af5e",
+      "name": "Send data to A.I.",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1180,
+        320
+      ],
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"model\": \"meta-llama/llama-3.1-70b-instruct:free\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are given a bank statement.{{encodeURIComponent($json.text)}}. Read the PDF and export all the transactions as CSV. Add a column called category and based on the information assign a category name. Return only the CSV data starting with the header row.\"\n    }\n  ]\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "WY7UkF14ksPKq3S8",
+          "name": "Header Auth account 2"
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "42341f03-c9fc-4290-963e-1a723202a739",
+      "name": "Convert to CSV",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        1400,
+        320
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "bb446447-3f46-47e7-96a2-3fc720715828",
+      "name": "Upload to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        1640,
+        320
+      ],
+      "parameters": {
+        "name": "={{$today}}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive",
+          "cachedResultName": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1Zo4OFCv1qWRX1jo0VL_iqUBf4v0fZEXe",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1Zo4OFCv1qWRX1jo0VL_iqUBf4v0fZEXe",
+          "cachedResultName": "CSV Exports"
+        },
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "axkK6IN61bEAT6GM",
+          "name": "Google Service Account account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "843bc9c1-79a6-4f42-b9ee-fbec5f30b18d",
+      "name": "Convert to CSV2",
+      "type": "n8n-nodes-base.convertToFile",
+      "position": [
+        1360,
+        740
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "6404bf65-3a7e-4be9-9b7f-98a23dca2ffd",
+      "name": "Upload to Google Drive1",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        1640,
+        740
+      ],
+      "parameters": {
+        "name": "={{$today}}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive",
+          "cachedResultName": "My Drive"
+        },
+        "options": {},
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1Zo4OFCv1qWRX1jo0VL_iqUBf4v0fZEXe",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1Zo4OFCv1qWRX1jo0VL_iqUBf4v0fZEXe",
+          "cachedResultName": "CSV Exports"
+        },
+        "authentication": "serviceAccount"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "axkK6IN61bEAT6GM",
+          "name": "Google Service Account account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "5dd5771f-6ccb-47ab-acbb-d6cbec60d22b",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        220,
+        -40
+      ],
+      "parameters": {
+        "width": 589.0376569037658,
+        "height": 163.2468619246862,
+        "content": "## How to extract PDF and image text into CSV using n8n (without manual data entry)\n\nThis workflow will extract text data from PDF and images, then store it as CSV.\n\n[💡 You can read more about this workflow here](https://rumjahn.com/how-to-create-an-a-i-agent-to-analyze-matomo-analytics-using-n8n-for-free/)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "37416630-9b52-4ce6-98d0-1bdd39ff0d6b",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        160
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 248.11715481171547,
+        "height": 432.7364016736402,
+        "content": "## Get PDF or image\nYou need to create a new folder inside Google Drive for uploading your PDF and images.\n\nOnce you create a folder, you need to add your Google cloud user by going to Share -> Add user. The user email should be like: n8n-server@n8n-server-435232.iam.gserviceaccount.com"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3ab10f17-de8f-4263-aef8-cc2fb090ffe5",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1120,
+        52.864368048917754
+      ],
+      "parameters": {
+        "color": 5,
+        "height": 446.3929762816575,
+        "content": "## Send to Openrouter\nYou need to set up an Openrouter account to use this. It sends the data to openrouter to extract text.\n\nUse Header Auth. Name is \"Authorization\" and value is \"Bearer {API token}\"."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e966f95c-c54e-4d11-895d-d5f75c53aca5",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        920,
+        540
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 399.0962343096232,
+        "height": 517.154811715481,
+        "content": "## Vertex AI for image recogniztion\nWe send the photo to Vertex AI to extract text. You'll need to activate Vertex AI and add the correct rights to your Google cloud credentials. \n- Enable Vertex API\n- Add vertex to user account"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "daa3ab66-fa14-4792-96d0-3bcbeffd5d60",
+      "name": "Vertex A.I. extract text",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        980,
+        740
+      ],
+      "parameters": {
+        "text": "=Extract the transactions from the image",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are given a screenshot of payment transactions. Read the image and export all the transactions as CSV. Add a column called category and based on the information assign a category name. Return only the CSV data starting with the header row."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "messageType": "imageBinary"
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.4
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "80635382-3d1c-4e46-a753-84b033cfc3a7",
+  "connections": {
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Extract data from PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to CSV": {
+      "main": [
+        [
+          {
+            "node": "Upload to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image": {
+      "main": [
+        [
+          {
+            "node": "Vertex A.I. extract text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to CSV2": {
+      "main": [
+        [
+          {
+            "node": "Upload to Google Drive1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PDF or Images": {
+      "main": [
+        [
+          {
+            "node": "Route based on PDF or Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send data to A.I.": {
+      "main": [
+        [
+          {
+            "node": "Convert to CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract data from PDF": {
+      "main": [
+        [
+          {
+            "node": "Send data to A.I.",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Vertex A.I. extract text",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vertex A.I. extract text": {
+      "main": [
+        [
+          {
+            "node": "Convert to CSV2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route based on PDF or Image": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

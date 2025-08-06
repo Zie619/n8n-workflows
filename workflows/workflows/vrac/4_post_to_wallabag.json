@@ -1,0 +1,319 @@
+{
+  "id": "4",
+  "name": "post to wallabag",
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        120,
+        250
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1280,
+        380
+      ],
+      "parameters": {
+        "url": "=http://{HERE-YOUR-WALLABAG-HOST}/api/entries.json",
+        "options": {},
+        "requestMethod": "POST",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "url",
+              "value": "={{$json[\"url\"]}}"
+            }
+          ]
+        },
+        "queryParametersUi": {
+          "parameter": []
+        },
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$json[\"access_token\"]}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        120,
+        400
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 10
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Function",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        900,
+        470
+      ],
+      "parameters": {
+        "functionCode": "// Get the global workflow static data\nconst staticData = getWorkflowStaticData('global')\n\n// Access its data\nconst lastStarRssId = staticData.lastStarRssId\n\nlet list = []\n\nfor (const item of items[0].json.content){\n  let currentId = item.id\n  if(currentId == lastStarRssId) break;\n  list.push({'json':{\n    'id': currentId,\n    'lastId': lastStarRssId,\n    'url': item.link,\n    'tags': item.tags,\n    'access_token': items[1].json.access_token\n  }})\n}\n\n\n// Get the last ID from Rss Feed\nlet currentStarRssId = items[0].json.content[0].id\n\n// TODO: make a loop to get all the items beyond the last saved id\nif(!lastStarRssId || currentStarRssId != lastStarRssId)\n{  \n  // Update its data\n  staticData.lastStarRssId = currentStarRssId;\n  \n}\nelse { list = [{'json':{ 'id': 'Nan', 'lastId': staticData.lastStarRssId }}] }\nreturn list;\n\n/*return [{'json':{'url': items[0].json.content.pop(), 'wallabag':items[1].json}}]*/"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1100,
+        470
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Function\"].json[\"id\"]}}",
+              "value2": "NaN",
+              "operation": "notEqual"
+            }
+          ],
+          "boolean": []
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1290,
+        570
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Auth Wallabag",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        490,
+        590
+      ],
+      "parameters": {
+        "url": "http://{HERE-YOUR-WALLABAG-HOST}/oauth/v2/token",
+        "options": {},
+        "requestMethod": "POST",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "grant_type",
+              "value": "password"
+            },
+            {
+              "name": "client_id",
+              "value": "{HERE-YOUR-CLIENT_ID}"
+            },
+            {
+              "name": "client_secret",
+              "value": "{HERE-YOUR-CLIENT_SECRET}"
+            },
+            {
+              "name": "username",
+              "value": "{HERE-YOUR-USERNAME}"
+            },
+            {
+              "name": "password",
+              "value": "{HERE-YOUR-PASSWORD}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        710,
+        470
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Get stared articles",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        490,
+        400
+      ],
+      "parameters": {
+        "url": "http://{HERE-YOUR-TTRSS-HOST}/tt-rss/api/",
+        "options": {},
+        "requestMethod": "POST",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "sid",
+              "value": "={{$json[\"content\"][\"session_id\"]}}"
+            },
+            {
+              "name": "op",
+              "value": "getHeadLines"
+            },
+            {
+              "name": "feed_id",
+              "value": "-1"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Auth TTRss",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        320,
+        400
+      ],
+      "parameters": {
+        "url": "http://{HERE-YOUR-TTRSS-HOST}/tt-rss/api/",
+        "options": {},
+        "requestMethod": "POST",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "op",
+              "value": "login"
+            },
+            {
+              "name": "user",
+              "value": "{HERE-YOUR-API-USER}"
+            },
+            {
+              "name": "password",
+              "value": "{HERE-YOUR-API-SECRET}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Auth TTRss",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth TTRss": {
+      "main": [
+        [
+          {
+            "node": "Get stared articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Wallabag": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get stared articles": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Auth TTRss",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

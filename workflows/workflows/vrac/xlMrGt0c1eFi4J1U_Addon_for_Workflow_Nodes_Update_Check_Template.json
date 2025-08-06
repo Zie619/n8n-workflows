@@ -1,0 +1,398 @@
+{
+  "id": "xlMrGt0c1eFi4J1U",
+  "meta": {
+    "instanceId": "fb8bc2e315f7f03c97140b30aa454a27bc7883a19000fa1da6e6b571bf56ad6d",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Addon for Workflow Nodes Update Check Template",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "e8068a93-5474-474e-a48e-947269b7ca5f",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        860,
+        1140
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "9b4524d8-6ded-489b-bf45-6810f5306652",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        120
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 1316.8621045610755,
+        "height": 887.980239951363,
+        "content": "## Download the main workflow and connect it's output to this workflow\n- Download this workflow and follow the belonging instructions: [https://n8n.io/workflows/2301-check-if-workflows-contain-build-in-nodes-that-are-not-of-the-latest-version/](https://n8n.io/workflows/2301-check-if-workflows-contain-build-in-nodes-that-are-not-of-the-latest-version/)\n- Add an \"Execute Workflow\" node and configure it, so it calls this workflow.\n  \n![Image](https://i.imgur.com/y0vPhYz.png#full-width)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cb0cacc1-34d0-4e4d-a7db-e44ece1a155f",
+      "name": "Prepare Output",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2180,
+        1140
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "26c2bf59-2051-47e3-a6bf-3896ad427404",
+              "name": "name",
+              "type": "string",
+              "value": "=<a href={{ $('Settings').item.json.instanceBaseUrl }}/workflow/{{ $json.id }}>{{ $json.name }}</a>"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "4b914937-1cff-4fc2-886b-64ec6818daf3",
+      "name": "Send Summary",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2400,
+        1140
+      ],
+      "webhookId": "1ad759b3-f1cd-49dd-b288-e3344fa94c8a",
+      "parameters": {
+        "message": "=These workflows contain outdated nodes:<br>\n<ul>\n{{ $('Prepare Output').all().pluck('json').pluck('name').map(item => \"<li>\"+item+\"</li>\").join('') }}\n</ul>",
+        "options": {
+          "appendAttribution": false
+        },
+        "subject": "Outdated n8n Workflow Nodes"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "TWM2BLjDHQtGAFQn",
+          "name": "Gmail (octionicsolutions)"
+        }
+      },
+      "executeOnce": true,
+      "typeVersion": 2.1
+    },
+    {
+      "id": "2f259d45-cb31-4007-beb0-93123cc619c3",
+      "name": "Get Workflow",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        1520,
+        1140
+      ],
+      "parameters": {
+        "operation": "get",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Start Reference').item.json.Id }}"
+        },
+        "requestOptions": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "fRyEJuhN9Nf3aQap",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e2bbfc5b-1af6-43b1-9d03-f35b5837d3cc",
+      "name": "Update Workflow",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        1960,
+        1140
+      ],
+      "parameters": {
+        "operation": "update",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "requestOptions": {},
+        "workflowObject": "={{ JSON.stringify($json) }}"
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "fRyEJuhN9Nf3aQap",
+          "name": "n8n account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f2bb0529-6e38-46c6-93e8-de76e9ecc31e",
+      "name": "Modify Workflow (if required)",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1740,
+        1140
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let symbol = $('Settings').item.json.symbol;\nlet onlyMajorChanges = $('Settings').item.json.onlyMajorChanges;\nlet addNodesToCanvas = $('Settings').item.json.addNodesToCanvas;\n\n// create shallow copy including nested objects\nlet data = JSON.parse(JSON.stringify($json));\n\nchangeCount = 0;\n// Loop through nodes and update the names\nfor (let outdatedNode of $('Start Reference').item.json.outdated_nodes) {\n  // skip minor changes, if settings require it\n  if (onlyMajorChanges && outdatedNode.version.toString().substring(0, 1) == outdatedNode.latestVersion.toString().substring(0, 1)) {\n    continue;\n  }\n  // update nodes, it they are not already renamed with symbol\n  for (let existingNode of data.nodes) {\n    if (outdatedNode.name == existingNode.name && !existingNode.name.startsWith(symbol) && existingNode.id) {\n      // prepend new nodes, so they appear below outdated nodes on the canvas\n      if (addNodesToCanvas) {\n        let newNode = JSON.parse(JSON.stringify(existingNode));\n        delete newNode.id;\n        newNode.typeVersion = outdatedNode.latestVersion;\n        newNode.position = [newNode.position[0] + 40, newNode.position[1] - 40];\n        data.nodes.unshift(newNode);\n      }\n      // rename outdated nodes (prepend symbol)\n      existingNode.name = symbol + \" \" + existingNode.name;\n    \n      // update connections\n      for (let connectionKey in data.connections) {\n        let connection = data.connections[connectionKey];\n      \n        // rename keys\n        if (connectionKey == outdatedNode.name) {\n          let newKey = symbol + \" \" + connectionKey;\n          data.connections[newKey] = connection;\n          delete data.connections[connectionKey];\n        }\n      \n        // check the nested \"main\" array\n        if (connection.main) {\n          for (let mainArray of connection.main) {\n            for (let nodeObj of mainArray) {\n              if (nodeObj.node == outdatedNode.name) {\n                nodeObj.node = symbol + \" \" + nodeObj.node;\n              }\n            }\n          }\n        }\n      }\n      changeCount++;\n    }\n  }\n}\n\nif (changeCount == 0) {\n  return null;\n}\n\nreturn {\n  id: data.id,\n  name: data.name,\n  nodes: data.nodes,\n  connections: data.connections,\n  settings: data.settings\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b4b7d328-8128-4f07-841a-1efa26c3fdd5",
+      "name": "Start Reference",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1080,
+        1140
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "7d80b557-15ac-479e-a219-dd254580a063",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        1020
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.6228464570463,
+        "height": 282.1449413577448,
+        "content": "This workflow is called by another workflow which provides a list of all workflows with major and minor node updates"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1becaab6-fe2a-44e9-bc7e-ce87665f25bd",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2120,
+        680
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 435.46822963832705,
+        "height": 327.68691689762716,
+        "content": "## Example input data\n\n```\n[\n  {\n    \"workflow\": \"Workflow Nodes Update\",\n    \"Id\": \"dFJpQTFg3QPH6Ol9\",\n    \"outdated_nodes\": [\n      {\n        \"name\": \"If\",\n        \"type\": \"n8n-nodes-base.if\",\n        \"version\": 2,\n        \"latestVersion\": 2.2\n      }\n    ]\n  }\n]\n```"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9ce81677-4dd4-4a9a-a7a3-66b113c69de6",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1020,
+        1020
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.6228464570463,
+        "height": 282.1449413577448,
+        "content": "The following nodes start referencing from here, so it is easily possible to change the logic prior to this node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f6e7e7ce-1282-4292-8675-ca8bbe215d5f",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1240,
+        1020
+      ],
+      "parameters": {
+        "width": 216.6228464570463,
+        "height": 282.1449413577448,
+        "content": "## Update settings\nMinimum requirement:\n- Set your instanceBaseUrl"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "46b168d5-c866-497b-8664-92722a356feb",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1300,
+        1140
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "99947a54-e9f9-4d04-b273-9d7eeed62775",
+              "name": "instanceBaseUrl",
+              "type": "string",
+              "value": "http://localhost:5432"
+            },
+            {
+              "id": "35a63bda-fcbb-4885-a8d6-4b52c6579206",
+              "name": "symbol",
+              "type": "string",
+              "value": "⚠️"
+            },
+            {
+              "id": "3481286b-359f-4e86-8f56-bdb267ebd6a2",
+              "name": "onlyMajorChanges",
+              "type": "boolean",
+              "value": true
+            },
+            {
+              "id": "2377c274-5501-494f-813e-0d3ebe47e375",
+              "name": "addNodesToCanvas",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "d28ac933-7dbc-4039-821b-7cd4c4c5ec94",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2120,
+        1020
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 216.6228464570463,
+        "height": 282.1449413577448,
+        "content": "URL's are generated for each affected workflow"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0fef2be5-92d5-4d4f-8afc-b958ee616787",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2340,
+        1020
+      ],
+      "parameters": {
+        "width": 216.6228464570463,
+        "height": 282.1449413577448,
+        "content": "## Setup Gmail\nMinimum requirement:\n- Update mail recipient"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "dc940f78-1eff-4393-9d9a-f4afefe24d45",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1460,
+        1020
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 657.2496253932529,
+        "height": 282.1449413577448,
+        "content": "Each workflow is being processed and modified if needed. Depending on the settings an icon is being prepended to the name of outdated nodes. In addition a newer version is being added close by, so it can be replaced quicker by the user."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f4bb34b0-7561-4d77-beac-8f6988a0ed64",
+  "connections": {
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Workflow": {
+      "main": [
+        [
+          {
+            "node": "Modify Workflow (if required)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Output": {
+      "main": [
+        [
+          {
+            "node": "Send Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Reference": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Workflow": {
+      "main": [
+        [
+          {
+            "node": "Prepare Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Start Reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modify Workflow (if required)": {
+      "main": [
+        [
+          {
+            "node": "Update Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,480 @@
+{
+  "id": "0QQxgdQABUbbDJ0G",
+  "meta": {
+    "instanceId": "c98909b50b05c4069bd93ee5a4753d07322c9680e81da8568e96de2c713adb5c"
+  },
+  "name": "Multi-Agent Conversation",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "218308e2-dc68-43ee-ae84-d931ad7a4ac5",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -1880,
+        -3280
+      ],
+      "webhookId": "a74752f3-419a-4510-856f-3efeaceec019",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "a519fe1e-8739-46e0-9770-deb256ab96cf",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        -340,
+        -3280
+      ],
+      "parameters": {
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "=Current date is {{ $now.format('yyyy-MM-dd') }}. The current time is {{ $now.format('HH:MM:ss') }}.\n\nThe user is {{ $('Define Global Settings').item.json.user.name }}, based in {{ $('Define Global Settings').item.json.user.location }}. {{ $('Define Global Settings').item.json.user.notes }}\n\nYou are part of a conversation with a user and multiple AI Assistants: {{ $('Define Agent Settings').item.json.keys() }}\n\nYou are {{ $('First loop?').item.json.name }}.\n\n{{ $('Loop Over Items').item.json.systemMessage }}\n\n{{ $('Define Global Settings').item.json.global.systemMessage }}"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "2e00f0ff-e7af-45d5-99bc-23031b5d7892",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        -1000,
+        -3280
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "1c979a20-46a5-4591-92da-82c1c96277c6",
+      "name": "Extract mentions",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1220,
+        -3280
+      ],
+      "parameters": {
+        "jsCode": "// Analyzes the user message and extracts @mentions in the order they appear. If there are none, all Assistants will be called in random order.\n// --- Configuration: Adjust these lines ---\nconst chatMessageNodeName = 'When chat message received'; // <-- Replace with your Chat Message node name\nconst agentSetupNodeName = 'Define Agent Settings';         // <-- Replace with your Agent Setup node name\nconst chatTextPath = 'json.chatInput';               // <-- Replace with path to text in Chat node output (e.g., 'json.message')\n// --- End Configuration ---\n\n// Helper function for safe nested property access (alternative to _.get)\nfunction getSafe(obj, path, defaultValue = undefined) {\n    const pathParts = path.split('.');\n    let current = obj;\n    for (const part of pathParts) {\n        if (current === null || current === undefined || typeof current !== 'object' || !Object.prototype.hasOwnProperty.call(current, part)) {\n            return defaultValue;\n        }\n        current = current[part];\n    }\n    return current ?? defaultValue;\n}\n\n// 1. Get Chat Text\nconst chatMessageNode = $(chatMessageNodeName);\nconst chatText = getSafe(chatMessageNode.item, chatTextPath, '');\n\n// 2. Get Agent Data and Names\nconst agentSetupNode = $(agentSetupNodeName);\nconst agentData = getSafe(agentSetupNode.item, 'json', {}); // e.g., { Chad: {...}, Gemma: {...}, Claude: {...} }\nconst agentNames = Object.keys(agentData);\n\n// 3. Find all mentions, their names, and their positions in the text\nconst foundMentions = [];\nif (chatText && agentNames.length > 0) {\n    const escapeRegex = (s) => s.replace(/[-\\/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&');\n    const agentPatternPart = agentNames.map(escapeRegex).join('|');\n\n    if (agentPatternPart) {\n        const mentionPattern = new RegExp(`\\\\B@(${agentPatternPart})\\\\b`, 'gi');\n        const matches = chatText.matchAll(mentionPattern);\n\n        for (const match of matches) {\n            const matchedNameCaseInsensitive = match[1];\n            const matchIndex = match.index;\n            const canonicalName = agentNames.find(name => name.toLowerCase() === matchedNameCaseInsensitive.toLowerCase());\n            if (canonicalName) {\n                foundMentions.push({ name: canonicalName, index: matchIndex });\n            }\n        }\n    }\n}\n\n// 4. Sort the found mentions by their index (order of appearance)\nfoundMentions.sort((a, b) => a.index - b.index);\n\n// 5. Map the sorted mentions to the desired output format (array of agent detail objects)\nlet outputArray = foundMentions.map(mention => {\n    const agentDetails = agentData[mention.name];\n    if (!agentDetails) {\n        console.warn(`Could not find details for agent: ${mention.name}`);\n        return null;\n    }\n    return {\n        name: agentDetails.name,\n        model: agentDetails.model,\n        systemMessage: agentDetails.systemMessage\n    };\n}).filter(item => item !== null);\n\n// 6. Check if any mentions were specifically found. If not, populate outputArray with ALL agents in RANDOM order.\nif (outputArray.length === 0 && foundMentions.length === 0) { // Check if NO mentions were found initially\n    // --- NO MENTIONS FOUND ---\n    // Populate outputArray with ALL agents from agentData\n    const allAgentDetailsArray = Object.values(agentData);\n\n    // --- Simple Randomization ---\n    // Shuffle the array in place using sort with a random comparator\n    allAgentDetailsArray.sort(() => 0.5 - Math.random());\n    // --- End Randomization ---\n\n    // Map all agents (now in random order) to the output structure\n    outputArray = allAgentDetailsArray.map(agentObject => ({\n        name: agentObject.name,\n        model: agentObject.model,\n        systemMessage: agentObject.systemMessage\n    }));\n} // Intentionally no 'else' here, if outputArray already had items from mentions, we use that.\n\n// 7. Final Output Formatting (Handles both cases: specific mentions OR all agents)\n// Check if, after everything, the outputArray is *still* empty (e.g., if agentData was empty initially)\nif (outputArray.length === 0) {\n    // If still empty, return a status or error as a fallback\n     return [{ json: { status: \"no_agents_available\", message: \"No mentions found and no agents defined.\" } }];\n} else {\n    // Return the array of agent objects formatted for n8n (multiple items)\n    return outputArray.map(agentObject => ({ json: agentObject }));\n}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "45f635ca-f4fa-4f6c-a32a-9722906255fd",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        -192,
+        -3060
+      ],
+      "parameters": {
+        "sessionKey": "={{ $('When chat message received').first().json.sessionId }}",
+        "sessionIdType": "customKey",
+        "contextWindowLength": 99
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "5c903044-bce2-4aa8-b168-a460a4999c54",
+      "name": "Set last Assistant message as input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -560,
+        -3180
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "38aa959a-e1e5-4c84-a7bd-ff5e0f61b62d",
+              "name": "=chatInput",
+              "type": "string",
+              "value": "={{ $('Set lastAssistantMessage').first().json.lastAssistantMessage }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "7b389b9f-1751-4bc1-9c6f-bf6a04a1e09f",
+      "name": "Set user message as input",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -560,
+        -3380
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "75b61275-7526-4431-b624-f8e098aa812d",
+              "name": "chatInput",
+              "type": "string",
+              "value": "={{ $('When chat message received').item.json.chatInput }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a238817f-0d10-4cd4-9760-53f69bb179f7",
+      "name": "First loop?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -780,
+        -3280
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "51c41fdf-f4d3-4c7a-ac18-06815a59a958",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $runIndex}}",
+              "rightValue": 0
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "415927d7-b1a4-42b2-9607-c6ff707a528b",
+      "name": "Set lastAssistantMessage",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        36,
+        -3155
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b93025b2-f5a7-476b-bd09-b5b4af050e73",
+              "name": "lastAssistantMessage",
+              "type": "string",
+              "value": "=**{{ $('Loop Over Items').item.json.name }}**:\n\n{{ $json.output }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "77861e4b-a1d2-4c35-bf50-15914602a8b5",
+      "name": "Combine and format responses",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -780,
+        -3480
+      ],
+      "parameters": {
+        "jsCode": "// Get the array of items from the input (output of the loop)\nconst inputItems = items;\n\n// Extract the 'lastAssistantMessage' from each item's JSON data.\n// If the field is missing or not a string, use an empty string to avoid errors.\nconst messages = inputItems.map(item => {\n  const message = item.json.lastAssistantMessage;\n  return typeof message === 'string' ? message : '';\n});\n\n// Join the extracted messages together with a horizontal rule separator\nconst combinedText = messages.join('\\n\\n---\\n\\n');\n\n// Return a new single item containing the combined text.\n// You can rename 'output' if you like.\nreturn [{ json: { output: combinedText } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4da2f95d-bce4-4844-a23c-63ca777efbfd",
+      "name": "Define Global Settings",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1660,
+        -3280
+      ],
+      "parameters": {
+        "jsCode": "// Configure Global settings. This includes information about you - the user - and a section of the System Message that all Assistants will see. (Assistant-specific System Message sections can be set in the 'Define Agent Settings' node.)\nreturn [\n  {\n    json: {\n      \"user\": {\n        \"name\": \"Jon\",\n        \"location\": \"Melbourne, Australia\",\n        \"notes\": \"Jon likes a casual, informal conversation style.\"\n      },\n      \"global\": {\n        \"systemMessage\": \"Don't overdo the helpful, agreeable approach.\"\n      }\n    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "6639a554-9e5f-40ac-b68e-b8eaa777252d",
+      "name": "Define Agent Settings",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -1440,
+        -3280
+      ],
+      "parameters": {
+        "jsCode": "// Configure Assistants. The number of Assistants can be changed by adding or removing JSON objects. Use the OpenRouter model naming convention.\nreturn [\n  {\n    json: {\n      \"Chad\": {\n        \"name\": \"Chad\",\n        \"model\": \"openai/gpt-4o\",\n        \"systemMessage\": \"You are a helpful Assistant. You are eccentric and creative, and try to take discussions into unexpected territory.\"\n      },\n      \"Claude\": {\n        \"name\": \"Claude\",\n        \"model\": \"anthropic/claude-3.7-sonnet\",\n        \"systemMessage\": \"You are logical and practical.\"\n      },\n      \"Gemma\": {\n        \"name\": \"Gemma\",\n        \"model\": \"google/gemini-2.0-flash-lite-001\",\n        \"systemMessage\": \"You are super friendly and love to debate.\"\n      }\n    }\n  }\n];\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "d55a7e02-3574-4d78-a141-db8d3657857b",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1750,
+        -3620
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 500,
+        "height": 500,
+        "content": "## Step 1: Configure Settings Nodes\n\nEdit the JSON in these nodes to:\n\n- Configure details about you (the user)\n- Define content that will appear in all system messages\n- Define Agents.\n\nFor Agents, you can configure:\n- How many you create\n- Their names\n- The LLM model they use (choose any that are available via OpenRouter)\n- Agent-specific system prompt content"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d3eb2797-4008-4bdb-a588-b2412ed5ffa7",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -400,
+        -3620
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 360,
+        "height": 720,
+        "content": "## Step 2: Connect Agent to OpenRouter\n\nSet your OpenRouter credentials, and all other parameters including system messages and model selection are dynamically populated."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a6085a55-db36-42d8-8c57-c9123490581f",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1940,
+        -3900
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 2180,
+        "height": 1100,
+        "content": "# Scalable Multi-Agent Conversations\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d2ee6317-3a9c-4df8-8fce-87daa3530233",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1200,
+        -3860
+      ],
+      "parameters": {
+        "width": 380,
+        "height": 360,
+        "content": "## About this workflow\n\n**What does this workflow do?**\nEnables you to initiate a conversation with multiple AI agents at once. Each agent can be configured with a unique name, system instructions, a different model.\n\n**How do I use it?**\n1. Configure the settings nodes to create the Agents you need.\n2. Call one or more individual agents using @Name mentions in your messages. If your message does not have @mentions, all agents will be called, in random order."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a190a268-7f90-4c4e-aceb-482545d0b72b",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -820,
+        -3860
+      ],
+      "parameters": {
+        "width": 380,
+        "height": 360,
+        "content": "**How does it work?**\nSettings are configured in the first two nodes after the chat trigger. Then @mentions in your message are extracted and fed into a loop. With each loop, the agent's system message and model are dynamically populated, avoiding the need to create multiple agent nodes and complex routing logic.\n\nWhen all agents have had their say, their responses are combined and formatted. The use of a shared memory node enables multi-round conversations.\n\n**What are the limitations?**\nAgents cannot call each other or respond in parallel. Agents' responses are not visible to the user until all agents have responded.\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "30d8c207-9a7a-46c5-be89-0deafc6c183f",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "position": [
+        -312,
+        -3060
+      ],
+      "parameters": {
+        "model": "={{ $('Extract mentions').item.json.model }}",
+        "options": {}
+      },
+      "credentials": {
+        "openRouterApi": {
+          "id": "jB56IT6KRdHSBbkw",
+          "name": "OpenRouter account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6c0312e7-7a81-41cd-9403-8ad947100b80",
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Set lastAssistantMessage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First loop?": {
+      "main": [
+        [
+          {
+            "node": "Set user message as input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set last Assistant message as input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Combine and format responses",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "First loop?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract mentions": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Agent Settings": {
+      "main": [
+        [
+          {
+            "node": "Extract mentions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Global Settings": {
+      "main": [
+        [
+          {
+            "node": "Define Agent Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set lastAssistantMessage": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set user message as input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Define Global Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine and format responses": {
+      "main": [
+        []
+      ]
+    },
+    "Set last Assistant message as input": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

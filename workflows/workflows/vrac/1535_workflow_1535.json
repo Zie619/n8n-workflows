@@ -1,0 +1,435 @@
+{
+  "nodes": [
+    {
+      "name": "Simplify Result",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        680,
+        100
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Content",
+              "value": "={{$json[\"full_text\"].replace(/(?:https?|ftp):\\/\\/[\\n\\S]+/g, '')}}"
+            },
+            {
+              "name": "Author",
+              "value": "={{$json[\"user\"][\"name\"]}} (@{{$json[\"user\"][\"screen_name\"]}})"
+            },
+            {
+              "name": "Created",
+              "value": "={{new Date($json[\"created_at\"]).toISOString()}}"
+            },
+            {
+              "name": "URL",
+              "value": "=https://twitter.com/{{$json[\"user\"][\"screen_name\"]}}/status/{{$json[\"id_str\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Store in Strapi",
+      "type": "n8n-nodes-base.strapi",
+      "position": [
+        1780,
+        100
+      ],
+      "parameters": {
+        "columns": "Content,Author,Created,URL",
+        "operation": "create",
+        "contentType": "posts"
+      },
+      "credentials": {
+        "strapiApi": {
+          "id": "136",
+          "name": "Strapi Demo"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.interval",
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "unit": "minutes",
+        "interval": 30
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Is Retweet or Old?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        900,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"Content\"]}}",
+              "value2": "RT @",
+              "operation": "startsWith"
+            }
+          ],
+          "dateTime": [
+            {
+              "value1": "={{$json[\"Created\"]}}",
+              "value2": "={{new Date(new Date().getTime() - 30 * 60 * 1000)}}",
+              "operation": "before"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Search Tweets",
+      "type": "n8n-nodes-base.twitter",
+      "position": [
+        460,
+        100
+      ],
+      "parameters": {
+        "operation": "search",
+        "searchText": "(strapi OR n8n.io) AND lang:en",
+        "additionalFields": {
+          "tweetMode": "extended",
+          "resultType": "recent"
+        }
+      },
+      "credentials": {
+        "twitterOAuth1Api": {
+          "id": "15",
+          "name": "@MutedJam"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        240,
+        -120
+      ],
+      "webhookId": "6f833370-9068-44ef-8e56-4ceb563a851e",
+      "parameters": {
+        "path": "6f833370-9068-44ef-8e56-4ceb563a851e",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Simplify Webhook Result",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        460,
+        -120
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Content",
+              "value": "={{$json[\"body\"][\"data\"][\"fields\"][1][\"value\"]}}"
+            },
+            {
+              "name": "Author",
+              "value": "={{$json[\"body\"][\"data\"][\"fields\"][0][\"value\"]}}"
+            },
+            {
+              "name": "Created",
+              "value": "={{new Date().toISOString()}}"
+            },
+            {
+              "name": "URL"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Analyze Form Submission",
+      "type": "n8n-nodes-base.googleCloudNaturalLanguage",
+      "position": [
+        680,
+        -220
+      ],
+      "parameters": {
+        "content": "={{$json[\"Content\"]}}",
+        "options": {}
+      },
+      "credentials": {
+        "googleCloudNaturalLanguageOAuth2Api": {
+          "id": "138",
+          "name": "Google Cloud Natural Language account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Analyze Tweet",
+      "type": "n8n-nodes-base.googleCloudNaturalLanguage",
+      "position": [
+        1120,
+        200
+      ],
+      "parameters": {
+        "content": "={{$json[\"Content\"]}}",
+        "options": {}
+      },
+      "credentials": {
+        "googleCloudNaturalLanguageOAuth2Api": {
+          "id": "138",
+          "name": "Google Cloud Natural Language account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge Form Sentiment with Source",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        900,
+        -120
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Merge Tweet Sentiment with Source",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1340,
+        100
+      ],
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Positive Form Sentiment?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1120,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"documentSentiment\"][\"score\"]}}",
+              "value2": 0.4,
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Store Form Submission in Strapi",
+      "type": "n8n-nodes-base.strapi",
+      "position": [
+        1340,
+        -120
+      ],
+      "parameters": {
+        "columns": "Content,Author,Created,URL",
+        "operation": "create",
+        "contentType": "posts"
+      },
+      "credentials": {
+        "strapiApi": {
+          "id": "136",
+          "name": "Strapi Demo"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Positive Tweet Sentiment?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1560,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"documentSentiment\"][\"score\"]}}",
+              "value2": 0.3,
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Simplify Webhook Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Tweet": {
+      "main": [
+        [
+          {
+            "node": "Merge Tweet Sentiment with Source",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Search Tweets": {
+      "main": [
+        [
+          {
+            "node": "Simplify Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simplify Result": {
+      "main": [
+        [
+          {
+            "node": "Is Retweet or Old?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Search Tweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Retweet or Old?": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Analyze Tweet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Tweet Sentiment with Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Form Submission": {
+      "main": [
+        [
+          {
+            "node": "Merge Form Sentiment with Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simplify Webhook Result": {
+      "main": [
+        [
+          {
+            "node": "Analyze Form Submission",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Form Sentiment with Source",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Positive Form Sentiment?": {
+      "main": [
+        [
+          {
+            "node": "Store Form Submission in Strapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Positive Tweet Sentiment?": {
+      "main": [
+        [
+          {
+            "node": "Store in Strapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Form Sentiment with Source": {
+      "main": [
+        [
+          {
+            "node": "Positive Form Sentiment?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Tweet Sentiment with Source": {
+      "main": [
+        [
+          {
+            "node": "Positive Tweet Sentiment?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

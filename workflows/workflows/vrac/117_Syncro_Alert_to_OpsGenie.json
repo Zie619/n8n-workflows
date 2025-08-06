@@ -1,0 +1,224 @@
+{
+  "id": 117,
+  "name": "Syncro Alert to OpsGenie",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        460,
+        380
+      ],
+      "webhookId": "fromsyncro",
+      "parameters": {
+        "path": "fromsyncro",
+        "options": {},
+        "httpMethod": "POST",
+        "responseData": "allEntries",
+        "responseMode": "lastNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        780,
+        380
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "AlertID",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"id\"]}}"
+            },
+            {
+              "name": "Description",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"computer_name\"]}} ({{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"customer\"][\"business_then_name\"]}}): {{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"formatted_output\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Create Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1180,
+        260
+      ],
+      "parameters": {
+        "url": "https://api.opsgenie.com/v2/alerts",
+        "options": {},
+        "requestMethod": "POST",
+        "authentication": "headerAuth",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "message",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"computer_name\"]}} ({{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"customer\"][\"business_then_name\"]}}): {{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"formatted_output\"]}}"
+            },
+            {
+              "name": "alias",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"id\"]}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"text\"]}}\n{{$node[\"Webhook\"].json[\"body\"][\"link\"]}}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "OpsGenie"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Close Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1180,
+        460
+      ],
+      "parameters": {
+        "url": "=https://api.opsgenie.com/v2/alerts/{{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"id\"]}}/close?identifierType=alias",
+        "options": {},
+        "requestMethod": "POST",
+        "authentication": "headerAuth",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "note",
+              "value": "Issue resolved automatically according to Syncro."
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "OpsGenie"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        780,
+        560
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        940,
+        380
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"resolved\"]}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        620,
+        380
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "agent_offline_trigger"
+            }
+          ]
+        },
+        "value1": "={{$node[\"Webhook\"].json[\"body\"][\"attributes\"][\"properties\"][\"trigger\"]}}",
+        "dataType": "string"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Create Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Close Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

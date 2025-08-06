@@ -1,0 +1,251 @@
+{
+  "id": "4nBQyhwqDqmXY2AL",
+  "meta": {
+    "instanceId": "558d88703fb65b2d0e44613bc35916258b0f0bf983c5d4730c00c424b77ca36a",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Automated Image Metadata Tagging (Community Node)",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "b0b030f5-8a8c-4254-bc18-a2790748248e",
+      "name": "Trigger: New file added to Google Drive Folder",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "position": [
+        -760,
+        120
+      ],
+      "parameters": {
+        "event": "fileCreated",
+        "options": {},
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1WaIRWXcaeNViKmpW5IyQ3YGARWYdMg47",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1WaIRWXcaeNViKmpW5IyQ3YGARWYdMg47",
+          "cachedResultName": "EXIF"
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "L47XiMFzcjUgBp2i",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1df51279-b3bd-49bd-9711-951eb4164290",
+      "name": "Download Image File",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        -540,
+        120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {},
+        "operation": "download"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "L47XiMFzcjUgBp2i",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "50a59e8e-ca95-4594-b8a9-0ba709795d42",
+      "name": "Analyze Image Content",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        -340,
+        200
+      ],
+      "parameters": {
+        "text": "=Deliver a comma separated list describing the content of this image.",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "chatgpt-4o-latest",
+          "cachedResultName": "CHATGPT-4O-LATEST"
+        },
+        "options": {},
+        "resource": "image",
+        "inputType": "base64",
+        "operation": "analyze"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "niikB3HA4fT5WAqt",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "456164cc-ed41-4482-adb4-4ed00682153d",
+      "name": "Merge Metadata and Image File",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        -140,
+        120
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combineBy": "combineByPosition"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ddd6aef5-4dae-48e3-a806-3c58adea6552",
+      "name": "Write Metadata into Image",
+      "type": "n8n-nodes-exif-data.exifData",
+      "position": [
+        40,
+        120
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "write",
+        "exifMetadata": {
+          "metadataValues": [
+            {
+              "name": "Subject",
+              "value": "={{$json.content}}"
+            },
+            {
+              "name": "Keywords",
+              "value": "={{$json.content}}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9c531288-7fca-4cca-9717-6dd059266f47",
+      "name": "Update Image File",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        220,
+        120
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Download Image File').item.json.id }}"
+        },
+        "options": {},
+        "operation": "update",
+        "changeFileContent": true,
+        "newUpdatedFileName": "={{ $('Download Image File').item.json.name }}"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "L47XiMFzcjUgBp2i",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "70b6bb63-fedf-42eb-a6a0-30faae883f2c",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1080,
+        320
+      ],
+      "parameters": {
+        "width": 660,
+        "height": 680,
+        "content": "# Welcome to my Automated Image Metadata Tagging Workflow!\n\nThis workflow automatically analyzes the image content with the help of AI and writes it directly back into the image file as keywords.\n\n## This workflow has the following sequence:\n\n1. Google Drive trigger (scan for new files added in a specific folder)\n2. Download the added image file\n3. Analyse the content of the image\n4. Merge Metadata and image file\n5. Write the Keywords into the Metadata (dc:subject/keywords) and create new image file\n6. Update the original file in the Google Drive folder\n\n## The following accesses are required for the workflow:\n- You have to install the [n8n-nodes-exif-data Community Node](https://www.npmjs.com/package/n8n-nodes-exif-data)\n- Google Drive: [Documentation](https://docs.n8n.io/integrations/builtin/credentials/google)\n- AI API access (e.g. via OpenAI, Anthropic, Google or Ollama)\n\nYou can contact me via LinkedIn, if you have any questions: https://www.linkedin.com/in/friedemann-schuetz"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c4d1520b-6df4-4e76-98ba-4d7555aec35d",
+  "connections": {
+    "Download Image File": {
+      "main": [
+        [
+          {
+            "node": "Analyze Image Content",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Metadata and Image File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Image Content": {
+      "main": [
+        [
+          {
+            "node": "Merge Metadata and Image File",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Write Metadata into Image": {
+      "main": [
+        [
+          {
+            "node": "Update Image File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Metadata and Image File": {
+      "main": [
+        [
+          {
+            "node": "Write Metadata into Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger: New file added to Google Drive Folder": {
+      "main": [
+        [
+          {
+            "node": "Download Image File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

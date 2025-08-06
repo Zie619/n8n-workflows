@@ -1,0 +1,611 @@
+{
+  "id": "jzcvnlV8g6aseE4A",
+  "meta": {
+    "instanceId": "1abe0e4c2be794795d12bf72aa530a426a6f87aabad209ed6619bcaf0f666fb0",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "GitLab MR Auto-Review & Risk Assessment",
+  "tags": [
+    {
+      "id": "DOZBZVy35P0wB50k",
+      "name": "Quality Assurance (QA)",
+      "createdAt": "2025-02-04T06:46:12.267Z",
+      "updatedAt": "2025-02-04T06:46:12.267Z"
+    },
+    {
+      "id": "ML7fy627V46ocsUS",
+      "name": "Development",
+      "createdAt": "2025-02-04T06:46:44.236Z",
+      "updatedAt": "2025-02-04T06:46:44.236Z"
+    },
+    {
+      "id": "fX8hRnEv4D8sLSzF",
+      "name": "OpenAI",
+      "createdAt": "2025-01-09T09:18:12.757Z",
+      "updatedAt": "2025-01-09T09:18:12.757Z"
+    },
+    {
+      "id": "xBTtGefXwPc4Bib6",
+      "name": "Engineering",
+      "createdAt": "2025-02-04T06:47:02.932Z",
+      "updatedAt": "2025-02-04T06:47:02.932Z"
+    },
+    {
+      "id": "yy04JQqCaXepPdSa",
+      "name": "Project Management",
+      "createdAt": "2024-10-30T18:27:57.309Z",
+      "updatedAt": "2024-10-30T18:27:57.309Z"
+    },
+    {
+      "id": "zJaZorWWcGpTp35U",
+      "name": "DevOps",
+      "createdAt": "2025-01-03T12:19:34.273Z",
+      "updatedAt": "2025-01-03T12:19:34.273Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "a82f2b02-538b-4531-921c-d25f1edb97ef",
+      "name": "Extract Diff",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        860,
+        320
+      ],
+      "parameters": {
+        "url": "=     https://gitlab.com/api/v4/projects/{{ encodeURIComponent($json.body.project.path_with_namespace) }}/merge_requests/{{ $json.body.object_attributes.iid }}/changes",
+        "options": {},
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer glpat-xxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "cd028c77-23e7-46d6-964d-af5afe468176",
+      "name": "Distribution List Generator",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2040,
+        160
+      ],
+      "parameters": {
+        "jsCode": "const ProjectLeads = {\n  \"alpha_backend\": {\n    \"dev\": [\"dev1@example.com\", \"dev2@example.com\"],\n    \"qa\": [\"qa1@example.com\", \"qa2@example.com\"]\n  },\n  \"beta_webapp\": {\n    \"dev\": [\"dev3@example.com\", \"dev4@example.com\"],\n    \"qa\": [\"qa3@example.com\", \"qa4@example.com\"]\n  },\n  \"gamma_mobile\": {\n    \"dev\": [\"dev5@example.com\", \"dev6@example.com\"],\n    \"qa\": [\"qa5@example.com\", \"qa6@example.com\", \"qa7@example.com\"]\n  },\n  \"delta_api\": {\n    \"dev\": [\"dev7@example.com\", \"dev8@example.com\", \"dev9@example.com\"],\n    \"qa\": [\"qa8@example.com\", \"qa9@example.com\", \"qa10@example.com\"]\n  },\n  \"epsilon_service\": {\n    \"dev\": [\"dev10@example.com\"],\n    \"qa\": [\"qa11@example.com\", \"qa12@example.com\"]\n  },\n  \"zeta_scraper\": {\n    \"dev\": [\"dev11@example.com\"],\n    \"qa\": [\"qa13@example.com\", \"qa14@example.com\"]\n  },\n  \"theta_ui\": {\n    \"dev\": [\"dev12@example.com\", \"dev13@example.com\"],\n    \"qa\": [\"qa15@example.com\", \"qa16@example.com\"]\n  },\n  \"iota_backend\": {\n    \"dev\": [\"dev14@example.com\", \"dev15@example.com\"],\n    \"qa\": [\"qa17@example.com\", \"qa18@example.com\"]\n  },\n  \"kappa_admin\": {\n    \"dev\": [\"dev16@example.com\", \"dev17@example.com\"],\n    \"qa\": [\"qa19@example.com\", \"qa20@example.com\"]\n  }\n};\n\n// Define the GlobalList\nconst GlobalList = [\n  \"admin1@example.com\",\n  \"admin2@example.com\",\n  \"admin3@example.com\"\n];\n\n// Retrieve the project name from the input data and convert it to lowercase\nconst fullName = $('Merge').first().json.body.project.path_with_namespace.toLowerCase();\nconst projectName = fullName.split('/')[1];\n\nlet emails = [];\n\nif (projectName && ProjectLeads[projectName]) {\n  // Extract the emails for the given project\n  const projectEmails = [\n    ...ProjectLeads[projectName].dev,\n    ...ProjectLeads[projectName].qa\n  ];\n\n  // Combine project-specific emails with GlobalList\n  emails = [...projectEmails, ...GlobalList];\n} else {\n  // Default to GlobalList only if project name is not found or is undefined\n  emails = [...GlobalList];\n}\n\n// Handle sender email replacement\nconst senderemail = $('Merge').first().json.body.object_attributes.last_commit.author.email;\nconst oldEmail = \"86149715+user@users.noreply.github.com\";\nconst newEmail = \"user@example.com\";\nconst senderEmail = senderemail.replace(oldEmail, newEmail);\n\n// Add senderEmail to emails list\nemails.push(senderEmail);\n\n// Remove duplicate emails\nemails = [...new Set(emails)];\n\n// Join all emails into a single string\nconst emailsString = emails.join(\", \");\n\n// Return the result\nreturn {\n  json: {\n    emails: emailsString\n  }\n};\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "922c9f5f-2db2-4034-8491-33208f04e580",
+      "name": "If Some Change",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1100,
+        320
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3c3e0e8b-7469-4394-ab99-a9ac5053197a",
+              "operator": {
+                "type": "array",
+                "operation": "lengthGt",
+                "rightType": "number"
+              },
+              "leftValue": "={{ $json.changes }}",
+              "rightValue": 0
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "e41fc6b0-ccc7-46c9-9667-79b199aaefc8",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        600,
+        320
+      ],
+      "parameters": {},
+      "executeOnce": true,
+      "typeVersion": 3
+    },
+    {
+      "id": "1bf7f593-a7d9-48f5-be20-d73e97b030bb",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "text": "={\n  \"model\": \"claude-3-5-haiku-20241022\",\n  \"max_tokens\": 1000,\n  \"temperature\": 0.7,\n  \"tools\": [\n    {\n      \"name\": \"record_summary\",\n      \"description\": \"Record a structured summary of a git diff using well-defined JSON.\",\n      \"input_schema\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"RiskLevel\": {\n            \"type\": \"string\",\n            \"description\": \"Overall risk assessment of the changes: High/Medium/Low.\"\n          },\n          \"Summary\": {\n            \"type\": \"string\",\n            \"description\": \"One-line summary of the git diff analysis\"\n          },\n          \"Recommendations\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"Recommendation\": {\n                  \"type\": \"string\",\n                  \"description\": \"Specific recommendation in HTML format.\"\n                },\n                \"CodeSnippet\": {\n                  \"type\": \"string\",\n                  \"description\": \"Relevant code full snippet formatted in HTML.\"\n                }\n              },\n              \"required\": [\"Recommendation\", \"CodeSnippet\"]\n            }\n          },\n          \"Issues\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"File\": {\n                  \"type\": \"string\",\n                  \"description\": \"HTML-formatted name of the file where the issue exists.\"\n                },\n                \"PotentialIssue\": {\n                  \"type\": \"string\",\n                  \"description\": \"HTML-formatted description of the issue.\"\n                },\n                \"Severity\": {\n                  \"type\": \"string\",\n                  \"description\": \"Severity of the issue: High/Medium/Low in HTML.\"\n                }\n              },\n              \"required\": [\"File\", \"PotentialIssue\", \"Severity\"]\n            }\n          },\n          \"URL\": {\n            \"type\": \"string\",\n            \"description\": \"Link to the repository in HTML.\"\n          },\n          \"DiffTable\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"FileName\": {\n                \"type\": \"string\",\n                \"description\": \"HTML-formatted name of the file.\"\n              },\n              \"Changes\": {\n                \"type\": \"array\",\n                \"items\": {\n                  \"type\": \"object\",\n                  \"properties\": {\n                    \"Line\": {\n                      \"type\": \"string\",\n                      \"description\": \"HTML-formatted line number.\"\n                    },\n                    \"Before\": {\n                      \"type\": \"string\",\n                      \"description\": \"Code before the change formatted in HTML.\"\n                    },\n                    \"After\": {\n                      \"type\": \"string\",\n                      \"description\": \"Code after the change formatted in HTML.\"\n                    }\n                  },\n                  \"required\": [\"Line\", \"Before\", \"After\"]\n                }\n              }\n            }\n          },\n          \"TestCases\": {\n            \"type\": \"array\",\n            \"description\": \"List of test cases the QA team must check.\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"TestFor\": {\n                  \"type\": \"string\",\n                  \"description\": \"Description of the functionality or area to test.\"\n                },\n                \"Steps\": {\n                  \"type\": \"string\",\n                  \"description\": \"HTML-formatted steps to test the functionality.\"\n                },\n                \"ExpectedOutcome\": {\n                  \"type\": \"string\",\n                  \"description\": \"HTML-formatted description of the expected result of the test.\"\n                }\n              },\n              \"required\": [\"TestFor\", \"Steps\", \"ExpectedOutcome\"]\n            }\n          }\n        },\n        \"required\": [\"RiskLevel\", \"Summary\", \"Recommendations\", \"Issues\", \"URL\", \"DiffTable\", \"TestCases\"]\n      }\n    }\n  ],\n  \"tool_choice\": {\n    \"type\": \"tool\",\n    \"name\": \"record_summary\"\n  },\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Analyze the following git diff, highlight potential issues, provide recommendations with code snippets (using HTML formatting for all values), and include the URL. Ensure proper risk evaluation. Mark issues that may break the build or reveal a security risk as High':\"\n        },\n        {\n          \"type\": \"text\",\n          \"text\": \"{{ $json.changes.map(change => JSON.stringify(change.diff).slice(1, -1).replace(/[\\r]/g, '')).join(' ') }}\"\n        },\n        {\n          \"type\": \"text\",\n          \"text\": \"URL: {{ $json.web_url }}\"\n        },\n        {\n          \"type\": \"text\",\n          \"text\": \"Provide a table of test cases for the QA team under the 'TestCases' field.\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {},
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "f888ea7c-04d4-4192-aa72-10c341da80c8",
+      "name": "Auto-fixing Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "position": [
+        1540,
+        600
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e52227f3-e606-4ec9-b338-c36fe7ca4b6d",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1760,
+        940
+      ],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"RiskLevel\": {\n      \"type\": \"string\",\n      \"description\": \"Overall risk assessment of the changes: High/Medium/Low.\"\n    },\n    \"Summary\": {\n      \"type\": \"string\",\n      \"description\": \"One-line summary of the git diff analysis in HTML.\"\n    },\n    \"Recommendations\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"Recommendation\": {\n            \"type\": \"string\",\n            \"description\": \"Specific recommendation in HTML format.\"\n          },\n          \"CodeSnippet\": {\n            \"type\": \"string\",\n            \"description\": \"Relevant code snippet formatted in HTML.\"\n          }\n        },\n        \"required\": [\"Recommendation\", \"CodeSnippet\"]\n      }\n    },\n    \"Issues\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"File\": {\n            \"type\": \"string\",\n            \"description\": \"HTML-formatted name of the file where the issue exists.\"\n          },\n          \"PotentialIssue\": {\n            \"type\": \"string\",\n            \"description\": \"HTML-formatted description of the issue.\"\n          },\n          \"Severity\": {\n            \"type\": \"string\",\n            \"description\": \"Severity of the issue: High/Medium/Low in HTML.\"\n          }\n        },\n        \"required\": [\"File\", \"PotentialIssue\", \"Severity\"]\n      }\n    },\n    \"URL\": {\n      \"type\": \"string\",\n      \"description\": \"Link to the repository in HTML.\"\n    },\n    \"DiffTable\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"FileName\": {\n          \"type\": \"string\",\n          \"description\": \"HTML-formatted name of the file.\"\n        },\n        \"Changes\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"Line\": {\n                \"type\": \"string\",\n                \"description\": \"HTML-formatted line number.\"\n              },\n              \"Before\": {\n                \"type\": \"string\",\n                \"description\": \"Code before the change formatted in HTML.\"\n              },\n              \"After\": {\n                \"type\": \"string\",\n                \"description\": \"Code after the change formatted in HTML.\"\n              }\n            },\n            \"required\": [\"Line\", \"Before\", \"After\"]\n          }\n        }\n      }\n    },\n    \"TestCases\": {\n      \"type\": \"array\",\n      \"description\": \"List of test cases the QA team must check.\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"TestFor\": {\n            \"type\": \"string\",\n            \"description\": \"Description of the functionality or area to test.\"\n          },\n          \"Steps\": {\n            \"type\": \"string\",\n            \"description\": \"HTML-formatted steps to test the functionality.\"\n          },\n          \"ExpectedOutcome\": {\n            \"type\": \"string\",\n            \"description\": \"HTML-formatted description of the expected result of the test.\"\n          }\n        },\n        \"required\": [\"TestFor\", \"Steps\", \"ExpectedOutcome\"]\n      }\n    }\n  },\n  \"required\": [\"RiskLevel\", \"Summary\", \"Recommendations\", \"Issues\", \"URL\", \"DiffTable\", \"TestCases\"]\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "360985e5-1195-4411-ab5e-daf182f3be9b",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [
+        1560,
+        940
+      ],
+      "parameters": {
+        "model": "claude-3-5-haiku-20241022",
+        "options": {}
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "9ZxBT7yu9DmfOCQi",
+          "name": "Anthropic account Vishal"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "e912886a-2a4c-4f82-b14b-71db3ee2b616",
+      "name": "Anthropic Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [
+        1400,
+        940
+      ],
+      "parameters": {
+        "model": "claude-3-5-haiku-20241022",
+        "options": {}
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "9ZxBT7yu9DmfOCQi",
+          "name": "Anthropic account Vishal"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "320b0fa4-f864-4a3c-8d25-f2cac2512fbf",
+      "name": "Comment Back on MR",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2040,
+        480
+      ],
+      "parameters": {
+        "url": "=     https://gitlab.com/api/v4/projects/{{ encodeURIComponent( $('Merge').item.json.body.project.path_with_namespace) }}/merge_requests/{{ $('Merge').item.json.body.object_attributes.iid }}/notes",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer glpatdemo -1234567890abcdef1234567890demo\"\n}\n",
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "body",
+              "value": "=# CodeSnape by Quantana\n\n**Summary** | {{ $('AI Agent').item.json.output.Summary }}\n--- | ---\n**Risk Level** | <span style=\"font-weight: bold; font-size: 1.5em; color: {{ $('AI Agent').item.json.output.RiskLevel.replace(/<\\/?b>/g, '') === 'Low' ? '#6B7280' : $('AI Agent').item.json.output.RiskLevel.replace(/<\\/?b>/g, '') === 'Medium' ? '#F59E0B' : '#EF4444' }};\">{{ $('AI Agent').item.json.output.RiskLevel.replace(/<\\/?b>/g, '') }}</span>\n\n## Recommendations\n\n| Recommendation | Code Snippet |\n| --- | --- |\n{{ $('AI Agent').item.json.output.Recommendations.map(rec => `| ${rec.Recommendation} | \\`${rec.CodeSnippet}\\` |`).join('\\n') }}\n\n## Test Cases\n\n| Test For | Steps | Expected Outcome |\n| --- | --- | --- |\n{{ $('AI Agent').item.json.output.TestCases.map(test => `| ${test.TestFor} | ${test.Steps} | ${test.ExpectedOutcome} |`).join('\\n') }}\n\n## Issues\n\n| File | Potential Issue | Severity |\n| --- | --- | --- |\n{{ $('AI Agent').item.json.output.Issues.map(issue => `| ${issue.File} | ${issue.PotentialIssue} | ${issue.Severity} |`).join('\\n') }}\n\n## Diff Table\n\n| Line | Before | After |\n| --- | --- | --- |\n{{ $('AI Agent').item.json.output.DiffTable.Changes.map(change => `| ${change.Line} | \\`${change.Before}\\` | \\`${change.After}\\` |`).join('\\n') }}"
+            }
+          ]
+        },
+        "specifyHeaders": "json"
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "0f8237ca-f3fb-46cc-b173-d42ea4cd447e",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -60,
+        140
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 360,
+        "content": "- Triggers workflow when a merge request (MR) is created or updated.  \n\n- Add GitLab credentials. Select merge_requests event."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2ddc9aa2-3673-4b64-8ffb-ba7428b67dbe",
+      "name": "GitLab Trigger",
+      "type": "n8n-nodes-base.gitlabTrigger",
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "fb878391-270b-47d8-addf-2917c71a3e09",
+      "parameters": {
+        "owner": "vishalkumar1",
+        "events": [
+          "merge_requests"
+        ],
+        "repository": "istorefront_server"
+      },
+      "credentials": {
+        "gitlabApi": {
+          "id": "tRWT5f3LnLNRPulP",
+          "name": "Gitlab overall"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f751cca3-781e-4eaa-bd90-da329ed53a7f",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        800,
+        160
+      ],
+      "parameters": {
+        "height": 320,
+        "content": "- Fetches code changes (diffs) from GitLab using API.  \n\n- Replace Authorization token with your GitLab API key."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ade683bb-8608-44bb-8047-f6c1b7de8f00",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1060,
+        160
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 320,
+        "content": "- Ensures that MR contains changes before proceeding.\n\n- No setup required."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "281db918-d9a9-43bc-ae51-c3631e2ac494",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1320,
+        160
+      ],
+      "parameters": {
+        "width": 380,
+        "height": 320,
+        "content": "- Calls Claude AI to analyze the diff and generate: Risk Level, Issues, Recommendations, Test Cases.\n\n- Add Anthropic API Key (Claude AI)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a7a1e7f4-1504-49be-8199-f929fc83f65e",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1480,
+        500
+      ],
+      "parameters": {
+        "width": 360,
+        "height": 220,
+        "content": "- Cleans and refines AI output for structured reporting.\n- No setup required."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fdbc74ea-a9cd-4811-b5b4-4eeadff28dff",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1700,
+        900
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 320,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n- Cleans and refines AI output for structured reporting.\n- No setup required."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e402a3ff-daac-4bae-bbb6-f9696c9adab5",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 320,
+        "content": "- Creates a list of developers & QA testers for email notifications.\n\n- Update email mappings for your team."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "21818092-87db-42c6-af12-cbe1632c79ab",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2220,
+        0
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 320,
+        "content": "- Sends an HTML-formatted MR Report to developers & QA teams.\n\n- Add Gmail credentials."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "13e5b3fa-c3a0-4399-baf7-84b99865907c",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1980,
+        340
+      ],
+      "parameters": {
+        "width": 220,
+        "height": 300,
+        "content": "- Posts AI-generated review report as a GitLab MR comment.\n- Replace Authorization token with your GitLab API key."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "REPLACE_WITH_GMAIL_OAUTH_ID",
+      "name": "Send to DL ( Email Notification)",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2280,
+        140
+      ],
+      "webhookId": "REPLACE_WITH_WEBHOOK_ID",
+      "parameters": {
+        "sendTo": "={{ $json.emails }}",
+        "message": "=<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>CodeSnape by Quantana</title>\n  <style>\n    body {\n      margin: 0;\n      padding: 0;\n      font-family: Arial, sans-serif;\n    }\n    table {\n      border-spacing: 0;\n      border-collapse: collapse;\n      width: 100%;\n      max-width: 960px;\n      margin: 0 auto;\n    }\n    .container {\n      width: 100%;\n      max-width: 960px;\n      margin: 0 auto;\n    }\n    .section {\n      margin-bottom: 20px;\n      padding: 10px;\n    }\n    .header {\n      background-color: #f2f2f2;\n      padding: 20px;\n      text-align: center;\n    }\n    .table-container {\n      background-color: #f9f9f9;\n      padding: 10px;\n      border-radius: 5px;\n      border: 1px solid #ddd;\n    }\n    .report-summary-table, .table-container table {\n      width: 100%;\n      border-collapse: collapse;\n    }\n    .report-summary-table th, .report-summary-table td, \n    .table-container th, .table-container td {\n      border: 1px solid #ddd;\n      padding: 8px;\n      text-align: left;\n    }\n    .report-summary-table th, .table-container th {\n      background-color: #f2f2f2;\n    }\n    .report-summary-table tbody td, .table-container tbody td {\n      background-color: #fff; /* White background for table body */\n    }\n    .summary-text {\n      color: #1D4ED8;\n    }\n    .risk-low {\n      color: #6B7280;\n    }\n    .risk-medium {\n      color: #F59E0B;\n    }\n    .risk-high {\n      color: #EF4444;\n    }\n    code {\n      background-color: #f4f4f4;\n      padding: 2px 4px;\n      border-radius: 3px;\n      font-family: \"Courier New\", Courier, monospace;\n    }\n  </style>\n</head>\n<body>\n  <table class=\"container\">\n    <tr>\n      <td class=\"header\">\n        <h1>CodeSnape by Quantana</h1>\n      </td>\n    </tr>\n    <tr>\n      <td>\n        <table class=\"report-summary-table\">\n          <tr>\n            <td><strong>Summary</strong></td>\n            <td class=\"summary-text\">{{ $('AI Agent').item.json.output.Summary }}</td>\n            <td><strong>Risk Level</strong></td>\n  <td style=\"\n    font-weight: bold;\n    font-size: 1.5em;\n    color: \n      {{ $('AI Agent').item.json.output.RiskLevel.replace(/<\\/?b>/g, '') === 'Low' ? '#6B7280' : \n         $('AI Agent').item.json.output.RiskLevel.replace(/<\\/?b>/g, '') === 'Medium' ? '#F59E0B' : \n         '#EF4444' }};\n    \">\n    {{ $('AI Agent').item.json.output.RiskLevel.replace(/<\\/?b>/g, '') }}\n  </td>\n          </tr>\n          <tr>\n            <td><strong>Project Name</strong></td>\n            <td>{{ $('Merge').first().json.body.project.name }}</td>\n            <td><strong>User Name</strong></td>\n            <td>{{ $('Merge').first().json.body.user.name }}</td>\n          </tr>\n          <tr>\n            <td><strong>Created Date</strong></td>\n            <td colspan=\"3\">\n              {{ $('Merge').first().json.body.object_attributes.created_at }} (UTC)\n              <br />\n{{ new Date($('Merge').first().json.body.object_attributes.created_at).toLocaleString('en-IN', { \n  timeZone: 'Asia/Kolkata', \n  day: '2-digit', \n  month: 'short', \n  year: 'numeric', \n  hour: '2-digit', \n  minute: '2-digit', \n  second: '2-digit', \n  hour12: true \n}).replace(',', '') }} (IST)\n              </span>\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n    <tr>\n      <td class=\"section\">\n        <h2>Recommendations</h2>\n        <table class=\"table-container\">\n          <thead>\n            <tr>\n              <th>Recommendation</th>\n              <th>Code Snippet</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $('AI Agent').item.json.output.Recommendations.map(rec => `\n              <tr>\n                <td>${rec.Recommendation}</td>\n                <td><code>${rec.CodeSnippet}</code></td>\n              </tr>\n            `).join('') }}\n          </tbody>\n        </table>\n      </td>\n    </tr>\n    <tr>\n      <td class=\"section\">\n        <h2>Test Cases</h2>\n        <table class=\"table-container\">\n          <thead>\n            <tr>\n              <th>Test For</th>\n              <th>Steps</th>\n              <th>Expected Outcome</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $('AI Agent').item.json.output.TestCases.map(test => `\n              <tr>\n                <td>${test.TestFor}</td>\n                <td>${test.Steps}</td>\n                <td>${test.ExpectedOutcome}</td>\n              </tr>\n            `).join('') }}\n          </tbody>\n        </table>\n      </td>\n    </tr>\n    <tr>\n      <td class=\"section\">\n        <h2>Issues</h2>\n        <table class=\"table-container\">\n          <thead>\n            <tr>\n              <th>File</th>\n              <th>Potential Issue</th>\n              <th>Severity</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $('AI Agent').item.json.output.Issues.map(issue => `\n              <tr>\n                <td>${issue.File}</td>\n                <td>${issue.PotentialIssue}</td>\n                <td>${issue.Severity}</td>\n              </tr>\n            `).join('') }}\n          </tbody>\n        </table>\n      </td>\n    </tr>\n    <tr>\n      <td class=\"section\">\n        <h2>Diff Table</h2>\n        <table class=\"table-container\">\n          <thead>\n            <tr>\n              <th>Line</th>\n              <th>Before</th>\n              <th>After</th>\n            </tr>\n          </thead>\n          <tbody>\n            {{ $('AI Agent').item.json.output.DiffTable.Changes.map(change => `\n              <tr>\n                <td>${change.Line}</td>\n                <td><code>${change.Before}</code></td>\n                <td><code>${change.After}</code></td>\n              </tr>\n            `).join('') }}\n          </tbody>\n        </table>\n      </td>\n    </tr>\n    <tr>\n      <td class=\"section\">\n        <h2>URL</h2>\n        <p><a href=\"{{ $('Extract Diff').item.json.web_url }}\" target=\"_blank\">{{ $('Extract Diff').item.json.web_url }}</a></p>\n      </td>\n    </tr>\n<tr><td>Email Generated by CodeSnape from <a href=“https://quantana.com.au/ai”>Quantana</a> </td></tr>\n  </table>\n</body>\n</html>",
+        "options": {
+          "appendAttribution": true
+        },
+        "subject": "=[{{ $('AI Agent').item.json.output.RiskLevel.replace(/<\\/?b>/g, '') }}] - CodeSnape for [{{ $('Merge').first().json.body.project.name }}] by [{{ $('Merge').first().json.body.user.name }}] at\n{{ $('Merge').first().json.body.object_attributes.created_at }}\n"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_GMAIL_OAUTH_ID",
+          "name": "Vishal Gmail"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "REPLACE_WITH_GITLAB_CRED_ID",
+      "name": "GitLab Trigger1",
+      "type": "n8n-nodes-base.gitlabTrigger",
+      "position": [
+        0,
+        540
+      ],
+      "webhookId": "REPLACE_WITH_WEBHOOK_ID",
+      "parameters": {
+        "owner": "vishalkumar1",
+        "events": [
+          "merge_requests"
+        ],
+        "repository": "istorefront_server"
+      },
+      "credentials": {
+        "gitlabApi": {
+          "id": "tRWT5f3LnLNRPulP",
+          "name": "Gitlab overall"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "REPLACE_WITH_GITLAB_CRED_ID",
+      "name": "GitLab Trigger2",
+      "type": "n8n-nodes-base.gitlabTrigger",
+      "position": [
+        0,
+        -20
+      ],
+      "webhookId": "REPLACE_WITH_WEBHOOK_ID",
+      "parameters": {
+        "owner": "vishalkumar1",
+        "events": [
+          "merge_requests"
+        ],
+        "repository": "istorefront_server"
+      },
+      "credentials": {
+        "gitlabApi": {
+          "id": "tRWT5f3LnLNRPulP",
+          "name": "Gitlab overall"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f1d633b3-d4d8-43aa-8a6b-7c4acbc67679",
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Extract Diff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Distribution List Generator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Comment Back on MR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Diff": {
+      "main": [
+        [
+          {
+            "node": "If Some Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitLab Trigger": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Some Change": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitLab Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitLab Trigger2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Distribution List Generator": {
+      "main": [
+        [
+          {
+            "node": "Send to DL ( Email Notification)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

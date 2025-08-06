@@ -1,0 +1,272 @@
+{
+  "id": "84dT8cFL0FV8ZGPx",
+  "meta": {
+    "instanceId": "85d2d2ffc8886227640b031e8f18fdfe6c91f530d34ec1a8b1f13727419ae956"
+  },
+  "name": "Slack Webhook - Verify Signature",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "b12fe8e7-45c4-4021-826e-3ae430e34001",
+      "name": "Make Slack Verif Token",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        900,
+        400
+      ],
+      "parameters": {
+        "jsCode": "function encodeFormData(data) {\n  const encodedData = Object.keys(data)\n    .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))\n    .join('&')\n    .replaceAll(\"%20\", \"+\") // Slack does not encode \"+\" signs\n    .replaceAll(\"*\", \"%2A\") // Slack encodes \"*\" signs\n    .replaceAll(\"~\", \"%7E\"); // Slack encodes \"~\" signs\n    \n  return encodedData;\n}\n\nfunction buildSigBaseString(requestJson) {\n  const version = \"v0\"; // Slack Webhook version (Always v0 for the moment)\n  \n  const timestamp = requestJson.headers[\"x-slack-request-timestamp\"];\n  \n  const body = requestJson.body;\n  const encodedBody = encodeFormData(body);\n  \n  const sigBaseString = `${version}:${timestamp}:${encodedBody}`;\n\n  return sigBaseString;\n}\n\nconst requestJson = $input.first().json;\n\nconst sigBaseString = buildSigBaseString(requestJson);\n\nconst requestSignature = requestJson.headers[\"x-slack-signature\"];\n\nconsole.log({\n    sigBaseString,\n    requestSignature\n  });\nreturn {\n  json: {\n    sigBaseString,\n    requestSignature\n  },\n  pairedItem: 0\n}\n\n\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "a91e2d8f-e907-439c-9fd3-cb75e957b059",
+      "name": "Encode Secret String",
+      "type": "n8n-nodes-base.crypto",
+      "position": [
+        1120,
+        400
+      ],
+      "parameters": {
+        "type": "SHA256",
+        "value": "={{ $json.sigBaseString }}",
+        "action": "hmac",
+        "dataPropertyName": "candidateSignature"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d79ccfe1-61cd-4da4-bfff-1e504627bb3d",
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1360,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.requestSignature }}",
+              "value2": "=v0={{ $json.candidateSignature }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cb2b9908-c226-438b-adb2-7c1ec852e007",
+      "name": "Stop and Error",
+      "type": "n8n-nodes-base.stopAndError",
+      "position": [
+        1580,
+        580
+      ],
+      "parameters": {
+        "errorMessage": "Could not verify Slack Webhook signature"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5ef4c06a-717b-4f90-83a7-06eda780a892",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        680,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "86b022fb-63fd-4ccf-952e-19ed0da54a5c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        880,
+        -420
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 554.4117841902089,
+        "height": 278.2403290971726,
+        "content": "## Slack Webhook - Verify Signature \nWhen receiving a message from a Slack Webhook, it is much more secure to verify that the message comes from Slack and not from bots or unknown services.\n\nThis small template is designed to validate the received signature (See [this URL](https://api.slack.com/authentication/verifying-requests-from-slack)).\n\n### Colors\n- **Blue** areas are **areas to edit**\n- **Yellow** areas are **explanations**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f5af4f44-1ea5-419b-a58b-f8f6839b6b05",
+      "name": "Set Verified to True",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1580,
+        220
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "signature_verified",
+              "type": "booleanValue"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "8a76dec8-7a2d-4cc9-82c9-002141e205ec",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1920,
+        40
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combinationMode": "mergeByPosition"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "0c8506bc-b114-4d25-8586-80549ae0026d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1000,
+        40
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 359.58396920054975,
+        "height": 548.3119898759418,
+        "content": "## TO EDIT \nSet your Slack Signing Secret.\nYou can obtain it by visiting your Slack App dashboard in the general tab: https://api.slack.com/apps/[SLACK_APP_ID]/general\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "20cca69c-9d00-4471-8845-2cb91458c23e",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1560,
+        399
+      ],
+      "parameters": {
+        "width": 300.4638046519632,
+        "height": 360.20237540316725,
+        "content": "## Error Output\nIf the signature cannot be verified, an error will be raised. You can manage this scenario in your main workflow by either using an Error Workflow or by modifying your node settings and selecting appropriate actions in the event of an error.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "55ede23b-acb4-43ea-ac32-c678dd48e056",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1880,
+        -220
+      ],
+      "parameters": {
+        "width": 300.4638046519632,
+        "height": 427.3843805720155,
+        "content": "## Success Output\nIf the signature is successfully verified, we return a key `verified_signature` set to `true` along with the data from the Slack request itself.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "22d44888-5af4-43b9-b514-ebfc9c61b07c",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        160
+      ],
+      "parameters": {
+        "width": 300.4638046519632,
+        "height": 427.3843805720155,
+        "content": "## Input\nThe input should be the received Slack request. Place this workflow directly after the Slack Webhook.\n"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f9e78d89-0da8-465e-aa47-5396d9ac4d48",
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Set Verified to True",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop and Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode Secret String": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Verified to True": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Make Slack Verif Token": {
+      "main": [
+        [
+          {
+            "node": "Encode Secret String",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Make Slack Verif Token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

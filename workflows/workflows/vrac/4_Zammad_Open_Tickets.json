@@ -1,0 +1,147 @@
+{
+  "id": 4,
+  "name": "Zammad Open Tickets",
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -40,
+        340
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Ticket Filtering",
+      "type": "n8n-nodes-base.function",
+      "notes": "Filter tickets by status.",
+      "position": [
+        400,
+        460
+      ],
+      "parameters": {
+        "functionCode": "let newTickets = 0\nlet openTickets = 0\nlet pendingReminder = 0\nlet pendingClose = 0\n\nfor (let i = 0; i < items.length; i++) {\n  const ticket = items[i]\n  if (ticket.json.state_id === 1) {\n    newTickets++\n  }\n  if (ticket.json.state_id === 2) {\n    openTickets++\n  }\n  if (ticket.json.state_id === 3) {\n    pendingReminder++\n  }\n  if (ticket.json.state_id === 7) {\n    pendingClose++\n  }\n}\n\nreturn [{\n  json: {\n    \"new\": newTickets,\n    open: openTickets,\n    pendingReminder: pendingReminder,\n    pendingClose: pendingClose\n  }\n}];"
+      },
+      "executeOnce": true,
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "List Tickets",
+      "type": "n8n-nodes-base.zammad",
+      "notes": "Get all tickets.",
+      "position": [
+        200,
+        460
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "zammadTokenAuthApi": {
+          "id": "7",
+          "name": "Zammad Token Auth account"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Notify for Standup",
+      "type": "n8n-nodes-base.zulip",
+      "notes": "Sends a summary to customer support stream.",
+      "position": [
+        580,
+        460
+      ],
+      "parameters": {
+        "topic": "=tickets",
+        "stream": "=customer support",
+        "content": "=:ticket: Support Tickets Summary:\n* Open: {{$node[\"Ticket Filtering\"].json[\"open\"]}}\n* New:{{$node[\"Ticket Filtering\"].json[\"new\"]}}\n* Pending Close {{$node[\"Ticket Filtering\"].json[\"pendingClose\"]}}\n* Pending Reminder {{$node[\"Ticket Filtering\"].json[\"pendingReminder\"]}}",
+        "operation": "sendStream"
+      },
+      "credentials": {
+        "zulipApi": {
+          "id": "1",
+          "name": "Zulip n8n Bot"
+        }
+      },
+      "executeOnce": true,
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "name": "Standup Cron",
+      "type": "n8n-nodes-base.cron",
+      "notes": "Daily stand-up open days.",
+      "position": [
+        -40,
+        560
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 30 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "executeOnce": true,
+      "notesInFlow": true,
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "settings": {},
+  "connections": {
+    "List Tickets": {
+      "main": [
+        [
+          {
+            "node": "Ticket Filtering",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standup Cron": {
+      "main": [
+        [
+          {
+            "node": "List Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ticket Filtering": {
+      "main": [
+        [
+          {
+            "node": "Notify for Standup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "List Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

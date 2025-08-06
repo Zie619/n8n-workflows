@@ -1,0 +1,240 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "acf47a04-1f3f-448a-b571-a94c84004c45",
+      "name": "Current won time Not Equal to Previous",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        140,
+        260
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"current\"].won_time}}",
+              "value2": "={{ $json[\"previous\"].won_time}}",
+              "operation": "notEqual"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "452a0208-be12-4aac-8c1a-9101ab79f8fb",
+      "name": "On deal updated",
+      "type": "n8n-nodes-base.pipedriveTrigger",
+      "position": [
+        -80,
+        260
+      ],
+      "webhookId": "af0f5626-e92f-4e29-bdc8-8e13c9c9cf99",
+      "parameters": {
+        "action": "updated",
+        "object": "deal"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "1",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "202b9a47-2f00-43ec-bbab-ba82f94e4174",
+      "name": "Get organisation details",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        380,
+        240
+      ],
+      "parameters": {
+        "resource": "organization",
+        "operation": "get",
+        "organizationId": "={{ $json[\"current\"].org_id }}",
+        "resolveProperties": true
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "1",
+          "name": "Pipedrive account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b88e18a3-1514-424f-ba96-c8bb94c14cb3",
+      "name": "Search customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        600,
+        100
+      ],
+      "parameters": {
+        "url": "https://api.stripe.com/v1/customers/search",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "query",
+              "value": "=name:'{{ $json[\"Name\"] }}'"
+            }
+          ]
+        },
+        "nodeCredentialType": "stripeApi"
+      },
+      "credentials": {
+        "stripeApi": {
+          "id": "3",
+          "name": "Stripe account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b4a4491e-8d69-41b6-83a4-128f228108e3",
+      "name": "Customer does not exist",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        860,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ JSON.stringify($json[\"data\"]) }}",
+              "value2": "[]"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6aeaa043-ce4b-4665-a1eb-9fe66d86202f",
+      "name": "Continue with organisation data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1120,
+        220
+      ],
+      "parameters": {
+        "mode": "passThrough",
+        "output": "input2"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "21bc3b5a-72eb-4015-957a-7facfce371e0",
+      "name": "Create customer",
+      "type": "n8n-nodes-base.stripe",
+      "position": [
+        1360,
+        220
+      ],
+      "parameters": {
+        "name": "={{ $json[\"Name\"] }}",
+        "resource": "customer",
+        "operation": "create",
+        "additionalFields": {
+          "address": {
+            "details": {
+              "city": "={{ $json[\"City/town/village/locality\"] }}",
+              "line1": "={{ $json[\"Street/road name\"] }} {{ $json[\"House number\"] }}",
+              "state": "={{ $json[\"State/county\"] }}",
+              "country": "={{ $json[\"Country\"] }}",
+              "postal_code": "={{ $json[\"ZIP/Postal code\"] }}"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "stripeApi": {
+          "id": "3",
+          "name": "Stripe account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "On deal updated": {
+      "main": [
+        [
+          {
+            "node": "Current won time Not Equal to Previous",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search customer": {
+      "main": [
+        [
+          {
+            "node": "Customer does not exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer does not exist": {
+      "main": [
+        [
+          {
+            "node": "Continue with organisation data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get organisation details": {
+      "main": [
+        [
+          {
+            "node": "Search customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Continue with organisation data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Continue with organisation data": {
+      "main": [
+        [
+          {
+            "node": "Create customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Current won time Not Equal to Previous": {
+      "main": [
+        [
+          {
+            "node": "Get organisation details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

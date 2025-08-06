@@ -1,0 +1,265 @@
+{
+  "id": "180",
+  "meta": {
+    "instanceId": "fb924c73af8f703905bc09c9ee8076f48c17b596ed05b18c0ff86915ef8a7c4a"
+  },
+  "name": "Discord AI bot",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "6f188270-2c08-491f-bf52-c4a152b33aa0",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        1220,
+        780
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "e4839de2-fc04-40b0-b6bc-596455ad93fe",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        1220,
+        580
+      ],
+      "webhookId": "d0cdd428-be96-4821-85bc-65342cf928d0",
+      "parameters": {
+        "path": "d0cdd428-be96-4821-85bc-65342cf928d0",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "15dcafe1-6361-4775-ace0-e34fd2a143b4",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        2120,
+        940
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "0d28fe8e-da80-458b-9a75-d316019cb3ae",
+      "name": "Analyze user request",
+      "type": "n8n-nodes-base.openAi",
+      "position": [
+        1420,
+        680
+      ],
+      "parameters": {
+        "model": "gpt-4",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "Act as a service desk agent and help to categorize user messages. Return back only JSON without quotations. Do not return anything else."
+            },
+            {
+              "content": "=Here is a user feedback: \"{{ $json.body.feedback }}\". Please analyse it and put into one of the categories:\n1. \"success-story\" for user appraisal or success story. this will be processed by customer success department\n2. \"urgent-issue\" for extreme dissatisfaction or an urgent problem. this will be escalated to the IT team. Please assess if the request is really urgent and whether it has an immediate impact on the client. If the ticket doesn't look like an immediate problem or an extreme dissatisfaction then proceed as a normal ticket.\n3. \"ticket\" for everything else. This will be processed as normal by customer support team.\n\nPlease return back a JSON with the following structure: category (string), feedback (string), instruction (string).\nCategory must match the analysed category. feedback must match the original text. instruction should contain a text for a department according to the category with a one sentense summary of the feedback. Please be polite and friendly to the colleagues."
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 500,
+          "temperature": 0.5
+        },
+        "resource": "chat"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "63",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ce1c4198-ce21-4436-9ccb-4a2a078cd06e",
+      "name": "Select category",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1840,
+        680
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "success-story"
+            },
+            {
+              "output": 1,
+              "value2": "urgent-issue"
+            },
+            {
+              "output": 2,
+              "value2": "ticket"
+            }
+          ]
+        },
+        "value1": "={{ $json.gpt_reply.category.toLowerCase() }}",
+        "dataType": "string",
+        "fallbackOutput": 3
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "839cc38d-b393-4fc1-a068-47a8fcf55e3f",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1640,
+        680
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "gpt_reply",
+              "value": "={{ JSON.parse( $json.message.content.replace(/\\n(?=[^\"]*\"(?:[^\"]*\"[^\"]*\")*[^\"]*$)/g, '\\\\n')) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4c150439-89af-42bd-bbdc-905d13ada76b",
+      "name": "User Success Dept",
+      "type": "n8n-nodes-base.discord",
+      "position": [
+        2120,
+        460
+      ],
+      "parameters": {
+        "text": "={{ $json.gpt_reply.instruction }}",
+        "options": {},
+        "webhookUri": "https://discord.com/api/webhooks/<YOUR WEBHOOK HERE>"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9a5e5335-9e6c-4f1f-a0f0-b1b022956549",
+      "name": "IT Dept",
+      "type": "n8n-nodes-base.discord",
+      "position": [
+        2120,
+        620
+      ],
+      "parameters": {
+        "text": "={{ $json.gpt_reply.instruction }}",
+        "options": {},
+        "webhookUri": "https://discord.com/api/webhooks/<YOUR WEBHOOK HERE>"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d6d6250a-3a24-49f1-a597-47ebc179949c",
+      "name": "Helpdesk",
+      "type": "n8n-nodes-base.discord",
+      "position": [
+        2120,
+        780
+      ],
+      "parameters": {
+        "text": "={{ $json.gpt_reply.instruction }}",
+        "options": {},
+        "webhookUri": "https://discord.com/api/webhooks/<YOUR WEBHOOK HERE>"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveManualExecutions": true,
+    "saveDataSuccessExecution": "all"
+  },
+  "versionId": "8871171e-7e18-49ee-a570-facbe97afb79",
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Analyze user request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON": {
+      "main": [
+        [
+          {
+            "node": "Select category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select category": {
+      "main": [
+        [
+          {
+            "node": "User Success Dept",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IT Dept",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Helpdesk",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze user request": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Analyze user request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

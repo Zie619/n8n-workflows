@@ -1,0 +1,456 @@
+{
+  "id": "JJKkNnO4PQ12gQdE",
+  "meta": {
+    "instanceId": "0c2c4ddeb912d098b1d34ad608a9ee98cbe4700322f0cd2d87fa360b51c1c8a8",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Retry Execution Hourly",
+  "tags": [
+    {
+      "id": "BREwPdgeEC5njFaD",
+      "name": "In Development",
+      "createdAt": "2024-04-13T07:17:56.132Z",
+      "updatedAt": "2024-04-13T07:17:56.132Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ca8badce-4a43-4e86-acb8-6a3939ffa597",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        580,
+        740
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "7867cbd1-bf14-488d-9bbf-11d4478f93f2",
+      "name": "n8n",
+      "type": "n8n-nodes-base.n8n",
+      "position": [
+        1160,
+        860
+      ],
+      "parameters": {
+        "filters": {
+          "status": "error"
+        },
+        "options": {
+          "activeWorkflows": false
+        },
+        "resource": "execution",
+        "returnAll": true,
+        "requestOptions": {}
+      },
+      "credentials": {
+        "n8nApi": {
+          "id": "m9lkUOoNENYqXZIQ",
+          "name": "Gatu a/c"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b9826e10-43b9-4a21-b2f8-f91fdee3e6a2",
+      "name": "Log into n8n",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        960,
+        860
+      ],
+      "parameters": {
+        "url": "={{ \n\n(() => {\n  const instance = $json.n8n_instance;\n  const normalizedUrl = instance.endsWith('/') ? instance + 'rest/login' : instance + '/rest/login';\n  return normalizedUrl;\n})()\n}}",
+        "method": "POST",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $json.username }}"
+            },
+            {
+              "name": "password",
+              "value": "={{ $json.password }}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "accept-language",
+              "value": "en-US,en;q=0.9"
+            },
+            {
+              "name": "user-agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+            }
+          ]
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "1ca0527f-ccc4-4b3f-b585-94550987e0d3",
+      "name": "retry workflow automatically",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueRegularOutput",
+      "position": [
+        2080,
+        980
+      ],
+      "parameters": {
+        "url": "={{ \n\n$('login_details').item.json.n8n_instance.endsWith('/') \n  ? $('login_details').item.json.n8n_instance + 'rest/executions/' + $json.id + '/retry' \n  : $('login_details').item.json.n8n_instance + '/rest/executions/' + $('login_details').item.json.executionid + '/retry'\n\n }}  ",
+        "method": "POST",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        },
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "loadWorkflow",
+              "value": "true"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "accept-language",
+              "value": "en-US,en;q=0.9"
+            },
+            {
+              "name": "cookie",
+              "value": "={{ $('Log into n8n').item.json.headers['set-cookie'][0] }}"
+            },
+            {
+              "name": "user-agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+            }
+          ]
+        }
+      },
+      "retryOnFail": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "b0b2f473-e12c-4377-80d3-46b18faa09b9",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1380,
+        860
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "06acbcc4-1a82-4063-8a92-2ebbc6597b4b",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.retrySuccessId }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "6ea6fe2c-de31-4628-87b1-69e7ba867030",
+      "name": "No Operation, do nothing",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1620,
+        680
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "851277e1-5b0e-4391-8174-2c118aacfa30",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        100,
+        780
+      ],
+      "parameters": {
+        "width": 383.5091496232509,
+        "height": 285.0376749192681,
+        "content": "- ## check for failed executions hourly.\n- ## filter out those that have successful reexecution ids.\n- ## log into n8n and get the session ids.\n- ## retry the executions.\n\n- h\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5b8bf8c1-f505-42da-936d-637394e71b34",
+      "name": "login_details",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        760,
+        860
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3edb7f73-73cb-44f4-b891-8499598d9b0a",
+              "name": "username",
+              "type": "string",
+              "value": "gaturanjenga@gmail.com"
+            },
+            {
+              "id": "bc07f892-aacf-4f7c-96d1-64a9e28a4d92",
+              "name": "password",
+              "type": "string",
+              "value": "Password123"
+            },
+            {
+              "id": "59874894-b1ec-4a31-949e-9c3834d68d47",
+              "name": "n8n_instance",
+              "type": "string",
+              "value": "https://ai.gatuservices.info/"
+            },
+            {
+              "id": "68c77c33-15e0-4505-90d0-8129e7a8fbba",
+              "name": "executionid",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "74716a90-25a2-48b6-b342-197fe3807a3d",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1620,
+        940
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": 5
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "6439f486-68d4-4f9e-8e7f-3df909e32324",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        580,
+        980
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "882c03ea-d9e0-4d00-b4c6-5a1c55994fb0",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        740
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 349.5813953488373,
+        "height": 278.232558139535,
+        "content": "## Set the login credential details in the set node, and login to n8n via api."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bcc4d7e3-a91e-4c90-a018-56c6321f6ae2",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1140,
+        740
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 343.81395348837225,
+        "height": 263.8139534883721,
+        "content": "## Get all `Error` executions.\n- ### Filter out those that have been successfully retried\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9219f2a8-8b71-45e0-a987-7e8c1a6364fe",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1780,
+        880
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 444.7441860465116,
+        "height": 268.139534883721,
+        "content": "## Retry the executions.\n- ### Feel free to add notifications error messages for failed one to  email or slack"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "eb687638-734c-4feb-af5a-b49cf1dc661b",
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log into n8n": {
+      "main": [
+        [
+          {
+            "node": "n8n",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "execution_id": {
+      "main": [
+        [
+          {
+            "node": "retry workflow automatically",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "login_details": {
+      "main": [
+        [
+          {
+            "node": "Log into n8n",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "execution_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "login_details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "retry workflow automatically": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "login_details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

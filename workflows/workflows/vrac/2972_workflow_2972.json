@@ -1,0 +1,618 @@
+{
+  "meta": {
+    "instanceId": "5287ddd2fa569cf8e4c5a724666246a45305c032a19bb677c9e4b963d365f84b",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "95c798a4-bc34-4219-b7c3-6b4a4070886b",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -320,
+        1080
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "09987590-1ec2-48d4-aa04-32b85addd9e6",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        420,
+        1080
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "newsTitle"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "758e3f60-01dc-46c7-bb53-7460eaed92e3",
+      "name": "Extract News Block",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        220,
+        1080
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "newsTitle",
+              "cssSelector": ".eGcloy",
+              "returnArray": true,
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "20440f9a-a40c-4419-af6d-383de041d078",
+      "name": "Extract News Content",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        600,
+        1080
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "newsTitle",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "h2"
+            },
+            {
+              "key": "link",
+              "attribute": "href",
+              "cssSelector": "a",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "description",
+              "cssSelector": ".kYtujW"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "47a50ada-127a-4037-8fe7-41c0caebb3de",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        2000,
+        1060
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "33050a43-842d-464d-b227-a6c2c870c0af",
+      "name": "Fetch BBC News Detail",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1400,
+        1060
+      ],
+      "parameters": {
+        "url": "=https://www.bbc.com{{ $json.link }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "646bfe6b-cac6-4177-9b59-dc205b44b7eb",
+      "name": "Extract Detail",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        1600,
+        1060
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "newsDetail",
+              "cssSelector": ".dlWCEZ .fYAfXe",
+              "returnArray": true
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "6e14f528-1e94-411f-8601-3c713d492aa9",
+      "name": "Filter Empty Detail",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        1800,
+        1060
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "7066e88c-03da-4196-b1c5-80bc16fa3fc6",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.newsDetail }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "5863e420-2392-468a-8e03-5d4c273168e0",
+      "name": "If script exists",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2620,
+        1060
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 1,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "2e968b41-88f7-4b28-9837-af50ae130979",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "=voice_id {{ $json.output.podcast_script }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "90b370d3-5712-401d-b769-490014e2b17c",
+      "name": "Basic Podcast LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        2200,
+        1060
+      ],
+      "parameters": {
+        "text": "=News Articles:{{ $json.data.map(item => item.newsDetail) }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "= \n*Convert the following one or multiple news articles into a podcast script formatted for direct use in ElevenLabs. If there is only one news piece, transform it into a compelling and engaging narrative. If multiple news stories are provided, structure them like a news bulletin, presenting each piece sequentially with smooth transitions. Avoid a formal or dry tone; instead, use a natural, conversational, and warm style. The podcast should feel dynamic, engaging, and informative while maintaining a storytelling approach.*  \n\n- *Ensure the script is formatted as a single, continuous text block suitable for direct speech synthesis.*  \n- *Start with an engaging introduction that sets the tone for the podcast.*  \n- *Narrate each news story smoothly, with natural transitions between segments.*  \n- *End with a closing statement that leaves the listener informed and engaged.*  \n- *Output must be in JSON format, with the full script as a single string under the key `\"podcast_script\"`.*  \n\n---\n\n### **Input Format:**  \n```json\n{\n  \"news_articles\": [\n    {\n      \"title\": \"First News Title\",\n      \"content\": \"First news article content...\"\n    },\n    {\n      \"title\": \"Second News Title\",\n      \"content\": \"Second news article content...\"\n    }\n  ]\n}\n```\n\n---\n\nExpected JSON Output Format:\n \n{\n  \"podcast_script\": \"Welcome to today's news podcast! We have some exciting stories lined up for you. Let's start with our first story. [First news article content rewritten in a conversational, engaging style]... Moving on to our next topic... [Second news article content rewritten dynamically]... That’s all for today’s news bulletin! Stay informed and see you next time.\"\n}\n\n\n "
+            }
+          ]
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "24c212c2-6d06-4fe1-841b-bc52a21060b1",
+      "name": "Gemini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "position": [
+        1600,
+        1600
+      ],
+      "parameters": {
+        "options": {},
+        "modelName": "models/gemini-2.0-pro-exp-02-05"
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "5x46RlCURyTUmbGW",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "02e9f1ee-dc80-403c-8c19-0e6f918cf8ed",
+      "name": "Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        2360,
+        1280
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"podcast_script\": \"California\"\n}"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "395ddac7-b2a4-48c5-b2d3-d21078d29c54",
+      "name": "News Classifier",
+      "type": "@n8n/n8n-nodes-langchain.textClassifier",
+      "position": [
+        980,
+        1080
+      ],
+      "parameters": {
+        "options": {},
+        "inputText": "=I will only send the headline as input:\n{{ $json.title }} {{ $json.description }}",
+        "categories": {
+          "categories": [
+            {
+              "category": "Suitable",
+              "description": "=Role: News Content Suitability Assessor (Positive)\n\nTask: Determine if the given news headline is highly likely to be suitable for storytelling, focusing on positive and engaging aspects.\n\nCriteria (Focus on what makes it suitable):\n\nCuriosity and Interest: Does the headline present an event, discovery, or information that is likely to pique the curiosity of a broad audience? Does it have a \"wow\" factor or relate to a significant trend?\n\nStorytelling Potential: Does the headline lend itself well to narrative expansion? Could it be the start of an engaging story, a key point in a developing situation, or a surprising conclusion?\n\nPositive or Neutral Tone: Is the headline generally positive, neutral, or focused on solutions/progress? (Avoid headlines that primarily focus on conflict, negativity, or routine events).\n\nRelevance: Does the headline touch upon topics that are relevant to a wide audience, such as health, science, technology, interesting discoveries, or positive global events?\n\nOutput Format:\n\nHeadline: [Original news headline]\n\nSuitable: [Yes / No] (Only say \"Yes\" if strongly confident)\n\nReason (Brief): [Briefly explain why it's likely suitable, focusing on the positive aspects.]\n\nExample (for the LLM to learn from):\n\nHeadline: \"Scientists Discover New Species of Butterfly in Amazon Rainforest\"\n\nSuitable: Yes\n\nReason: Discovery, biodiversity, positive natural event, intriguing.\n\nHeadline: \"Stock Market Experiences Minor Fluctuations\"\n\nSuitable: No\n\nReason: Routine economic event, lacks general interest."
+            },
+            {
+              "category": "Not Suitable",
+              "description": "=Role: News Content Filter (Negative)\n\nTask: Identify news headlines that are clearly unsuitable for storytelling due to negative content, lack of general interest, or ethical concerns.\n\nCriteria (Focus on what makes it unsuitable):\n\nNegative Content: Does the headline contain violence, crime, accidents, death, suffering, or other traumatic events?\n\nPolitical/Economic Routine: Does the headline focus on routine political announcements, standard economic reports (like minor market changes), or internal political disputes?\n\nDivisive or Harmful Content: Does the headline contain hate speech, discrimination, strong political bias, or potentially harmful misinformation?\n\nLack of General Interest: Is the headline highly niche, specific to a very small group, or about a topic unlikely to interest a broad audience?\n\nOutput Format:\n\nHeadline: [Original news headline]\n\nNot Suitable: [Yes / No] (Only say \"Yes\" if strongly confident)\n\nReason (Brief): [Briefly explain why it's clearly unsuitable.]\n\nExample (for the LLM to learn from):\n\nHeadline: \"Local Politician Announces Campaign Platform\"\n\nNot Suitable: Yes\n\nReason: Routine political event, lacks broad appeal.\n\nHeadline: \"Car Crash Results in Minor Injuries\"\n\nNot Suitable: Yes\n\nReason: Negative event (accident), though thankfully not severe."
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "13fac9ed-688c-4af9-a810-d49a74b98c22",
+      "name": "Fetch BBC News Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -60,
+        1080
+      ],
+      "parameters": {
+        "url": "https://www.bbc.com/",
+        "options": {},
+        "responseFormat": "string"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e2aa33f3-aa7c-4a9d-ac3c-32f9f5872606",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -120,
+        920
+      ],
+      "parameters": {
+        "width": 500,
+        "height": 340,
+        "content": "## This node fetches the main BBC News page, which contains links to various news articles."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0821b944-44cb-41ed-b5ff-70f99018c5dc",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        960,
+        840
+      ],
+      "parameters": {
+        "color": 2,
+        "width": 340,
+        "height": 360,
+        "content": "## This node uses a Gemini LLM to classify news articles based on their titles and descriptions. It determines if the content is suitable for a podcast.\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d32b2ebb-0a4d-4d27-9262-894ab7a65cce",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1360,
+        820
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 400,
+        "height": 420,
+        "content": "## This node fetches the detailed content of the news articles that were classified as suitable for a podcast."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e6e1d180-b2c2-4b62-a611-7c039037ed69",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2180,
+        880
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 340,
+        "height": 320,
+        "content": "## This node uses a Gemini LLM to convert the news articles into a podcast script.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d8776355-967d-4875-b948-25792f6f38ec",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2840,
+        920
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 360,
+        "height": 300,
+        "content": "##  It structures the script for direct use with the Hugging Face text-to-speech model."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "631a2caf-c640-41df-9215-2b542de51ccb",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -660,
+        740
+      ],
+      "parameters": {
+        "width": 460,
+        "height": 280,
+        "content": "## 3rd Party Application Requirements:\n\n### Gemini \nYou've already set up a Gemini LLM. No access token is needed for this.\n### Hugging Face\n You'll need an access token for the Hugging Face text-to-speech model \n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "655e6799-5b7c-4747-b3a9-d01b47f5cba8",
+      "name": "Limit 10 Items",
+      "type": "n8n-nodes-base.limit",
+      "position": [
+        800,
+        1080
+      ],
+      "parameters": {
+        "maxItems": 10
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "64d011d2-9c51-4f1f-a3b8-edf3fcbc6710",
+      "name": "Hugging Face Text-to-Speech.",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2900,
+        1060
+      ],
+      "parameters": {
+        "url": "https://router.huggingface.co/hf-inference/models/facebook/mms-tts-eng",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "authentication": "predefinedCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "inputs",
+              "value": "={{ $json.output.podcast_script }}"
+            }
+          ]
+        },
+        "nodeCredentialType": "huggingFaceApi"
+      },
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "FF4PO5RYOJqZ0vhQ",
+          "name": "HuggingFaceApi account"
+        }
+      },
+      "typeVersion": 4.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "News Classifier",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Basic Podcast LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Basic Podcast LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Extract News Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic Podcast LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Detail": {
+      "main": [
+        [
+          {
+            "node": "Filter Empty Detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit 10 Items": {
+      "main": [
+        [
+          {
+            "node": "News Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News Classifier": {
+      "main": [
+        [
+          {
+            "node": "Fetch BBC News Detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If script exists": {
+      "main": [
+        [
+          {
+            "node": "Hugging Face Text-to-Speech.",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Extract News Block": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch BBC News Page": {
+      "main": [
+        [
+          {
+            "node": "Extract News Block",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Empty Detail": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract News Content": {
+      "main": [
+        [
+          {
+            "node": "Limit 10 Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch BBC News Detail": {
+      "main": [
+        [
+          {
+            "node": "Extract Detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic Podcast LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "If script exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Fetch BBC News Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

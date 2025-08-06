@@ -1,0 +1,594 @@
+{
+  "nodes": [
+    {
+      "id": "a99b3164-fe36-4dde-9525-110c1ae08afb",
+      "name": "Convert raw to base64",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        3320,
+        580
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const encoded = Buffer.from($json.raw).toString('base64');\n\nreturn { encoded };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f0f731bd-7b2f-4c39-bc06-42fd57bc4ae8",
+      "name": "Add email draft to thread",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3580,
+        580
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/gmail/v1/users/me/drafts",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\"message\":{\"raw\":\"{{ $json.encoded }}\", \"threadId\": \"{{ $('Map fields for further processing').item.json[\"threadId\"] }}\"}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "uBcIMfsTtKjexw7I",
+          "name": "Gmail (workfloowstutorial@gmail.com)"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "c1ce3400-4582-46c7-a85d-8fa9c325ff7b",
+      "name": "Remove AI label from email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        3820,
+        580
+      ],
+      "parameters": {
+        "resource": "thread",
+        "threadId": "={{ $('Map fields for further processing').item.json[\"threadId\"] }}",
+        "operation": "removeLabels"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "uBcIMfsTtKjexw7I",
+          "name": "Gmail (workfloowstutorial@gmail.com)"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "65f0508a-ca2e-49ce-b02f-ef6505b5e983",
+      "name": "Schedule trigger (1 min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        960,
+        580
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "ca4a209b-a79d-4911-b69b-1db22808be60",
+      "name": "Map fields for further processing",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2620,
+        580
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a77b2d79-1e70-410c-a657-f3d618154ea1",
+              "name": "response",
+              "type": "string",
+              "value": "={{ $json.output }}"
+            },
+            {
+              "id": "20850cac-f82c-4f02-84f0-3de31871a5b8",
+              "name": "threadId",
+              "type": "string",
+              "value": "={{ $('Get single message content').item.json[\"threadId\"] }}"
+            },
+            {
+              "id": "d270c18e-39a0-4d87-85f0-cc1ffc9c10ff",
+              "name": "to",
+              "type": "string",
+              "value": "={{ $('Get single message content').item.json[\"from\"][\"text\"] }}"
+            },
+            {
+              "id": "30acb50b-bdde-44bf-803c-76e0ae65f526",
+              "name": "subject",
+              "type": "string",
+              "value": "={{ $('Get single message content').item.json[\"subject\"] }}"
+            },
+            {
+              "id": "88914536-8c25-4877-8914-feab5e32fae3",
+              "name": "messageId",
+              "type": "string",
+              "value": "={{ $('Get threads with specific labels').item.json[\"id\"] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "93eb3844-f1fe-4b09-bcae-3e372a19ab6f",
+      "name": "Convert response to HTML",
+      "type": "n8n-nodes-base.markdown",
+      "position": [
+        2860,
+        580
+      ],
+      "parameters": {
+        "mode": "markdownToHtml",
+        "options": {
+          "simpleLineBreaks": false
+        },
+        "markdown": "={{ $json.response }}",
+        "destinationKey": "response"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "da35eda9-b63e-49f9-8fe8-7517c1445c92",
+      "name": "Build email raw",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        3100,
+        580
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "913e9cb1-10de-4637-bf48-40272c7c7fe3",
+              "name": "raw",
+              "type": "string",
+              "value": "=To: {{ $json.to }}\nSubject: {{ $json.subject }}\nContent-Type: text/html; charset=\"utf-8\"\n\n{{ $json.response }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.3
+    },
+    {
+      "id": "b667a399-a178-42e3-a587-4eccd2a153d8",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        460
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 420.4803040774015,
+        "height": 189.69151356225348,
+        "content": "## Reply draft with OpenAI Assistant\nThis workflow automatically transfers content of incoming email messages with specific labels into OpenAI Assitant and returns reply draft. After draft is composed, trigger label is deleted from the thread.\n\n**Please remember to configure your OpenAI Assistant first.**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fe47636b-2142-4c40-a937-2ec360b230ae",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        900,
+        460
+      ],
+      "parameters": {
+        "width": 451.41125086385614,
+        "height": 313.3056033573073,
+        "content": "### Schedule trigger and get emails\nRun the workflow in equal intervals and check for threads with specific labels (trigger labels)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c9bfa42c-a045-404d-aebe-d87dceb68f1a",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        460,
+        680
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 421.0932411886662,
+        "height": 257.42916378714597,
+        "content": "## \u26a0\ufe0f Note\n\n1. Complete video guide for this workflow is available [on my YouTube](https://youtu.be/a8Dhj3Zh9vQ). \n2. Remember to add your credentials and configure nodes (covered in the video guide).\n3. If you like this workflow, please subscribe to [my YouTube channel](https://www.youtube.com/@workfloows) and/or [my newsletter](https://workfloows.com/).\n\n**Thank you for your support!**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "40424340-c0ec-435a-9ce0-0e0dc3b94cfc",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2160,
+        460
+      ],
+      "parameters": {
+        "width": 381.6458068293894,
+        "height": 313.7892229150129,
+        "content": "### Generate reply\nTransfer email content to OpenAI Assitant and return AI-generated reply.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e7cce507-6658-414d-8cbc-3af847dad124",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2800,
+        460
+      ],
+      "parameters": {
+        "width": 219.88389496558554,
+        "height": 314.75072291501283,
+        "content": "### Create HTML message\nConvert incoming Markdown from OpenAI Assistant into HTML content."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2b383967-0a23-46a1-9a19-a9532a3c3425",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3040,
+        460
+      ],
+      "parameters": {
+        "width": 461.3148409669012,
+        "height": 314.75072291501283,
+        "content": "### Build and encode message\nCreate raw message in RFC standard and encode it into base64 string (please see [Gmail API reference](https://developers.google.com/gmail/api/reference/rest/v1/users.drafts/create) for more details)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "07685b17-cf22-4adf-a6b7-7acc2d863115",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3520,
+        460
+      ],
+      "parameters": {
+        "width": 219.88389496558554,
+        "height": 314.75072291501283,
+        "content": "### Insert reply draft\nAdd reply draft from OpenAI Assistant to specific Gmail thread."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1e8109f8-7dd3-4308-a5e8-32382aa41805",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3760,
+        460
+      ],
+      "parameters": {
+        "width": 219.88389496558554,
+        "height": 314.75072291501283,
+        "content": "### Remove label\nDelete trigger label from the Gmail thread."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d488db90-7367-49fa-b366-ccdfc796b5b3",
+      "name": "Get threads with specific labels",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1180,
+        580
+      ],
+      "parameters": {
+        "filters": {
+          "labelIds": []
+        },
+        "resource": "thread",
+        "returnAll": true
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "uBcIMfsTtKjexw7I",
+          "name": "Gmail (workfloowstutorial@gmail.com)"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "9f5262c5-d319-4a9d-af6e-aa42970d1a6f",
+      "name": "Ask OpenAI Assistant",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        2220,
+        580
+      ],
+      "parameters": {
+        "text": "={{ $json.text }}",
+        "prompt": "define",
+        "options": {},
+        "resource": "assistant",
+        "assistantId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "asst_kmKeAtwF2rv0vgF0ujY4jlp6",
+          "cachedResultName": "Customer assistant"
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "jazew1WAaSRrjcHp",
+          "name": "OpenAI (workfloows@gmail.com)"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6ffd7d66-40b6-49a4-9e15-9742bda73d2f",
+      "name": "Loop over threads",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1440,
+        580
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "8afc47c8-075f-4f3d-a89d-fda81fc270fc",
+      "name": "Get thread messages",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1700,
+        820
+      ],
+      "parameters": {
+        "options": {
+          "returnOnlyMessages": true
+        },
+        "resource": "thread",
+        "threadId": "={{ $json.id }}",
+        "operation": "get"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "uBcIMfsTtKjexw7I",
+          "name": "Gmail (workfloowstutorial@gmail.com)"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "2286bfa7-dcb8-4a61-a71b-ea58e21bf7ab",
+      "name": "Return last message in thread",
+      "type": "n8n-nodes-base.limit",
+      "position": [
+        1920,
+        820
+      ],
+      "parameters": {
+        "keep": "lastItems"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "44c52e61-dd88-4499-85db-69ce4704c2b2",
+      "name": "Get single message content",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1700,
+        460
+      ],
+      "parameters": {
+        "simple": false,
+        "options": {},
+        "messageId": "={{ $json.id }}",
+        "operation": "get"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "uBcIMfsTtKjexw7I",
+          "name": "Gmail (workfloowstutorial@gmail.com)"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "7ca62611-f02e-47bf-b940-3a56ece443b7",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1640,
+        340
+      ],
+      "parameters": {
+        "width": 219.88389496558554,
+        "height": 314.75072291501283,
+        "content": "### Return message content\nRetrieve content of the last message in the thread."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "165df2a4-3c94-456d-9906-be8020098802",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1640,
+        680
+      ],
+      "parameters": {
+        "width": 470.88389496558545,
+        "height": 314.75072291501283,
+        "content": "### Get last message from thread\nReturn all messages for a single thread and pass for further processing only the last one."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "connections": {
+    "Build email raw": {
+      "main": [
+        [
+          {
+            "node": "Convert raw to base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop over threads": {
+      "main": [
+        [
+          {
+            "node": "Get single message content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get thread messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get thread messages": {
+      "main": [
+        [
+          {
+            "node": "Return last message in thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask OpenAI Assistant": {
+      "main": [
+        [
+          {
+            "node": "Map fields for further processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert raw to base64": {
+      "main": [
+        [
+          {
+            "node": "Add email draft to thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert response to HTML": {
+      "main": [
+        [
+          {
+            "node": "Build email raw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule trigger (1 min)": {
+      "main": [
+        [
+          {
+            "node": "Get threads with specific labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add email draft to thread": {
+      "main": [
+        [
+          {
+            "node": "Remove AI label from email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get single message content": {
+      "main": [
+        [
+          {
+            "node": "Ask OpenAI Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return last message in thread": {
+      "main": [
+        [
+          {
+            "node": "Loop over threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get threads with specific labels": {
+      "main": [
+        [
+          {
+            "node": "Loop over threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map fields for further processing": {
+      "main": [
+        [
+          {
+            "node": "Convert response to HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

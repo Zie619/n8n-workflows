@@ -1,0 +1,258 @@
+{
+  "id": "6",
+  "name": "ETL pipeline",
+  "nodes": [
+    {
+      "name": "Twitter",
+      "type": "n8n-nodes-base.twitter",
+      "position": [
+        300,
+        300
+      ],
+      "parameters": {
+        "limit": 3,
+        "operation": "search",
+        "searchText": "=#OnThisDay",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "twitterOAuth1Api": "twitter_api"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "table": "tweets",
+        "columns": "text, score, magnitude",
+        "returnFields": "=*"
+      },
+      "credentials": {
+        "postgres": "postgres"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "MongoDB",
+      "type": "n8n-nodes-base.mongoDb",
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "fields": "text",
+        "options": {},
+        "operation": "insert",
+        "collection": "tweets"
+      },
+      "credentials": {
+        "mongoDb": "mongodb"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1500,
+        200
+      ],
+      "parameters": {
+        "text": "=\ud83d\udc26 NEW TWEET with sentiment score {{$json[\"score\"]}} and magnitude {{$json[\"magnitude\"]}} \u2b07\ufe0f\n{{$json[\"text\"]}}",
+        "channel": "tweets",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": "slack"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1300,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"score\"]}}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1500,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Google Cloud Natural Language",
+      "type": "n8n-nodes-base.googleCloudNaturalLanguage",
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "content": "={{$node[\"MongoDB\"].json[\"text\"]}}",
+        "options": {}
+      },
+      "credentials": {
+        "googleCloudNaturalLanguageOAuth2Api": "google_nlp"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "score",
+              "value": "={{$json[\"documentSentiment\"][\"score\"]}}"
+            },
+            {
+              "name": "magnitude",
+              "value": "={{$json[\"documentSentiment\"][\"magnitude\"]}}"
+            }
+          ],
+          "string": [
+            {
+              "name": "text",
+              "value": "={{$node[\"Twitter\"].json[\"text\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Cron",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 6
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron": {
+      "main": [
+        [
+          {
+            "node": "Twitter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB": {
+      "main": [
+        [
+          {
+            "node": "Google Cloud Natural Language",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twitter": {
+      "main": [
+        [
+          {
+            "node": "MongoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Cloud Natural Language": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

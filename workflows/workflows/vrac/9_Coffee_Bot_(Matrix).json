@@ -1,0 +1,137 @@
+{
+  "id": "9",
+  "name": "Coffee Bot (Matrix)",
+  "nodes": [
+    {
+      "name": "Greetings",
+      "type": "n8n-nodes-base.matrix",
+      "position": [
+        670,
+        240
+      ],
+      "parameters": {
+        "text": "👋 Happy Monday Groups for this week's virtual coffee are:",
+        "roomId": "Enter your Room ID"
+      },
+      "credentials": {
+        "matrixApi": "Matrix Creds"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Employees in coffee chat channel",
+      "type": "n8n-nodes-base.matrix",
+      "position": [
+        880,
+        240
+      ],
+      "parameters": {
+        "roomId": "Enter your Room ID",
+        "filters": {
+          "membership": ""
+        },
+        "resource": "roomMember"
+      },
+      "credentials": {
+        "matrixApi": "Enter Your Matrix Credentials"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Weekly trigger on monday1",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        480,
+        240
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 10,
+              "mode": "everyWeek"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Divide into groups",
+      "type": "n8n-nodes-base.function",
+      "notes": "This still needs to be reconfigured to grab the information from the second Matrix node. Have an issue with the ",
+      "position": [
+        1090,
+        240
+      ],
+      "parameters": {
+        "functionCode": "const ideal_group_size = 3;\nlet groups = [];\nlet data_as_array = [];\nlet newItems = [];\n\n// Take all the users and add them to an array\nfor (let j = 0; j < items.length; j++) {\n  data_as_array.push({username: items[j].json.user_id});\n}\n\n// Fisher-Yates (aka Knuth) Shuffle\nfunction shuffle(array) {\n  var currentIndex = array.length, temporaryValue, randomIndex;\n\n  // While there remain elements to shuffle...\n  while (0 !== currentIndex) {\n\n    // Pick a remaining element...\n    randomIndex = Math.floor(Math.random() * currentIndex);\n    currentIndex -= 1;\n\n    // And swap it with the current element.\n    temporaryValue = array[currentIndex];\n    array[currentIndex] = array[randomIndex];\n    array[randomIndex] = temporaryValue;\n  }\n\n  return array;\n}\n\n// Randomize the sequence of names in the array\ndata_as_array = shuffle(data_as_array);\n\n// Create groups of ideal group size (3)\nfor (let i = 0; i < data_as_array.length; i += ideal_group_size) {\n  groups.push(data_as_array.slice(i, i + ideal_group_size));\n}\n\n// Make sure that no group has just one person. If it does, take\n// one from previous group and add it to that group \nfor (let k = 0; k < groups.length; k++) {\n  if (groups[k].length === 1) {\n    groups[k].push(groups[k-1].shift());\n  }\n}\n\nfor (let l = 0; l < groups.length; l++) {\n    newItems.push({json: {groupsUsername: groups[l].map(a=> a.username)}})\n}\n\nreturn newItems;\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Announce groups",
+      "type": "n8n-nodes-base.matrix",
+      "position": [
+        1290,
+        240
+      ],
+      "parameters": {
+        "text": "=☀️ {{$node[\"Divide into groups\"].json[\"groupsUsername\"].join(', ')}}",
+        "roomId": "!hobuowPzLuKnojiyfV:matrix.org"
+      },
+      "credentials": {
+        "matrixApi": "Matrix Creds"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "settings": {},
+  "connections": {
+    "Greetings": {
+      "main": [
+        [
+          {
+            "node": "Employees in coffee chat channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Divide into groups": {
+      "main": [
+        [
+          {
+            "node": "Announce groups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly trigger on monday1": {
+      "main": [
+        [
+          {
+            "node": "Greetings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Employees in coffee chat channel": {
+      "main": [
+        [
+          {
+            "node": "Divide into groups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

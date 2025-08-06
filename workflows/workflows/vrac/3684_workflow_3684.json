@@ -1,0 +1,734 @@
+{
+  "meta": {
+    "instanceId": "=",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "10d2d97d-428e-4224-beae-e4ce4e090e4f",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        3220,
+        2500
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "7f8ac804-088d-4dfa-a661-8b6b09a6e340",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.date }}",
+              "rightValue": "={{ $now.minus(5,\"day\").day }} {{ $now.minus(5,\"day\").monthLong }} {{ $now.minus(5,\"day\").year }}"
+            },
+            {
+              "id": "094bd21e-1d23-4f06-a286-501045a53c9b",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "News article"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "968fac7c-48be-4fe1-a1d0-3c1fd828b0bc",
+      "name": "OpenAI Chat Model3",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        3640,
+        2480
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "fde7d8e1-4124-4506-abb7-8e400ad2729b",
+      "name": "Agent Classification",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        3660,
+        2300
+      ],
+      "parameters": {
+        "text": "=Title: {{$json.title}}\nDescription: {{$json.description}}\n\nIs this article about sustainability? Return only: true or false\n",
+        "options": {
+          "systemMessage": "=You are a classification assistant. \n\nYour role is to analyze the title and description of an article and determine if it is related to sustainability. \n\nYou must only return {\"answer\": true} if the article is clearly related to sustainability (e.g., environmental protection, renewable energy, sustainable development, climate action, green economy, etc.). \n\nIf it is not clearly related, return {\"answer\": false}.\n\nIf the description is empty or missing, rely only on the title. Your response must be only one of the two JSON options: {\"answer\": true} or {\"answer\": false}. Do not provide explanations.\n"
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "typeVersion": 1.8
+    },
+    {
+      "id": "670c0877-008f-4943-9a6b-c5e543ae6482",
+      "name": "Get Sustainability News",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2380,
+        2880
+      ],
+      "parameters": {
+        "options": {},
+        "filtersUI": {
+          "values": [
+            {
+              "lookupValue": "true",
+              "lookupColumn": "sustainability"
+            }
+          ]
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "=",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.5
+    },
+    {
+      "id": "ba6605af-5b5f-44d1-b47d-4246c2b999f3",
+      "name": "Send to your mailing list",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2740,
+        2880
+      ],
+      "webhookId": "=",
+      "parameters": {
+        "sendTo": "email@gmail.com",
+        "message": "={{ $json.email_body }}",
+        "options": {
+          "appendAttribution": false
+        },
+        "subject": "Your Sustainability News Digest from LogiGreen"
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.1
+    },
+    {
+      "id": "5d662a41-969a-49d8-a594-f0f962d51350",
+      "name": "Generate Email HTML",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2560,
+        2880
+      ],
+      "parameters": {
+        "jsCode": "const summary = `Welcome to the EU Sustainability News Digest provided by <a href=\"https://logi-green.com\" style=\"color: #0077cc; text-decoration: none;\">LogiGreen Consulting</a>.`;\n\nconst articles = items.map(item => item.json);  // each item is an article\n\nlet html = `\n<div style=\"font-family: Arial, sans-serif; max-width: 700px; margin: auto;\">\n  <h2 style=\"color: #2c3e50;\">🌍 EU News Digest – ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</h2>\n  <p style=\"font-size: 16px; color: #333;\">${summary}</p>\n  <hr style=\"border: 1px solid #eee;\" />\n`;\n\nfor (const article of articles) {\n  const link = article.link.startsWith(\"http\") ? article.link : `https://ec.europa.eu${article.link}`;\n  html += `\n    <div style=\"display: flex; margin: 20px 0; border-bottom: 1px solid #ddd; padding-bottom: 15px;\">\n      ${article.image ? `<img src=\"${article.image}\" alt=\"\" width=\"150\" style=\"margin-right: 15px; border-radius: 6px; object-fit: cover;\" />` : ''}\n      <div>\n        <p style=\"margin: 0; font-size: 12px; color: #888;\">${article.type} | ${article.date}</p>\n        <h3 style=\"margin: 5px 0;\">\n          <a href=\"${link}\" style=\"text-decoration: none; color: #0077cc;\">${article.title}</a>\n        </h3>\n        <p style=\"margin: 5px 0; color: #333;\">${article.description || ''}</p>\n        ${article.read_time ? `<p style=\"font-size: 12px; color: gray;\">${article.read_time}</p>` : ''}\n      </div>\n    </div>\n  `;\n}\n\nhtml += `\n  <div style=\"margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;\">\n    <p style=\"font-size: 12px; color: #999;\">You received this email as part of the EU Sustainability News Digest project.</p>\n    <a href=\"https://logi-green.com\" target=\"_blank\">\n      <img src=\"https://www.logi-green.com/web/image/website/1/logo/LogiGreen%20Consulting?unique=e2af3c6\" alt=\"LogiGreen Consulting Logo\" style=\"height: 40px; margin-top: 10px;\" />\n    </a>\n  </div>\n</div>\n`;\n\n\nreturn [{ json: { email_body: html } }];\n"
+      },
+      "notesInFlow": true,
+      "typeVersion": 2
+    },
+    {
+      "id": "378789d8-7b01-40ca-8bd5-96e1d137445d",
+      "name": "Parse Article Blocks",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        3000,
+        2500
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "dataPropertyName": "articles",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "type",
+              "cssSelector": "ul.ecl-content-block__primary-meta-container li:nth-child(1)"
+            },
+            {
+              "key": "date",
+              "cssSelector": "ul.ecl-content-block__primary-meta-container li:nth-child(2) time\t"
+            },
+            {
+              "key": "title",
+              "cssSelector": "div.ecl-content-block__title a\t"
+            },
+            {
+              "key": "link",
+              "attribute": "href",
+              "cssSelector": "div.ecl-content-block__title a\t",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "description",
+              "cssSelector": "div.ecl-content-block__description p\t"
+            },
+            {
+              "key": "image",
+              "attribute": "src",
+              "cssSelector": "picture img",
+              "returnValue": "attribute"
+            },
+            {
+              "key": "read_time",
+              "cssSelector": "ul.ecl-content-block__secondary-meta-container span.ecl-content-block__secondary-meta-label\t"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "cf7017a4-b996-452b-8aca-6f37964bd288",
+      "name": "Extract Articles Blocks",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        2560,
+        2500
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "articles",
+              "cssSelector": "div.ecl-content-item-block__item",
+              "returnArray": true,
+              "returnValue": "html"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1.2
+    },
+    {
+      "id": "d6f27e99-d866-4c27-9e99-5c579f505751",
+      "name": "Trigger at 08:30 am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        2120,
+        2500
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "1cc2483b-72ca-415d-90fc-a9b3ed0f6de8",
+      "name": "Query EU News Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2340,
+        2500
+      ],
+      "parameters": {
+        "url": "https://commission.europa.eu/news-and-media/news_en",
+        "options": {}
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "93bb792d-7979-4b68-a026-df960ea3cd8d",
+      "name": "Split Out by Article Block",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        2780,
+        2500
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "articles"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "127662c6-5561-4d35-9ca5-d23b26c223e9",
+      "name": "Loop Over Articles",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        3440,
+        2500
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "900bb98e-5b83-4e29-81f8-2f04478f9c2e",
+      "name": "Sustainability Flag",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        4040,
+        2300
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dcfc8260-1125-4883-8895-8a5f55d09341",
+              "name": "sustainability",
+              "type": "string",
+              "value": "={{ $json.output.answer }}"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "retryOnFail": false,
+      "typeVersion": 3.4
+    },
+    {
+      "id": "a6114158-8842-4cb5-b43b-0c4cb3134e0e",
+      "name": "Merge Article + Flag",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        4260,
+        2360
+      ],
+      "parameters": {
+        "mode": "combineBySql"
+      },
+      "notesInFlow": true,
+      "typeVersion": 3.1
+    },
+    {
+      "id": "585e6348-9af4-49e8-b30b-605d04921a88",
+      "name": "Record Results",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        4480,
+        2440
+      ],
+      "parameters": {
+        "columns": {
+          "value": {
+            "date": "={{ $json.date }}",
+            "link": "={{ $json.link }}",
+            "type": "={{ $json.type }}",
+            "image": "={{ $json.image }}",
+            "title": "={{ $json.title }}",
+            "read_time": "={{ $json.read_time }}",
+            "description": "={{ $json.description }}",
+            "sustainability": "={{ $json.sustainability }}"
+          },
+          "schema": [
+            {
+              "id": "sustainability",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "sustainability",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "type",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "type",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "date",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "date",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "title",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "link",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "link",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "description",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "image",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "image",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "read_time",
+              "type": "string",
+              "display": true,
+              "removed": false,
+              "required": false,
+              "displayName": "read_time",
+              "defaultMatch": false,
+              "canBeUsedToMatch": true
+            }
+          ],
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {},
+        "operation": "append",
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "=",
+          "cachedResultUrl": "=",
+          "cachedResultName": "="
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.5
+    },
+    {
+      "id": "78743430-d367-45b9-8d79-72dfdd436e3b",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        3920,
+        2480
+      ],
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"answer\": \"boolean | null\"\n}\n"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "a5bc414c-3a8c-45f2-ae73-9dbe591a9bae",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2060,
+        1960
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 220,
+        "height": 680,
+        "content": "### 1. Workflow Trigger with Cron Job\nThe workflow is triggered every morning at 08:30 am (local time)\n\n#### How to setup?\n- Select the time you want to set it up\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a21f729a-2e9d-4c7d-a31c-e68c54ee613e",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2300,
+        2680
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 620,
+        "height": 380,
+        "content": "### 4. Generate HTML page and send by email\nThis block collects all the articles of the day to create a prettified HTML page that is sent using the Gmail node.\n#### How to setup?\n- **Gmail Node:** set up your Gmail API credentials\n[Learn more about the Gmail Trigger Node]\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5b79acce-0b33-493d-ba90-a93fa6f32fbb",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2300,
+        1960
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 840,
+        "height": 700,
+        "content": "### 2. Scrapping and Parsing of Articles blocks\nThis starts with the HTTP node collecting HTML code that is parsed to extract Article Titles, Link, Image Cover and Reading time.\n\n#### How to setup?\n*Nothing to do*"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5705f302-1c6e-4a99-a653-f093186787f5",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3220,
+        1960
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 1440,
+        "height": 700,
+        "content": "### 3. Classifiy all the articles (Sustainability: true or false)\nThis starts with the If node that filters based on the scope date fixed by you. Through the loop, the AI Agent classify the articles using the title and description.\nThe ones that are flagged as \"sustainability\" are recorded in a Google Sheet.\n\n#### How to setup?\n- **Record results in the Google Sheet Node**:\n   1. Add your Google Sheet API credentials to access the Google Sheet file\n   2. Select the file using the list, an URL or an ID\n   3. Select the sheet in which you want to record the articles\n   4. Map the fields: **sustainability, type, date, title, link, description, image, read time**\n  [Learn more about the Google Sheet Node](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.googlesheets)\n- **AI Agent with the Chat Model**:\n   1. Add a chat model with the required credentials *(Example: Open AI 4o-mini)*"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f7a0f75d-c70e-46cb-a260-6c05d890e63c",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2960,
+        2680
+      ],
+      "parameters": {
+        "width": 580,
+        "height": 380,
+        "content": "### [Check the Tutorial](https://www.youtube.com/watch?v=q8VCAUbuat8)\n![Thumbnail](https://www.samirsaci.com/content/images/2025/04/temp-10.png)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Results": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Articles": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Agent Classification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Article + Flag",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent Classification",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Send to your mailing list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sustainability Flag": {
+      "main": [
+        [
+          {
+            "node": "Merge Article + Flag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger at 08:30 am": {
+      "main": [
+        [
+          {
+            "node": "Query EU News Website",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Sustainability News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Classification": {
+      "main": [
+        [
+          {
+            "node": "Sustainability Flag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Article + Flag": {
+      "main": [
+        [
+          {
+            "node": "Record Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Article Blocks": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query EU News Website": {
+      "main": [
+        [
+          {
+            "node": "Extract Articles Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Articles Blocks": {
+      "main": [
+        [
+          {
+            "node": "Split Out by Article Block",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sustainability News": {
+      "main": [
+        [
+          {
+            "node": "Generate Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Agent Classification",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out by Article Block": {
+      "main": [
+        [
+          {
+            "node": "Parse Article Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

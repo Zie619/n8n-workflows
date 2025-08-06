@@ -1,0 +1,420 @@
+{
+  "id": "U1xUqDLvBYYSU6EU",
+  "meta": {
+    "instanceId": "8d54a4232b4618928ac9df0152e207cb858f5f9ffa6f3ba2d31d941bdcaec9d7",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Jira Retrospective",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "b91c4727-8c63-4bf3-8101-6282aa6f592c",
+      "name": "Jira Get All Issues",
+      "type": "n8n-nodes-base.jira",
+      "position": [
+        60,
+        60
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "getAll"
+      },
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "AqnrDWxoCa8luriP",
+          "name": "Jira SW Cloud account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4cf0689c-2a1f-4a90-81f4-d3483c63fc96",
+      "name": "Jira Get All Comments",
+      "type": "n8n-nodes-base.jira",
+      "position": [
+        280,
+        60
+      ],
+      "parameters": {
+        "options": {},
+        "issueKey": "={{ $json.key }}",
+        "resource": "issueComment",
+        "operation": "getAll"
+      },
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "AqnrDWxoCa8luriP",
+          "name": "Jira SW Cloud account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "26803742-1a94-4969-878b-2f757aced4f8",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        940,
+        60
+      ],
+      "parameters": {
+        "text": "=comments = {{ $json.concatenated_Comment }}\ndescription = {{ $json.Description }}\ntitle = {{ $json.Title }}\nstatus = {{ $json.EpicStatus }}\nepic_name = {{ $json.EpicName }}\n",
+        "options": {
+          "systemMessage": "=You are an AI assistant specialized in creating comprehensive Agile retrospective documents. Your task is to analyze the provided information about a completed task and generate an insightful **Lessons Learned** report formatted in **clean Markdown**, optimized for seamless conversion to Google Docs.\n\n---\n\n### 📥 Input Format\nYou will receive structured input containing:\n* `epic_name`: The broader initiative or project category\n* `title`: The specific task or user story name\n* `description`: A concise explanation of what the task involved\n\n---\n\n### 📤 Output Instructions\nGenerate a detailed **Lessons Learned** report using the following **Markdown** structure:\n\n# LESSONS LEARNED REPORT\n\n**Epic:** {epic_name} \n**Date:** {{$today.format('yyyy-MM-dd')}}}  \n**Task:** {title}  \n**Description:** {description}\n\n## Key Findings\n\n* Clear, specific insight about a technical challenge encountered\n* Process-related discovery that impacted delivery\n* Team dynamics observation or workflow improvement identified\n* {Add more if needed}\n\n## Comments & Observations\n\n{Write 2–3 paragraphs with:}\n\n* Specific examples from task execution\n* Feedback or quotes from team members (if available)\n* Comparisons to prior approaches\n* Unexpected challenges or positive surprises\n\n## Actionable Recommendations\n\n1. Specific, implementable action to address a finding\n2. Concrete suggestion for process improvement\n3. Recommendation for knowledge sharing or team development\n4. {Add more as needed}\n\n## Metrics & Impact\n\n{When possible, include:}\n\n* Time saved or efficiency gained\n* Quality improvements\n* User/customer feedback\n* Cost implications\n\n## Tags\n\n`#lessons-learned` `#{normalized_epic_name}` `#{relevant_technology}` `#{improvement_area}`\n\n---\n\n### 📝 Guidelines\n\n1. **Be specific** – use real details, not vague statements\n2. **Stay relevant** – stick to the task and its broader context\n3. **Focus on learning** – prioritize transferable insights\n4. **Balance** – include both wins and challenges\n5. **Actionability** – make every suggestion doable\n6. **Concise yet clear** – avoid fluff; write for impact\n7. **Formatting Guidelines for Google Docs compatibility:**\n   * Use only asterisks (*) for bullet points, never hyphens (-)\n   * Add two spaces after each line in lists for proper line breaks\n   * Always leave a blank line before and after headings\n   * Avoid using underscores (_) in text; use hyphens (-) instead\n   * For emphasis, use consistently **bold** for important points and *italics* for supplementary information\n   * When mentioning code or technical terms, use `single backticks`, never triple backticks\n   * Use a pipe-separated format for tables as shown in the template\n   * Keep paragraphs short (3-5 sentences) for better readability\n8. **Metadata Handling:** Include the epic name and task title exactly as provided in the input, without modification\n9. **Date Format:** Use YYYY-MM-DD format for the date for consistent sorting and display\n10. **Tags:** Keep tags lowercase, with hyphens instead of spaces, and relevant to the content\n\n---"
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.9
+    },
+    {
+      "id": "29e37c80-68a4-490a-8952-2dcf974ff8d3",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        920,
+        280
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "f3KRKVUp9GyRxd6U",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "da5e365b-cc69-4bdd-bd58-e5b2ecb17387",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        500,
+        60
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "84fcaf69-4234-46be-9fa7-15026c60fed4",
+              "name": "EpicName",
+              "type": "string",
+              "value": "={{ $('Jira Get All Issues').item.json.fields.parent.fields.summary }}"
+            },
+            {
+              "id": "a7890a6b-1d0d-4486-908e-d3db571b89af",
+              "name": "EpicStatus",
+              "type": "string",
+              "value": "={{ $('Jira Get All Issues').item.json.fields.parent.fields.status.statusCategory.name }}"
+            },
+            {
+              "id": "c2c58d73-17a8-47b5-beb6-8295905cd8c2",
+              "name": "Title",
+              "type": "string",
+              "value": "={{ $('Jira Get All Issues').item.json.fields.summary }}"
+            },
+            {
+              "id": "baa10a35-ab3e-490f-b9ed-e661a6e9f4aa",
+              "name": "Description",
+              "type": "string",
+              "value": "={{ $('Jira Get All Issues').item.json.fields.description }}"
+            },
+            {
+              "id": "5da4ae54-07e6-41b8-bd51-054fe56beb5f",
+              "name": "Comment",
+              "type": "string",
+              "value": "={{ $json.body.content[0].content[0].text }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9718b066-e28f-41ea-97c2-559cbd894764",
+      "name": "Summarize",
+      "type": "n8n-nodes-base.summarize",
+      "position": [
+        720,
+        60
+      ],
+      "parameters": {
+        "options": {},
+        "fieldsToSplitBy": "EpicName, EpicStatus, Title, Description",
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "field": "Comment",
+              "separateBy": "\n",
+              "aggregation": "concatenate"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "1d37efb7-09f1-43a7-a6c0-77d07b1f7a6b",
+      "name": "Google Docs",
+      "type": "n8n-nodes-base.googleDocs",
+      "position": [
+        1280,
+        60
+      ],
+      "parameters": {
+        "simple": false,
+        "actionsUi": {
+          "actionFields": [
+            {
+              "text": "={{ $json.output }}",
+              "action": "insert"
+            }
+          ]
+        },
+        "operation": "update",
+        "documentURL": "14X5gcowEprmL6ORyoo9tIrWWEB1HlhkixXUelesCLXs"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "Qe3TZG3K1euzTr3n",
+          "name": "Google Docs account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "bfab4af8-1f26-45b0-952b-1bd5f411d5f4",
+      "name": "Jira Trigger",
+      "type": "n8n-nodes-base.jiraTrigger",
+      "position": [
+        -380,
+        180
+      ],
+      "webhookId": "3eb46690-d7b1-4a69-9a99-8adf8f843ed9",
+      "parameters": {
+        "events": [
+          "jira:issue_updated"
+        ],
+        "additionalFields": {
+          "filter": ""
+        }
+      },
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "AqnrDWxoCa8luriP",
+          "name": "Jira SW Cloud account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "cc654cf3-c360-4704-a4b7-57447dbec8c6",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -200,
+        180
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a7028dd9-e262-4528-a20f-c80a26a28202",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.changelog.items[0].toString }}",
+              "rightValue": "Done"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "b3ccd93e-a412-46f5-858d-ef8a2cd0efa9",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        1080,
+        280
+      ],
+      "parameters": {
+        "sessionKey": "47",
+        "sessionIdType": "customKey"
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "e8379684-93ca-4118-bab5-f52a444c50e1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -420,
+        -120
+      ],
+      "parameters": {
+        "width": 380,
+        "height": 580,
+        "content": "## Epic Done?\nThis Node is Triggered on any issue change in Jira. However it only triggers the automation when the Epic status is changed to **Done**"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cdddcd3f-f896-4dbf-89e2-09060111cbc6",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        20,
+        -120
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 820,
+        "height": 580,
+        "content": "## Fetch issue Description and Comments\nOnce the Epic is Done, these nodes fetch issues and comments that fall under the Epic. For further processing the output is bundled."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c718a2e8-be7b-47b9-b7cc-9f4549a1060f",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        880,
+        -120
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 540,
+        "height": 580,
+        "content": "## Summarize and send to Google Docs\nThe LLM is summarizing the description / comments and generates a report with a layout defined in the System Message. Finally the output is send to Google Docs."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "793ad505-261f-44ae-a197-a7c0e496dd69",
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Jira Get All Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Google Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jira Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jira Get All Issues": {
+      "main": [
+        [
+          {
+            "node": "Jira Get All Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jira Get All Comments": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

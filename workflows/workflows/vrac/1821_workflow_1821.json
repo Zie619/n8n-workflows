@@ -1,0 +1,221 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "1c041974-2a1f-4464-be3e-70b8a700f40d",
+      "name": "Get ticket",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        460,
+        480
+      ],
+      "parameters": {
+        "id": "={{$node[\"On new Zendesk ticket\"].json[\"body\"][\"id\"]}}",
+        "operation": "get"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "24",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4a05b2a-2382-44af-8226-a2c60bee1ce3",
+      "name": "Create task",
+      "type": "n8n-nodes-base.asana",
+      "position": [
+        1000,
+        580
+      ],
+      "parameters": {
+        "name": "={{$node[\"Get ticket\"].json[\"subject\"]}}",
+        "workspace": "1177253494675264",
+        "otherProperties": {
+          "assignee": "1202718619090236",
+          "assignee_status": "inbox"
+        }
+      },
+      "credentials": {
+        "asanaApi": {
+          "id": "8",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "55128ee9-9210-4341-bf9a-2e4ea415b668",
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        820,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Determine\"].json[\"Asana GID\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6319045c-7df8-4031-b738-835f8fe12d06",
+      "name": "Update ticket",
+      "type": "n8n-nodes-base.zendesk",
+      "notes": "Update the Zendesk ticket by adding the Jira issue key to the \"Jira Issue Key\" field.",
+      "position": [
+        1180,
+        580
+      ],
+      "parameters": {
+        "id": "={{$node[\"On new Zendesk ticket\"].json[\"body\"][\"id\"]}}",
+        "operation": "update",
+        "updateFields": {
+          "customFieldsUi": {
+            "customFieldsValues": [
+              {
+                "id": 6707064637597,
+                "value": "={{$node[\"Create task\"].json[\"gid\"]}}"
+              }
+            ]
+          }
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "24",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "39172e43-def7-4e05-9ce3-6d0bb1c3ff59",
+      "name": "Determine",
+      "type": "n8n-nodes-base.function",
+      "notes": "if issue was created already in Jira",
+      "position": [
+        640,
+        480
+      ],
+      "parameters": {
+        "functionCode": "/* configure here =========================================================== */\n/*  Zendesk field ID which represents the \"Jira Issue Key\" field.\n*/\nconst ISSUE_KEY_FIELD_ID = 6707064637597;\n\n/* ========================================================================== */\nnew_items = [];\n\nfor (item of $items(\"Get ticket\")) {\n    \n    // instantiate a new variable for status\n    var custom_fields = item.json[\"custom_fields\"];\n    var asana_gid = \"\";\n    for (var i = 0; i < custom_fields.length; i++) {\n        if (custom_fields[i].id == ISSUE_KEY_FIELD_ID) {\n            asana_gid = custom_fields[i].value;\n            break;\n        }\n    }\n\n    // push the new item to the new_items array\n    new_items.push({\n        \"Asana GID\": asana_gid\n    });\n}\n\nreturn new_items;"
+      },
+      "notesInFlow": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "26f2aaf3-8b21-429f-bfec-c5876792d4b9",
+      "name": "Create comment on existing task",
+      "type": "n8n-nodes-base.asana",
+      "position": [
+        1000,
+        380
+      ],
+      "parameters": {
+        "id": "={{$node[\"Determine\"].json[\"Asana GID\"]}}",
+        "text": "=<body>{{$node[\"On new Zendesk ticket\"].json[\"body\"][\"comment\"]}}</body>",
+        "resource": "taskComment",
+        "isTextHtml": true,
+        "additionalFields": {}
+      },
+      "credentials": {
+        "asanaApi": {
+          "id": "8",
+          "name": "[UPDATE ME]"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bbbf0fc1-3fa7-4a15-a949-c8d9d5e32031",
+      "name": "On new Zendesk ticket",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        280,
+        480
+      ],
+      "webhookId": "4637a853-0b3a-43d4-9d76-92e1ce87889d",
+      "parameters": {
+        "path": "4637a853-0b3a-43d4-9d76-92e1ce87889d",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Create comment on existing task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get ticket": {
+      "main": [
+        [
+          {
+            "node": "Determine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create task": {
+      "main": [
+        [
+          {
+            "node": "Update ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On new Zendesk ticket": {
+      "main": [
+        [
+          {
+            "node": "Get ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

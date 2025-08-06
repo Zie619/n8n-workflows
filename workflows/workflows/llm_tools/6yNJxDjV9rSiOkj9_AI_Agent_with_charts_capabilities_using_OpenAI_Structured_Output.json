@@ -1,0 +1,287 @@
+{
+  "id": "6yNJxDjV9rSiOkj9",
+  "meta": {
+    "instanceId": "f4f5d195bb2162a0972f737368404b18be694648d365d6c6771d7b4909d28167",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "AI Agent with charts capabilities using OpenAI Structured Output",
+  "tags": [
+    {
+      "id": "9tRfTc35T5pruw03",
+      "name": "experiment",
+      "createdAt": "2024-03-18T15:32:10.504Z",
+      "updatedAt": "2024-03-18T15:32:10.504Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "4b7c314a-d7c5-46cb-af6f-b3ff02a182b7",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        980,
+        600
+      ],
+      "parameters": {
+        "model": "gpt-4o-mini-2024-07-18",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "WqzqjezKh8VtxdqA",
+          "name": "OpenAi account - Baptiste"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "cf4ffa49-8830-4db2-9a7d-b8931e806947",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        1120,
+        600
+      ],
+      "parameters": {},
+      "typeVersion": 1.2
+    },
+    {
+      "id": "22d36226-ca37-4ccc-a2d6-826b78c2f1f3",
+      "name": "Generate a chart",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        1260,
+        600
+      ],
+      "parameters": {
+        "name": "generate_a_chart",
+        "schemaType": "manual",
+        "workflowId": "={{ $workflow.id }}",
+        "description": "Call this tool whenever you need to generate a chart.",
+        "inputSchema": "{\n\"type\": \"object\",\n\"properties\": {\n\t\"query\": {\n\t\t\"type\": \"string\",\n\t\t\"description\": \"a query describing the chart to generate\"\n\t\t}\n\t}\n}",
+        "specifyInputSchema": true
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "d9ea85d7-3a56-4a95-88c8-60e5c95014e7",
+      "name": "Execute \"Generate a chart\" tool",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        580,
+        1100
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "68d538f7-acce-447f-9ab1-6975639e05f7",
+      "name": "OpenAI - Generate Chart definition with Structured Output",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        1100
+      ],
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n    \"model\": \"gpt-4o-2024-08-06\",\n    \"messages\": [\n        {\n            \"role\": \"system\",\n            \"content\": \"Based on the user request, generate a valid Chart.js definition. Important: - Be careful with the data scale and beginatzero that all data are visible. Example if ploted data 2 and 3 on a bar chart, the baseline should be 0. - Charts colors should be different only if there are multiple datasets. - Output valid JSON. In scales, min and max are numbers. Example: `{scales:{yAxes:[{ticks:{min:0,max:3}`\"\n        },\n        {\n            \"role\": \"user\",\n            \"content\": \"{{ $json.query.query }}\"\n        }\n    ],\n    \"response_format\": {\n  \"type\": \"json_schema\",\n  \"json_schema\": {\n    \"name\": \"chart_configuration\",\n    \"description\": \"Configuration schema for Chart.js charts\",\n    \"strict\": true,\n    \"schema\": {\n  \"type\": \"object\",\n  \"properties\": {\n    \"type\": {\n      \"type\": \"string\",\n      \"enum\": [\"bar\", \"line\", \"radar\", \"pie\", \"doughnut\", \"polarArea\", \"bubble\", \"scatter\", \"area\"]\n    },\n    \"data\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"labels\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          }\n        },\n        \"datasets\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"label\": {\n                \"type\": [\"string\", \"null\"]\n              },\n              \"data\": {\n                \"type\": \"array\",\n                \"items\": {\n                  \"type\": \"number\"\n                }\n              },\n              \"backgroundColor\": {\n                \"type\": [\"array\", \"null\"],\n                \"items\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"borderColor\": {\n                \"type\": [\"array\", \"null\"],\n                \"items\": {\n                  \"type\": \"string\"\n                }\n              },\n              \"borderWidth\": {\n                \"type\": [\"number\", \"null\"]\n              }\n            },\n            \"required\": [\"data\", \"label\", \"backgroundColor\", \"borderColor\", \"borderWidth\"],\n            \"additionalProperties\": false\n          }\n        }\n      },\n      \"required\": [\"labels\", \"datasets\"],\n      \"additionalProperties\": false\n    },\n    \"options\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"scales\": {\n          \"type\": [\"object\", \"null\"],\n          \"properties\": {\n            \"yAxes\": {\n              \"type\": \"array\",\n              \"items\": {\n                \"type\": [\"object\", \"null\"],\n                \"properties\": {\n                  \"ticks\": {\n                    \"type\": [\"object\", \"null\"],\n                    \"properties\": {\n                      \"max\": {\n                        \"type\": [\"number\", \"null\"]\n                      },\n                      \"min\": {\n                        \"type\": [\"number\", \"null\"]\n                      },\n                      \"stepSize\": {\n                        \"type\": [\"number\", \"null\"]\n                      },\n                      \"beginAtZero\": {\n                        \"type\": [\"boolean\", \"null\"]\n                      }\n                    },\n                    \"required\": [\"max\", \"min\", \"stepSize\", \"beginAtZero\"],\n                    \"additionalProperties\": false\n                  },\n                  \"stacked\": {\n                    \"type\": [\"boolean\", \"null\"]\n                  }\n                },\n                \"required\": [\"ticks\", \"stacked\"],\n                \"additionalProperties\": false\n              }},\n              \"xAxes\": {\n                \"type\": [\"object\", \"null\"],\n                \"properties\": {\n                  \"stacked\": {\n                    \"type\": [\"boolean\", \"null\"]\n                  }\n                },\n                \"required\": [\"stacked\"],\n                \"additionalProperties\": false\n              }\n          },\n          \"required\": [\"yAxes\", \"xAxes\"],\n          \"additionalProperties\": false\n        },\n        \"plugins\": {\n          \"type\": [\"object\", \"null\"],\n          \"properties\": {\n            \"title\": {\n              \"type\": [\"object\", \"null\"],\n              \"properties\": {\n                \"display\": {\n                  \"type\": [\"boolean\", \"null\"]\n                },\n                \"text\": {\n                  \"type\": [\"string\", \"null\"]\n                }\n              },\n              \"required\": [\"display\", \"text\"],\n              \"additionalProperties\": false\n            },\n            \"legend\": {\n              \"type\": [\"object\", \"null\"],\n              \"properties\": {\n                \"display\": {\n                  \"type\": [\"boolean\", \"null\"]\n                },\n                \"position\": {\n                  \"type\": [\"string\", \"null\"],\n                  \"enum\": [\"top\", \"left\", \"bottom\", \"right\", null]\n                }\n              },\n              \"required\": [\"display\", \"position\"],\n              \"additionalProperties\": false\n            }\n          },\n          \"required\": [\"title\", \"legend\"],\n          \"additionalProperties\": false\n        }\n      },\n      \"required\": [\"scales\", \"plugins\"],\n      \"additionalProperties\": false\n    }\n  },\n  \"required\": [\"type\", \"data\", \"options\"],\n  \"additionalProperties\": false\n}\n}\n}\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "=Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "nodeCredentialType": "openAiApi"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "WqzqjezKh8VtxdqA",
+          "name": "OpenAi account - Baptiste"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "0fd4ad08-ad85-4d0b-b75f-0e59f789cbfd",
+      "name": "Set response",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1120,
+        1100
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "37512e1a-8376-4ba0-bdcd-34bb9329ae4b",
+              "name": "response",
+              "type": "string",
+              "value": "={{ encodeURIComponent(\"https://quickchart.io/chart?width=200&c=\"+$json.choices[0].message.content) }}\n\n"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "6785cadb-4875-47ac-9b57-29b583c53937",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        20,
+        260
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 680.7609104727082,
+        "height": 619.3187860363884,
+        "content": "## Workflow: AI Agent with charts capabilities using OpenAI Structured Output\n\n**Overview**\n- This workflow is a experiment to integrate charts into an AI Agent\n- The AI Agent has normal AI conversation and can invoke a tool to integrate a graph in the conversation.\n- It uses OpenAI Structured Output to generate a chart definition according to Quickchart specifications.\n\n\n**How it works**\n- Activate the workflow\n- Start chatting with the AI Agent.\n- When the AI Agent detects that the user needs a chat, it calls the tool\n- The tool calls the sub-workflow with a query.\n- The sub-workflow calls the HTTP Request node (calling OpenAI) to retrieve a chart definition\n- In the \"set response\" node, he chat definition is added at the end of a quickchart.io url - the URL to the chart image. It is sent back to the AI Agent.\n- The AI Agent uses this image in its response.\n- For example, you can ask the AI Agent to generate a chart about the top 5 movies at the box office\n\n\n**Notes**\n- The full Quickchart.io specifications have not been integrated, thus there are some possible glitches (e.g due to the size of the graph, radar graphs are not displayed properly)\n- This could be provided to any automation, not only AI Agents."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fd507ff6-2d16-4498-ba2b-d91b02079311",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        800
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 768.8586342909368,
+        "height": 503,
+        "content": "## Generate a Quickchart definition\n\n**HTTP Request node**\n- Send the chart query to OpenAI, with a defined JSON response format - *using HTTP Request node as it has not yet been implemented in the OpenAI nodes*\n- The JSON structure is based on ChartJS and Quickchart.io definitions, that let us create nice looking graphs.\n- The output is a JSON containing the chart definition that is passed to the next node.\n\n**Set Response node**\n- Adds the chart definition at the end of a Quickchart.io URL ([see documentation](https://quickchart.io/documentation/usage/parameters/))\n- Note that in the parameters, we specify the width to 250 in order to be properly displayed in the chart interface."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7f14532a-75ee-40f8-a45b-0f037af7cb05",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        260
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 768,
+        "height": 485.8165429718969,
+        "content": "### Chat Agent\n- This is agent is mostly here to demonstrate how to use the sub workflow.\n- This is a basic agent with a tool \"generate a chart\"\n- The tool calls the sub-workflow\n- The sub-workflow responds with the Quickchart URL that is displayed in the conversation"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7793a567-c4d4-4745-83c9-adf5397755e9",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1020,
+        400
+      ],
+      "parameters": {
+        "options": {
+          "systemMessage": "You're a general purpose ai. Using markdown, you can display images in the conversation. Don't change the width of the chart"
+        }
+      },
+      "typeVersion": 1.6
+    },
+    {
+      "id": "71bd2cb5-7b20-4d83-adba-c1fd57511155",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        840,
+        400
+      ],
+      "webhookId": "1281cd48-08a0-431d-9bf5-9bb60e6b7a77",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3af7cf64-60dc-4ba6-9ac6-f7ed2453812c",
+  "connections": {
+    "Generate a chart": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute \"Generate a chart\" tool": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Generate Chart definition with Structured Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Generate Chart definition with Structured Output": {
+      "main": [
+        [
+          {
+            "node": "Set response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,313 @@
+{
+  "meta": {
+    "instanceId": "ce110ceecbd52a55e2f86f58f176c40bfe61a2a2c6b384a681009bc6b9ef0dd4",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "dd049dd7-3f85-4c36-a4ec-d5df856fed14",
+      "name": "Notion Trigger",
+      "type": "n8n-nodes-base.notionTrigger",
+      "position": [
+        -100,
+        360
+      ],
+      "parameters": {
+        "event": "pagedUpdatedInDatabase",
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "databaseId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "f50f830b-cadd-4d9c-9a38-bb22e284193e",
+          "cachedResultUrl": "https://www.notion.so/f50f830bcadd4d9c9a38bb22e284193e",
+          "cachedResultName": "Journal"
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "C26NOhx95lnHIdzV",
+          "name": "Notion account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4bedb493-7a17-4d3f-8b00-93d7134e74ca",
+      "name": "Notion",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        320,
+        220
+      ],
+      "parameters": {
+        "blockId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "resource": "block",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "C26NOhx95lnHIdzV",
+          "name": "Notion account"
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "8994422e-8b71-4638-be36-d105557a20d8",
+      "name": "Notion Node Blocks to Md",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        760,
+        220
+      ],
+      "parameters": {
+        "jsCode": "function notionToMarkdown(blocks) {\n  return blocks\n    .map(block => {\n      if (!block.json.content) return \"\"; // Skip empty content\n      \n      switch (block.json.type) {\n        case \"heading_1\":\n          return `# ${block.json.content}`;\n        case \"heading_2\":\n          return `## ${block.json.content}`;\n        case \"heading_3\":\n          return `### ${block.json.content}`;\n        case \"bulleted_list_item\":\n          return `- ${block.json.content}`;\n        case \"to_do\":\n          return `- [ ] ${block.json.content}`;\n        case \"paragraph\":\n          return `${block.json.content}`;\n        default:\n          return \"\"; // Ignore unsupported types\n      }\n    })\n    .filter(line => line.trim() !== \"\") // Remove empty lines\n    .join(\"\\n\\n\"); // Ensure proper spacing\n}\nconsole.log($input.all())\nreturn [ {\"md\": notionToMarkdown($input.all())} ]"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4321475e-3eac-4aea-bcd6-11d764af0f02",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        560,
+        540
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "results"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b0f9b62c-009e-4d00-9d5d-5e1ea3f1314b",
+      "name": "Full Notion Blocks to Md",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        760,
+        540
+      ],
+      "parameters": {
+        "jsCode": "function jsonToMarkdown(blocks) {\n    let markdown = \"\";\n\n    function parseRichText(richTextArray) {\n        return richTextArray.map(text => {\n            let content = text.text.content;\n            if (text.annotations.bold) content = `**${content}**`;\n            if (text.annotations.italic) content = `*${content}*`;\n            if (text.annotations.strikethrough) content = `~~${content}~~`;\n            if (text.annotations.underline) content = `_${content}_`;\n            if (text.annotations.code) content = `\\`${content}\\``;\n            if (text.text.link) content = `[${content}](${text.text.link.url})`;\n            return content;\n        }).join(\"\");\n    }\n\n    blocks.forEach(block => {\n        switch (block.json.type) {\n            case \"heading_1\":\n                markdown += `\\n# ${parseRichText(block.json.heading_1.rich_text)}\\n`;\n                break;\n            case \"heading_2\":\n                markdown += `\\n## ${parseRichText(block.json.heading_2.rich_text)}\\n`;\n                break;\n            case \"heading_3\":\n                markdown += `\\n### ${parseRichText(block.json.heading_3.rich_text)}\\n`;\n                break;\n            case \"paragraph\":\n                markdown += `\\n${parseRichText(block.json.paragraph.rich_text)}\\n`;\n                break;\n            case \"bulleted_list_item\":\n                markdown += `- ${parseRichText(block.json.bulleted_list_item.rich_text)}\\n`;\n                break;\n            case \"numbered_list_item\":\n                markdown += `1. ${parseRichText(block.json.numbered_list_item.rich_text)}\\n`;\n                break;\n            case \"to_do\":\n                let checked = block.json.to_do.checked ? \"[x]\" : \"[ ]\";\n                markdown += `- ${checked} ${parseRichText(block.json.to_do.rich_text)}\\n`;\n                break;\n            case \"quote\":\n                markdown += `\\n> ${parseRichText(block.json.quote.rich_text)}\\n`;\n                break;\n            case \"code\":\n                markdown += `\\n\\\n\\`${block.code.language}\\`\\n\\\n${parseRichText(block.json.code.rich_text)}\\n\\\n\\n`;\n                break;\n            case \"unsupported\":\n                break;\n        }\n    });\n\n    return markdown.trim();\n}\n\nreturn [ { \"md\": jsonToMarkdown($input.all()) }];\n\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b3224aea-ca82-4e11-9e7f-df062f20512d",
+      "name": "Md to Notion Blocks v3",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1100,
+        340
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function markdownToNotionBlocks(markdown) {\n    const lines = markdown.split('\\n');\n    const blocks = [];\n    let currentList = null;\n    \n    function parseRichText(text) {\n        const richText = [];\n        const regex = /(\\*\\*|__)(.*?)\\1|(_|\\*)(.*?)\\3|(`)(.*?)\\5|(\\[)(.*?)\\]\\((.*?)\\)/g;\n        let lastIndex = 0;\n        \n        text.replace(regex, (match, bold1, boldText, italic1, italicText, code1, codeText, link1, linkText, linkUrl, index) => {\n            if (index > lastIndex) {\n                richText.push({ text: { content: text.slice(lastIndex, index) } });\n            }\n            \n            if (boldText) {\n                richText.push({ text: { content: boldText }, annotations: { bold: true } });\n            } else if (italicText) {\n                richText.push({ text: { content: italicText }, annotations: { italic: true } });\n            } else if (codeText) {\n                richText.push({ text: { content: codeText }, annotations: { code: true } });\n            } else if (linkText) {\n                richText.push({ text: { content: linkText, link: { url: linkUrl } } });\n            }\n            \n            lastIndex = index + match.length;\n        });\n        \n        if (lastIndex < text.length) {\n            richText.push({ text: { content: text.slice(lastIndex) } });\n        }\n        \n        return richText.length > 0 ? richText : [{ text: { content: text } }];\n    }\n    \n    for (const line of lines) {\n        if (line.startsWith('# ')) {\n            blocks.push({ type: 'heading_1', heading_1: { rich_text: parseRichText(line.slice(2)) } });\n        } else if (line.startsWith('## ')) {\n            blocks.push({ type: 'heading_2', heading_2: { rich_text: parseRichText(line.slice(3)) } });\n        } else if (line.startsWith('### ')) {\n            blocks.push({ type: 'heading_3', heading_3: { rich_text: parseRichText(line.slice(4)) } });\n        } else if (line.startsWith('- ')) {\n            if (!currentList) {\n                currentList = { type: 'bulleted_list_item', bulleted_list_item: { rich_text: parseRichText(line.slice(2)) } };\n                blocks.push(currentList);\n            } else {\n                blocks.push({ type: 'bulleted_list_item', bulleted_list_item: { rich_text: parseRichText(line.slice(2)) } });\n            }\n        } else if (line.startsWith('> ')) {\n            blocks.push({ type: 'quote', quote: { rich_text: parseRichText(line.slice(2)) } });\n        } else if (line.startsWith('```')) {\n            const codeLines = [];\n            while (lines.length && !lines[0].startsWith('```')) {\n                codeLines.push(lines.shift());\n            }\n            blocks.push({ type: 'code', code: { rich_text: [{ text: { content: codeLines.join('\\n') } }] } });\n        } else if (line.trim()) {\n            blocks.push({ type: 'paragraph', paragraph: { rich_text: parseRichText(line) } });\n        }\n    }\n    \n    return blocks;\n}\n\n\nreturn { \"blocks\" : markdownToNotionBlocks($json.md)};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "1af23a39-132a-45c5-8e71-090d0c4cf7df",
+      "name": "Add blocks as Children",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1340,
+        340
+      ],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/blocks/{{ $('Notion Trigger').first().json.id }}/children",
+        "method": "PATCH",
+        "options": {},
+        "jsonBody": "={\n  \"children\": {{ $json.blocks.toJsonString() }}\n} ",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "C26NOhx95lnHIdzV",
+          "name": "Notion account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "89883f62-11f6-49ff-bbcf-f9e45399e73e",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        280,
+        100
+      ],
+      "parameters": {
+        "width": 640,
+        "height": 300,
+        "content": "## Either use the official Notion getAll: Blocks node\nThis removes formatting like bold and links. "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c3c10d91-1380-4525-a1d7-0fc9c8218f2b",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        280,
+        440
+      ],
+      "parameters": {
+        "width": 640,
+        "height": 260,
+        "content": "## ... or get block rich text data\nwith custom HTTP request."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7be73933-e515-4273-adeb-59832313bbf3",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -180,
+        220
+      ],
+      "parameters": {
+        "width": 340,
+        "height": 340,
+        "content": "## Configure a notion connection."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "55e20cdd-d567-4f67-96bf-15db71a92060",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        200
+      ],
+      "parameters": {
+        "height": 320,
+        "content": "## This will triple the content by way of demo."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bc62cd3b-cc4b-4e4d-b617-e4012494a03b",
+      "name": "Get Child blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        340,
+        540
+      ],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.id }}/children",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi"
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "C26NOhx95lnHIdzV",
+          "name": "Notion account"
+        }
+      },
+      "typeVersion": 4.2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Notion": {
+      "main": [
+        [
+          {
+            "node": "Notion Node Blocks to Md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Full Notion Blocks to Md",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Trigger": {
+      "main": [
+        [
+          {
+            "node": "Notion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Child blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Child blocks": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Md to Notion Blocks v3": {
+      "main": [
+        [
+          {
+            "node": "Add blocks as Children",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Full Notion Blocks to Md": {
+      "main": [
+        [
+          {
+            "node": "Md to Notion Blocks v3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Node Blocks to Md": {
+      "main": [
+        [
+          {
+            "node": "Md to Notion Blocks v3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

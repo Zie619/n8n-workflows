@@ -1,0 +1,583 @@
+{
+  "nodes": [
+    {
+      "id": "ffe22db7-06b9-4efe-ab35-758e420dbe57",
+      "name": "END",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        -2880,
+        540
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "9480feb6-e12a-4b59-998e-bdc7b119087a",
+      "name": "Workflow 1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2620,
+        -20
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "54492842-137b-48d6-851a-1ce6cc751612",
+      "name": "Workflow 2",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2620,
+        200
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "83bbda2c-112b-4ed0-9ccd-c7a5c840100d",
+      "name": "Workflow 3",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -2620,
+        420
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "74d889d9-5215-495b-8e60-e1c78d79ae8c",
+      "name": "Incoming Webhook Data",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -4760,
+        220
+      ],
+      "webhookId": "94d08900-4816-4c74-962a-aacff5077d5d",
+      "parameters": {
+        "path": "94d08900-4816-4c74-962a-aacff5077d5d",
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cb5e3e72-6678-4efb-8301-f149014444d2",
+      "name": "Fetch Webhook Data & Declare lockValue",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -4520,
+        220
+      ],
+      "parameters": {
+        "jsCode": "// Parse the Slack payload\nconst payload = JSON.parse($('Incoming Webhook Data').first().json[\"body\"][\"payload\"]);\n\n// Extract button action details\nconst var1 = payload.var1;\nconst var2 = payload.var2;\nconst var3 = payload.var3;\n\n// Log or return the details\nreturn {\n    var1 : var1,\n    var2: var2,\n    var3: var3,\n    lockValue : `${var1}-${var2}-${var3}`\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e118f753-945b-4951-95da-394732fc636c",
+      "name": "Check Redis Lock",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        -4220,
+        220
+      ],
+      "parameters": {
+        "key": "xyz-lock",
+        "options": {},
+        "operation": "get",
+        "propertyName": "Element"
+      },
+      "credentials": {
+        "redis": {
+          "id": "o0RxOKCtencIaop1",
+          "name": "Geoffrey Redis"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c1488bae-cb82-48ce-94cd-5359d7d10b04",
+      "name": "Acquire Redis Lock",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        -3520,
+        200
+      ],
+      "parameters": {
+        "key": "xyz-lock",
+        "ttl": 180,
+        "value": "={{ $('Fetch Webhook Data & Declare lockValue').item.json.lookupVariable }}",
+        "expire": true,
+        "operation": "set"
+      },
+      "credentials": {
+        "redis": {
+          "id": "o0RxOKCtencIaop1",
+          "name": "Geoffrey Redis"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0fe5e1d8-f1e4-40e0-a3a4-4c00bbf2b50b",
+      "name": "redisLock existence boolean",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -4020,
+        220
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "905501b4-718c-44fb-b2a5-a8eaf8605511",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.Element }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "3c66fab5-2c2a-4bba-8ba1-ed85e57cd42d",
+      "name": "redisLock acquired booleans",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -3800,
+        320
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "6c071e68-a15a-4da8-b962-fe173b1eb145",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.Element }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "787d1c86-1a66-40ea-b8b6-29f50a48737c",
+      "name": "Poll for lock",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        -3520,
+        420
+      ],
+      "webhookId": "615b4c18-2c29-418c-a2bf-302ff24e5c65",
+      "parameters": {},
+      "typeVersion": 1.1
+    },
+    {
+      "id": "f5b88169-e97b-4359-890e-969dbdc6d829",
+      "name": "duplicateWebhook boolean",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -3200,
+        420
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "08500e34-cc7f-4005-87bd-f7250dc076fe",
+              "operator": {
+                "name": "filter.operator.equals",
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $('Fetch Webhook Data & Declare lockValue').item.json.lookupVariable }}",
+              "rightValue": "={{ $input.first().json.Element }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "db4e4149-7970-402c-a3d7-2cfe47b6a5b7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -4760,
+        -120
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 480,
+        "height": 220,
+        "content": "#### 🔒 This workflow demonstrates Redis-based locking to prevent concurrent execution of workflows.\n\n**Steps:**\n+ Try to acquire a lock via Redis\n+ If successful, execute workflow\n+ If duplicate request; ignore request\n+ Release the lock after completion"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "879b7ab5-402b-4ea8-977b-64d29cd9bb39",
+      "name": "Discard Redis Lock",
+      "type": "n8n-nodes-base.redis",
+      "position": [
+        -2320,
+        200
+      ],
+      "parameters": {
+        "key": "n8n-rca-lock",
+        "operation": "delete"
+      },
+      "credentials": {
+        "redis": {
+          "id": "o0RxOKCtencIaop1",
+          "name": "Geoffrey Redis"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "494030d6-e731-4f4f-9193-7b46f2d470d0",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -3580,
+        80
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 220,
+        "height": 80,
+        "content": "Attempts to acquire a lock using Redis by setting a key with expiration."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a643b45e-2067-4c42-8c1c-365b3fea911a",
+      "name": "Workflow Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -2880,
+        200
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "1",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "2761039b-e76c-4606-9aaf-48a569942ab7",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "2",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "ef07c62f-bd3f-4f54-85b9-9dbf64915f2c",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "3",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "2dfc15de-bf33-4c25-932f-dae16758e2e6",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "5531d4c3-158c-4f98-b6fa-9ef9a85eef71",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2940,
+        680
+      ],
+      "parameters": {
+        "color": 5,
+        "height": 80,
+        "content": "Skips execution when duplicate request is received."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0a159f03-3ecc-4010-ab63-cc24df90df31",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -2320,
+        100
+      ],
+      "parameters": {
+        "color": 5,
+        "height": 80,
+        "content": "Deletes the Redis lock key to release the lock."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Workflow 1": {
+      "main": [
+        [
+          {
+            "node": "Discard Redis Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow 2": {
+      "main": [
+        [
+          {
+            "node": "Discard Redis Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow 3": {
+      "main": [
+        [
+          {
+            "node": "Discard Redis Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll for lock": {
+      "main": [
+        [
+          {
+            "node": "duplicateWebhook boolean",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Switch": {
+      "main": [
+        [
+          {
+            "node": "Workflow 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Workflow 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Workflow 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Redis Lock": {
+      "main": [
+        [
+          {
+            "node": "redisLock existence boolean",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire Redis Lock": {
+      "main": [
+        [
+          {
+            "node": "Workflow Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incoming Webhook Data": {
+      "main": [
+        [
+          {
+            "node": "Fetch Webhook Data & Declare lockValue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "duplicateWebhook boolean": {
+      "main": [
+        [
+          {
+            "node": "END",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Redis Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "redisLock acquired booleans": {
+      "main": [
+        [
+          {
+            "node": "Acquire Redis Lock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Poll for lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "redisLock existence boolean": {
+      "main": [
+        [
+          {
+            "node": "Acquire Redis Lock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "redisLock acquired booleans",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Webhook Data & Declare lockValue": {
+      "main": [
+        [
+          {
+            "node": "Check Redis Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

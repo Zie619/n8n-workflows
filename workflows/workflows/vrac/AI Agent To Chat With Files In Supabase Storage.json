@@ -1,0 +1,915 @@
+{
+  "meta": {
+    "instanceId": "6a2a7715680b8313f7cb4676321c5baa46680adfb913072f089f2766f42e43bd"
+  },
+  "nodes": [
+    {
+      "id": "f577f6bd-b1a4-48ec-9329-7bccc3fc1463",
+      "name": "Get All files",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        400,
+        -100
+      ],
+      "parameters": {
+        "url": "=https://yqtvdcvjboenlblgcivl.supabase.co/storage/v1/object/list/private",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n \"prefix\": \"\",\n \"limit\": 100,\n \"offset\": 0,\n \"sortBy\": {\n \"column\": \"name\",\n \"order\": \"asc\"\n }\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "t8AQJzvZvrOMDLec",
+          "name": "Supabase account My Airtable Gen"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "10693bc8-560d-4cf6-8bd0-2fe3f4d863d1",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "position": [
+        1780,
+        100
+      ],
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "=file_id",
+                "value": "={{ $json.id }}"
+              }
+            ]
+          }
+        },
+        "jsonData": "={{ $('Merge').item.json.data ?? $('Merge').item.json.text }}",
+        "jsonMode": "expressionData"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "49428060-e707-4269-8344-77b301f56f7c",
+      "name": "Recursive Character Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "position": [
+        1780,
+        280
+      ],
+      "parameters": {
+        "options": {},
+        "chunkSize": 500,
+        "chunkOverlap": 200
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "08742063-e235-4874-a128-b352786b19ce",
+      "name": "Extract Document PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1240,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "pdf"
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "21f19360-d7ce-4106-ae5a-aa0f15b7c4aa",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        1600,
+        80
+      ],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "fLfRtaXbR0EVD0pl",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4147409f-8686-418f-b979-04f8c8e7fe42",
+      "name": "Create File record2",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        1540,
+        -100
+      ],
+      "parameters": {
+        "tableId": "files",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $('Loop Over Items').item.json.name }}"
+            },
+            {
+              "fieldId": "storage_id",
+              "fieldValue": "={{ $('Loop Over Items').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "t8AQJzvZvrOMDLec",
+          "name": "Supabase account My Airtable Gen"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "016f1afe-172b-4609-b451-8d67609214d3",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        720,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "9b14e306-a04d-40f7-bc5b-b8eda8d8f7f2",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ \n !$('Aggregate').item.json.data || \n !Array.isArray($('Aggregate').item.json.data) || \n !$('Aggregate').item.json.data.some(item => \n item.storage_id === $('Loop Over Items').item.json.id \n ) \n}}",
+              "rightValue": ""
+            },
+            {
+              "id": "c3c0af88-9aea-4539-8948-1b69e601c27c",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.name }}",
+              "rightValue": ".emptyFolderPlaceholder"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "75e8a7db-8c4a-4ad8-b902-062cbc93e1eb",
+      "name": "Get All Files",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        20,
+        -100
+      ],
+      "parameters": {
+        "tableId": "files",
+        "operation": "getAll"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "t8AQJzvZvrOMDLec",
+          "name": "Supabase account My Airtable Gen"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b22a3bab-f615-4d8a-8832-ce25b1a385fe",
+      "name": "Download",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        900,
+        -100
+      ],
+      "parameters": {
+        "url": "=https://yqtvdcvjboenlblgcivl.supabase.co/storage/v1/object/private/{{ $json.name }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "t8AQJzvZvrOMDLec",
+          "name": "Supabase account My Airtable Gen"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "50d1fede-4bd0-4cd4-b74a-7d689fe211cc",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        560,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "batchSize": "=1"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "f9c23b5e-0b40-4886-b54f-59fb46132d3f",
+      "name": "When clicking \u2018Test workflow\u2019",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -160,
+        -100
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "0a0ec290-2c3d-40ba-8d03-6abf75202e73",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [
+        220,
+        -100
+      ],
+      "parameters": {
+        "options": {},
+        "aggregate": "aggregateAllItemData"
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "32b3e2e1-2d25-4dd1-93e8-3f693beb7b6f",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        800,
+        -1020
+      ],
+      "webhookId": "3c40d311-7996-4ed4-b2fa-c73bea5f4cf5",
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "79073b5c-a4ad-45a6-bbfa-e900a05bfde3",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        940,
+        -820
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "zJhr5piyEwVnWtaI",
+          "name": "OpenAi club"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f8663483-76d5-4fc8-ad07-7eec815ff7a6",
+      "name": "Embeddings OpenAI2",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "position": [
+        1020,
+        -540
+      ],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "SphXAX7rlwRLkiox",
+          "name": "Test club key"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a1458799-d379-46de-93e6-a5ba0c665163",
+      "name": "OpenAI Chat Model2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1300,
+        -680
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "SphXAX7rlwRLkiox",
+          "name": "Test club key"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d6eeda2f-c984-406d-a625-726840308413",
+      "name": "Vector Store Tool1",
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "position": [
+        1100,
+        -820
+      ],
+      "parameters": {
+        "name": "knowledge_base",
+        "topK": 8,
+        "description": "Retrieve data about user request"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e1d9a348-7d44-4ad1-adbd-2c9a31e06876",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1060,
+        -100
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "txt",
+              "conditions": {
+                "options": {
+                  "version": 1,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{$binary.data?.fileExtension == undefined }}",
+                    "rightValue": "txt"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "pdf",
+              "conditions": {
+                "options": {
+                  "version": 1,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "bf04cbec-dd86-4607-988f-4c96b6fd4b58",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{$binary.data.fileExtension }}",
+                    "rightValue": "pdf"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.1
+    },
+    {
+      "id": "d38afb92-87ae-4e2a-a712-ec24b1efd105",
+      "name": "Insert into Supabase Vectorstore",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "position": [
+        1700,
+        -100
+      ],
+      "parameters": {
+        "mode": "insert",
+        "options": {
+          "queryName": "match_documents"
+        },
+        "tableName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "documents",
+          "cachedResultName": "documents"
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "t8AQJzvZvrOMDLec",
+          "name": "Supabase account My Airtable Gen"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1a903b2e-cab0-4798-b820-ec08d6a71ddd",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1380,
+        -100
+      ],
+      "parameters": {},
+      "typeVersion": 3
+    },
+    {
+      "id": "3afd552e-4995-493e-9cd5-ef496dfe359f",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1020,
+        -1020
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "d9688acc-311b-42fd-afa8-2c0e493be34b",
+      "name": "Supabase Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "position": [
+        1020,
+        -660
+      ],
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "file_id",
+                "value": "300b0128-0955-4058-b0d3-a9aefe728432"
+              }
+            ]
+          }
+        },
+        "tableName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "documents",
+          "cachedResultName": "documents"
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "t8AQJzvZvrOMDLec",
+          "name": "Supabase account My Airtable Gen"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "66df007c-0418-4551-950e-32e7d79840bd",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        340,
+        -220
+      ],
+      "parameters": {
+        "height": 89.3775420487804,
+        "content": "### Replace Storage name, database ID and credentials."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b164b520-20dd-44a4-aa3b-647391786b20",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -20,
+        -220
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "### Replace credentials."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8688c219-5af4-4e54-9fd1-91851829445b",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1540,
+        -220
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "### Replace credentials."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "45c6ece4-f849-4496-8149-31385f5e36a4",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        840,
+        -220
+      ],
+      "parameters": {
+        "height": 89.3775420487804,
+        "content": "### Replace Storage name, database ID and credentials."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2ca07cb0-b5f4-4761-b954-faf2131872d9",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1500,
+        220
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "### Replace credentials."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8d682dae-6f88-42f0-a717-affffd37d882",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1140,
+        -520
+      ],
+      "parameters": {
+        "height": 80,
+        "content": "### Replace credentials."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "796b5dca-d60e-43a9-afe8-194244643557",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -520,
+        -940
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 330.5152611046425,
+        "height": 239.5888196628349,
+        "content": "### ... or watch set up video [10 min]\n[![Youtube Thumbnail](https://res.cloudinary.com/de9jgixzm/image/upload/v1739773273/Youtube%20Thumbs/Chat%20With%20FIles.png)](https://www.youtube.com/watch?v=glWUkdZe_3w)\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eba121de-a3f7-4ba5-8396-f7d64e648322",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -820,
+        -1460
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 636.2128494576581,
+        "height": 497.1532689930921,
+        "content": "![5min Logo](https://res.cloudinary.com/de9jgixzm/image/upload/v1739773200/Skool%20Assets/ejm3hqnvhgwpnu2fv92s.png)\n## AI Agent To Chat With Files In Supabase Storage\n**Made by [Mark Shcherbakov](https://www.linkedin.com/in/marklowcoding/) from community [5minAI](https://www.skool.com/5minai-2861)**\n\nManually retrieving and analyzing specific information from large document repositories is time-consuming and inefficient. This workflow automates the process by vectorizing documents and enabling AI-powered interactions, making it easy to query and retrieve context-based information from uploaded files.\n\nThe workflow integrates Supabase with an AI-powered chatbot to process, store, and query text and PDF files. The steps include:\n- Fetching and comparing files to avoid duplicate processing.\n- Handling file downloads and extracting content based on the file type.\n- Converting documents into vectorized data for contextual information retrieval.\n- Storing and querying vectorized data from a Supabase vector store.\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "df054036-d6b9-4f53-86cb-85ad96f07d0e",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -820,
+        -940
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 280.2462120317618,
+        "height": 545.9087885077763,
+        "content": "### Set up steps\n\n1. **Fetch File List from Supabase**:\n - Use Supabase to retrieve the stored file list from a specified bucket.\n - Add logic to manage empty folder placeholders returned by Supabase, avoiding incorrect processing.\n\n2. **Compare and Filter Files**:\n - Aggregate the files retrieved from storage and compare them to the existing list in the Supabase `files` table.\n - Exclude duplicates and skip placeholder files to ensure only unprocessed files are handled.\n\n3. **Handle File Downloads**:\n - Download new files using detailed storage configurations for public/private access.\n - Adjust the storage settings and GET requests to match your Supabase setup.\n\n4. **File Type Processing**:\n - Use a Switch node to target specific file types (e.g., PDFs or text files).\n - Employ relevant tools to process the content:\n - For PDFs, extract embedded content.\n - For text files, directly process the text data.\n\n5. **Content Chunking**:\n - Break large text data into smaller chunks using the Text Splitter node.\n - Define chunk size (default: 500 tokens) and overlap to retain necessary context across chunks.\n\n6. **Vector Embedding Creation**:\n - Generate vectorized embeddings for the processed content using OpenAI's embedding tools.\n - Ensure metadata, such as file ID, is included for easy data retrieval.\n\n7. **Store Vectorized Data**:\n - Save the vectorized information into a dedicated Supabase vector store.\n - Use the default schema and table provided by Supabase for seamless setup.\n\n8. **AI Chatbot Integration**:\n - Add a chatbot node to handle user input and retrieve relevant document chunks.\n - Use metadata like file ID for targeted queries, especially when multiple documents are involved."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "450a1e49-4be9-451a-9d05-2860e29c3695",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        -1160
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 951.7421645394404,
+        "height": 809.7437181509877,
+        "content": "## Scenario 2 - AI agent"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c3814c5d-8881-4598-897e-268019bee1bc",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -260,
+        -280
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 2304.723519246249,
+        "height": 739.2522526116408,
+        "content": "## Scenario 1 - Flow for adding new files from Supabase storage"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Download",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Create File record2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Document PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Get All files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Files": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All files": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        null,
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert into Supabase Vectorstore",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Vector Store Tool1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vector Store Tool1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create File record2": {
+      "main": [
+        [
+          {
+            "node": "Insert into Supabase Vectorstore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert into Supabase Vectorstore",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Document PDF": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Supabase Vector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Vector Store Tool1",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into Supabase Vectorstore": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \u2018Test workflow\u2019": {
+      "main": [
+        [
+          {
+            "node": "Get All Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

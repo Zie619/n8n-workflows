@@ -1,0 +1,247 @@
+{
+  "nodes": [
+    {
+      "id": "aea55995-2c2c-4f59-8b68-43fa1871bb4c",
+      "name": "Replace Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        860,
+        140
+      ],
+      "parameters": {
+        "url": "=https://slides.googleapis.com/v1/presentations/{{ $('Webhook').item.json[\"body\"][\"presentation_id\"] }}:batchUpdate ",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"requests\": [\n    {\n        \"replaceImage\": {\n          \"imageObjectId\": \"{{ $json.objectId }}\",\n          \"url\": \"{{ $('Webhook').item.json[\"body\"][\"image_url\"] }}\",\n          \"imageReplaceMethod\": \"CENTER_CROP\"\n        }\n    },\n    {\n      \"updatePageElementAltText\": {\n        \"objectId\": \"{{ $json.objectId }}\",\n        \"description\": \"{{ $('Webhook').item.json[\"body\"][\"image_key\"] }}\"\n      }\n    }\n  ]\n}  \n   ",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSlidesOAuth2Api"
+      },
+      "credentials": {
+        "googleSlidesOAuth2Api": {
+          "id": "XnM5YeAtI5QnYrMh",
+          "name": "Google Slides account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "92eeca3a-47b2-4daa-ac51-5b957c8d7d56",
+      "name": "Error Missing Fields",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        500,
+        340
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 500
+        },
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"Missing fields.\"\n}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "14878542-6a42-4fe4-8dd6-328450a883eb",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1040,
+        140
+      ],
+      "parameters": {
+        "options": {},
+        "respondWith": "json",
+        "responseBody": "{\n  \"message\": \"Image replaced.\"\n}"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "ac42249b-3c7d-4ba1-be7d-ba6e1ae652cd",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        60,
+        -540
+      ],
+      "parameters": {
+        "width": 596.8395976509729,
+        "height": 654.4370838798395,
+        "content": "## Dynamically Replace Images in Google Slides\nThis workflow exposes an API endpoint that lets you dynamically replace an image in Google Slides, perfect for automating deck presentations like updating backgrounds or client logos.\n\n### Step 1: Set Up a Key Identifier in Google Slides\nAdd a unique key identifier to the images you want to replace.\n1. Click on the image.\n2. Go to **Format Options** and then **Alt Text**.\n3. Enter your unique identifier, like `client_logo` or `background`.\n\n### Step 2: Use a POST Request to Update the Image\nSend a POST request to the workflow endpoint with the following parameters in the body:\n- `presentation_id`: The ID of your Google Slides presentation.\nYou can find it in the URL of your Google presentation : `https://docs.google.com/presentation/d/{this-part}/edit#slide=id.p`)\n- `image_key`: The unique identifier you created.\n- `image_url`: The URL of the new image.\n\nThat's it! The specified image in your Google Slides presentation will be replaced with the new one from the provided URL.\n\nThis workflow is designed to be flexible, allowing you to use the same identifier across multiple slides and presentations. I hope it streamlines your slide automation process!\n\nHappy automating!\nThe n8Ninja"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "735c5c4e-df8f-47ad-b0d7-ed57453a84d0",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        60,
+        160
+      ],
+      "webhookId": "df3b8b83-fd6d-40f8-be13-42bae85dcf63",
+      "parameters": {
+        "path": "replace-image-in-slide",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "22d1dd70-0716-4407-8e25-703355969e95",
+      "name": "Retrieve matching Images ObjectIds",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        680,
+        140
+      ],
+      "parameters": {
+        "jsCode": "const key = $('Webhook').item.json.body.image_key;\n\nconst pageElements = $input\n  .all()\n  .flatMap(item => item.json.slides)\n  .flatMap(slide => slide.pageElements.filter(el => el.image && el.description === key));\n\nconst objectIds = pageElements.map(el => ({ objectId: el.objectId }));\n\nreturn objectIds"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f942a8de-9fa8-4855-9be1-4247bae887e5",
+      "name": "Retrieve All Slide Elements",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        500,
+        140
+      ],
+      "parameters": {
+        "url": "=https://slides.googleapis.com/v1/presentations/{{ $('Webhook').item.json.body.presentation_id }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSlidesOAuth2Api"
+      },
+      "credentials": {
+        "googleSlidesOAuth2Api": {
+          "id": "XnM5YeAtI5QnYrMh",
+          "name": "Google Slides account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "ddcbe7ed-9abc-49ac-98e5-4d5222a641d4",
+      "name": "Check if all params are provided",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        260,
+        160
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "3272f7e8-4bc2-44bd-9760-437b2992e6e7",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.body.presentation_id }}",
+              "rightValue": ""
+            },
+            {
+              "id": "9e8abf56-622d-4704-95ea-c0f5f31683dd",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.body.image_key }}",
+              "rightValue": ""
+            },
+            {
+              "id": "d2cec4c9-2a90-4a24-ab6c-628689419698",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.body.image_url }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check if all params are provided",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Images": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve All Slide Elements": {
+      "main": [
+        [
+          {
+            "node": "Retrieve matching Images ObjectIds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if all params are provided": {
+      "main": [
+        [
+          {
+            "node": "Retrieve All Slide Elements",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Missing Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve matching Images ObjectIds": {
+      "main": [
+        [
+          {
+            "node": "Replace Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

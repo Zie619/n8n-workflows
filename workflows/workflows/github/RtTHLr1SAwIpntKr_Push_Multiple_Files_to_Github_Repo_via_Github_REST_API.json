@@ -1,0 +1,402 @@
+{
+  "id": "RtTHLr1SAwIpntKr",
+  "meta": {
+    "instanceId": "ddfdf733df99a65c801a91865dba5b7c087c95cc22a459ff3647e6deddf2aee6"
+  },
+  "name": "Push Multiple Files to Github Repo via Github REST API",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "f9de827d-6aea-47f9-ac01-bf41e9a41642",
+      "name": "Get latest commit SHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -300,
+        180
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Set Github Info').item.json['Github Username'] }}/{{ $('Set Github Info').item.json['Github Repo'] }}/git/refs/heads/{{ $('Set Github Info').item.json['Github Branch'] }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Set Github Info').item.json['Github Token'] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "28576f1f-2e41-46fe-9bb3-9e4678bb3f45",
+      "name": "Get base tree SHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -120,
+        180
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Set Github Info').item.json['Github Username'] }}/{{ $('Set Github Info').item.json['Github Repo'] }}/git/commits/{{ $json.object.sha }}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Set Github Info').item.json['Github Token'] }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "eb3c7f72-a2bd-4ef2-ae9d-e548746a1260",
+      "name": "Create new tree",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        60,
+        180
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Set Github Info').item.json['Github Username'] }}/{{ $('Set Github Info').item.json['Github Repo'] }}/git/trees",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendHeaders": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "base_tree",
+              "value": "={{ $json[\"tree\"][\"sha\"] }}"
+            },
+            {
+              "name": "tree[0].path",
+              "value": "public/file1.txt"
+            },
+            {
+              "name": "tree[0].mode",
+              "value": "100644"
+            },
+            {
+              "name": "tree[0].type",
+              "value": "blob"
+            },
+            {
+              "name": "tree[0].content",
+              "value": "={{ $('File 1').item.json.content }}"
+            },
+            {
+              "name": "tree[1].path",
+              "value": "public/file2.txt"
+            },
+            {
+              "name": "tree[1].mode",
+              "value": "100644"
+            },
+            {
+              "name": "tree[1].type",
+              "value": "blob"
+            },
+            {
+              "name": "tree[1].content",
+              "value": "={{ $('File 2').item.json.content }}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Set Github Info').item.json['Github Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "ba76ddd3-844a-4aa1-8a5a-efaa2f228044",
+      "name": "Create commit",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        240,
+        180
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Set Github Info').item.json['Github Username'] }}/{{ $('Set Github Info').item.json['Github Repo'] }}/git/commits",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"message\": \"{{ $('Set Github Info').item.json['Github Commit Update Message'] }}\",\n  \"tree\": \"{{ $json.sha }}\",\n  \"parents\": [\"{{ $('Get latest commit SHA').item.json.object.sha }}\"]\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Set Github Info').item.json['Github Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "3a29539c-dd3f-4092-9d36-84fe9d65c2bf",
+      "name": "Update branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        420,
+        180
+      ],
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('Set Github Info').item.json['Github Username'] }}/{{ $('Set Github Info').item.json['Github Repo'] }}/git/refs/heads/{{ $('Set Github Info').item.json['Github Branch'] }}",
+        "method": "PATCH",
+        "options": {},
+        "jsonBody": "={\n  \"sha\": \"{{ $json.sha }}\",\n  \"force\": false\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Set Github Info').item.json['Github Token'] }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "891f7a36-a17d-4c32-bd62-e68c8a0ae0a7",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -300,
+        -60
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "ea97d057-fc19-49cc-a5fb-1ab0adbceacb",
+      "name": "Set Github Info",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -120,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1ba4494-05cf-4c4f-8ec1-283083fbcaa4",
+              "name": "Github Token",
+              "type": "string",
+              "value": "YOUR_GITHUB_PAT_TOKEN"
+            },
+            {
+              "id": "3e65c520-9fcd-442a-adf3-2a0f273b149b",
+              "name": "Github Repo",
+              "type": "string",
+              "value": "YOUR_GITHUB_REPO_NAME"
+            },
+            {
+              "id": "49bf7a21-6fc2-4c8c-a229-1b2f41a4de71",
+              "name": "Github Username",
+              "type": "string",
+              "value": "YOUR_GITHUB_USERNAME"
+            },
+            {
+              "id": "c8cf6bad-5c28-4536-ac16-1442a4fdbd18",
+              "name": "Github Branch",
+              "type": "string",
+              "value": "main"
+            },
+            {
+              "id": "3fea08bc-032e-4194-9fd6-9e4de79e2fcf",
+              "name": "Github Commit Update Message",
+              "type": "string",
+              "value": "Updating file1.txt and file2.txt"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "afd1d74c-7d06-4e49-a906-a9d637ce8600",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -960,
+        -80
+      ],
+      "parameters": {
+        "width": 580,
+        "height": 380,
+        "content": "## Push Multiple Files to GitHub Repo  \nA streamlined workflow for uploading multiple files to a GitHub repository via the GitHub REST API. This solution addresses a significant limitation of the native GitHub n8n node, which supports only single-file uploads.\n\nThis approach enables batch file operations, making it particularly valuable for automation scenarios that require simultaneous uploads of multiple files to your GitHub repositories.\n\n### Setup Instructions:\n1. Create a new GitHub Personal Access Token [here](https://github.com/settings/personal-access-tokens). In the \"Repository access\" section, select your repository and grant \"Read and write\" permissions under the \"Contents\" category.  \n2. Configure your GitHub information in the \"Set GitHub Info\" node.  \n3. Update the \"Create New Tree\" node with your filenames and content. You can add as many tree entries (files) as needed."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d282fec1-0fd9-4956-95b4-0437ed67ff03",
+      "name": "File 1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        60,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0ddbab7f-7073-4568-9ca5-2b3799d4a87e",
+              "name": "content",
+              "type": "string",
+              "value": "This is the content of your file #1."
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "426b3d80-c5af-4029-a4e7-b56b0af7601a",
+      "name": "File 2",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        240,
+        -60
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0ddbab7f-7073-4568-9ca5-2b3799d4a87e",
+              "name": "content",
+              "type": "string",
+              "value": "This is the content of your file #2."
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2920d785-d42a-4901-b5d9-6929ac62c132",
+  "connections": {
+    "File 1": {
+      "main": [
+        [
+          {
+            "node": "File 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File 2": {
+      "main": [
+        [
+          {
+            "node": "Get latest commit SHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create commit": {
+      "main": [
+        [
+          {
+            "node": "Update branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create new tree": {
+      "main": [
+        [
+          {
+            "node": "Create commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Github Info": {
+      "main": [
+        [
+          {
+            "node": "File 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get base tree SHA": {
+      "main": [
+        [
+          {
+            "node": "Create new tree",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get latest commit SHA": {
+      "main": [
+        [
+          {
+            "node": "Get base tree SHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Github Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

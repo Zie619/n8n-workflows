@@ -1,0 +1,146 @@
+{
+  "id": "6pOGYw5O3iOY1Gc6",
+  "meta": {
+    "instanceId": "7221598654c32899e94731aab144bdcd338735c2ac218dc0873131caa0be0ef8",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Remote IOT Sensor monitoring via MQTT and InfluxDB",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "4997f226-f236-4d27-bea4-904744d9ff07",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -700,
+        -360
+      ],
+      "parameters": {
+        "width": 340,
+        "height": 120,
+        "content": "MQTT trigger subscribed to a topic called wokwi-weather via a Mosquitto MQTT broker. The trigger receives the temperature and humidity payloads from a DHT22 sensor connected to a remote ESP32 microcontroller "
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "9d4f1da6-fda3-4312-a6b1-bd0ac499dde7",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -240,
+        -360
+      ],
+      "parameters": {
+        "height": 100,
+        "content": "Javascript code to extract the temperature and humidity values to ensure correct JSON format for the database"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d8f01dba-5019-457e-8c1a-99c802282fdf",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        140,
+        -360
+      ],
+      "parameters": {
+        "width": 260,
+        "height": 120,
+        "content": "HTTP request node posts temperature and humidity data from the DHT22 sensor to the InfluxDB data bucket running on a local host http://localhost:8086"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "020858a6-7771-4322-8eb6-b83e99b3563d",
+      "name": "Remote Sensor MQTT Trigger",
+      "type": "n8n-nodes-base.mqttTrigger",
+      "position": [
+        -580,
+        -220
+      ],
+      "parameters": {
+        "topics": "wokwi-weather",
+        "options": {}
+      },
+      "credentials": {
+        "mqtt": {
+          "id": "xtd75tjk1hKlQOba",
+          "name": "MQTT account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "51e6f59f-9b93-4121-8db4-7f47b929fdf5",
+      "name": "Data ingest to InfluxDB bucket",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        200,
+        -220
+      ],
+      "parameters": {
+        "url": "http://localhost:8086/api/v2/write?orgID=<Organization ID>&bucket=<InfluxDB bucket name>&precision=s",
+        "body": "={{ $json.payload }}",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "contentType": "raw",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Token  <API Token value generated in InfluxDB>"
+            }
+          ]
+        }
+      },
+      "notesInFlow": true,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "6abe1212-b128-492f-b485-401a4315fcbc",
+      "name": "Payload data preparation node",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -180,
+        -220
+      ],
+      "parameters": {
+        "jsCode": "// Try to parse the incoming message as JSON\nlet data;\ntry {\n  data = JSON.parse($json.message); // $json.message is expected to be a JSON string\n} catch (e) {\n  // If parsing fails, throw an error\n  throw new Error(\"Invalid JSON in MQTT message\");\n}\n\n// Get the topic from the input, or use a default value\nconst topic = $json.topic || \"unknown-topic\";\n\n// Make sure humidity and temp are numbers\nif (typeof data.humidity !== \"number\" || typeof data.temp !== \"number\") {\n  throw new Error(\"Missing or invalid humidity/temp in MQTT message\");\n}\n\n// Create a formatted string like: \"topic_name humidity=45,temp=22\"\nconst line = `${topic} humidity=${data.humidity},temp=${data.temp}`;\n\n// Return the result in the expected format\nreturn [\n  {\n    json: {\n      payload: line\n    }\n  }\n];"
+      },
+      "typeVersion": 2
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d1311dca-5edf-4f14-86b9-629937cd3416",
+  "connections": {
+    "Remote Sensor MQTT Trigger": {
+      "main": [
+        [
+          {
+            "node": "Payload data preparation node",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload data preparation node": {
+      "main": [
+        [
+          {
+            "node": "Data ingest to InfluxDB bucket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

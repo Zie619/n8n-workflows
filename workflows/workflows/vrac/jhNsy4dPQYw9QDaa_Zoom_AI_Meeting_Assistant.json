@@ -1,0 +1,795 @@
+{
+  "id": "jhNsy4dPQYw9QDaa",
+  "meta": {
+    "instanceId": "1acdaec6c8e84424b4715cf41a9f7ec057947452db21cd2e22afbc454c8711cd",
+    "templateId": "2683",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Zoom AI Meeting Assistant",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "536e360c-d668-4f58-8670-4e78ef579dbe",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        160,
+        460
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "eb2b6b98-ca3c-46a9-9d5f-9b5297441224",
+      "name": "No Recording/Transcript available",
+      "type": "n8n-nodes-base.stopAndError",
+      "position": [
+        880,
+        660
+      ],
+      "parameters": {
+        "errorMessage": "={{ $json.error.cause.message }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "33ee5d8b-a373-44a8-9777-9386cf8cf008",
+      "name": "Zoom: Get data of last meeting",
+      "type": "n8n-nodes-base.zoom",
+      "position": [
+        340,
+        460
+      ],
+      "parameters": {
+        "filters": {
+          "type": "scheduled"
+        },
+        "operation": "getAll",
+        "returnAll": true,
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "zoomOAuth2Api": {
+          "id": "MmccxSST1g202tG2",
+          "name": "Zoom account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d67d1fcb-78d1-47e5-bc0e-5735f0f48350",
+      "name": "Filter transcript URL",
+      "type": "n8n-nodes-base.set",
+      "onError": "continueRegularOutput",
+      "position": [
+        880,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ef149af8-7f9d-4e5a-8ccf-4a5f1e09eecc",
+              "name": "transcript_file",
+              "type": "string",
+              "value": "={{ $json.recording_files.find(f => f.file_type === 'TRANSCRIPT').download_url }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "41665b4e-4d3e-4da9-9b0d-c6f9f0b2cde4",
+      "name": "Filter: Only 1 item",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1060,
+        460
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "ea12b33a-ae01-403d-9f14-466dc8880874",
+      "name": "Zoom: Get transcript file",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1240,
+        460
+      ],
+      "parameters": {
+        "url": "={{ $json.transcript_file }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zoomOAuth2Api"
+      },
+      "credentials": {
+        "zoomOAuth2Api": {
+          "id": "MmccxSST1g202tG2",
+          "name": "Zoom account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "fb1c32c3-5161-499d-8cd6-7624fb78ed3e",
+      "name": "Extract text from transcript file",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1420,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "text"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "87986fd3-37f0-48cd-942a-73fd3b5bd70f",
+      "name": "Format transcript text",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1600,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "70019192-02ef-4b0a-a747-3ca5f46aeeaa",
+              "name": "transcript",
+              "type": "string",
+              "value": "={{ $json.data.split('\\r\\n\\r\\n').slice(1).map(block => {\n    const lines = block.split('\\r\\n');\n    return lines.slice(2).join(' ');\n}).join('\\n') }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "9af3559d-2fd0-481f-84d6-caefbcd8e4f2",
+      "name": "Zoom: Get participants data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1760,
+        460
+      ],
+      "parameters": {
+        "url": "=https://api.zoom.us/v2/past_meetings/{{ $('Filter: Last 24 hours').item.json.id }}/participants",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zoomOAuth2Api"
+      },
+      "credentials": {
+        "zoomOAuth2Api": {
+          "id": "MmccxSST1g202tG2",
+          "name": "Zoom account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5edc73f7-aa1b-47ae-97f7-c6f897e914a6",
+      "name": "Sort for mail delivery",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2240,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cc51b7e4-d5c2-4cd4-9488-4d181eaaa02e",
+              "name": "subject",
+              "type": "string",
+              "value": "=Meeting summary: {{ $('Zoom: Get data of last meeting').item.json.topic }} on {{ DateTime.fromISO($('Zoom: Get data of last meeting').item.json.start_time).toFormat('yyyy-MM-dd HH:mm') }}"
+            },
+            {
+              "id": "f3940ea2-9084-4c25-828e-5ddaa428ec83",
+              "name": "=to",
+              "type": "string",
+              "value": "={{ $('Zoom: Get participants data').item.json.participants[0].user_email }}"
+            },
+            {
+              "id": "1211af5b-2240-44ce-9df7-63d93f57806e",
+              "name": "body",
+              "type": "string",
+              "value": "={{ $json.output }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "29ad24ba-016b-4e65-b8c8-908d8e2207c5",
+      "name": "Format to html",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2400,
+        460
+      ],
+      "parameters": {
+        "jsCode": "const items = [];\n\nfor (const item of $input.all()) {\n  const body = item.json.body;\n  if (!body) continue;\n\n  // Simple split approach\n  const sections = body.split('\\n\\n');\n  const title = sections[0].replace(/\\*\\*/g, '');\n  const participants = sections[1].split('\\n').slice(1).join('\\n');\n  const summary = sections[2].split('\\n').slice(1).join('\\n');\n  const tasks = sections[3].split('\\n').slice(1).join('\\n');\n  const dates = sections[4].split('\\n').slice(1).join('\\n');\n\n  const html = `<html>\n<body style=\"font-family: Arial, sans-serif; max-width: 800px; margin: 20px;\">\n<h1 style=\"color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;\">${title}</h1>\n<h2 style=\"color: #2c3e50; margin-top: 20px;\">Participants:</h2>\n<ul style=\"list-style-type: none; padding-left: 20px;\">\n${participants.split('\\n').map(p => `<li>${p.replace('- ', '')}</li>`).join('\\n')}\n</ul>\n<h2 style=\"color: #2c3e50; margin-top: 20px;\">Meeting Summary:</h2>\n<p style=\"margin-left: 20px;\">${summary}</p>\n<h2 style=\"color: #2c3e50; margin-top: 20px;\">Tasks:</h2>\n<ul style=\"margin-left: 20px;\">\n${tasks.split('\\n').map(t => `<li>${t.replace('- ', '')}</li>`).join('\\n')}\n</ul>\n<h2 style=\"color: #2c3e50; margin-top: 20px;\">Important Dates:</h2>\n<ul style=\"margin-left: 20px;\">\n${dates.split('\\n').map(d => `<li>${d.replace('- ', '')}</li>`).join('\\n')}\n</ul>\n</body>\n</html>`;\n\n  items.push({\n    json: {\n      html,\n      to: item.json.to,\n      subject: item.json.subject\n    }\n  });\n}\n\nreturn items;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "60c9d778-d97a-4e17-858c-804f523590e5",
+      "name": "Send meeting summary",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        2560,
+        460
+      ],
+      "webhookId": "81c4f081-f3d1-44c3-a344-3f735f1873b5",
+      "parameters": {
+        "html": "={{ $json.html }}",
+        "options": {},
+        "subject": "={{ $json.subject }}",
+        "toEmail": "={{ $json.to }}",
+        "fromEmail": "friedemann.schuetz@posteo.de"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "OFGEnOq5l8U8Lb3U",
+          "name": "SMTP account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "39d8bb49-d9e9-46e3-89b3-fcbf9345bad8",
+      "name": "Create tasks",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "position": [
+        2340,
+        1040
+      ],
+      "parameters": {
+        "name": "create_task",
+        "schemaType": "manual",
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "zSKQLEObdU9RiThI",
+          "cachedResultName": "create_task"
+        },
+        "description": "=Use this tool to create a task. \nFor task creation use only action items for me Friedemann, don't use action items for other participants.",
+        "inputSchema": "{\n    \"type\": \"object\",\n    \"properties\": {\n      \"items\": {\n        \"type\": \"array\",\n        \"description\": \"An array of tasks\",\n        \"items\": {\n          \"type\": \"object\",\n          \"properties\": {\n            \"name\": {\n              \"type\": \"string\",\n              \"description\": \"The name of the task\"\n            },\n            \"description\": {\n              \"type\": \"string\",\n              \"description\": \"A detailed description of the task\"\n            },\n            \"due_date\": {\n              \"type\": \"string\",\n              \"description\": \"Due Date\"\n            },\n            \"priority\": {\n              \"type\": \"string\",\n              \"description\": \"Priority. . Please capitalize first letter\"\n            },\n            \"project_name\": {\n              \"type\": \"string\",\n              \"description\": \"Name of the project. Word 'Project' shouldn't be included\"\n            }\n          },\n          \"required\": [\n            \"name\",\n            \"description\",\n            \"due_date\",\n            \"priority\"\n          ],\n          \"additionalProperties\": false\n        }\n      }\n    },\n    \"required\": [\n      \"items\"\n    ],\n    \"additionalProperties\": false\n}",
+        "specifyInputSchema": true
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "9fa8eb9e-d4fc-4a2a-9843-2f51055944e9",
+      "name": "Create tasks and follow-up call",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        2240,
+        720
+      ],
+      "parameters": {
+        "text": "=<system_prompt>\n\nTODAY IS: {{ $now }}\n\nYOU ARE A MEETING ASSISTANT FOR AUTOMATION IN N8N. YOUR TASK IS TO EFFICIENTLY AND PRECISELY PROCESS INFORMATION FROM ZOOM MEETINGS TO GENERATE TO-DOS AND SCHEDULE FOLLOW-UP MEETINGS. YOU HAVE ACCESS TO THE FOLLOWING DATA:\n\n### INPUTS ###\n- **MEETING TITLE**: {{ $('Zoom: Get data of last meeting').item.json.topic }}\n- **PARTICIPANTS**: {{ $('Zoom: Get participants data').item.json.participants[0].name }}\n- **TRANSCRIPT**: {{ $('Format transcript text').item.json.transcript }}\n\n### YOUR TASKS ###\n1. **CREATE TO-DOS**:\n   - IDENTIFY TASKS AND TO-DOS IN THE TRANSCRIPT.\n   - FORMULATE CLEAR, CONCRETE TASKS.\n   - PASS THESE TASKS TO THE TOOL \"Create tasks\" TO SAVE THEM IN CLICKUP. \n   - DATA STRUCTURE:\n     - **TASK DESCRIPTION**: Brief description of the task.\n     - **ASSIGNED PERSON**: First name from the participant list.\n     - **DUE DATE**: Use any date mentioned in the transcript; otherwise, set to \"Not specified.\"\n\n2. **CREATE MEETING**:\n   - ANALYZE THE TRANSCRIPT TO IDENTIFY INFORMATION ABOUT THE NEXT MEETING (DATE, TIME, AND TOPIC).\n   - PASS THIS INFORMATION TO THE TOOL \"Create follow-up call.\"\n   - DATA STRUCTURE:\n     - **MEETING TITLE**: \"Follow-up: [Meeting Title]\"\n     - **DATE AND TIME**: Determined from the transcript or set to \"Next Tuesday at 10:00 AM\" if no information is provided.\n     - **PARTICIPANTS**: Add all participants from the list.\n\n### CHAIN OF THOUGHTS ###\n1. **UNDERSTAND**: Read and analyze the provided inputs (title, participants, transcript).\n2. **IDENTIFY**: Extract relevant information for the to-dos and the next meeting.\n3. **DIVIDE**: Split the task into two separate processes: creating to-dos and creating the meeting.\n4. **STRUCTURE**: Format the results in the required structure for the respective tools.\n5. **TRANSMIT**: Pass the data to the designated tools in n8n.\n6. **VERIFY**: Ensure the data is correct and complete.\n\n### WHAT YOU SHOULD NOT DO ###\n- **NEVER**: Create unclear or vague to-dos.\n- **NEVER**: Ignore missing data – use default values where uncertain.\n- **NEVER**: Overlook information from the inputs or make incorrect connections.\n- **NEVER**: Transmit tasks or meetings without proper formatting.\n\n### OUTPUT EXAMPLES ###\n1. **TO-DO**:\n   - **TASK DESCRIPTION**: \"Prepare presentation for the next meeting.\"\n   - **ASSIGNED PERSON**: \"John Doe.\"\n   - **DUE DATE**: \"2025-01-25.\"\n\n2. **MEETING**:\n   - **MEETING TITLE**: \"Follow-up: Project Discussion.\"\n   - **DATE AND TIME**: \"2025-01-28 at 10:00 AM.\"\n   - **PARTICIPANTS**: \"John Doe, Jane Example.\"\n\n### NOTES ###\n- EXECUTE YOUR TASKS WITH THE HIGHEST PRECISION AND CONTEXT SENSITIVITY.\n- RELY ON THE PROVIDED DATA AND DEFAULT VALUES WHERE NECESSARY.\n</system_prompt>\n",
+        "options": {},
+        "promptType": "define"
+      },
+      "typeVersion": 1.7
+    },
+    {
+      "id": "05515784-c99d-4197-9d88-62350bacfb7b",
+      "name": "Create follow-up call",
+      "type": "n8n-nodes-base.microsoftOutlookTool",
+      "position": [
+        2500,
+        1040
+      ],
+      "webhookId": "04587796-f979-450d-b9ab-0103cdbf1861",
+      "parameters": {
+        "subject": "={{ $fromAI(\"meeting_name\",\"Meeting name\",\"string\") }}",
+        "resource": "event",
+        "operation": "create",
+        "calendarId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "AQMkADAwATNiZmYAZC1jYjE5LWExMzQtMDACLTAwCgBGAAAD1gD8iHcpKEiYQc0w4fCLUgcA-79r8r8ac0aInYGVxRUqCwAAAgEGAAAA-79r8r8ac0aInYGVxRUqCwAAAkH-AAAA",
+          "cachedResultName": "Calendar"
+        },
+        "endDateTime": "={{ $fromAI(\"end_date_time\",\"Date and time of meeting end\",\"string\") }}",
+        "startDateTime": "={{ $fromAI(\"start_date_time\",\"Date and time of meeting start\",\"string\") }}",
+        "descriptionType": "manual",
+        "toolDescription": "=Use tool to create Outlook Calendar Event. Use this tool only when transcript contains information that call should be scheduled.",
+        "additionalFields": {
+          "timeZone": "Europe/Berlin"
+        }
+      },
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "DNMkqql32uwVETij",
+          "name": "Microsoft Outlook account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2f00c2c6-2389-429c-8c9a-f8f1fbfb6524",
+      "name": "Filter: Last 24 hours",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        500,
+        460
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "de097a4f-1f3e-4dc0-9ab6-139311ff4676",
+              "operator": {
+                "type": "dateTime",
+                "operation": "afterOrEquals"
+              },
+              "leftValue": "={{ $json.start_time }}",
+              "rightValue": "={{$now.minus({ hours: 24 }).toISO()}}"
+            },
+            {
+              "id": "b22e726e-b68a-433b-a19b-22bb0b008b9b",
+              "operator": {
+                "type": "dateTime",
+                "operation": "beforeOrEquals"
+              },
+              "leftValue": "={{ $json.start_time }}",
+              "rightValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "fd353a51-eac3-4d04-ae06-dd8e90b82990",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "disabled": true,
+      "position": [
+        1280,
+        980
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "40480f97-699b-4a49-867a-54950702af79",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        1500,
+        980
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "query.items"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "22e6165f-d7c2-4b23-be63-00c76505cdd3",
+      "name": "ClickUp",
+      "type": "n8n-nodes-base.clickUp",
+      "position": [
+        1720,
+        980
+      ],
+      "parameters": {
+        "list": "901207046581",
+        "name": "={{ $json.name }}",
+        "team": "9012366821",
+        "space": "90122025710",
+        "folder": "90123813376",
+        "authentication": "oAuth2",
+        "additionalFields": {
+          "content": "={{ $json.description }}",
+          "dueDate": "={{ $json.due_date }}"
+        }
+      },
+      "credentials": {
+        "clickUpOAuth2Api": {
+          "id": "KYxmoCCdfSkwWlXE",
+          "name": "ClickUp account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "742a411e-05cb-4aa0-a541-7b67e613e2bb",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1060,
+        900
+      ],
+      "parameters": {
+        "width": 1000,
+        "height": 280,
+        "content": "## Sub workflow: Create Task in ClickUp"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ebc5f1df-b417-4977-9700-b71b49a15cbb",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        140,
+        660
+      ],
+      "parameters": {
+        "width": 660,
+        "height": 520,
+        "content": "## Welcome to my Zoom AI Meeting Assistant Workflow!\n\n### This workflow has the following sequence:\n\n1. manual trigger (Can be replaced by a scheduled trigger or a webhook)\n2. retrieval of of Zoom meeting data\n3. filter the events of the last 24 hours\n4. retrieval of transcripts and extract of the text\n5. creating a meeting summary, format to html and send per mail\n6. create tasks and follow-up call (if discussed in the meeting) in ClickUp/Outlook (can be replaced by Gmail, Airtable, and so forth) via sub workflow\n\n### The following accesses are required for the workflow:\n- Zoom Workspace (via API and HTTP Request): [Documentation](https://docs.n8n.io/integrations/builtin/credentials/zoom/)\n- Microsoft Outlook: [Documentation](https://docs.n8n.io/integrations/builtin/credentials/microsoft/)\n- ClickUp: [Documentation](https://docs.n8n.io/integrations/builtin/credentials/clickup/)\n- AI API access (e.g. via OpenAI, Anthropic, Google or Ollama)\n- SMTP access data (for sending the mail)\n\nYou can contact me via LinkedIn, if you have any questions: https://www.linkedin.com/in/friedemann-schuetz"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d9109d09-eb1f-4685-a78b-d17e3dd22438",
+      "name": "Zoom: Get transcripts data",
+      "type": "n8n-nodes-base.httpRequest",
+      "onError": "continueErrorOutput",
+      "position": [
+        680,
+        460
+      ],
+      "parameters": {
+        "url": "=https://api.zoom.us/v2/meetings/{{ $json.id }}/recordings",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zoomOAuth2Api"
+      },
+      "credentials": {
+        "zoomOAuth2Api": {
+          "id": "MmccxSST1g202tG2",
+          "name": "Zoom account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "fa006183-8f8d-4999-a749-ded5c506b052",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [
+        2080,
+        920
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-3-7-sonnet-20250219",
+          "cachedResultName": "Claude 3.7 Sonnet"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "sSOLnAcU9zQcL404",
+          "name": "Anthropic account"
+        }
+      },
+      "typeVersion": 1.3
+    },
+    {
+      "id": "bc94960d-36a0-4a52-ba32-7755d19fc441",
+      "name": "Think",
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "position": [
+        2200,
+        920
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "04c96143-5a1b-4599-b5c1-af5990433fa1",
+      "name": "Create meeting summary",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1920,
+        460
+      ],
+      "parameters": {
+        "text": "=Create a formal meeting minutes document from the following transcript and meeting details.\n\nMeeting Date: {{ $('Zoom: Get data of last meeting').item.json.start_time }} // This needs to be formatted from the meeting details\nParticipants: {{ $json.participants.map(p => p.name + ' (' + p.user_email + ')').join(', ') }}\n\nTranscript:\n{{ $('Format transcript text').item.json.transcript }}\n\nPlease create the minutes in the following format:\n\nMeeting on [Date]\n\nParticipants:\n[List of participants with email addresses]\n\nSummary of the Meeting:\n[Brief and concise summary of the topics discussed]\n\nTasks:\n- [Task] (Responsible: [Name])\n- ...\n\nImportant Dates:\n- [Date] ([Context])\n- ...\n",
+        "options": {},
+        "promptType": "define"
+      },
+      "typeVersion": 1.9
+    }
+  ],
+  "active": false,
+  "pinData": {
+    "Execute Workflow Trigger": [
+      {
+        "json": {
+          "query": {
+            "items": [
+              {
+                "name": "Partner abtelefonieren",
+                "due_date": "2025-01-06",
+                "priority": "High",
+                "description": "Am 6. Januar alle Partner anrufen, um zu klären, ob Interesse an einer weiteren Kooperation besteht und wie diese dargestellt werden kann.",
+                "project_name": "Partnerkooperationen"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "settings": {},
+  "versionId": "56b41429-33c6-45ac-84a4-4dacec001e35",
+  "connections": {
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "Create meeting summary",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Create tasks and follow-up call",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "ClickUp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create tasks": {
+      "ai_tool": [
+        [
+          {
+            "node": "Create tasks and follow-up call",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format to html": {
+      "main": [
+        [
+          {
+            "node": "Send meeting summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Only 1 item": {
+      "main": [
+        [
+          {
+            "node": "Filter: Only 1 item",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Zoom: Get transcript file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Create meeting summary",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Create tasks and follow-up call",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send meeting summary": {
+      "main": [
+        []
+      ]
+    },
+    "Create follow-up call": {
+      "ai_tool": [
+        [
+          {
+            "node": "Create tasks and follow-up call",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter transcript URL": {
+      "main": [
+        [
+          {
+            "node": "Filter: Only 1 item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Last 24 hours": {
+      "main": [
+        [
+          {
+            "node": "Zoom: Get transcripts data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create meeting summary": {
+      "main": [
+        [
+          {
+            "node": "Sort for mail delivery",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create tasks and follow-up call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format transcript text": {
+      "main": [
+        [
+          {
+            "node": "Zoom: Get participants data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort for mail delivery": {
+      "main": [
+        [
+          {
+            "node": "Format to html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zoom: Get transcript file": {
+      "main": [
+        [
+          {
+            "node": "Extract text from transcript file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zoom: Get transcripts data": {
+      "main": [
+        [
+          {
+            "node": "Filter transcript URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Recording/Transcript available",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zoom: Get participants data": {
+      "main": [
+        [
+          {
+            "node": "Create meeting summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zoom: Get data of last meeting": {
+      "main": [
+        [
+          {
+            "node": "Filter: Last 24 hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create tasks and follow-up call": {
+      "main": [
+        []
+      ]
+    },
+    "Extract text from transcript file": {
+      "main": [
+        [
+          {
+            "node": "Format transcript text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Zoom: Get data of last meeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

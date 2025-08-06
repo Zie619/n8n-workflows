@@ -1,0 +1,159 @@
+{
+  "id": "mW6b4dMHkIDfnaIj",
+  "meta": {
+    "instanceId": "7b7fd5f72a378d0859f4d1cf8dd3c226094df4777ef6aca192ac32e815fe212a",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "My workflow 4",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "9ae28c07-bb44-4e64-b38c-a74a9de81b2e",
+      "name": "Receive Feedback",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -440,
+        540
+      ],
+      "webhookId": "89e8d5ec-d442-41ea-9ff1-93a9df0b2aa1",
+      "parameters": {
+        "path": "client-feedback",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "770bc041-1846-4ac1-b8dc-61756686f906",
+      "name": "Prepare AI Prompt",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        -240,
+        540
+      ],
+      "parameters": {
+        "functionCode": "\nconst feedback = $json.feedback || \"No feedback provided.\";\nreturn [{\n  json: {\n    prompt: `Analyze this client feedback: \"${feedback}\"\\n\\n1. Summarize the positive points.\\n2. Suggest improvements.\\n3. Generate a short social media post based on the positive elements.`\n  }\n}];\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0b3a469a-f6f4-4140-9c6f-fd7ba7689c5e",
+      "name": "Analyze with AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -40,
+        540
+      ],
+      "parameters": {
+        "url": "https://api.deepseek.com/generate",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "jsonParameters": true
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "bdbf3a85-e68f-4fe3-b0b4-d44578d11c31",
+      "name": "Format AI Output",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        160,
+        540
+      ],
+      "parameters": {
+        "functionCode": "\nconst output = $json.response || $json.choices?.[0]?.text || \"No AI output.\";\nconst splitIndex = output.indexOf(\"3.\");\nlet summary = output;\nlet post = \"No post generated.\";\n\nif (splitIndex !== -1) {\n  summary = output.substring(0, splitIndex).trim();\n  post = output.substring(splitIndex).replace(/^3\\./, \"\").trim();\n}\n\nreturn [{\n  json: {\n    report: summary,\n    post: post\n  }\n}];\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "47093d4d-645b-4dc8-a5a4-1b35a649ac97",
+      "name": "Send Feedback Report",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        380,
+        500
+      ],
+      "parameters": {
+        "text": "={{ $json[\"report\"] }}",
+        "options": {},
+        "subject": "Client Feedback Summary",
+        "toEmail": "team@email.com",
+        "fromEmail": "your@email.com"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e49a4898-00d9-4413-ac6d-87aafdfe6ff9",
+      "name": "Send Social Draft",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        380,
+        660
+      ],
+      "webhookId": "07598764-aee9-41ea-82c1-0ded0ac08b57",
+      "parameters": {
+        "text": "={{ $json[\"post\"] }}",
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "additionalFields": {}
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "54d175ec-080f-4d2d-9d83-60dd36c8f11b",
+  "connections": {
+    "Analyze with AI": {
+      "main": [
+        [
+          {
+            "node": "Format AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI Output": {
+      "main": [
+        [
+          {
+            "node": "Send Feedback Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Social Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Receive Feedback": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "Analyze with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

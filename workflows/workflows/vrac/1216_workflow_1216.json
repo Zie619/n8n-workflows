@@ -1,0 +1,148 @@
+{
+  "nodes": [
+    {
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "position": [
+        600,
+        300
+      ],
+      "webhookId": "2d0805da-143e-40c9-b327-242b1f052c31",
+      "parameters": {
+        "updates": [
+          "message",
+          "edited_message",
+          "channel_post",
+          "edited_channel_post"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": "telegram_habot"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Google Perspective",
+      "type": "n8n-nodes-base.googlePerspective",
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "text": "={{$json[\"message\"][\"text\"]}}",
+        "options": {
+          "languages": "en"
+        },
+        "requestedAttributesUi": {
+          "requestedAttributesValues": [
+            {
+              "attributeName": "identity_attack"
+            },
+            {
+              "attributeName": "threat"
+            },
+            {
+              "attributeName": "profanity"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googlePerspectiveOAuth2Api": "perspective_api"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"attributeScores\"][\"PROFANITY\"][\"summaryScore\"][\"value\"]}}",
+              "value2": 0.7,
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        1200,
+        150
+      ],
+      "parameters": {
+        "text": "I don't tolerate toxic language!",
+        "chatId": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "additionalFields": {
+          "reply_to_message_id": "={{$node[\"Telegram Trigger\"].json[\"message\"][\"message_id\"]}}"
+        }
+      },
+      "credentials": {
+        "telegramApi": "telegram_habot"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1200,
+        400
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Google Perspective",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Perspective": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

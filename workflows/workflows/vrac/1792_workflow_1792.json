@@ -1,0 +1,382 @@
+{
+  "nodes": [
+    {
+      "id": "29451054-fcd6-4054-b072-a87c716f6c67",
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        240,
+        240
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "995ae9b0-130c-4989-8e94-81a14b7743c4",
+      "name": "Read Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        460,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "sheetId": "1cz-4tVi7Nn3j1gh147hROq9l6S4ta06sMfhm2AAI6js"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "19",
+          "name": "Tom's Google Sheets account"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2c1ed019-85f1-4b0f-bcf5-ce59ff13ea49",
+      "name": "Search Salesforce accounts",
+      "type": "n8n-nodes-base.salesforce",
+      "position": [
+        680,
+        240
+      ],
+      "parameters": {
+        "query": "=SELECT id, Name FROM Account WHERE Name = '{{$json[\"Company Name\"].replace(/'/g, '\\\\\\'')}}'",
+        "resource": "search"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "40",
+          "name": "Salesforce account"
+        }
+      },
+      "typeVersion": 1,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "c6978a27-3cdc-44a2-a961-94557b2aed88",
+      "name": "Keep new companies",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        900,
+        40
+      ],
+      "parameters": {
+        "mode": "removeKeyMatches",
+        "propertyName1": "Company Name",
+        "propertyName2": "Name"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7b5df5cf-7019-415b-9758-7f62c4fb13c8",
+      "name": "Merge existing account data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        900,
+        440
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "Company Name",
+        "propertyName2": "Name"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7da1de2f-2b37-4e33-b8d4-d1dc59e94bbe",
+      "name": "Account found?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1120,
+        440
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"Id\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "80890a2a-f6d3-4efd-92b1-6465f98f512b",
+      "name": "Remove duplicate companies",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        1120,
+        140
+      ],
+      "parameters": {
+        "compare": "selectedFields",
+        "options": {},
+        "operation": "removeDuplicates",
+        "fieldsToCompare": {
+          "fields": [
+            {
+              "fieldName": "Company Name"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ea9afa15-77be-4d7a-a287-35d4c1c6e6c1",
+      "name": "Set Account ID for existing accounts",
+      "type": "n8n-nodes-base.renameKeys",
+      "position": [
+        1340,
+        440
+      ],
+      "parameters": {
+        "keys": {
+          "key": [
+            {
+              "newKey": "Account ID",
+              "currentKey": "Id"
+            }
+          ]
+        },
+        "additionalOptions": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "61cfdf30-9135-40bf-929d-317fca0ad474",
+      "name": "Retrieve new company contacts",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1780,
+        40
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "Company Name",
+        "propertyName2": "Name"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c10dea7c-96b0-4f3b-b859-af094ced51cc",
+      "name": "Set new account name",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1560,
+        140
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "id",
+              "value": "={{ $json[\"id\"] }}"
+            },
+            {
+              "name": "Name",
+              "value": "={{ $node[\"Remove duplicate companies\"].json[\"Company Name\"] }}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a4a2be2a-7bd9-4a70-b4d9-0df53834bdda",
+      "name": "Create Salesforce account",
+      "type": "n8n-nodes-base.salesforce",
+      "position": [
+        1340,
+        140
+      ],
+      "parameters": {
+        "name": "={{ $json[\"Company Name\"] }}",
+        "resource": "account",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "40",
+          "name": "Salesforce account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "89f49e6f-62be-403f-9a4c-cd56e28141f3",
+      "name": "Create Salesforce contact",
+      "type": "n8n-nodes-base.salesforce",
+      "position": [
+        2000,
+        240
+      ],
+      "parameters": {
+        "lastname": "={{ $json[\"Last Name\"] }}",
+        "resource": "contact",
+        "operation": "upsert",
+        "externalId": "Email",
+        "externalIdValue": "={{ $json[\"Email\"] }}",
+        "additionalFields": {
+          "email": "={{ $json[\"Email\"] }}",
+          "firstName": "={{ $json[\"First Name\"] }}",
+          "acconuntId": "={{ $json[\"Account ID\"] }}"
+        }
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "40",
+          "name": "Salesforce account"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Account found?": {
+      "main": [
+        [
+          {
+            "node": "Set Account ID for existing accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Search Salesforce accounts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Keep new companies",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge existing account data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep new companies": {
+      "main": [
+        [
+          {
+            "node": "Remove duplicate companies",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Retrieve new company contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set new account name": {
+      "main": [
+        [
+          {
+            "node": "Retrieve new company contacts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Salesforce account": {
+      "main": [
+        [
+          {
+            "node": "Set new account name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove duplicate companies": {
+      "main": [
+        [
+          {
+            "node": "Create Salesforce account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Salesforce accounts": {
+      "main": [
+        [
+          {
+            "node": "Keep new companies",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "Merge existing account data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge existing account data": {
+      "main": [
+        [
+          {
+            "node": "Account found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve new company contacts": {
+      "main": [
+        [
+          {
+            "node": "Create Salesforce contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Account ID for existing accounts": {
+      "main": [
+        [
+          {
+            "node": "Create Salesforce contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

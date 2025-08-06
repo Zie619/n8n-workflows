@@ -1,0 +1,398 @@
+{
+  "meta": {
+    "instanceId": "dfb8aefc80b77b230bd90d6a6e5210eb7a28e6e1d2a8b1d27d54942b54eb9e7a",
+    "templateCredsSetupCompleted": true
+  },
+  "nodes": [
+    {
+      "id": "4f42007b-3813-410f-a608-5af89459b14f",
+      "name": "Check Authorization Header",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        -20,
+        20
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Webhook').item.json.headers.authorization }}",
+              "value2": "=Bearer {{ $json.config.bearerToken }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "86d6157e-593d-4370-a480-1a9417300555",
+      "name": "401 Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        340,
+        280
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 401
+        },
+        "respondWith": "json",
+        "responseBody": "{\n  \"code\": 401,\n  \"message\": \"Unauthorized: Missing or invalid authorization token.\",\n  \"hint\": \"Ensure the request includes a valid 'Authorization' header (e.g., 'Bearer YOUR_SECRET_TOKEN').\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0831093a-adef-41dc-8ac0-2e1998fc22ad",
+      "name": "200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1140,
+        20
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b4f42651-c7f6-43a3-a695-7d5197b45642",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -300,
+        20
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4c35898d-5a70-41bc-9fb6-9d63bbbee222",
+              "name": "config.bearerToken",
+              "type": "string",
+              "value": "123"
+            },
+            {
+              "id": "822739a6-15da-48df-8f92-c4b1adce5fef",
+              "name": "config.requiredFields.message",
+              "type": "string",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "f1539109-8585-4cf2-9b9b-f3012544ac6c",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -580,
+        20
+      ],
+      "webhookId": "2c5b9b70-1b08-44b1-a007-dc3d9f7e70db",
+      "parameters": {
+        "path": "secure-webhook",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bcf1183c-9a3d-41eb-89f7-1666d3a6c5fc",
+      "name": "Has required fields?",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        220,
+        20
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "if(! $json.config.requiredFields) {\n  return { json: { valid: true } };\n}\n\nconst body = $('Webhook').first().json.body;\n\nlet requiredFields = $json.config.requiredFields;\n\nfor (let [key, value] of Object.entries(requiredFields)) {\n  console.log(`${key}: ${value}`);\n  if (!(key in body)) {\n    return { json: { valid: false } };\n  }\n}\n\nreturn { json: { valid: true } };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "81b125f1-faa0-4998-8624-431746052a84",
+      "name": "Check Valid Request",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        440,
+        20
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "8c7fe174-f284-4e41-b851-8939f0c2d19f",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "906c671d-e2a6-4a9e-b7df-d7b9142ffeb4",
+      "name": "400 Bad Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        780,
+        280
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 401
+        },
+        "respondWith": "json",
+        "responseBody": "{\n  \"code\": 400,\n  \"message\": \"Bad Request: Missing required fields\",\n  \"hint\": \"Make sure all required fields are included in the request body.\"\n}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ce657170-34e4-4b40-ba22-bb4638fa98c6",
+      "name": "Create Response",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        920,
+        20
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c6258b81-6f40-4dd5-8a60-89e2b0322490",
+              "name": "message",
+              "type": "string",
+              "value": "Success! Workflow completed."
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "0a6b9f12-9b60-458e-85de-014a66063e50",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -440,
+        -280
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 360,
+        "height": 460,
+        "content": "### 🛠️ Config Node Setup\n\n*This node defines the configuration for the secure webhook.*\n\n- `config.bearerToken`: The expected Bearer token for authentication.\n\n- `config.requiredFields`: Set one key for each required field in the incoming request body (e.g., `config.requiredFields.message`.\n*👉 The value doesn't matter, only the keys are checked.*"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bba24ba5-3c8d-40f7-99e0-44115b1025e0",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -440,
+        200
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 1740,
+        "height": 240,
+        "content": "### 🚫 Error Handling Nodes\n\n*These nodes return standardized JSON error responses:*\n\n- 🔒 `401 Unauthorized`:\nTriggered when the request is missing a valid Bearer token.\n\n- 📭 `400 Bad Request`:\nTriggered when required fields are missing from the request body."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f451c9be-4cfb-4628-8aa7-66b66ad86bab",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        840,
+        -280
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 460,
+        "height": 460,
+        "content": "### ✅ Set & 200 Response Nodes\n\n- 🧱 `Create Response`\nBuilds the JSON response from the incoming request.\nUse this to extract, transform, or forward specific values (e.g., message, sender, etc.).\n\n- 📬 `200 OK`\nReturns a successful response using values from the `Create Response` node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "8d4e8406-c3fe-4e8a-bfa8-18407fe5e67a",
+      "name": "Add workflow nodes here",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        680,
+        20
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "f3f461a6-dc48-42cd-ac75-d045795006d0",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        -280
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 440,
+        "height": 460,
+        "content": "### 🔍 Required Fields Validator\n\n*This Code node checks if all fields defined in config.requiredFields are present in the incoming request body.*\n\n- Reads the body from the Webhook node.\n\n- Loops through each key in config.requiredFields.\n\n- Returns `{ valid: true }` if all are present, otherwise `{ valid: false }`."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2766dae8-8def-462f-a53c-0f51606eea0a",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1220,
+        -340
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 760,
+        "height": 780,
+        "content": "## 🔐 Secure Webhook – Summary\n\n*This workflow protects a public webhook with **authentication** and **payload validation**.*\n\n\n---\n\n#### 🧩 Why use it?\n- ✅ Ensure only trusted clients can call your workflow (via Bearer token).\n- ✅ Validate that all expected fields are present in the request body.\n- ✅ Return helpful and consistent JSON responses (`200`, `400`, `401`).\n\n---\n\n#### ⚙️ How it works:\n1. **`Webhook`** – Entry point for external `POST` requests.\n2. **`Configuration`** – Defines `config.bearerToken` and `config.requiredFields`.\n3. **`Check Authorization Header`** – Compares incoming Bearer token with config.\n4. **`401 Unauthorized`** – Returned if the token is missing or incorrect.\n5. **`Has required fields?`** – JS code checks for required fields in the request body.\n6. **`400 Bad Request`** – Returned if any required field is missing.\n7. **`Create Response` & `200 OK`** – Returns a custom success message.\n\n---\n\n#### 🛠 Setup Instructions:\n- Set your desired Bearer token in `config.bearerToken`.\n- For each required field, set a key in `config.requiredFields`  \n  *(e.g., `config.requiredFields.message)*.\n*👉 The value doesn't matter, only the keys are checked.*\n- Replace the **`Add workflow nodes here`** node with your own workflow logic.\n- Edit the `Create Response` node to build your response.\n\n---\n\n📌 *Great for building secure, reusable webhook endpoints for APIs, forms, or 3rd-party services.*"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "70c8f060-587a-4524-ab32-7362cc0c4cf9",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1220,
+        -600
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 760,
+        "height": 240,
+        "content": "## Support My Work! ❤️\n\n**👋 Hello! I'm Audun / xqus** \n🔗 My work: [xqus.com](https://xqus.com)\n💸 n8n shop: [xqus.gumroad.com](https://xqus.gumroad.com)\n\n**If you find this workflow helpful**, consider downloading or purchasing it on [Gumroad](https://xqus.gumroad.com/l/hasgi).\n\nYour support helps me create more useful n8n workflows and resources for the community. \n-Thanks a lot! 🙌"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "200 OK": {
+      "main": [
+        []
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Check Authorization Header",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Response": {
+      "main": [
+        [
+          {
+            "node": "200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Valid Request": {
+      "main": [
+        [
+          {
+            "node": "Add workflow nodes here",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "400 Bad Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has required fields?": {
+      "main": [
+        [
+          {
+            "node": "Check Valid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add workflow nodes here": {
+      "main": [
+        [
+          {
+            "node": "Create Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Authorization Header": {
+      "main": [
+        [
+          {
+            "node": "Has required fields?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "401 Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

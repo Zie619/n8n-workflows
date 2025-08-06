@@ -1,0 +1,399 @@
+{
+  "nodes": [
+    {
+      "name": "list people",
+      "type": "n8n-nodes-base.itemLists",
+      "position": [
+        820,
+        240
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "company.employees"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Pipedrive - Enrich Organization",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        1060,
+        740
+      ],
+      "parameters": {
+        "resource": "organization",
+        "operation": "update",
+        "updateFields": {
+          "customProperties": {
+            "property": [
+              {
+                "name": "Total Funding Amount",
+                "value": "={{$json[\"company\"][\"full\"][\"cards\"][\"fundingRoundsSummary\"][\"fundingTotal\"][\"valueUsdRoundup\"]}}"
+              },
+              {
+                "name": "Website Traffic",
+                "value": "={{$json[\"company\"][\"full\"][\"cards\"][\"trafficRankHeadline\"][\"visitsLastestMonthPrettier\"]}}"
+              },
+              {
+                "name": "Industry",
+                "value": "={{$json[\"company\"][\"premium\"][\"industries\"]}}"
+              },
+              {
+                "name": "Linkedin URL",
+                "value": "={{$json[\"company\"][\"full\"][\"cards\"][\"overviewFields2\"][\"linkedin\"][\"value\"]}}"
+              },
+              {
+                "name": "=Website",
+                "value": "={{$json[\"company\"][\"premium\"][\"website\"]}}"
+              },
+              {
+                "name": "Number of Employees",
+                "value": "={{$json[\"company\"][\"premium\"][\"companySize\"]}}"
+              },
+              {
+                "name": "Address",
+                "value": "={{$json[\"company\"][\"premium\"][\"headquaterAddr\"]}}"
+              }
+            ]
+          }
+        },
+        "organizationId": "={{$node[\"Pipedrive Trigger - New Company Created\"].json[\"meta\"][\"id\"]}}",
+        "encodeProperties": true
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "27",
+          "name": "Free TRial Lucas"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Pipedrive - Add Person",
+      "type": "n8n-nodes-base.pipedrive",
+      "position": [
+        1840,
+        660
+      ],
+      "parameters": {
+        "name": "={{$json[\"name\"]}}",
+        "resource": "person",
+        "additionalFields": {
+          "email": [
+            "={{$json[\"emailDatagma\"]}}"
+          ],
+          "org_id": "={{$items(\"Pipedrive Trigger - New Company Created\")[0].json[\"meta\"][\"id\"]}}",
+          "customProperties": {
+            "property": [
+              {
+                "name": "aa8c534fc3ea812ffe8b155290873293b9950c3a",
+                "value": "={{$json[\"jobTitle\"]}}"
+              },
+              {
+                "name": "04215f535458ffd9092b4a337f217201087dae2b",
+                "value": "={{$json[\"linkedInUrl\"]}}"
+              }
+            ]
+          }
+        }
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "27",
+          "name": "Free TRial Lucas"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Datagma - Enrich Company",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        580,
+        520
+      ],
+      "parameters": {
+        "url": "https://gateway.datagma.net/api/ingress/v2/full",
+        "options": {
+          "batchSize": 10,
+          "fullResponse": false,
+          "batchInterval": 2000
+        },
+        "authentication": "queryAuth",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "data",
+              "value": "={{$json[\"current\"][\"name\"]}}"
+            },
+            {
+              "name": "companyPremium",
+              "value": "true"
+            },
+            {
+              "name": "companyFull",
+              "value": "true"
+            },
+            {
+              "name": "companyEmployees",
+              "value": "true"
+            },
+            {
+              "name": "employeeTitle",
+              "value": "(head of OR director) AND (sales OR business)"
+            },
+            {
+              "name": "findEmailV2",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "18",
+          "name": "Datagma Auth"
+        }
+      },
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1640,
+        660
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "linkedInUrl",
+        "propertyName2": "linkedInUrl"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "If lead is Ideal Buyer",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1100,
+        240
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"employeeCompanyScore\"]}}",
+              "value2": 0.1,
+              "operation": "larger"
+            }
+          ],
+          "string": [
+            {
+              "value1": "={{$json[\"jobTitle\"].toLowerCase()\t}}",
+              "value2": "sales",
+              "operation": "contains"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Datagma - Find Emails",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        220
+      ],
+      "parameters": {
+        "url": "https://gateway.datagma.net/api/ingress/v4/findEmail?findEmailV2Step=3&findEmailV2Country=General\n",
+        "options": {
+          "batchSize": 10,
+          "fullResponse": false,
+          "batchInterval": 2000
+        },
+        "authentication": "queryAuth",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "fullName",
+              "value": "={{$json[\"name\"]}}"
+            },
+            {
+              "name": "company",
+              "value": "={{$json[\"company\"]}}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "18",
+          "name": "Datagma Auth"
+        }
+      },
+      "typeVersion": 1,
+      "continueOnFail": true
+    },
+    {
+      "name": "Prepare Data Before Merge",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1520,
+        220
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "linkedInUrl",
+              "value": "={{$node[\"If lead is Ideal Buyer\"].json[\"linkedInUrl\"]}}"
+            },
+            {
+              "name": "emailDatagma",
+              "value": "={{$json[\"email\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Pipedrive Trigger - New Company Created",
+      "type": "n8n-nodes-base.pipedriveTrigger",
+      "position": [
+        320,
+        520
+      ],
+      "webhookId": "90b68fad-3216-4dde-9afd-77f98cda0711",
+      "parameters": {
+        "action": "added",
+        "object": "organization"
+      },
+      "credentials": {
+        "pipedriveApi": {
+          "id": "27",
+          "name": "Free TRial Lucas"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        500,
+        340
+      ],
+      "parameters": {
+        "height": 400,
+        "content": "### Find a different ideal buyer:\nIn \"Datagma - Enrich Company\" node - change \"employeeTitle\" value with the keywords of your ideal buyer (-> Head of Marketing)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1020,
+        60
+      ],
+      "parameters": {
+        "height": 380,
+        "content": "### Refine lead results\nHere I am refining lead results to make sure they match my search.\nIf you have a different ICP, make sure to change the first value."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Pipedrive - Add Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "list people": {
+      "main": [
+        [
+          {
+            "node": "If lead is Ideal Buyer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Datagma - Find Emails": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data Before Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If lead is Ideal Buyer": {
+      "main": [
+        [
+          {
+            "node": "Datagma - Find Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Datagma - Enrich Company": {
+      "main": [
+        [
+          {
+            "node": "list people",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pipedrive - Enrich Organization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data Before Merge": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipedrive Trigger - New Company Created": {
+      "main": [
+        [
+          {
+            "node": "Datagma - Enrich Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

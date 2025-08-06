@@ -1,0 +1,394 @@
+{
+  "meta": {
+    "instanceId": "26ba763460b97c249b82942b23b6384876dfeb9327513332e743c5f6219c2b8e"
+  },
+  "nodes": [
+    {
+      "id": "bebbf9cf-8103-4694-a3be-ae3ee1e9ebaf",
+      "name": "Watch For Bank Statements",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "position": [
+        780,
+        400
+      ],
+      "parameters": {
+        "path": "/home/node/host_mount/reconciliation_project",
+        "events": [
+          "add"
+        ],
+        "options": {
+          "ignored": "!**/*.csv"
+        },
+        "triggerOn": "folder"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "eca26bed-ba44-4507-97d4-9154e26908a5",
+      "name": "Get Tenant Details",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "position": [
+        1660,
+        540
+      ],
+      "parameters": {
+        "name": "get_tenant_details",
+        "jsCode": "const xlsx = require('xlsx');\n\nconst { spreadsheet_location } = $('Set Variables').item.json;\nconst sheetName = 'tenants';\n\nconst wb = xlsx.readFile(spreadsheet_location, { sheets: [sheetName] });\nconst rows = xlsx.utils.sheet_to_json(wb.Sheets[sheetName], { raw: false });\n\nconst queryToList = [].concat(typeof query === 'string' ? query.split(',') : query);\n\nconst result = queryToList.map(q => (\n  rows.find(row =>\n    row['Tenant Name'].toLowerCase() === q.toLowerCase()\n    || row['Tenant ID'].toLowerCase() === q.toString().toLowerCase()\n  )\n));\n\nreturn result ? JSON.stringify(result) : `No results were found for ${query}`;",
+        "description": "Call this tool to get a tenant's details which includes their tenancy terms, rent amount and any notes attached to their account. Pass in one or an array of either the tenant ID or the name of the tenant."
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "76b68c2f-8d33-4f61-a442-732e784b733a",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        1920,
+        540
+      ],
+      "parameters": {
+        "jsonSchemaExample": "[{\n  \"tenant_id\": \"\",\n  \"tenant_name\": \"\",\n  \"property_id\": \"\",\n  \"property_postcode\": \"\",\n  \"action_required\": \"\",\n  \"details\": \"\",\n  \"date\": \"\"\n}]"
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "be01720f-4617-4a2b-aaed-2474f9f0e25b",
+      "name": "Get Bank Statement File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "position": [
+        1100,
+        400
+      ],
+      "parameters": {
+        "options": {},
+        "fileSelector": "={{ $('Watch For Bank Statements').item.json.path }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2aba5f6a-56b0-411f-9124-33025d90e325",
+      "name": "Get CSV Data",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1260,
+        400
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a60d5851-f938-4696-855b-1f0845ffbc6c",
+      "name": "Alert Actions To List",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        2260,
+        400
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "output"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f804d9fb-f679-4e95-b70f-722e7c222c40",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        690.6721905682555,
+        177.80249392766257
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 748.2548372021405,
+        "height": 457.6238063670572,
+        "content": "## Step 1. Wait For Incoming Bank Statements\n[Read more about the local file triggers](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.localfiletrigger)\n\nFor this demo, we'll show that n8n is more than capable working with the local filesystem. This gives great benefits in terms of privacy and data security.\n\nFor our datastore, we're using a locally hosted XLSX Excel file which we'll query and update throughout this workflow."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "01e9c335-320c-4fff-9ade-ad1cf808db00",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1460,
+        80
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 634.3165117416636,
+        "height": 675.2455596085985,
+        "content": "## Step 2. Delegate to AI Agent to Quickly Identify Issues with Rental Payments\n[Read more about AI Agents](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.agent/)\n\nAn AI agent can not only check against agreed amounts and compare due dates but also consider contract exceptions and tenant notes before deciding to take action. In a scenario of 10+ of tenants, this can save a lot of admin time.\n\nFor this demo, we're using a remote LLM Model but this can easily be swapped out for other self-hosted LLMS models that support function calling."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2456b1e5-ceec-45c3-91a7-52e21125e6e5",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2120,
+        143.8836673253448
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 618.3293247808133,
+        "height": 473.7439917476675,
+        "content": "## Step 3. Generate a Report to Action any Issues\n[Read more about using the Code Node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.code)\n\nAfter the AI Agent has helped identify issues to action, we can generate a  report and update a locally hosted xlsx file. This again helps keep workflows private to nothing senstive goes over the wire.\n\nThough n8n lacks a builtin node for editing local xlsx file, we can tap into the sheetJS library available to the \"Code\" node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7b32e8f9-b543-47e1-a08e-53ee47105966",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        260,
+        80
+      ],
+      "parameters": {
+        "width": 399.5148533727183,
+        "height": 558.2628336538015,
+        "content": "## Try It Out!\n### This workflow ingests bank statements to analyses them against a list of tenants using an AI Agent. The agent then flags any issues such as missing payments or incorrect amounts which are exported to a XLSX spreadsheet.\n\n### Note: This workflow is intended to work with a self-hosted version of n8n and has access to the local file system.\n\n* Watches for CSV files (bank statements)\n* Imports into AI agent for analysis.\n* AI agent will query the Excel spreadsheet for tenant and property details.\n* AI agent will generate report on discrepancies or issues and write them to the Excel file.\n\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Hacking!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ba35ed0b-7ace-4b76-b915-0dc516a07fb1",
+      "name": "Get Property Details",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "position": [
+        1800,
+        540
+      ],
+      "parameters": {
+        "name": "get_property_details",
+        "jsCode": "const xlsx = require('xlsx');\n\nconst { spreadsheet_location } = $('Set Variables').item.json;\nconst sheetName = 'properties'\n\nconst wb = xlsx.readFile(spreadsheet_location, { sheets: [sheetName] });\nconst rows = xlsx.utils.sheet_to_json(wb.Sheets[sheetName], { raw: false });\n\nconst queryToList = [].concat(typeof query === 'string' ? query.split(',') :query);\n\nconst result = queryToList.map(q => rows.find(row => row['Property ID'] === q));\n\nreturn result ? JSON.stringify(result) : `No results were found for ${query}`;",
+        "description": "Call this tool to get a property details which includes the address, postcode and type of the property. Pass in one or an array of Property IDs."
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "8c85a2f5-6741-41f4-b377-c74a74b14d0f",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        940,
+        400
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bcd3dd04-0082-4da6-b36b-e5ad09c4de30",
+              "name": "spreadsheet_location",
+              "type": "string",
+              "value": "/home/node/host_mount/reconciliation_project/reconcilation-workbook.xlsx"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "bd75bad8-caa3-48f1-8892-3d1221765564",
+      "name": "Append To Spreadsheet",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        2480,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const xlsx = require('xlsx');\n\nconst { spreadsheet_location } = $('Set Variables').first().json;\nconst sheetName = 'alerts';\n\nconst wb = xlsx.readFile(spreadsheet_location);\nxlsx.writeFile(wb, spreadsheet_location + '.bak.xlsx'); // create backup\n\nconst worksheet = wb.Sheets[sheetName];\n\nconst inputs = $input.all();\n\nfor (input of inputs) {\n  xlsx.utils.sheet_add_aoa(worksheet, [\n    [\n      input.json.date,\n      input.json[\"property_id\"],\n      input.json[\"property_postcode\"],\n      input.json[\"tenant_id\"],\n      input.json[\"tenant_name\"],\n      input.json[\"action_required\"],\n      input.json[\"details\"],\n    ]\n  ], { origin: -1 });\n}\n\n// update sheet ref\nconst range = xlsx.utils.decode_range(worksheet['!ref']);\nconst rowIndex = range.e.r + 1; // The next row index to append\nworksheet['!ref'] = xlsx.utils.encode_range({\n    s: range.s,\n    e: { r: rowIndex, c: range.e.c }\n});\n\nxlsx.writeFile(wb, spreadsheet_location, {\n  cellDates: true,\n  cellStyles: true,\n  bookType: 'xlsx',\n});\n\nreturn {\"json\": { \"output\": `${inputs.length} rows added` }}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "c818ea7e-dc57-4680-b797-abb21cca87fb",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1540,
+        540
+      ],
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b2a97514-6020-49a6-bbdb-ee1251eb6aed",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2280,
+        640
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 461.5505566920007,
+        "height": 106.59049079746408,
+        "content": "### 🚨Warning! Potentially Destructive Operations!\nWith code comes great responsibility! There is a risk you may overwrite/delete data you didn't intend. Always makes backups and test on a copy of your spreadsheets!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f869f6eb-cf19-4b14-bf3a-4db5d636646f",
+      "name": "Reconcile Rental Payments",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        1640,
+        360
+      ],
+      "parameters": {
+        "text": "=Bank Statement for {{ $input.first().json.date }} to {{  $input.last().json.date }}:\n|date|reference|money in|money out|\n|-|-|-|-|\n{{ $input.all().map(row => `|${row.json.date}|${row.json.reference}|${row.json.money_in || ''}|${row.json.money_out || ''}|`).join('\\n') }}",
+        "options": {
+          "systemMessage": "Your task is to help reconcile rent payments with the uploaded bank statement and alert only if there are any actions to be taken in regards to the tenants.\n* Identify and flag any tenants who have have missed their rent according to the month. Late payments which are within a few days of the due date are acceptable and should not be flagged.\n* Identify and flag if any tenants have not paid the correct ammount due, either less or more.\n* Identify and flag any tenants who are finishing their rentals within the time period of the current statement.\n* Identify and flag any remaining fees which are due and have not been paid from any tenant in the last month of their rental.\n\nIf the bank statement show incomplete months due to cut off, it is ok to assume the payment is pending and not actually missing.\n\nThe alert system requires a JSON formatted message. It is important that you format your response as follows:\n[{\n  \"tenant_id\": \"\",\n  \"tenant_name\": \"\",\n  \"property_id\": \"\",\n  \"property_postcode\": \"\",\n  \"action required\": \"\",\n  \"details\": \"\",\n  \"date\": \"\"\n}]"
+        },
+        "promptType": "define",
+        "hasOutputParser": true
+      },
+      "executeOnce": true,
+      "typeVersion": 1.6
+    },
+    {
+      "id": "510dc73c-f267-41f3-a981-58f5bfc229a6",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        360,
+        660
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 302.6142384407349,
+        "height": 86.00673806595168,
+        "content": "### 💡I'm designed to work self-hosted!\nSome nodes in this workflow are only available to the self-hosted version of n8n."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get CSV Data": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Rental Payments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "Get Bank Statement File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Reconcile Rental Payments",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tenant Details": {
+      "ai_tool": [
+        [
+          {
+            "node": "Reconcile Rental Payments",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Property Details": {
+      "ai_tool": [
+        [
+          {
+            "node": "Reconcile Rental Payments",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Actions To List": {
+      "main": [
+        [
+          {
+            "node": "Append To Spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bank Statement File": {
+      "main": [
+        [
+          {
+            "node": "Get CSV Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Reconcile Rental Payments",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Rental Payments": {
+      "main": [
+        [
+          {
+            "node": "Alert Actions To List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Watch For Bank Statements": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

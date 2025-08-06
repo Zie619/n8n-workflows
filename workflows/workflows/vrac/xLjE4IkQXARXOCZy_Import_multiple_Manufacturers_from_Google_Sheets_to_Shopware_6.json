@@ -1,0 +1,405 @@
+{
+  "id": "xLjE4IkQXARXOCZy",
+  "meta": {
+    "instanceId": "24bd2f3b51439b955590389bfa4dd9889fbd30343962de0b7daedce624cf4a71"
+  },
+  "name": "Import multiple Manufacturers from Google Sheets to Shopware 6",
+  "tags": [
+    {
+      "id": "Bpo3iitXqy2zfvPW",
+      "name": "tutorial",
+      "createdAt": "2024-01-06T22:57:17.318Z",
+      "updatedAt": "2024-01-06T22:57:17.318Z"
+    },
+    {
+      "id": "NfcTamKf2RPwzXbo",
+      "name": "automate-everything",
+      "createdAt": "2024-02-14T20:01:44.966Z",
+      "updatedAt": "2024-02-14T20:01:44.966Z"
+    },
+    {
+      "id": "2Vgn1rq99D9L11Gq",
+      "name": "submitted",
+      "createdAt": "2024-02-15T16:09:47.798Z",
+      "updatedAt": "2024-02-15T16:09:47.798Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "460ed5fb-cc70-41ed-b6e2-07bc2266603f",
+      "name": "When clicking \"Execute Workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        340,
+        360
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "291e6fc4-31b4-4c7c-91e8-261581664759",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        620,
+        360
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "shopware_url",
+              "stringValue": "https://your-shopware-url.com"
+            },
+            {
+              "name": "default_language_code",
+              "stringValue": "de_DE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "38f62300-bbc9-4c2e-a1ba-1d1a49e9cecc",
+      "name": "Create Import Request Body",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1260,
+        360
+      ],
+      "parameters": {
+        "jsCode": "// importing crypto package to create md5 hashes for the media ids\nconst crypto = require('crypto');\nconst md5 = data => crypto.createHash('md5').update(data).digest(\"hex\")\n\nfunction addTranslation(translations, code, name, description) {\n  return translations = {\n    ...translations,\n    [code]: {\n      ...name && {\n        name: name\n      },\n      ...description && {\n        description: description\n      }\n    }\n  }\n}\n\nfor (const item of $input.all()) {\n  const { name, website, description, logo_url } = item.json\n\n  // If you add another language to the Google Sheet, extract values here\n  const { translation_language_code_1, translation_language_code_2, translation_language_code_3, translation_name_1, translation_name_2, translation_name_3, translation_description_1, translation_description_2, translation_description_3 } = item.json\n  \n  let translations = {}\n\n  if(translation_language_code_1 && (translation_name_1 || translation_description_1)){\n    translations = addTranslation(translations, translation_language_code_1, translation_name_1, translation_description_1)\n  }\n\n  if(translation_language_code_2 && (translation_name_2 || translation_description_2)){\n    translations = addTranslation(translations, translation_language_code_2, translation_name_2, translation_description_2)\n  }\n\n    if(translation_language_code_3 && (translation_name_3 || translation_description_3)){\n    translations = addTranslation(translations, translation_language_code_3, translation_name_3, translation_description_3)\n  }\n\n  //If you add another language to the Google Sheet, call addTranslation with the values of the new language as already done above with three languages\n  \n  item.json.manufacturer = {\n    entity: \"product_manufacturer\",\n    action: \"upsert\",\n    payload: [\n      {\n        name: name,\n        link: website,\n        description: description,\n        ...Object.keys(translations).length && {\n          translations: translations\n        },\n        ...logo_url &&  { \n          media:{\n            id: md5(\"media-\"+item.json.name)\n          }\n        }\n      }\n    ]\n  }\n}\n\nreturn $input.all();"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "2e6d1b94-ffb0-46bf-8197-32865764e753",
+      "name": "Upload Manufacturer Logo",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2300,
+        360
+      ],
+      "parameters": {
+        "url": "={{ $('Settings').item.json.shopware_url }}/api/_action/media/{{ $('Loop Over Manufacturers').item.json.manufacturer.payload[0].media.id }}/upload",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $('Get Manufacturer from Google Sheet').item.json.logo_url }}"
+            }
+          ]
+        },
+        "genericAuthType": "oAuth2Api",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "extension",
+              "value": "={{ $('Get Manufacturer from Google Sheet').item.json.logo_url.split(\".\").pop() }}"
+            },
+            {
+              "name": "fileName",
+              "value": "={{ $('Get Manufacturer from Google Sheet').item.json.name }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "hrFvifgKqhhV11RK",
+          "name": "SW6 Demo"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "6c219e67-1547-475a-aa4f-0018d10ccf5f",
+      "name": "Import Manufacturer",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1800,
+        380
+      ],
+      "parameters": {
+        "url": "={{ $('Settings').item.json.shopware_url }}/api/_action/sync",
+        "method": "POST",
+        "options": {},
+        "sendBody": true,
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "import-manufacturer",
+              "value": "={{ $json.manufacturer }}"
+            }
+          ]
+        },
+        "genericAuthType": "oAuth2Api",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "_response",
+              "value": "details"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "hrFvifgKqhhV11RK",
+          "name": "SW6 Demo"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "f4dc392f-8679-4624-a045-ff560f282f5f",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        540,
+        240
+      ],
+      "parameters": {
+        "width": 271,
+        "height": 330,
+        "content": "## Settings\n**Todo**: Configure your Shopware URL"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "15b857a8-ef6a-4212-ac73-7ab16ffcb6e5",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        900,
+        120
+      ],
+      "parameters": {
+        "width": 272,
+        "height": 450,
+        "content": "## Google Sheet\n**Todo:** Create a Google Sheet with the columns:\n- name (**unique**)\n- website\n- description\n- logo_url"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "52f5804c-65a9-4772-99e5-fdde53ff3f3d",
+      "name": "Loop Over Manufacturers",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1520,
+        360
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "f37d7f57-b86b-4296-9114-0a1b97178bc9",
+      "name": "Get Manufacturer from Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        980,
+        360
+      ],
+      "parameters": {
+        "options": {},
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Qmsjs8usT90fPNnCIaI605W77zoKkOB3t3i8UsdpA5Q/edit#gid=0",
+          "cachedResultName": "Sheet1"
+        },
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "1Qmsjs8usT90fPNnCIaI605W77zoKkOB3t3i8UsdpA5Q",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Qmsjs8usT90fPNnCIaI605W77zoKkOB3t3i8UsdpA5Q/edit?usp=drivesdk",
+          "cachedResultName": "SW6 Manufacturer"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dmSqFI4zNuhZqIvL",
+          "name": "Google Sheets account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "dfe522c5-f481-4bc1-ba95-85f8f471b20a",
+      "name": "If has Logo",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        2040,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1cd0654f-b088-420a-be28-4468dc901890",
+              "operator": {
+                "type": "array",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.data['import-manufacturer'].result[0].entities.media }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "b006dce3-16c6-4ebb-b752-67e5972841f5",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1740,
+        60
+      ],
+      "parameters": {
+        "height": 499.67801857585135,
+        "content": "## Shopware Manufacturer Import\n**Todo**: Connect your Shopware Account by creating a [Shopware Integration](https://docs.shopware.com/en/shopware-6-en/settings/system/integrationen) and using a Generic OAuth2 API Authentication with Grant Type \"Client Credentials\" to authenticate the request. The Access Token URL is https://*your-shopware-domain.com*/api/oauth/token."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "681e7c0a-6e6f-4896-8e86-6eacfc4fd2ab",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2240,
+        160
+      ],
+      "parameters": {
+        "height": 399.1455108359133,
+        "content": "## Shopware Manufacturer Logo Upload\n**Todo**: Connect your Shopware Account as you did two nodes before."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1d0510a7-b383-481a-801b-f0f77f144858",
+  "connections": {
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Manufacturer from Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If has Logo": {
+      "main": [
+        [
+          {
+            "node": "Upload Manufacturer Logo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Manufacturers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Import Manufacturer": {
+      "main": [
+        [
+          {
+            "node": "If has Logo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Manufacturers": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Import Manufacturer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Manufacturer Logo": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Manufacturers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Import Request Body": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Manufacturers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \"Execute Workflow\"": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Manufacturer from Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Create Import Request Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

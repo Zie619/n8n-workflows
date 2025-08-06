@@ -1,0 +1,320 @@
+{
+  "id": 122,
+  "name": "Automate assigning GitHub issues",
+  "nodes": [
+    {
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        720,
+        360
+      ],
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value2": "opened"
+            },
+            {
+              "output": 1,
+              "value2": "created"
+            }
+          ]
+        },
+        "value1": "={{$json[\"body\"][\"action\"]}}",
+        "dataType": "string"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF no assignee?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1120,
+        220
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"body\"][\"issue\"][\"assignees\"].length}}",
+              "operation": "equal"
+            }
+          ],
+          "string": [
+            {
+              "value1": "={{$json[\"body\"][\"issue\"][\"body\"]}}",
+              "value2": "/[a,A]ssign[\\w*\\s*]*me/gm",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1320,
+        320
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "IF wants to work?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        920,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [],
+          "string": [
+            {
+              "value1": "={{$json[\"body\"][\"comment\"][\"body\"]}}",
+              "value2": "/[a,A]ssign[\\w*\\s*]*me/gm",
+              "operation": "regex"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "IF not assigned?",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1120,
+        520
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json[\"body\"][\"issue\"][\"assignees\"].length}}",
+              "operation": "equal"
+            }
+          ],
+          "string": []
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Assign Issue Creator",
+      "type": "n8n-nodes-base.github",
+      "position": [
+        1320,
+        120
+      ],
+      "parameters": {
+        "owner": "={{$node[\"Switch\"].json[\"body\"][\"repository\"][\"owner\"][\"login\"]}}",
+        "operation": "edit",
+        "editFields": {
+          "labels": [
+            {
+              "label": "assigned"
+            }
+          ],
+          "assignees": [
+            {
+              "assignee": "={{$json.body.issue[\"user\"][\"login\"]}}"
+            }
+          ]
+        },
+        "repository": "={{$node[\"Switch\"].json[\"body\"][\"repository\"][\"name\"]}}",
+        "issueNumber": "={{ $json[\"body\"][\"issue\"][\"number\"] }}",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": null,
+          "name": "GitHub@Harshil"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Add Comment",
+      "type": "n8n-nodes-base.github",
+      "position": [
+        1420,
+        660
+      ],
+      "parameters": {
+        "body": "=Hey @{{$json[\"body\"][\"comment\"][\"user\"][\"login\"]}},\n\nThis issue is already assigned to {{$json[\"body\"][\"issue\"][\"assignee\"][\"login\"]}} 🙂",
+        "owner": "={{$json[\"body\"][\"repository\"][\"owner\"][\"login\"]}}",
+        "operation": "createComment",
+        "repository": "={{$json[\"body\"][\"repository\"][\"name\"]}}",
+        "issueNumber": "={{$json[\"body\"][\"issue\"][\"number\"]}}",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": null,
+          "name": "GitHub@Harshil"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "NoOp1",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1120,
+        720
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Assign Commenter",
+      "type": "n8n-nodes-base.github",
+      "position": [
+        1420,
+        460
+      ],
+      "parameters": {
+        "owner": "={{$json[\"body\"][\"repository\"][\"owner\"][\"login\"]}}",
+        "operation": "edit",
+        "editFields": {
+          "labels": [
+            {
+              "label": "assigned"
+            }
+          ],
+          "assignees": [
+            {
+              "assignee": "={{$json[\"body\"][\"comment\"][\"user\"][\"login\"]}}"
+            }
+          ]
+        },
+        "repository": "={{$json[\"body\"][\"repository\"][\"name\"]}}",
+        "issueNumber": "={{$json[\"body\"][\"issue\"][\"number\"]}}",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": null,
+          "name": "GitHub@Harshil"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Github Trigger1",
+      "type": "n8n-nodes-base.githubTrigger",
+      "position": [
+        520,
+        360
+      ],
+      "webhookId": "52c5fe44-23ef-4903-b6ae-731edd36127e",
+      "parameters": {
+        "owner": "harshil1712",
+        "events": [
+          "issue_comment",
+          "issues"
+        ],
+        "repository": "build-discord-bot",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": null,
+          "name": "GitHub Personal Credentials"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "IF no assignee?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF wants to work?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Github Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF no assignee?": {
+      "main": [
+        [
+          {
+            "node": "Assign Issue Creator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF not assigned?": {
+      "main": [
+        [
+          {
+            "node": "Assign Commenter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF wants to work?": {
+      "main": [
+        [
+          {
+            "node": "IF not assigned?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

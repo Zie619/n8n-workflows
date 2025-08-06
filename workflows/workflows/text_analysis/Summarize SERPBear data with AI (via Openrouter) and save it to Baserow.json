@@ -1,0 +1,277 @@
+{
+  "id": "qmmXKcpJOCm9qaCk",
+  "meta": {
+    "instanceId": "558d88703fb65b2d0e44613bc35916258b0f0bf983c5d4730c00c424b77ca36a",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "SERPBear analytics template",
+  "tags": [],
+  "nodes": [
+    {
+      "id": "2ad0eb40-6628-4c6b-bc15-7081e7712f1a",
+      "name": "When clicking \u2018Test workflow\u2019",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        260,
+        380
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "5a3c9ad8-a562-4bb0-bb11-c325552d8101",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        260,
+        160
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "bdfa7388-f9b3-4145-90de-2e58138e14bf",
+      "name": "Get data from SerpBear",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        580,
+        260
+      ],
+      "parameters": {
+        "url": "https://myserpbearinstance.com/api/keyword?id=22",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "rumjahn.com"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3fshHb4fyI5XfLyq",
+          "name": "Header Auth account 6"
+        }
+      },
+      "executeOnce": false,
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "c169f4e3-ab60-4b46-9f49-cf27a13dd7c6",
+      "name": "Parse data from SerpBear",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        820,
+        260
+      ],
+      "parameters": {
+        "jsCode": "const keywords = items[0].json.keywords;\nconst today = new Date().toISOString().split('T')[0];\n\n// Create summary for each keyword\nconst keywordSummaries = keywords.map(kw => {\n const position = kw.position || 0;\n const lastWeekPositions = Object.values(kw.history || {}).slice(-7);\n const avgPosition = lastWeekPositions.reduce((a, b) => a + b, 0) / lastWeekPositions.length;\n \n return {\n keyword: kw.keyword,\n currentPosition: position,\n averagePosition: Math.round(avgPosition * 10) / 10,\n trend: position < avgPosition ? 'improving' : position > avgPosition ? 'declining' : 'stable',\n url: kw.url || 'not ranking'\n };\n});\n\n// Create the prompt\nconst prompt = `Here's the SEO ranking data for rumjahn.com as of ${today}:\n\n${keywordSummaries.map(kw => `\nKeyword: \"${kw.keyword}\"\nCurrent Position: ${kw.currentPosition}\n7-Day Average: ${kw.averagePosition}\nTrend: ${kw.trend}\nRanking URL: ${kw.url}\n`).join('\\n')}\n\nPlease analyze this data and provide:\n1. Key observations about ranking performance\n2. Keywords showing the most improvement\n3. Keywords needing attention\n4. Suggested actions for improvement`;\n\nreturn {\n prompt\n};"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cc6e16a7-db46-42fe-837a-59ce635c906c",
+      "name": "Send data to A.I. for analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1060,
+        260
+      ],
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n \"model\": \"meta-llama/llama-3.1-70b-instruct:free\",\n \"messages\": [\n {\n \"role\": \"user\",\n \"content\": \"You are an SEO expert. This is keyword data for my site. Can you summarize the data into a table and then give me some suggestions:{{ encodeURIComponent($json.prompt)}}\" \n }\n ]\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "WY7UkF14ksPKq3S8",
+          "name": "Header Auth account 2"
+        }
+      },
+      "typeVersion": 4.2,
+      "alwaysOutputData": false
+    },
+    {
+      "id": "a623f06c-1dfe-4d04-a7fd-fed7049a7588",
+      "name": "Save data to Baserow",
+      "type": "n8n-nodes-base.baserow",
+      "position": [
+        1340,
+        260
+      ],
+      "parameters": {
+        "tableId": 644,
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": 6264,
+              "fieldValue": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "fieldId": 6265,
+              "fieldValue": "={{ $json.choices[0].message.content }}"
+            },
+            {
+              "fieldId": 6266,
+              "fieldValue": "Rumjahn"
+            }
+          ]
+        },
+        "operation": "create",
+        "databaseId": 121
+      },
+      "credentials": {
+        "baserowApi": {
+          "id": "8w0zXhycIfCAgja3",
+          "name": "Baserow account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e8048faf-bbed-4e48-b273-d1a50a767e76",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        220,
+        -360
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 614.709677419355,
+        "height": 208.51612903225802,
+        "content": "## Send Matomo analytics to A.I. and save results to baserow\n\nThis workflow will check the Google keywords for your site and it's rank.\n\n[\ud83d\udca1 You can read more about this workflow here](https://rumjahn.com/how-to-create-an-a-i-agent-to-analyze-serpbear-keyword-rankings-using-n8n-for-free-without-any-coding-skills-required/)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1a18e685-79db-423f-992a-5e0d4ddeb672",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        520,
+        -80
+      ],
+      "parameters": {
+        "width": 214.75050403225822,
+        "height": 531.7318548387107,
+        "content": "## Get SERPBear Data\n \n1. Enter your SerpBear API keys and URL. You need to find your website ID which is probably 1.\n2. Navigate to Administration > Personal > Security > Auth tokens within your Matomo dashboard. Click on Create new token and provide a purpose for reference."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "99895baf-75d0-4af2-87de-5b8951186e78",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        980,
+        -60
+      ],
+      "parameters": {
+        "color": 3,
+        "width": 225.99936321742769,
+        "height": 508.95792207792226,
+        "content": "## Send data to A.I.\n\nFill in your Openrouter A.I. credentials. Use Header Auth.\n- Username: Authorization\n- Password: Bearer {insert your API key}\n\nRemember to add a space after bearer. Also, feel free to modify the prompt to A.1."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "07d03511-98b0-4f4a-8e68-96ca177fb246",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1240,
+        -40
+      ],
+      "parameters": {
+        "color": 6,
+        "width": 331.32883116883124,
+        "height": 474.88,
+        "content": "## Send data to Baserow\n\nCreate a table first with the following columns:\n- Date\n- Note\n- Blog\n\nEnter the name of your website under \"Blog\" field."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8b7e7da7-1965-4ca4-8e15-889eda819723",
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get data from SerpBear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get data from SerpBear": {
+      "main": [
+        [
+          {
+            "node": "Parse data from SerpBear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse data from SerpBear": {
+      "main": [
+        [
+          {
+            "node": "Send data to A.I. for analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send data to A.I. for analysis": {
+      "main": [
+        [
+          {
+            "node": "Save data to Baserow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking \u2018Test workflow\u2019": {
+      "main": [
+        [
+          {
+            "node": "Get data from SerpBear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

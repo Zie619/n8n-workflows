@@ -1,0 +1,285 @@
+{
+  "meta": {
+    "instanceId": "237600ca44303ce91fa31ee72babcdc8493f55ee2c0e8aa2b78b3b4ce6f70bd9"
+  },
+  "nodes": [
+    {
+      "id": "60e3ee97-68cb-46ef-8a92-a9e8d1cdd45d",
+      "name": "Add Zendesk company data to Hubspot data",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        1120,
+        320
+      ],
+      "parameters": {
+        "mode": "mergeByKey",
+        "propertyName1": "properties.name.value",
+        "propertyName2": "name"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d72c4307-c24c-494f-b5c2-57fd44ede5a5",
+      "name": "Set new last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        1820,
+        300
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nstaticData.lastExecution = $item(0).$node[\"Get last execution timestamp\"].executionTimeStamp;\n\nreturn item;"
+      },
+      "executeOnce": true,
+      "typeVersion": 1
+    },
+    {
+      "id": "c10e7993-4cd4-4b79-9dce-66097d797b30",
+      "name": "Get last execution timestamp",
+      "type": "n8n-nodes-base.functionItem",
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "functionCode": "// Code here will run once per input item.\n// More info and help: https://docs.n8n.io/nodes/n8n-nodes-base.functionItem\n// Tip: You can use luxon for dates and $jmespath for querying JSON structures\n\n// Add a new field called 'myNewField' to the JSON of the item\nconst staticData = getWorkflowStaticData('global');\n\nif(!staticData.lastExecution){\n  staticData.lastExecution = new Date();\n}\n\nitem.executionTimeStamp = new Date();\nitem.lastExecution = staticData.lastExecution;\n\n\nreturn item;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3c154d99-7984-4561-9fdf-60b0f705c5ee",
+      "name": "Get modified companies",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        620,
+        300
+      ],
+      "parameters": {
+        "filters": {
+          "since": "={{ $json[\"lastExecution\"] }}"
+        },
+        "resource": "company",
+        "operation": "getRecentlyModified",
+        "authentication": "appToken"
+      },
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "13",
+          "name": "HubSpot App Token account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6f05aae1-731e-42cf-b403-baf5f86aa934",
+      "name": "Get all Zendesk organisations",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        880,
+        420
+      ],
+      "parameters": {
+        "resource": "organization",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a8ae65dc-0c60-42cb-9996-26e84770e299",
+      "name": "Company exists in Zendesk",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1340,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json[\"id\"] }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a81ff688-8639-476d-8274-383e5ff51b97",
+      "name": "Create organisation",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        1600,
+        400
+      ],
+      "parameters": {
+        "name": "={{ $json[\"properties\"].name.value }}",
+        "resource": "organization",
+        "additionalFields": {
+          "domain_names": "={{ $json[\"properties\"].domain.value }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fd2780b3-c5cc-4535-ba71-840b13578a07",
+      "name": "Update organisation",
+      "type": "n8n-nodes-base.zendesk",
+      "position": [
+        1600,
+        200
+      ],
+      "parameters": {
+        "id": "={{ $json[\"id\"] }}",
+        "resource": "organization",
+        "operation": "update",
+        "updateFields": {
+          "name": "={{ $json[\"properties\"].name.value }}",
+          "domain_names": "={{ $json[\"properties\"].domain.value }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "5",
+          "name": "Zendesk account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7f19e5ba-e973-4e6c-a2d0-a320ac314fa6",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        180,
+        300
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 5
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Get last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create organisation": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update organisation": {
+      "main": [
+        [
+          {
+            "node": "Set new last execution timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get modified companies": {
+      "main": [
+        [
+          {
+            "node": "Get all Zendesk organisations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add Zendesk company data to Hubspot data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Company exists in Zendesk": {
+      "main": [
+        [
+          {
+            "node": "Update organisation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create organisation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get last execution timestamp": {
+      "main": [
+        [
+          {
+            "node": "Get modified companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all Zendesk organisations": {
+      "main": [
+        [
+          {
+            "node": "Add Zendesk company data to Hubspot data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Add Zendesk company data to Hubspot data": {
+      "main": [
+        [
+          {
+            "node": "Company exists in Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

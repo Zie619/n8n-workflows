@@ -1,0 +1,653 @@
+{
+  "meta": {
+    "instanceId": "21b41c2deb1c9e3f543253a0aa6a6e2c7bd7ef6bab90ffd478aa947c17d3b352",
+    "templateCredsSetupCompleted": true
+  },
+  "name": "Linear Project Status and End Date to Productboard feature Sync",
+  "tags": [
+    {
+      "id": "6Ek7V8f4xbM9vWLj",
+      "name": "linear",
+      "createdAt": "2024-11-08T12:12:15.330Z",
+      "updatedAt": "2024-11-08T12:12:15.330Z"
+    },
+    {
+      "id": "XpcIJ8IHNenz3bWz",
+      "name": "productboard",
+      "createdAt": "2024-11-08T12:12:17.249Z",
+      "updatedAt": "2024-11-08T12:12:17.249Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "5cf79e5e-6a69-49b5-865f-6ca8009dbf75",
+      "name": "linear project id",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        3180,
+        220
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "linear_project_url",
+              "stringValue": "={{ $json.url }}"
+            },
+            {
+              "name": "linear_project_id",
+              "stringValue": "={{ $json.url.split('https://linear.app/<your company>/project/')[1] }}"
+            },
+            {
+              "name": "linear_project_status",
+              "stringValue": "={{ $json.data.status.name }}"
+            },
+            {
+              "name": "startDate",
+              "stringValue": "={{ $json.data.startDate }}"
+            },
+            {
+              "name": "targetDate",
+              "stringValue": "={{ $json.data.targetDate }}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "642e73fc-8904-4631-9e97-1ccff6dbb559",
+      "name": "get productboard feature id",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        3180,
+        400
+      ],
+      "parameters": {
+        "url": "https://api.productboard.com/hierarchy-entities/custom-fields-values",
+        "options": {},
+        "sendQuery": true,
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "customField.id",
+              "value": "<productboard_customfield_uuid>"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Version",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "stickyNote": "Fetches the Productboard feature ID using a custom field value.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z0ptr85smbBZBIYx",
+          "name": "Product Board"
+        }
+      },
+      "notesInFlow": false,
+      "typeVersion": 4.1
+    },
+    {
+      "id": "3c328300-ff68-4958-8ac3-5b8fca122bbd",
+      "name": "update productboard status & timeframe",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        5560,
+        380
+      ],
+      "parameters": {
+        "url": "=https://api.productboard.com/features/{{ $json.feature_id }}",
+        "method": "PATCH",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        },
+        "jsonBody": "={\n  \"data\": {\n    \"status\": {\n      \"name\": \"{{ $json[\"productboard_status\"] }}\"\n    },\n    \"timeframe\": {\n      {{ $json[\"targetDate\"] ? '\"granularity\": \"month\",': '\"granularity\": \"none\",'}}\n      {{ $json[\"targetDate\"] ? '\"startDate\": \"' + $json['targetDate'].substring(0, 7) + '-01' +'\",': '\"startDate\": \"none\",'}}\n      {{ $json[\"targetDate\"] \n        ? (() => {\n            const date = new Date($json['targetDate']);\n            const year = date.getFullYear();\n            const month = date.getMonth() + 1;\n            const lastDay = new Date(year, month, 0).getDate();\n            return `\"endDate\": \"${year}-${month.toString().padStart(2, '0')}-${lastDay}\"`;\n          })() \n        : '\"endDate\": \"none\"'}}\n    }\n  }\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Version",
+              "value": "1"
+            },
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z0ptr85smbBZBIYx",
+          "name": "Product Board"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "ec57bdeb-413b-4f71-b8c4-82b966fd4caf",
+      "name": "map linear to productboard status",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        4300,
+        280
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "linear_status",
+              "stringValue": "={{ $json.linear_project_status }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "052dcbb4-c113-4e1a-8469-e460a9bfefaf",
+      "name": "mapping",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        4560,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const linearStatus = $json.linear_status;\nlet productboardStatus;\n\nswitch(linearStatus) {\n  case 'Backlog':\n    productboardStatus = 'Candidate';\n    break;\n  case 'Planned':\n    productboardStatus = 'Planned';\n    break;\n  case 'Paused':\n    productboardStatus = 'Planned';\n    break;\n  case 'In Progress':\n    productboardStatus = 'In progress';\n    break;\n  case 'Completed':\n    productboardStatus = 'Released';\n    break;\n  case 'Canceled':\n    productboardStatus = 'Won\\'t do';\n    break;\n  default:\n    productboardStatus = 'Candidate'; // Default or handle unknown status\n}\n\nreturn { productboard_status: productboardStatus };\n"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4fee2a41-4e20-4642-badd-164c6d0b1232",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        4780,
+        300
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combinationMode": "mergeByPosition"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "49289417-ca21-4b03-b558-61a04b6eb7dd",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        3400,
+        400
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "data"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "b89135b5-3c72-44a9-9d8e-b0190385cf65",
+      "name": "Merge1",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        3920,
+        280
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "linear_project_url",
+              "field2": "linear_url_productboard"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "cf533225-7507-471e-9d45-4a490b30a01d",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        3740,
+        400
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "linear_url_productboard",
+              "stringValue": "={{ $json['value'].match('^(https:\\/\\/linear\\.app\\/[^\\/]+\\/project\\/[^\\/]+)')[0] }}"
+            },
+            {
+              "name": "feature_id",
+              "stringValue": "={{ $json['hierarchyEntity'].id }}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "ee7f8ef5-f5a9-4a39-9621-ccf908036eeb",
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        5820,
+        380
+      ],
+      "parameters": {
+        "text": "=:linear: {{ $json.data.name }} with status {{ $json.data.status.name }} and dates {{ $json.data.timeframe.startDate }} - {{ $json.data.timeframe.endDate }} updated :productboard: {{ $json.data.links.html }}.",
+        "select": "channel",
+        "blocksUi": "={\n  \"blocks\": [\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \":linear: to :productboard: update\\n\\n*{{ $json.data.name }}*\\n\\n*Status:* {{ $json.data.status.name }}\\n*:dart: date:* {{ $json[\"data\"][\"timeframe\"][\"endDate\"] && $json[\"data\"][\"timeframe\"][\"endDate\"] !== \"none\" ? new Date($json[\"data\"][\"timeframe\"][\"endDate\"]).toLocaleDateString(\"en-US\", { month: \"long\", year: \"numeric\" }) : \"none\" }}\"\n      }\n    },\n    {\n      \"type\": \"divider\"\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"You can view the update in Productboard using the link below:\"\n      },\n      \"accessory\": {\n        \"type\": \"button\",\n        \"text\": {\n          \"type\": \"plain_text\",\n          \"text\": \"Open Productboard\"\n        },\n        \"url\": \"{{ $json.data.links.html }}\"\n      }\n    }\n  ]\n}\n",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#product-notifications"
+        },
+        "messageType": "block",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "SG3oDwwLGpxwoJSO",
+          "name": "Slack"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "4ab5c298-5947-47d1-ac10-db502a0b4b60",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        5280,
+        400
+      ],
+      "parameters": {
+        "options": {
+          "looseTypeValidation": true
+        },
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "f53c6eb9-61cc-4cf9-bbb6-03cc9f78b6b1",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.productboard_status }}",
+              "rightValue": "={{ $json.data.status.name }}"
+            },
+            {
+              "id": "a61b4bca-47b0-48bb-b93f-ba9a419740d0",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json[\"targetDate\"] \n        ? (() => {\n            const date = new Date($json['targetDate']);\n            const year = date.getFullYear();\n            const month = date.getMonth() + 1;\n            const lastDay = new Date(year, month, 0).getDate();\n            return `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;\n          })() \n        : '\"endDate\": \"none\"'}}",
+              "rightValue": "={{ $json.data.timeframe.endDate }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "3efe9d27-7983-419d-8ac1-9efde3751952",
+      "name": "get productboard feature details",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        4300,
+        540
+      ],
+      "parameters": {
+        "url": "=https://api.productboard.com/features/{{ $json.feature_id }}",
+        "options": {},
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Version",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z0ptr85smbBZBIYx",
+          "name": "Product Board"
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "265b3359-c63d-4188-ad1b-a33ce5e081f5",
+      "name": "Merge2",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        5040,
+        400
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "joinMode": "keepEverything",
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "feature_id",
+              "field2": "data.id"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "5dc1c2f5-a92d-49f4-acb9-8084bf878b05",
+      "name": "Your Linear Project 2",
+      "type": "n8n-nodes-base.linearTrigger",
+      "position": [
+        2840,
+        260
+      ],
+      "webhookId": "180ebe54-3ab2-439f-b44b-40be97a62b87",
+      "parameters": {
+        "teamId": "8434c5f8-1ce0-4733-949d-ef6a095c27fd",
+        "resources": [
+          "project"
+        ]
+      },
+      "credentials": {
+        "linearApi": {
+          "id": "hhmsOxH2jUEvGbvN",
+          "name": "Linear"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6f70d103-cf98-4ab8-9550-a5749a40f7e3",
+      "name": "Your Linear Project 1",
+      "type": "n8n-nodes-base.linearTrigger",
+      "position": [
+        2840,
+        60
+      ],
+      "webhookId": "5b10cdb4-85a6-41de-a0de-ce50c75dcc6f",
+      "parameters": {
+        "teamId": "e7c75e79-fbcf-45cc-95bd-110efb6cb555",
+        "resources": [
+          "project"
+        ]
+      },
+      "credentials": {
+        "linearApi": {
+          "id": "hhmsOxH2jUEvGbvN",
+          "name": "Linear"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "65abdb10-dba2-4535-a155-957106ae6cdd",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2960,
+        680
+      ],
+      "parameters": {
+        "width": 487.89456119016046,
+        "height": 156.00544089827184,
+        "content": "## Tips\n- Avoid copying and pasting the Linear node; instead, add a new one from the menu.\n- Remember to configure the custom Productboard field in the \"Get Productboard Feature ID\" node."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "adcb71e4-880b-4c19-acbb-0708ae4af95f",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        5500,
+        620
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 492.6340257353018,
+        "height": 182.8624066540728,
+        "content": "## Preview Slack Message\n:linear: to :productboard: update\nMy awesome feature name\nStatus: Candidate\n:dart: date: Decembre 2024\nYou can view the update in Productboard using the link below:\n<link productboard feature>"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "update productboard status & timeframe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "map linear to productboard status",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "get productboard feature details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "mapping": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "linear project id": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your Linear Project 1": {
+      "main": [
+        [
+          {
+            "node": "get productboard feature id",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "linear project id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your Linear Project 2": {
+      "main": [
+        [
+          {
+            "node": "linear project id",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "get productboard feature id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get productboard feature id": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get productboard feature details": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "map linear to productboard status": {
+      "main": [
+        [
+          {
+            "node": "mapping",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "update productboard status & timeframe": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

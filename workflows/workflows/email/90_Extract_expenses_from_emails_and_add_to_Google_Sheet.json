@@ -1,0 +1,204 @@
+{
+  "id": 90,
+  "name": "Extract expenses from emails and add to Google Sheet",
+  "nodes": [
+    {
+      "name": "Check subject",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"subject\"].toLowerCase()}}",
+              "value2": "=/{{$json[\"subjectPatterns\"].toLowerCase()}}/",
+              "operation": "regex"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Setup Variables",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        620,
+        300
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "subjectPatterns",
+              "value": "(expenses|reciept)"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Check for new emails",
+      "type": "n8n-nodes-base.emailReadImap",
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "format": "resolved",
+        "mailbox": "Inbox",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "credentials": {
+        "imap": {
+          "id": "24",
+          "name": "GMAIL"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Read Receipts",
+      "type": "n8n-nodes-base.mindee",
+      "position": [
+        1020,
+        280
+      ],
+      "parameters": {
+        "binaryPropertyName": "attachment_0"
+      },
+      "credentials": {
+        "mindeeReceiptApi": {
+          "id": "61",
+          "name": "Mindee Receipt account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set column data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1200,
+        280
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Date",
+              "value": "={{$json[\"date\"]}}"
+            },
+            {
+              "name": "Description",
+              "value": "={{$node[\"Check for new emails\"].json[\"subject\"].split(\"-\")[1]}}"
+            },
+            {
+              "name": "Category",
+              "value": "={{$json[\"category\"]}}"
+            },
+            {
+              "name": "Currency",
+              "value": "={{$json[\"currency\"]}}"
+            },
+            {
+              "name": "Amount",
+              "value": "={{$json[\"total\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Add to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1380,
+        280
+      ],
+      "parameters": {
+        "range": "A:E",
+        "options": {},
+        "sheetId": "1xAtx1ORZYKu4urgqpOe3DawFjiWeOZO0VCVvOlQYnaE",
+        "operation": "append",
+        "authentication": "oAuth2"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "8",
+          "name": "Sheets"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Check subject": {
+      "main": [
+        [
+          {
+            "node": "Read Receipts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Receipts": {
+      "main": [
+        [
+          {
+            "node": "Set column data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set column data": {
+      "main": [
+        [
+          {
+            "node": "Add to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Variables": {
+      "main": [
+        [
+          {
+            "node": "Check subject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check for new emails": {
+      "main": [
+        [
+          {
+            "node": "Setup Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

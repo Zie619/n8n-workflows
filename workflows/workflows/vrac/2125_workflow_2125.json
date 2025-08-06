@@ -1,0 +1,798 @@
+{
+  "meta": {
+    "instanceId": "3c58c896c9089c8fb4d7f2b069bf3119193f239a1f538829758e2f4d6b5f5b24"
+  },
+  "nodes": [
+    {
+      "id": "ed18a0ab-ac62-469e-9490-d9fcf75b4606",
+      "name": "Setup",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -700,
+        320
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "linkedInAPIKey"
+            },
+            {
+              "name": "twitterAPIKey"
+            },
+            {
+              "name": "emails"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "d6624796-3f59-4077-8d41-4418c869ad27",
+      "name": "Every morning @ 7",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -940,
+        320
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "1cb46dc8-c2b5-487c-a382-a5714686be50",
+      "name": "Get meetings for today",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        -300,
+        320
+      ],
+      "parameters": {
+        "options": {
+          "timeMax": "={{ $today.plus({ days: 1 }) }}",
+          "timeMin": "={{ $today.minus({ days: 3 }) }}",
+          "singleEvents": true
+        },
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "milorad.filipovic19@gmail.com",
+          "cachedResultName": "milorad.filipovic19@gmail.com"
+        },
+        "operation": "getAll"
+      },
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "22",
+          "name": "Google Calendar account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "22167c9c-6dc2-41a8-a8b8-218643b943e5",
+      "name": "Get attendees email domains",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -80,
+        320
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "domain",
+              "type": "arrayValue",
+              "arrayValue": "={{ $json.attendees.filter(a => !a.organizer).map(a => a.email.split('@').pop()) }}"
+            },
+            {
+              "name": "attendeeEmails",
+              "type": "arrayValue",
+              "arrayValue": "={{ $json.attendees.filter(a => !a.organizer).map(a => a.email) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "271d0044-ceb1-4e3a-9a60-9c003cd4b198",
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        140,
+        320
+      ],
+      "parameters": {
+        "include": "selectedOtherFields",
+        "options": {},
+        "fieldToSplitOut": "domain",
+        "fieldsToInclude": "attendeeEmails, start"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "68041cd4-6dc3-4225-b39e-d227a3142e02",
+      "name": "Get recent LinkedIn posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -20,
+        540
+      ],
+      "parameters": {
+        "url": "https://fresh-linkedin-profile-data.p.rapidapi.com/get-company-posts",
+        "options": {
+          "batching": {
+            "batch": {}
+          }
+        },
+        "sendQuery": true,
+        "sendHeaders": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "linkedin_url",
+              "value": "=https://www.linkedin.com/{{ $json.linkedin.handle }}"
+            },
+            {
+              "name": "sort_by",
+              "value": "recent"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RapidAPI-Key",
+              "value": "={{ $('Setup').item.json.linkedInAPIKey }}"
+            },
+            {
+              "name": "X-RapidAPI-Host",
+              "value": "fresh-linkedin-profile-data.p.rapidapi.com"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.1
+    },
+    {
+      "id": "bcbc845c-dd69-491e-b18d-7e1cd73d94b4",
+      "name": "Enrich attendee company",
+      "type": "n8n-nodes-base.clearbit",
+      "position": [
+        580,
+        320
+      ],
+      "parameters": {
+        "domain": "={{ $json.domain }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "clearbitApi": {
+          "id": "tuwO0i7CavIt5j8X",
+          "name": "Clearbit account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "a928a47a-c7be-4b08-ae78-05541963bf0e",
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1360,
+        640
+      ],
+      "parameters": {
+        "sendTo": "={{ $('Setup').first().json.emails }}",
+        "message": "={{ $json.html }}",
+        "options": {},
+        "subject": "=Latest social activity for: {{ $('Wrap everything together').item.json.name }}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "10",
+          "name": "mrdosija@gmail.com"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "cc82d1ef-5601-4844-b2c1-91cb7d16c080",
+      "name": "Combine all activity for a company",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        460,
+        620
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {
+          "clashHandling": {
+            "values": {
+              "resolveClash": "preferInput2"
+            }
+          }
+        },
+        "joinMode": "keepEverything",
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "name",
+              "field2": "name"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "d0843f1d-173c-4c6a-8ef7-be122551ce03",
+      "name": "Extract data for email",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        680,
+        800
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "attendeeEmail",
+              "stringValue": "={{ $json.meeting.attendeeEmails.find(a => a.endsWith($json.meeting.domain)) }}"
+            },
+            {
+              "name": "startHour",
+              "type": "numberValue",
+              "numberValue": "={{ DateTime.fromISO($json.meeting.start.dateTime).hour }}"
+            },
+            {
+              "name": "startMinute",
+              "type": "numberValue",
+              "numberValue": "={{ DateTime.fromISO($json.meeting.start.dateTime).minute }}"
+            }
+          ]
+        },
+        "include": "selected",
+        "options": {},
+        "includeFields": "name, html_twitter, html_linkedin"
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "7bbb4100-7529-4b33-8301-6e312e15d0c3",
+      "name": "Prepare email template",
+      "type": "n8n-nodes-base.html",
+      "position": [
+        1140,
+        640
+      ],
+      "parameters": {
+        "html": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta charset=\"UTF-8\" />\n\n</head>\n<body>\n  <div class=\"container\">\n     <h2 style=\"font-size: 1.2em\">\n      🗓️ Meeting with <span>{{ $json.attendeeEmail }}</span>\n       at {{ $json.startHour }}:{{ $json.startMinute < 10 ? `0${$json.startMinute}` : $json.startMinute }}h\n       <h3>Here's a quick summary of {{ $json.name }}'s recent social media activities</h3>\n       <p class=\"summary\">\n         {{ $json.message.content }}\n       </p>\n    </h2>\n\n  </div>\n</body>\n</html>\n\n<style>\n.container {\n  font-family: sans-serif;\n}\n\n.summary {\n  background-color: #f7f9fc; \n  font-family: sans-serif; \n  padding: 0.3em 1em\n}\n</style>"
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "0ebfe036-0988-4775-bff4-1e52ba81fd12",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -773.5590877677955,
+        50.38078783690389
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 409.31582584657923,
+        "height": 426.61520915049425,
+        "content": "## Start here\n1️⃣ Register on [RapidAPI](https://rapidapi.com) and subscribe to these two APIs:\n- [Fresh LinkedIn Profile Data](https://rapidapi.com/freshdata-freshdata-default/api/fresh-linkedin-profile-data)\n- [Twitter](https://rapidapi.com/omarmhaimdat/api/twitter154)\n\n\n2️⃣ Set API keys for these two in `linkedInAPIKey` and `twitterAPIKey`fields of this node\n\n3️⃣ Set email addresses that should receive the list in the `emails` field of this node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3fcc1786-757f-49fd-842c-9f77c2a869a4",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -474,
+        620
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 334.90628250854803,
+        "height": 282.9114150520537,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\nℹ️ If you need to get activities from more social media accounts found by ClearBit, they can be added here, just make sure to process them properly in separate switch node branches"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "0eb689e9-f347-482c-b6f3-de9913696eec",
+      "name": "Keep only ones with the domain",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        360,
+        320
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "881d891e-ea17-4879-a5cf-72d08b281f56",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.domain }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "9c479fe7-b0da-402a-bc4e-1c52b0bcb677",
+      "name": "Extract important data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        220,
+        540
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "linkedin_posts",
+              "type": "arrayValue",
+              "arrayValue": "={{ $input.item.json.data.slice(0, 10).map(d => { return { text: d.text, likes: d.num_likes, comments: d.num_comments, postedAt: d.posted } } ) }}"
+            },
+            {
+              "name": "name",
+              "stringValue": "={{ $('Switch').item.json.name }}"
+            },
+            {
+              "name": "meeting",
+              "type": "objectValue",
+              "objectValue": "={{ $('Split Out').item.json }}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "4956210f-4797-4266-acb7-b80684f76052",
+      "name": "Extract important data again",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        220,
+        740
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "twitter_posts",
+              "type": "arrayValue",
+              "arrayValue": "={{ $input.item.json.results.map(d => { return { text: d.text, favorites: d.favorite_count, retweets: d.retweet_count, replies: d.reply_count, postedAt: d.creationDate} }) }}"
+            },
+            {
+              "name": "name",
+              "stringValue": "={{ $('Switch').item.json.name }}"
+            },
+            {
+              "name": "meeting",
+              "type": "objectValue",
+              "objectValue": "={{ $('Split Out').item.json }}"
+            }
+          ]
+        },
+        "include": "none",
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "fda56f50-ebc8-4259-9155-017f09a64f26",
+      "name": "Ask AI to summerize",
+      "type": "n8n-nodes-base.openAi",
+      "position": [
+        680,
+        620
+      ],
+      "parameters": {
+        "prompt": {
+          "messages": [
+            {
+              "content": "=I am a sales representative in my company and I want to see social media activity for a company I am about to meet. I will give you a JSON object  containing company name, and lists of recent LinkedIn and X(Twitter) posts and your job is to give me a summary these posts. This summary needs to be in textual form suitable for email (just the content without the subject and should be impersonal) and should include details interested to a sales representative such as me. JSON data has the following properties: - 'name': Company name, - 'linkedin_posts': List of LinkedIn posts, - 'twitter_posts': List of Twitter posts, You can ignore all other properties in the JSON data. This is the data:\n{{ JSON.stringify($json) }}"
+            }
+          ]
+        },
+        "options": {},
+        "resource": "chat",
+        "chatModel": "gpt-4"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "fN3KsfZMEf9qu6J6",
+          "name": "OpenAi account 3"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "0c082a02-72b3-47d8-9a62-ca5973eed8be",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -260,
+        640
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "linkedin",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.linkedin.handle !== null }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "twitter",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "bbb0310e-8b20-4bc6-a540-a4cd17470e28",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "leftValue": "={{ $json.twitter.id !== null }}",
+                    "rightValue": ""
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "allMatchingOutputs": true,
+          "looseTypeValidation": false
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "e1cf0a2e-834b-4259-91e4-47e13c07c321",
+      "name": "Wrap everything together",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        940,
+        640
+      ],
+      "parameters": {
+        "mode": "combine",
+        "options": {},
+        "combinationMode": "mergeByPosition"
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "e45f33ec-6d67-4ae9-a450-5c300c8748b1",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        780,
+        197.44186046511595
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 738.9631933644362,
+        "height": 399.8417061497098,
+        "content": "### 📬 You will receive one email for every company in your calendar. These emails will look something like this:\n\n![Email example](https://i.imgur.com/IP2Jw1F.png#full-width)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "31d22fdc-aacf-4228-ac78-b8f05621c0e0",
+      "name": "Get latest tweets",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -20,
+        740
+      ],
+      "parameters": {
+        "url": "https://twitter154.p.rapidapi.com/user/tweets",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          }
+        },
+        "sendQuery": true,
+        "sendHeaders": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "10"
+            },
+            {
+              "name": "user_id",
+              "value": "={{ $json.twitter.id }}"
+            },
+            {
+              "name": "include_replies",
+              "value": "={{ false }}"
+            },
+            {
+              "name": "include_pinned",
+              "value": "={{ false }}"
+            }
+          ]
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RapidAPI-Host",
+              "value": "twitter154.p.rapidapi.com"
+            },
+            {
+              "name": "X-RapidAPI-Key",
+              "value": "={{ $('Setup').first().json.twitterAPIKey }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4.1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Setup": {
+      "main": [
+        [
+          {
+            "node": "Get meetings for today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get recent LinkedIn posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get latest tweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Keep only ones with the domain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every morning @ 7": {
+      "main": [
+        [
+          {
+            "node": "Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get latest tweets": {
+      "main": [
+        [
+          {
+            "node": "Extract important data again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask AI to summerize": {
+      "main": [
+        [
+          {
+            "node": "Wrap everything together",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract data for email": {
+      "main": [
+        [
+          {
+            "node": "Wrap everything together",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Extract important data": {
+      "main": [
+        [
+          {
+            "node": "Combine all activity for a company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get meetings for today": {
+      "main": [
+        [
+          {
+            "node": "Get attendees email domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare email template": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich attendee company": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wrap everything together": {
+      "main": [
+        [
+          {
+            "node": "Prepare email template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get recent LinkedIn posts": {
+      "main": [
+        [
+          {
+            "node": "Extract important data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get attendees email domains": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract important data again": {
+      "main": [
+        [
+          {
+            "node": "Combine all activity for a company",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Keep only ones with the domain": {
+      "main": [
+        [
+          {
+            "node": "Enrich attendee company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine all activity for a company": {
+      "main": [
+        [
+          {
+            "node": "Ask AI to summerize",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract data for email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

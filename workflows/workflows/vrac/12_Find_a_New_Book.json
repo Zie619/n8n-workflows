@@ -1,0 +1,399 @@
+{
+  "id": "12",
+  "name": "Find a New Book",
+  "nodes": [
+    {
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        40,
+        140
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "name": "Every Friday at 11:00 AM",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        20,
+        330
+      ],
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 11,
+              "mode": "everyWeek",
+              "weekday": "5"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Set Subject",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        220,
+        330
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "subject",
+              "value": "juvenile_literature"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Retrieve Book Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        420,
+        330
+      ],
+      "parameters": {
+        "url": "=http://openlibrary.org/subjects/{{$json[\"subject\"]}}.json",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "limit",
+              "value": "0"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Check Book Count",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        620,
+        330
+      ],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$node[\"Retrieve Book Count\"].json[\"work_count\"]}}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Select Random Book",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        820,
+        330
+      ],
+      "parameters": {
+        "functionCode": "var retrieve_book = 0;\nvar book_count = items[0].json.work_count;\n\nretrieve_book = Math.floor(Math.random() * book_count) + 1\n\nitems[0].json.retrieve_book = retrieve_book;\nreturn items;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Retrieve Detailed Book Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1260,
+        330
+      ],
+      "parameters": {
+        "url": "=http://openlibrary.org.{{$node[\"Retrieve Basic Book Info\"].json[\"works\"][0][\"key\"]}}.json",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Retrieve Basic Book Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1040,
+        330
+      ],
+      "parameters": {
+        "url": "=http://openlibrary.org/subjects/{{$json[\"name\"]}}.json",
+        "options": {},
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "offset",
+              "value": "={{$json[\"retrieve_book\"]}}"
+            },
+            {
+              "name": "detail",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Book Recommendation",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1830,
+        330
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "msgSubject",
+              "value": "=Book Recommendation: {{$node[\"Create Author String\"].json[\"title\"]}}"
+            },
+            {
+              "name": "msgBody",
+              "value": "=<H2><a href=\"{{$node[\"Create Author String\"].json[\"URL\"]}}\">{{$node[\"Create Author String\"].json[\"title\"]}}</a></H2>\n<p><em>By {{$node[\"Create Author String\"].json[\"authors\"]}}</em><br>\n{{$node[\"Create Author String\"].json[\"description\"]}}</p>"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Filtered Book Info",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1460,
+        330
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "authors",
+              "value": "={{$node[\"Retrieve Basic Book Info\"].json[\"works\"][0][\"authors\"]}}"
+            },
+            {
+              "name": "title",
+              "value": "={{$node[\"Retrieve Basic Book Info\"].json[\"works\"][0][\"title\"]}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$node[\"Retrieve Detailed Book Info\"].json[\"description\"][\"value\"]}}"
+            },
+            {
+              "name": "URL",
+              "value": "=https://openlibrary.org{{$node[\"Retrieve Basic Book Info\"].json[\"works\"][0][\"key\"]}}"
+            }
+          ]
+        },
+        "options": {},
+        "keepOnlySet": true
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Create Author String",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1630,
+        330
+      ],
+      "parameters": {
+        "functionCode": "var arrAuthors = items[0].json.authors;\n\nvar arrNames = arrAuthors.map(function(author) {\n  return \"<a href=\\\"https://openlibrary.org\" + author['key'] + \"\\\">\" + author['name'] + \"</a>\";\n});\n\nvar names = arrNames.join(\", \");\n\nitems[0].json.authors = names;\n\nreturn items;"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send No Book Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        830,
+        520
+      ],
+      "parameters": {
+        "html": "=<p>Unfortunately, there are no books available for the subject of <em>{{$node[\"Check Book Count\"].json[\"name\"]}}</em>. Please update your n8n workflow with a different subject.</p>\n\n<p>A list of all available subjects can be found at <a href=\"https://openlibrary.org/subjects\">the Open Library</a>.</p>",
+        "options": {},
+        "subject": "=Book not found in {{$node[\"Check Book Count\"].json[\"name\"]}}",
+        "toEmail": "john.doe@example.com",
+        "fromEmail": "john.doe@example.com"
+      },
+      "credentials": {
+        "smtp": "Gmail Creds"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send Book Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        2030,
+        330
+      ],
+      "parameters": {
+        "html": "={{$node[\"Book Recommendation\"].json[\"msgBody\"]}}",
+        "options": {},
+        "subject": "={{$node[\"Book Recommendation\"].json[\"msgSubject\"]}}",
+        "toEmail": "john.doe@example.com",
+        "fromEmail": "john.doe@example.com"
+      },
+      "credentials": {
+        "smtp": "Gmail Creds"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "Set Subject": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Book Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Book Count": {
+      "main": [
+        [
+          {
+            "node": "Select Random Book",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send No Book Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtered Book Info": {
+      "main": [
+        [
+          {
+            "node": "Create Author String",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Random Book": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Basic Book Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Recommendation": {
+      "main": [
+        [
+          {
+            "node": "Send Book Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Book Count": {
+      "main": [
+        [
+          {
+            "node": "Check Book Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Author String": {
+      "main": [
+        [
+          {
+            "node": "Book Recommendation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Set Subject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Friday at 11:00 AM": {
+      "main": [
+        [
+          {
+            "node": "Set Subject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Basic Book Info": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Detailed Book Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Detailed Book Info": {
+      "main": [
+        [
+          {
+            "node": "Filtered Book Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

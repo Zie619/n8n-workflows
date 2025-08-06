@@ -1,0 +1,464 @@
+{
+  "id": "AjD7Xo4vjbBvBb93",
+  "meta": {
+    "instanceId": "172d50be57a0a76a25e8cdb8e29b27309a5342fa93c6c159fcaa693db9d4d218"
+  },
+  "tags": [
+    {
+      "id": "XrsuA1YXyGXhbMOC",
+      "name": "Pollup Automation",
+      "createdAt": "2024-12-26T13:41:03.811Z",
+      "updatedAt": "2024-12-26T13:41:03.811Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "446b17f4-2e1f-4155-8b36-1c063f738176",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -420,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "51cfb529-c09e-4afc-8279-67145317bfb7",
+      "name": "RSS Read Testing Catalog",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        -100,
+        160
+      ],
+      "parameters": {
+        "url": "https://www.testingcatalog.com/rss/",
+        "options": {
+          "ignoreSSL": true
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2b6dc055-6877-4070-9fb3-4547ecf5ca15",
+      "name": "Transform date",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9aec0a09-4b6f-4fca-98e6-789abd5fdc51",
+              "name": "title",
+              "type": "string",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "id": "56277e54-31a0-4804-ad23-c9ee6d244641",
+              "name": "content",
+              "type": "string",
+              "value": "={{ $json.contentSnippet }}"
+            },
+            {
+              "id": "a3586a80-588e-42d1-9780-370a956ddf6b",
+              "name": "link",
+              "type": "string",
+              "value": "={{ $json.link }}"
+            },
+            {
+              "id": "58f01618-8014-4685-9192-d15d596ffcd9",
+              "name": "isoDate",
+              "type": "number",
+              "value": "={{ new Date($json.isoDate).getTime() }}"
+            },
+            {
+              "id": "716bb078-8df3-4d96-8a1b-4aec4f8cf206",
+              "name": "categories",
+              "type": "array",
+              "value": "={{ $json.categories }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "d66d19c6-96f1-4ae5-8295-de65809ba517",
+      "name": "Filter by date (more than 7 days)",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        620,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e7cf09fb-af35-495d-a840-341f8d0ddcd8",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.isoDate }}",
+              "rightValue": "={{ Date.now() - 7 * 24 * 60 * 60 * 1000 }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "a5d651b8-6c66-40c9-9d56-84b7265bdef8",
+      "name": "Sort by date",
+      "type": "n8n-nodes-base.sort",
+      "position": [
+        840,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "order": "descending",
+              "fieldName": "isoDate"
+            }
+          ]
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ba15be96-5173-4ea5-9792-b52af467ba16",
+      "name": "Limit news to x",
+      "type": "n8n-nodes-base.limit",
+      "position": [
+        1060,
+        0
+      ],
+      "parameters": {
+        "maxItems": 10
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f290a6c6-7135-4eaf-83dc-03eab6073e93",
+      "name": "Transform new to MD",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1280,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nlet ret = \"\"\nfor (const item of $input.all()) {\n  ret = ret + '- [' + item.json.title + '](' + item.json.link + ' \"‌\"): \\n' + item.json.content + \"\\n\\n\"\n}\n\nreturn {data: ret}"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4ecc9388-504b-450c-b79c-ca455dd38afb",
+      "name": "Publish comment",
+      "type": "n8n-nodes-base.trello",
+      "position": [
+        1480,
+        0
+      ],
+      "parameters": {
+        "text": "={{ $json.data }}",
+        "cardId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "dFtYLRXv"
+        },
+        "resource": "cardComment"
+      },
+      "credentials": {
+        "trelloApi": {
+          "id": "44ijLUdXcqQSGDs3",
+          "name": "Trello account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "96a42e03-0114-4098-9645-ce5bc29544e7",
+      "name": "Send revision email",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1700,
+        0
+      ],
+      "webhookId": "8afe9499-f75c-4bd2-91cc-1d581133cc5a",
+      "parameters": {
+        "sendTo": "thomas@pollup.net",
+        "message": "The Trello comment for https://trello.com/c/dFtYLRXv has been update. \nPlease check.",
+        "options": {},
+        "subject": "Update for Trello done",
+        "emailType": "text"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Q3VYwvyoywYrkHOI",
+          "name": "Gmail account"
+        }
+      },
+      "typeVersion": 2.1
+    },
+    {
+      "id": "d2199794-61c9-4e62-9a7a-e71733ed01a8",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "position": [
+        180,
+        0
+      ],
+      "parameters": {
+        "numberInputs": 3
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "d8f1413b-6d29-4d11-a9cc-cf42ac1dca6d",
+      "name": "RSS Read marktechpost",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        -100,
+        0
+      ],
+      "parameters": {
+        "url": "https://www.marktechpost.com/feed/",
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "9a165edb-6e92-41ff-8f8a-af1bfab92d86",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -180,
+        -280
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 500,
+        "height": 620,
+        "content": "## RSS sources \nHere you can add up to nine sources of RSS. To do so, modify the merge node for the number of RSS feeds you want, duplicate the RSS node and wire it to the trigger and the merge node\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "780c4737-1776-4340-b23d-bd2a52ee9f96",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        -160
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 640,
+        "height": 360,
+        "content": "## Age and number of the news \nHere you can set the number of days behind by changing the 7 by any number in the filter by date node:\n```\nDate.now() - 7 * 24 * 60 * 60 * 1000\n```\nYou can also modify the number of news in the \"limit news to x\" node"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "36819879-d53e-4730-ae0e-bd0a105d54fb",
+      "name": "RSS Read",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "position": [
+        -100,
+        -160
+      ],
+      "parameters": {
+        "url": "https://www.artificial-intelligence.blog/ai-news?format=rss",
+        "options": {}
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "2b089f64-5bbb-4357-86f7-21cea7cb8e60",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -980,
+        -780
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 500,
+        "height": 1120,
+        "content": "## RSS Feed News Processing and Distribution Workflow\n\n### Who is this for?\n\nThis workflow is designed for professionals and teams who need to monitor multiple RSS feeds, filter the latest content, and distribute actionable updates as a Trello comment. Ideal for content managers, marketers, and team leads managing news or content pipelines.\n\n### What problem is this workflow solving?\n\nManually monitoring RSS feeds and keeping track of the latest content can be time-consuming. This workflow automates the aggregation, filtering, and distribution of news, ensuring that only relevant and timely updates are shared with your team or audience.\n\n### What this workflow does:\n1. Aggregates RSS Feeds: Pulls data from up to three RSS feeds simultaneously.\n2. Filters Content: Filters articles based on their publication date (default: last 7 days).\n3. Organizes and Sorts: Sorts filtered articles by date for clarity.\n4. Formats Updates: Transforms news items into Markdown format for better readability.\n5. Publishes and Notifies: Posts comments to Trello cards and sends an email to a moderator to check the comment.\n\n### Setup:\n1. Connect your RSS feeds by configuring the RSS Read nodes.\n2. Link your Trello and Gmail accounts for seamless integration.\n3. Adjust the schedule trigger to set how often the workflow should run (e.g., daily, weekly).\n4. Test the workflow to ensure all connections and configurations are correct.\n\n### How to customize this workflow to your needs:\n- Change the Number of RSS Feeds: Add or remove RSS Read nodes and update the merge configuration accordingly.\n- Adjust the Date Filter: Modify the date logic in the “Filter by date” node to include more or fewer days.\n- Limit the Number of Articles: Adjust the limit in the “Limit news to x” node.\n- Custom Formatting: Update the Transform node to format the news items differently.\n- Alternative Notifications: Replace Trello and Gmail with other integrations, such as Slack or Microsoft Teams.\n\nThis workflow ensures your team stays informed with minimal effort and delivers content updates in an organized and professional manner."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": true,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "14af0ee8-487d-426a-9674-b49d5b34512d",
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Transform date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort by date": {
+      "main": [
+        [
+          {
+            "node": "Limit news to x",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform date": {
+      "main": [
+        [
+          {
+            "node": "Filter by date (more than 7 days)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit news to x": {
+      "main": [
+        [
+          {
+            "node": "Transform new to MD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish comment": {
+      "main": [
+        [
+          {
+            "node": "Send revision email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS Read Testing Catalog",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Read marktechpost",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send revision email": {
+      "main": [
+        []
+      ]
+    },
+    "Transform new to MD": {
+      "main": [
+        [
+          {
+            "node": "Publish comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read marktechpost": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS Read Testing Catalog": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Filter by date (more than 7 days)": {
+      "main": [
+        [
+          {
+            "node": "Sort by date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

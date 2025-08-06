@@ -1,0 +1,1300 @@
+{
+  "nodes": [
+    {
+      "id": "065d7ec9-edc5-46f6-b8ac-d62ed0e5c8e3",
+      "name": "Baserow Event",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -1180,
+        -140
+      ],
+      "webhookId": "267ea500-e2cd-4604-a31f-f0773f27317c",
+      "parameters": {
+        "path": "267ea500-e2cd-4604-a31f-f0773f27317c",
+        "options": {},
+        "httpMethod": "POST"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ac1403b4-9d45-404d-9892-0bed39b9ec82",
+      "name": "Event Type",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        -220,
+        -140
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "rows.updated",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "2162daf8-d23d-4b8f-8257-bdfc5400a3a8",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "rows.updated"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "field.created",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "48e112f6-afe8-40bf-b673-b37446934a62",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "field.created"
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "field.updated",
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "5aa258cd-15c2-4156-a32d-afeed662a38e",
+                    "operator": {
+                      "name": "filter.operator.equals",
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "field.updated"
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "typeVersion": 3.2
+    },
+    {
+      "id": "c501042d-f9e7-4c1a-b01d-b11392b1a804",
+      "name": "Table Fields API",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        -900,
+        -140
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/fields/table/{{ $json.body.table_id }}/",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user_field_names",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F28aPWK5NooSHAg0",
+          "name": "Baserow (n8n-local)"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "af6c3b7f-bb8b-4037-8e3b-337d81ca5632",
+      "name": "Get Prompt Fields",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        -720,
+        -140
+      ],
+      "parameters": {
+        "jsCode": "const fields = $input.all()\n    .filter(item => item.json.description)\n    .map(item => ({\n      id: item.json.id,\n      order: item.json.order,\n      name: item.json.name,\n      description: item.json.description,\n    }));\n\nreturn { json: { fields } };"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e1f8f740-c784-4f07-9265-76db518f3ebc",
+      "name": "Get Event Body",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        -380,
+        -140
+      ],
+      "parameters": {
+        "mode": "raw",
+        "options": {},
+        "jsonOutput": "={{ $('Baserow Event').first().json.body }}"
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "e303b7c3-639a-4136-8aa4-074eedeb273f",
+      "name": "List Table API",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        480,
+        220
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/rows/table/{{ $json.table_id }}/",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "nextURL": "={{ $response.body.next || `https://api.baserow.io/api/database/rows/table/${$json.table_id}/?user_field_names=true&size=20&page=9999` }}",
+              "maxRequests": 3,
+              "paginationMode": "responseContainsNextURL",
+              "requestInterval": 1000,
+              "limitPagesFetched": true,
+              "completeExpression": "={{ $response.body.isEmpty() || $response.statusCode >= 400 }}",
+              "paginationCompleteWhen": "other"
+            }
+          }
+        },
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user_field_names",
+              "value": "true"
+            },
+            {
+              "name": "size",
+              "value": "20"
+            },
+            {
+              "name": "include",
+              "value": "id,order,_id,name,created_at,last_modified_at"
+            },
+            {
+              "name": "filters",
+              "value": "{\"filter_type\":\"AND\",\"filters\":[{\"type\":\"not_empty\",\"field\":\"File\",\"value\":\"\"}],\"groups\":[]}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F28aPWK5NooSHAg0",
+          "name": "Baserow (n8n-local)"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "9ad2e0c8-c92d-460d-be7a-237ce29b34c2",
+      "name": "Get Valid Rows",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        640,
+        220
+      ],
+      "parameters": {
+        "jsCode": "return $input.all()\n  .filter(item => item.json.results?.length)\n  .flatMap(item => item.json.results);"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "72b137e9-2e87-4580-9282-0ab7c5147f68",
+      "name": "Get File Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        320
+      ],
+      "parameters": {
+        "url": "={{ $json.File[0].url }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "d479ee4e-4a87-4a0e-b9ca-4aa54afdc67a",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1480,
+        320
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "pdf"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "717e36f8-7dd7-44a6-bcef-9f20735853d2",
+      "name": "Update Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "Execute Once",
+      "onError": "continueRegularOutput",
+      "maxTries": 2,
+      "position": [
+        2280,
+        380
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/rows/table/{{ $('Event Ref').first().json.table_id }}/{{ $('Row Reference').item.json.id }}/",
+        "method": "PATCH",
+        "options": {},
+        "jsonBody": "={{\n{\n  ...$input.all()\n    .reduce((acc, item) => ({\n      ...acc,\n      [item.json.field]: item.json.value\n    }), {})\n}\n}}",
+        "sendBody": true,
+        "sendQuery": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user_field_names",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F28aPWK5NooSHAg0",
+          "name": "Baserow (n8n-local)"
+        }
+      },
+      "executeOnce": true,
+      "notesInFlow": true,
+      "retryOnFail": false,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "b807a9c0-2334-491c-a259-1e0e266f89df",
+      "name": "Get Result",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2100,
+        380
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ad72567-1d17-4910-b916-4c34a43b1060",
+              "name": "field",
+              "type": "string",
+              "value": "={{ $('Event Ref').first().json.field.name }}"
+            },
+            {
+              "id": "e376ba60-8692-4962-9af7-466b6a3f44a2",
+              "name": "value",
+              "type": "string",
+              "value": "={{ $json.text.trim() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "d29a58db-f547-4a4b-bc20-10e14529e474",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        900,
+        220
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "233b2e96-7873-42f0-989f-c3df5a8e4542",
+      "name": "Row Reference",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1080,
+        320
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "396eb9c0-dcde-4735-9e15-bf6350def086",
+      "name": "Generate Field Value",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1640,
+        320
+      ],
+      "parameters": {
+        "text": "=<file>\n{{ $json.text }}\n</file>\n\nData to extract: {{ $('Event Ref').first().json.field.description }}\noutput format is: {{ $('Event Ref').first().json.field.type }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You assist the user in extracting the required data from the given file.\n* Keep you answer short.\n* If you cannot extract the requested data, give you response as \"n/a\"."
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "4be0a9e5-e77e-4cea-9dd3-bc6e7de7a72b",
+      "name": "Get Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        640,
+        -420
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/rows/table/{{ $('Event Ref1').first().json.table_id }}/{{ $json.id }}/",
+        "options": {},
+        "sendQuery": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user_field_names",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F28aPWK5NooSHAg0",
+          "name": "Baserow (n8n-local)"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "40fc77b8-a986-40ab-a78c-da05a3f171c2",
+      "name": "Rows to List",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [
+        320,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "fieldToSplitOut": "items"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "4c5bc9c8-1bcb-48b1-82d0-5cf04535108c",
+      "name": "Fields to Update",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1640,
+        -300
+      ],
+      "parameters": {
+        "jsCode": "const row = $('Row Ref').first().json;\nconst fields = $('Get Prompt Fields').first().json.fields;\nconst missingFields = fields\n  .filter(field => field.description && !row[field.name]);\n\nreturn missingFields;"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "85d5c817-e5f8-45ea-bf7f-efc7913f542c",
+      "name": "Loop Over Items1",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        900,
+        -420
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "69005b35-9c66-4c14-80a9-ef8e945dab30",
+      "name": "Row Ref",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1080,
+        -300
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "1b0e14da-13a8-4023-9006-464578bf0ff5",
+      "name": "Get File Data1",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1320,
+        -300
+      ],
+      "parameters": {
+        "url": "={{ $('Row Ref').item.json.File[0].url }}",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "47cf67bc-a3e2-4796-b5a7-4f6a6aef3e90",
+      "name": "Extract from File1",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        1480,
+        -300
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "pdf"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "3dc743cc-0dde-4349-975c-fa453d99dbaf",
+      "name": "Update Row1",
+      "type": "n8n-nodes-base.httpRequest",
+      "notes": "Execute Once",
+      "onError": "continueRegularOutput",
+      "maxTries": 2,
+      "position": [
+        2440,
+        -260
+      ],
+      "parameters": {
+        "url": "=https://api.baserow.io/api/database/rows/table/{{ $('Event Ref1').first().json.table_id }}/{{ $('Row Ref').first().json.id }}/",
+        "method": "PATCH",
+        "options": {},
+        "jsonBody": "={{\n{\n  ...$input.all()\n    .reduce((acc, item) => ({\n      ...acc,\n      [item.json.field]: item.json.value\n    }), {})\n}\n}}",
+        "sendBody": true,
+        "sendQuery": true,
+        "specifyBody": "json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "user_field_names",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "F28aPWK5NooSHAg0",
+          "name": "Baserow (n8n-local)"
+        }
+      },
+      "executeOnce": true,
+      "notesInFlow": true,
+      "retryOnFail": false,
+      "typeVersion": 4.2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "49c53281-d323-4794-919a-d807d7ccc25e",
+      "name": "Get Result1",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2260,
+        -260
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ad72567-1d17-4910-b916-4c34a43b1060",
+              "name": "field",
+              "type": "string",
+              "value": "={{ $('Fields to Update').item.json.name }}"
+            },
+            {
+              "id": "e376ba60-8692-4962-9af7-466b6a3f44a2",
+              "name": "value",
+              "type": "string",
+              "value": "={{ $json.text.trim() }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "bc23708a-b177-47db-8a30-4330198710e0",
+      "name": "Generate Field Value1",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        1800,
+        -300
+      ],
+      "parameters": {
+        "text": "=<file>\n{{ $('Extract from File1').first().json.text }}\n</file>\n\nData to extract: {{ $json.description }}\noutput format is: {{ $json.type }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You assist the user in extracting the required data from the given file.\n* Keep you answer short.\n* If you cannot extract the requested data, give you response as \"n/a\" followed by \"(reason)\" where reason is replaced with reason why data could not be extracted."
+            }
+          ]
+        },
+        "promptType": "define"
+      },
+      "typeVersion": 1.5
+    },
+    {
+      "id": "c0297c19-04b8-4d56-9ce0-320b399f73bd",
+      "name": "Filter Valid Rows",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        480,
+        -420
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "7ad58f0b-0354-49a9-ab2f-557652d7b416",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.File[0].url }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "5aab6971-1d6f-4b82-a218-4e25c7b28052",
+      "name": "Filter Valid Fields",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        320,
+        220
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "5b4a7393-788c-42dc-ac1f-e76f833f8534",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.field.description }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "typeVersion": 2.2
+    },
+    {
+      "id": "bc144115-f3a2-4e99-a35c-4a780754d0fb",
+      "name": "Event Ref",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        160,
+        220
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "13fd10c0-d4eb-463a-a8b6-5471380f3710",
+      "name": "Event Ref1",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        160,
+        -420
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "e07053a4-a130-41b0-85d3-dfa3983b1547",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1000,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 480,
+        "height": 440,
+        "content": "### 1. Get Table Schema\n[Learn more about the HTTP node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest)\n\nFor this operation, we'll have to use the Baserow API rather than the built-in node. However, this way does allow for more flexibility with query parameters.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "675b9d6a-1ba6-49ce-b569-38cc0ba04dcb",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -260,
+        -440
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 330,
+        "height": 80,
+        "content": "### 2a. Updates Minimal Number of Rows\nThis branch updates only the rows impacted."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "021d51f9-7a5b-4f93-baad-707144aeb7ba",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        140
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 390,
+        "height": 120,
+        "content": "### 2b. Update Every Row under the Field\nThis branch updates all applicable rows under field when the field/column is created or changed. Watch out - if you have 1000s of rows, this could take a while!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ae49cfb0-ac83-4501-bc01-d98be32798f0",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1780,
+        -1060
+      ],
+      "parameters": {
+        "width": 520,
+        "height": 1160,
+        "content": "## Try It Out!\n### This n8n template powers a \"dynamic\" or \"user-defined\" prompts with PDF workflow pattern for a [Baserow](https://baserow.io) table. Simply put, it allows users to populate a spreadsheet using prompts without touching the underlying template.\n\n**Check out the video demo I did for n8n Studio**: https://www.youtube.com/watch?v=_fNAD1u8BZw\n\nThis template is intended to be used as a webhook source for Baserow. **Looking for a Airtable version? [Click here](https://n8n.io/workflows/2771-ai-data-extraction-with-dynamic-prompts-and-airtable/)**\n\n## How it works\n* Each Baserow.io tables offers integration feature whereby changes to the table can be sent as events to any accessible webhook. This allows for a reactive trigger pattern which makes this type of workflow possible. For our usecase, we capture the vents of `row_updated`, `field_created` and `field_updated`.\n* Next, we'll need an \"input\" column in our Baserow.io table. This column will be where our context lives for evaluating the prompts against. In this example, our \"input\" column name is \"file\" and it's where we'll upload our PDFs. Note, this \"input\" field is human-controlled and never updated from this template.\n* Now for the columns (aka \"fields\" in Baserow). Each field allows us to define a name, type and description and together form the schema. The first 2 are self-explaintory but the \"description\" will be for users to provide their prompts ie. what data should the field to contain.\n* In this template, a webhook trigger waits for when a row or column is updated. The incoming event comes with lots of details such as the table, row and/or column Ids that were impacted.\n* We use this information to fetch the table's schema in order to get the column's descriptions (aka dynamic prompts).\n* For each triggered event, we download our input ie. the PDF and ready it for our AI/LLM. By iterating through the available columns and feeding the dynamic prompts, our LLM can run those prompts against the PDF and thus generating a value response for each cell.\n* These values are then collected and used to update the Baserow Table.\n\n## How to use\n* You'll need to publish this workflow and make it accessible to our Baserow instance. Good to note, you only really need to do this once and can reuse for many Baserow Tables.\n* Configure your Baserow Table to send `row_updated`, `field_created` and `field_updated` events to this n8n workflow.\n* This workflow should work with both cloud-hosted and self-hosted versions of Baserow.\n\n\n### Need Help?\nJoin the [Discord](https://discord.com/invite/XPKeKXeB7d) or ask in the [Forum](https://community.n8n.io/)!\n\nHappy Flowgramming!"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "23ea63f5-e1ad-4326-95a4-945bf98d03f4",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -500,
+        -340
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 580,
+        "height": 440,
+        "content": "### 2. Event Router Pattern\n[Learn more about the Switch node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.switch/)\n\nA simple switch node can be used to determine which event to handle. The difference between our row and field events is that row event affect a single row whereas field events affect all rows. \n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "179f9459-43d0-4342-ab94-e248730182a5",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        100,
+        -620
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 700,
+        "height": 400,
+        "content": "### 3. Filter Only Rows with Valid Input\n[Learn more about the Split Out node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.splitout/)\n\nThis step handles one or more updated rows where \"updated\" means the \"input\" column (ie. \"file\" in our example) for these rows were changed. For each affected row, we'll get the full row to figure out only the columns we need to update - this is an optimisation to avoid redundant work ie. generating values for columns which already have a value."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "7124a8c0-549e-4b82-8e1f-c6428d2bfb44",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2140,
+        -480
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 520,
+        "height": 440,
+        "content": "### 6. Update the Baserow Table Row\n[Learn more about the Edit Fields node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.set/)\n\nFinally, we can collect the LLM responses and combine them to build an API request to update our Baserow Table row - the Id of which we got from initial webhook. After this is done, we can move onto the next row and repeat the process.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "c55ce945-10ba-440b-a444-81cb4ed63539",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1260,
+        -580
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 860,
+        "height": 580,
+        "content": "### 5. PDFs, LLMs and Dynamic Prompts? Oh My!\n[Learn more about the Basic LLM node](https://docs.n8n.io/integrations/builtin/cluster-nodes/root-nodes/n8n-nodes-langchain.chainllm/)\n\nThis step is where it all comes together! In short, we give our LLM the PDF contents as the context and loop through our dynamic prompts (from the schema we pulled earlier) for our row. At the end, our LLM should have produced a value for each column requested.\n\n**Note**: There's definitely a optimisation which could be done for caching PDFs but it beyond the scope of this demonstration.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "1a0ff82e-64aa-479e-8dec-c29b512b0686",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        -580
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 420,
+        "height": 460,
+        "content": "### 4. Using an Items Loop\n[Learn more about the Split in Batches node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.splitinbatches/)\n\nA split in batches node is used here to update a row at a time however, this is a preference for user experience - changes are seen in the Baserow quicker.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f4562d44-4fc0-4c59-ba90-8b65f1162aac",
+      "name": "Sticky Note10",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        100,
+        40
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 680,
+        "height": 360,
+        "content": "### 7. Listing All Rows Under The Column\n[Learn more about the Code node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.code)\n\nWe can use Baserow's List API and the HTTP node's pagination feature to fetch all applicable rows under the affected field - the filter query on the API is helpful here.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "979983e9-1002-444c-a018-50ce525ef02a",
+      "name": "Sticky Note11",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1260,
+        140
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 700,
+        "height": 500,
+        "content": "### 9. Generating Value using LLM\n[Learn more about the Extract From File node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.extractfromfile/)\n\nPretty much identical to Step 5 but instead of updating every field/column, we only need to generate a value for one. \n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f38aa7a3-479b-4876-87bf-769ada3089f2",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1800,
+        -140
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "a5061210-2e6b-4b62-994f-594fc10a0ac6",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        40
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 420,
+        "height": 460,
+        "content": "### 8. Using an Items Loop\n[Learn more about the Split in Batches node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.splitinbatches/)\n\nSimilar to Step 4, the Split in Batches node is a preference for user experience - changes are seen in the Baserow quicker.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e47e36d4-bf6d-48d3-9e52-d8bbac06c4b4",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        1640,
+        500
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "8gccIjcuf3gvaoEr",
+          "name": "OpenAi account"
+        }
+      },
+      "typeVersion": 1.1
+    },
+    {
+      "id": "52501eab-861e-4de9-837d-65879cd43e5b",
+      "name": "Sticky Note13",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1980,
+        200
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 500,
+        "height": 380,
+        "content": "### 10. Update the Baserow Table Row\n[Learn more about the Edit Fields node](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.set/)\n\nAs with Step 6, the LLM response is used to update the row however only under the field that was created/changed. Once complete, the loop continues and the next row is processed.\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "6d9fb2e9-6aca-4276-b9b3-d409be24e40e",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1780,
+        -1200
+      ],
+      "parameters": {
+        "color": 7,
+        "height": 120,
+        "content": "![baserow.io](https://res.cloudinary.com/daglih2g8/image/upload/f_auto,q_auto/v1/n8n-workflows/baserow_logo)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bccfc32b-fd18-4de7-88d5-0aeb02ab7954",
+      "name": "Sticky Note14",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1200,
+        -1280
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 820,
+        "height": 800,
+        "content": "## ⭐️ Creating Baserow Webhooks\nBaserow webhooks are created via the UI and the option can be accessed by clicking on the 3 dots button in the toolbar.\n\n* Create a POST webhook for your n8n webhook URL found in this template.\n* Select the \"use fields names instead of IDs\" option.\n* Select \"let me choose individual events\"\n* The events to choose are \"row updated\", \"field created\" and \"field updated\".\n* For the \"row updated\" event, be sure to specify the input field - in this case, \"File\".\n\n![](https://res.cloudinary.com/daglih2g8/image/upload/f_auto,q_auto/v1/n8n-workflows/jfhvavdpnf3krloc6iaz)"
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Get Row": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row Ref": {
+      "main": [
+        [
+          {
+            "node": "Get File Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Ref": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Ref1": {
+      "main": [
+        [
+          {
+            "node": "Rows to List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Type": {
+      "main": [
+        [
+          {
+            "node": "Event Ref1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Event Ref",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Event Ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Result": {
+      "main": [
+        [
+          {
+            "node": "Update Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Row": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Result1": {
+      "main": [
+        [
+          {
+            "node": "Update Row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Row1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rows to List": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baserow Event": {
+      "main": [
+        [
+          {
+            "node": "Table Fields API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Data": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Row Reference": {
+      "main": [
+        [
+          {
+            "node": "Get File Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Event Body": {
+      "main": [
+        [
+          {
+            "node": "Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Data1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Valid Rows": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Table API": {
+      "main": [
+        [
+          {
+            "node": "Get Valid Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Row Reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fields to Update": {
+      "main": [
+        [
+          {
+            "node": "Generate Field Value1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Row Ref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Table Fields API": {
+      "main": [
+        [
+          {
+            "node": "Get Prompt Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Generate Field Value",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Rows": {
+      "main": [
+        [
+          {
+            "node": "Get Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Prompt Fields": {
+      "main": [
+        [
+          {
+            "node": "Get Event Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Field Value1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Fields to Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Field Value",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Fields": {
+      "main": [
+        [
+          {
+            "node": "List Table API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Field Value": {
+      "main": [
+        [
+          {
+            "node": "Get Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Field Value1": {
+      "main": [
+        [
+          {
+            "node": "Get Result1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

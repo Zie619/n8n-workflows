@@ -1,0 +1,244 @@
+{
+  "nodes": [
+    {
+      "id": "517fad39-50ec-4eae-94c4-aca5b111a093",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        -120,
+        -100
+      ],
+      "webhookId": "a227afae-e16e-44c2-bb5c-e69fe553b455",
+      "parameters": {
+        "path": "a227afae-e16e-44c2-bb5c-e69fe553b455",
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "cbd978df-9b95-4148-a054-7772213f5b8f",
+      "name": "continue with valid token",
+      "type": "n8n-nodes-base.noOp",
+      "position": [
+        1020,
+        -40
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "65167cf9-3ec5-4727-a604-a318e86bb54e",
+      "name": "get new accessToken",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        560,
+        80
+      ],
+      "parameters": {
+        "url": "http://your-api.com",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "notesInFlow": false,
+      "typeVersion": 4.2
+    },
+    {
+      "id": "b17e01d2-c43a-486f-ab08-d81e05f8d110",
+      "name": "2. set token in static data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        780,
+        80
+      ],
+      "parameters": {
+        "jsCode": "const workflowStaticData = $getWorkflowStaticData('global');\n\n// get new access token\nworkflowStaticData.accessToken = $input.first().json.AccessToken;\n// set timestamp of new access token\nworkflowStaticData.timestamp = $now.toISO().toString();\n\nreturn [\n  {\n      // data: $input.all(),\n      accessToken: workflowStaticData.accessToken,\n      timestamp: workflowStaticData.timestamp,\n      // today: $today\n  }\n];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "31fd494a-f323-47cc-8f89-0bb2f2332e0f",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        -120,
+        60
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "typeVersion": 1.2
+    },
+    {
+      "id": "77623419-99f9-4369-9546-375eaf6f5732",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -180,
+        240
+      ],
+      "parameters": {
+        "width": 660,
+        "height": 400,
+        "content": "# StaticData Demo\n\n\nThis workflow demonstrates how to use the [`workflowStaticData()` function](https://docs.n8n.io/code/cookbook/builtin/get-workflow-static-data/\n) to set any type of variable that will persist within workflow executions. \n\nThis can be useful for working with access tokens that expire after a certain time period. \n\nhttps://docs.n8n.io/code/cookbook/builtin/get-workflow-static-data/\n\n## Important\n\nStatic Data only persists across **_production_** executions, i.e. triggered by Webhooks or Schedule Triggers (not manual executions!)\nFor this the workflow will have to be activated. \n\n\n\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e4cbdbf7-7b3d-4c52-9d41-bc427d63df5d",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        520,
+        60
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 180,
+        "height": 420,
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### HTTP Request\n\nToggle \n`Include Response Headers and Status` \noption if access token is not sent in the body"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bed68570-bf35-4fa9-984c-1b67a53b59ba",
+      "name": "if token is valid",
+      "type": "n8n-nodes-base.if",
+      "notes": "(1 minute expiration)",
+      "position": [
+        340,
+        -20
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "65f5c979-3e7d-4e50-92c3-3ae39f1bba3d",
+              "operator": {
+                "type": "dateTime",
+                "operation": "afterOrEquals"
+              },
+              "leftValue": "={{ $json.timestamp }}",
+              "rightValue": "={{ $now.minus(1,'minute') }}"
+            }
+          ]
+        },
+        "looseTypeValidation": true
+      },
+      "notesInFlow": true,
+      "typeVersion": 2.2
+    },
+    {
+      "id": "57a4f5f9-eb77-4fd4-b6b1-55137f108374",
+      "name": "1. initiate static data",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        120,
+        -20
+      ],
+      "parameters": {
+        "jsCode": "// initialize staticData object\nconst workflowStaticData = $getWorkflowStaticData('global');\n\n// initialize accessToken on staticData if it desn't exist yet\nif (!workflowStaticData.hasOwnProperty('accessToken')) {\n  workflowStaticData.accessToken = 0\n}\n\n// initializing any other variables on the staticData object\nif (!workflowStaticData.hasOwnProperty('timestamp')) {\n  workflowStaticData.timestamp = $now.toISO()\n}\n\nreturn [\n  {\n      // data: $input.all(),\n      accessToken: workflowStaticData.accessToken,\n      timestamp: workflowStaticData.timestamp,\n      // today: $today\n  }\n];"
+      },
+      "notesInFlow": false,
+      "typeVersion": 2
+    }
+  ],
+  "pinData": {
+    "get new accessToken": [
+      {
+        "AccessToken": "5763273631"
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "1. initiate static data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "1. initiate static data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if token is valid": {
+      "main": [
+        [
+          {
+            "node": "continue with valid token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get new accessToken",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get new accessToken": {
+      "main": [
+        [
+          {
+            "node": "2. set token in static data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. initiate static data": {
+      "main": [
+        [
+          {
+            "node": "if token is valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. set token in static data": {
+      "main": [
+        [
+          {
+            "node": "continue with valid token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,175 @@
+{
+  "id": 88,
+  "name": "Check for valid Hubspot contact email",
+  "nodes": [
+    {
+      "name": "When contact created",
+      "type": "n8n-nodes-base.hubspotTrigger",
+      "position": [
+        540,
+        480
+      ],
+      "webhookId": "d24ffb14-1e00-4d4e-b3b8-a812690c40d5",
+      "parameters": {
+        "eventsUi": {
+          "eventValues": [
+            {}
+          ]
+        },
+        "additionalFields": {}
+      },
+      "credentials": {
+        "hubspotDeveloperApi": {
+          "id": "58",
+          "name": "Hubspot Developer account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Get contact email address",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [
+        720,
+        480
+      ],
+      "parameters": {
+        "resource": "contact",
+        "contactId": "={{$json[\"contactId\"] ? 151 : 151}}",
+        "operation": "get",
+        "additionalFields": {
+          "properties": [
+            "email"
+          ],
+          "propertyMode": "valueOnly"
+        }
+      },
+      "credentials": {
+        "hubspotApi": {
+          "id": "57",
+          "name": "Hubspot account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "validate the email",
+      "type": "n8n-nodes-base.oneSimpleApi",
+      "position": [
+        900,
+        480
+      ],
+      "parameters": {
+        "resource": "utility",
+        "emailAddress": "={{$json[\"properties\"][\"email\"][\"value\"]}}"
+      },
+      "credentials": {
+        "oneSimpleApi": {
+          "id": "33",
+          "name": "One Simple account"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "If email is suspicious",
+      "type": "n8n-nodes-base.if",
+      "notes": "IF\ndeliverability is not good\nOR\nDomain is not valid\nOR\nEmail is Disposable",
+      "position": [
+        1080,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"deliverability\"]}}",
+              "value2": "GOOD",
+              "operation": "notEqual"
+            }
+          ],
+          "boolean": [
+            {
+              "value1": "={{$json[\"is_domain_valid\"]}}"
+            },
+            {
+              "value1": "={{$json[\"is_email_disposable\"]}}",
+              "value2": true
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "typeVersion": 1
+    },
+    {
+      "name": "Send to Slack",
+      "type": "n8n-nodes-base.slack",
+      "position": [
+        1280,
+        460
+      ],
+      "parameters": {
+        "text": "=:warning: New Contact with Suspicious Email :warning:\n*Name: * {{$node[\"Item Lists\"].json[\"contact\"][\"fields\"][\"core\"][\"firstname\"][\"normalizedValue\"]}} {{$node[\"Item Lists\"].json[\"contact\"][\"fields\"][\"core\"][\"lastname\"][\"normalizedValue\"]}}\n*Email: * {{$node[\"Item Lists\"].json[\"contact\"][\"fields\"][\"core\"][\"email\"][\"normalizedValue\"]}}\n*Creator: * {{$node[\"Item Lists\"].json[\"contact\"][\"createdByUser\"]}}",
+        "channel": "#hubspot-alerts",
+        "attachments": [],
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "53",
+          "name": "Slack Access Token"
+        }
+      },
+      "typeVersion": 1
+    }
+  ],
+  "active": false,
+  "settings": {},
+  "connections": {
+    "validate the email": {
+      "main": [
+        [
+          {
+            "node": "If email is suspicious",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When contact created": {
+      "main": [
+        [
+          {
+            "node": "Get contact email address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If email is suspicious": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get contact email address": {
+      "main": [
+        [
+          {
+            "node": "validate the email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

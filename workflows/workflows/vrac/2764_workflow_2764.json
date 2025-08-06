@@ -1,0 +1,283 @@
+{
+  "meta": {
+    "instanceId": "f4f5d195bb2162a0972f737368404b18be694648d365d6c6771d7b4909d28167"
+  },
+  "nodes": [
+    {
+      "id": "b6cd232e-e82e-457b-9f03-c010b3eba148",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -40,
+        0
+      ],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "2b734806-e3c0-4552-a491-54ca846ed3ac",
+      "name": "Extract from File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [
+        620,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "operation": "binaryToPropery"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "2c199499-cc4f-405c-8560-765500b7acba",
+      "name": "Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "position": [
+        420,
+        0
+      ],
+      "parameters": {
+        "fileId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "18Ac2xorxirIBm9FNFDDB5aVUSPBCCg1U",
+          "cachedResultUrl": "https://drive.google.com/file/d/18Ac2xorxirIBm9FNFDDB5aVUSPBCCg1U/view?usp=drivesdk",
+          "cachedResultName": "Invoice-798FE2FA-0004.pdf"
+        },
+        "options": {},
+        "operation": "download"
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AUEpxwlqBJghNMtb",
+          "name": "Google Drive account"
+        }
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "e3031c0c-f059-4f30-9684-10014a277d55",
+      "name": "Call Gemini 2.0 Flash with PDF Capabilities",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        220
+      ],
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"inline_data\": {\n            \"mime_type\": \"application/pdf\",\n            \"data\": \"{{ $json.data }}\"\n          }\n        },\n        {\n          \"text\": \"{{ $('Define Prompt').item.json.prompt }}\"\n        }\n      ]\n    }\n  ]\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi"
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "eOt6Ois0jSizRFMJ",
+          "name": "Anthropic Mira Account"
+        },
+        "googlePalmApi": {
+          "id": "IQrjvfoUd5LUft3b",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "135df716-32a1-47e8-9ed8-30c830b803d6",
+      "name": "Call Claude 3.5 Sonnet with PDF Capabilities",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        880,
+        -140
+      ],
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "options": {},
+        "jsonBody": "={\n  \"model\": \"claude-3-5-sonnet-20241022\",\n    \"max_tokens\": 1024,\n    \"messages\": [{\n        \"role\": \"user\",\n        \"content\": [{\n            \"type\": \"document\",\n            \"source\": {\n                \"type\": \"base64\",\n                \"media_type\": \"application/pdf\",\n                \"data\": \"{{$json.data}}\"\n            }\n        },\n        {\n            \"type\": \"text\",\n            \"text\": \"{{ $('Define Prompt').item.json.prompt }}\"\n        }]\n    }]\n}",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyBody": "json",
+        "authentication": "predefinedCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "nodeCredentialType": "anthropicApi"
+      },
+      "credentials": {
+        "anthropicApi": {
+          "id": "eOt6Ois0jSizRFMJ",
+          "name": "Anthropic Mira Account"
+        }
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "5b8994d1-4bfd-4776-84ac-b3141aca6378",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -700,
+        -280
+      ],
+      "parameters": {
+        "color": 7,
+        "width": 601,
+        "height": 585,
+        "content": "## Workflow: Extract data from PDF with Claude 3.5 Sonnet or Gemini 2.0 Flash\n\n**Overview**\n- This workflow helps you compare Claude 3.5 Sonnet and Gemini 2.0 Flash when extracting data from a PDF\n- This workflow extracts and processes the data within a PDF in **one single step**, **instead of calling an OCR and then an LLM”**\n\n\n**How it works**\n- The initial 2 steps download the PDF and convert it to base64.\n- This base64 string is then sent to both Claude 3.5 Sonnet and Gemini 2.0 Flash to extract information.\n- This workflow is made to let you compare results, latency, and cost (in their dedicated dashboard).\n\n\n**How to use it**\n- Set up your Google Drive if not already done\n- Select a document on your Google Drive\n- Modify the prompt in \"Define Prompt\" to extract the information you need and transform it as wanted.\n- Get a [Claude API key](https://console.anthropic.com/settings/keys) and/or [Gemini API key](https://aistudio.google.com/app/apikey)\n- Note that you can deactivate one of the 2 API calls if you don't want to try both\n- Test the Workflow\n"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "616241a9-6199-406b-88dc-0afc7d974250",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        60
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 320,
+        "height": 360,
+        "content": "You can output the result as JSON by adding the following:\n```\n\"generationConfig\": {\n    \"responseMimeType\": \"application/json\"\n```\nor even use a structured output.\n[Check the documentation](https://ai.google.dev/gemini-api/docs/structured-output?lang=rest)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "bbac8d3d-d68f-4aa2-a41a-b06f7de2317b",
+      "name": "Define Prompt",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        180,
+        0
+      ],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dba23ef5-95df-496a-8e24-c7c1544533d2",
+              "name": "prompt",
+              "type": "string",
+              "value": "Extract the VAT numbers for each country"
+            }
+          ]
+        }
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "3c2e7265-76e5-4911-a950-7e6b0c89ec5a",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        820,
+        -200
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 320,
+        "height": 240,
+        "content": "You can force Claude to output JSON with [Prefill response format](https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency#prefill-claudes-response)"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "f2b46305-5200-486e-ad4d-ecc0d2a14314",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        380,
+        -120
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 380,
+        "height": 280,
+        "content": "These 2 steps first download the PDF file, and then convert it to base64.\nThis is required by both APIs to process the file."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "e5dff70f-b55a-4c23-9025-765a7cf19c4a",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        120,
+        -120
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 220,
+        "height": 280,
+        "content": "This prompt is used in both Gemini’s and Claude’s calls to define what information should be extracted and processed."
+      },
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Define Prompt": {
+      "main": [
+        [
+          {
+            "node": "Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Call Claude 3.5 Sonnet with PDF Capabilities",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call Gemini 2.0 Flash with PDF Capabilities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "Define Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
