@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Any
 
-from categorize_workflows import categorize_by_filename
+from create_categories import categorize_by_filename
 
 
 def load_categories():
