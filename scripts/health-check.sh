@@ -46,7 +46,7 @@ for attempt in $(seq 1 $MAX_ATTEMPTS); do
     
     # Test API stats endpoint
     if response=$(curl -s -w "%{http_code}" -o /tmp/health_response --connect-timeout $TIMEOUT "$ENDPOINT/api/stats" 2>/dev/null); then
-        http_code="${response: -3}"
+        http_code=$(echo "$response" | tail -c 4 | head -c 3)
         
         if [[ "$http_code" == "200" ]]; then
             success "API is responding (HTTP $http_code)"
