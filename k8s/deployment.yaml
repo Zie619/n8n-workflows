@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflows-docs
+  namespace: n8n-workflows
+  labels:
+    app.kubernetes.io/name: n8n-workflows-docs
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: n8n-workflows-docs
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: n8n-workflows-docs
+        app.kubernetes.io/component: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: workflows-docs
+        image: ghcr.io/sahiixx/n8n-workflows-1:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: workflows-docs-config
+        - secretRef:
+            name: workflows-docs-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/stats
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/stats
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: database-storage
+          mountPath: /app/database
+        - name: logs-storage
+          mountPath: /app/logs
+      volumes:
+      - name: database-storage
+        persistentVolumeClaim:
+          claimName: workflows-docs-database
+      - name: logs-storage
+        persistentVolumeClaim:
+          claimName: workflows-docs-logs
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workflows-docs-database
+  namespace: n8n-workflows
+  labels:
+    app.kubernetes.io/name: n8n-workflows-docs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workflows-docs-logs
+  namespace: n8n-workflows
+  labels:
+    app.kubernetes.io/name: n8n-workflows-docs
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: standard
