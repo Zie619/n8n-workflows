@@ -30,7 +30,7 @@ class ProductionStatus:
 class UltimateProductionFixer:
     """Ultimate production fixer - FINAL SOLUTION"""
     
-    def __init__(self, workflows_dir="C:\\Users\\sahii\\OneDrive\\Saved Games\\Microsoft Edge Drop Files\\Documents\\Cline\\n8n-workflows\\workflows", max_workers=8):
+    def __init__(self, workflows_dir="workflows", max_workers=8):
         self.workflows_dir = Path(workflows_dir)
         self.max_workers = max_workers
         self.fix_stats = defaultdict(int)
