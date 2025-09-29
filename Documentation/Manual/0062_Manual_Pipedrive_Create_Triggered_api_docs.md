@@ -1,0 +1,28 @@
+# API Documentation: Create an deal in Pipedrive
+
+## Overview
+Automated workflow: Create an deal in Pipedrive. This workflow processes data and performs automated tasks.
+
+## Workflow Metadata
+- **Total Nodes**: 8
+- **Complexity Level**: Moderate
+- **Estimated Execution Time**: 5-30 seconds
+- **Error Handling**: ❌ Not implemented
+
+## Trigger Information
+### Trigger Types
+- `n8n-nodes-base.manualTrigger`
+
+## Node Types Used
+- `n8n-nodes-base.manualTrigger`
+- `n8n-nodes-base.stickyNote`
+- `n8n-nodes-base.pipedrive`
+
+## Integrations
+- No external integrations detected
+
+## Required Credentials
+- `pipedriveApi`
+
+## Environment Variables
+- No environment variables required
