@@ -40,24 +40,44 @@ If you'd like to say thanks, consider buying me a coffee—your support helps me
 
 # Quick Start
 
- - Fast Documentation System
-```text
+## 🚀 Instant Deployment (Docker - Recommended)
 
-text
+```bash
+# Clone and start with Docker (fastest method)
+git clone <repository-url>
+cd n8n-workflows-1
+./run-as-docker-container.sh
 
-bash
+# Or use Docker Compose directly
+docker compose up -d
 
+# Access the application
+open http://localhost:8000
+```
+
+## 🛠️ Development Setup
+
+```bash
 # Install dependencies
 pip install -r requirements.txt
 
-# Start the fast API server
-python run.py
+# Start development server with auto-reload
+./scripts/deploy-dev.sh
+# or manually:
+python run.py --dev
 
-# Open in browser
-<http://localhost:8000>
-```text
+# Access at http://localhost:8000
+```
 
-text
+## 📦 Alternative Deployment Methods
+
+- **Docker Compose:** `docker compose up -d`
+- **Kubernetes:** `kubectl apply -f k8s/deployment.yaml`
+- **Production:** `./scripts/deploy-prod.sh`
+- **Development:** `./scripts/deploy-dev.sh`
+- **Maintenance:** `./scripts/maintain.sh [command]`
+
+📋 **See [DEPLOYMENT.md](DEPLOYMENT.md) for comprehensive deployment guide**
 
 text
 
