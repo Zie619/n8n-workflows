@@ -41,22 +41,66 @@ success() {
 check_prerequisites() {
     log "Checking prerequisites..."
     
-    # Check Docker
-    if ! command -v docker &> /dev/null; then
-        error "Docker is not installed"
+    local missing_tools=()
+    local deployment_method=""
+    
+    # Determine deployment method based on available tools and environment
+    if command -v kubectl &> /dev/null && [[ "$ENVIRONMENT" == "production" ]]; then
+        deployment_method="kubernetes"
+        if ! command -v kubectl &> /dev/null; then
+            missing_tools+=("kubectl")
+        fi
+    elif command -v docker &> /dev/null; then
+        deployment_method="docker"
+        # Check Docker
+        if ! command -v docker &> /dev/null; then
+            missing_tools+=("docker")
+        fi
+        
+        # Check Docker Compose
+        if ! docker compose version &> /dev/null && ! command -v docker-compose &> /dev/null; then
+            missing_tools+=("docker-compose")
+        fi
+        
+        # Check if Docker daemon is running
+        if ! docker info &> /dev/null; then
+            error "Docker daemon is not running. Please start Docker and try again."
+        fi
+    else
+        deployment_method="python"
+        # Check Python for fallback deployment
+        local python_cmd=""
+        for cmd in python3 python; do
+            if command -v "$cmd" &> /dev/null; then
+                python_cmd="$cmd"
+                break
+            fi
+        done
+        
+        if [[ -z "$python_cmd" ]]; then
+            missing_tools+=("python3")
+        else
+            # Check if pip is available
+            if ! $python_cmd -m pip --version &> /dev/null; then
+                missing_tools+=("pip")
+            fi
+        fi
     fi
     
-    # Check Docker Compose
-    if ! docker compose version &> /dev/null; then
-        error "Docker Compose is not installed"
+    # Check for missing tools
+    if [[ ${#missing_tools[@]} -gt 0 ]]; then
+        error "Missing required tools for $deployment_method deployment: ${missing_tools[*]}. Please install them or run ./install.sh"
     fi
     
-    # Check if Docker daemon is running
-    if ! docker info &> /dev/null; then
-        error "Docker daemon is not running"
+    # Check project files
+    cd "$PROJECT_DIR"
+    if [[ ! -f "requirements.txt" ]] && [[ ! -f "Dockerfile" ]]; then
+        error "Project files not found. Please ensure you're in the correct directory."
     fi
     
+    log "Using $deployment_method deployment method"
     success "Prerequisites check passed"
+    export DEPLOYMENT_METHOD="$deployment_method"
 }
 
 # Validate environment
@@ -86,6 +130,65 @@ build_image() {
     fi
     
     success "Docker image built successfully: $DOCKER_IMAGE"
+}
+
+# Deploy with Python (fallback method)
+deploy_python() {
+    log "Deploying with Python..."
+    
+    local python_cmd=""
+    for cmd in python3 python; do
+        if command -v "$cmd" &> /dev/null; then
+            python_cmd="$cmd"
+            break
+        fi
+    done
+    
+    if [[ -z "$python_cmd" ]]; then
+        error "Python not found. Please install Python or use Docker deployment."
+    fi
+    
+    cd "$PROJECT_DIR"
+    
+    # Install/update dependencies
+    log "Installing Python dependencies..."
+    if ! $python_cmd -m pip install --user -r requirements.txt; then
+        error "Failed to install Python dependencies"
+    fi
+    
+    # Create necessary directories
+    mkdir -p database logs static
+    
+    # Stop any existing Python processes (if running as service)
+    pkill -f "python.*run.py" || true
+    
+    # Determine host and port based on environment
+    local host="127.0.0.1"
+    local port="8000"
+    
+    if [[ "$ENVIRONMENT" == "production" ]]; then
+        host="0.0.0.0"
+        port="8000"
+    elif [[ "$ENVIRONMENT" == "staging" ]]; then
+        host="0.0.0.0"
+        port="8001"
+    fi
+    
+    # Start the application in background
+    log "Starting Python application on $host:$port..."
+    nohup $python_cmd run.py --host "$host" --port "$port" > logs/app.log 2>&1 &
+    local app_pid=$!
+    
+    # Wait a moment for startup
+    sleep 5
+    
+    # Check if process is still running
+    if ! kill -0 "$app_pid" 2>/dev/null; then
+        error "Python application failed to start. Check logs/app.log"
+    fi
+    
+    echo "$app_pid" > logs/app.pid
+    success "Python deployment completed (PID: $app_pid)"
 }
 
 # Deploy with Docker Compose
@@ -170,8 +273,21 @@ health_check() {
     local attempt=1
     local url="http://localhost:8000/api/stats"
     
+    # Adjust URL based on environment and deployment method
     if [[ "$ENVIRONMENT" == "production" ]]; then
-        url="https://workflows.yourdomain.com/api/stats"  # Update with your domain
+        if [[ "${DEPLOYMENT_METHOD}" == "kubernetes" ]]; then
+            url="https://workflows.yourdomain.com/api/stats"
+        elif [[ "${DEPLOYMENT_METHOD}" == "python" ]]; then
+            url="http://0.0.0.0:8000/api/stats"
+        else
+            url="http://localhost:8000/api/stats"
+        fi
+    elif [[ "$ENVIRONMENT" == "staging" ]]; then
+        if [[ "${DEPLOYMENT_METHOD}" == "python" ]]; then
+            url="http://0.0.0.0:8001/api/stats"
+        else
+            url="http://localhost:8000/api/stats"
+        fi
     fi
     
     while [[ $attempt -le $max_attempts ]]; do
@@ -179,6 +295,9 @@ health_check() {
         
         if curl -f -s "$url" &> /dev/null; then
             success "Application is healthy!"
+            # Show a sample of the API response
+            local response=$(curl -s "$url" 2>/dev/null || echo "Could not fetch stats")
+            log "API Response: $response"
             return 0
         fi
         
@@ -186,7 +305,31 @@ health_check() {
         ((attempt++))
     done
     
-    error "Health check failed after $max_attempts attempts"
+    warn "Health check failed after $max_attempts attempts"
+    
+    # Show debugging information
+    if [[ "${DEPLOYMENT_METHOD}" == "python" ]]; then
+        log "Checking Python process status..."
+        if [[ -f "logs/app.pid" ]]; then
+            local pid=$(cat logs/app.pid)
+            if kill -0 "$pid" 2>/dev/null; then
+                log "Python process is running (PID: $pid)"
+                log "Recent logs:"
+                tail -n 10 logs/app.log || log "No logs available"
+            else
+                error "Python process is not running"
+            fi
+        else
+            error "No PID file found"
+        fi
+    elif [[ "${DEPLOYMENT_METHOD}" == "docker" ]]; then
+        log "Checking Docker container status..."
+        docker compose ps || log "Could not check container status"
+        log "Recent container logs:"
+        docker compose logs --tail=10 || log "No container logs available"
+    fi
+    
+    return 1
 }
 
 # Cleanup old resources
@@ -209,17 +352,26 @@ deploy() {
     check_prerequisites
     validate_environment
     
-    # Choose deployment method based on environment and available tools
-    if command -v kubectl &> /dev/null && [[ "$ENVIRONMENT" == "production" ]]; then
-        if command -v helm &> /dev/null; then
-            deploy_helm
-        else
-            deploy_kubernetes
-        fi
-    else
-        build_image
-        deploy_docker_compose
-    fi
+    # Choose deployment method based on what was detected in prerequisites
+    case "${DEPLOYMENT_METHOD:-docker}" in
+        kubernetes)
+            if command -v helm &> /dev/null; then
+                deploy_helm
+            else
+                deploy_kubernetes
+            fi
+            ;;
+        docker)
+            build_image
+            deploy_docker_compose
+            ;;
+        python)
+            deploy_python
+            ;;
+        *)
+            error "Unknown deployment method: ${DEPLOYMENT_METHOD}"
+            ;;
+    esac
     
     health_check
     cleanup
@@ -229,8 +381,13 @@ deploy() {
     # Show deployment information
     case $ENVIRONMENT in
         development)
-            log "Application is available at: http://localhost:8000"
-            log "API Documentation: http://localhost:8000/docs"
+            if [[ "${DEPLOYMENT_METHOD}" == "python" ]]; then
+                log "Application is available at: http://localhost:8000"
+                log "API Documentation: http://localhost:8000/docs"
+            else
+                log "Application is available at: http://localhost:8000"
+                log "API Documentation: http://localhost:8000/docs"
+            fi
             ;;
         staging)
             log "Application is available at: http://workflows-staging.yourdomain.com"
@@ -239,6 +396,11 @@ deploy() {
             log "Application is available at: https://workflows.yourdomain.com"
             ;;
     esac
+    
+    # Show how to stop the application
+    if [[ "${DEPLOYMENT_METHOD}" == "python" ]]; then
+        log "To stop the application: kill \$(cat logs/app.pid) || pkill -f 'python.*run.py'"
+    fi
 }
 
 # Rollback function
