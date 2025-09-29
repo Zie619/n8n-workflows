@@ -251,52 +251,52 @@ app.get('/api/integrations', async (req, res) => {
   }
 });
 
-// Get categories (based on integrations)
+// Get categories (list of category names)
 app.get('/api/categories', async (req, res) => {
   try {
-    const { workflows } = await db.searchWorkflows('', 'all', 'all', false, 1000, 0);
+    const uniqueCategoriesPath = path.join(__dirname, '../context/unique_categories.json');
     
-    const categories = {
-      'Communication': ['Slack', 'Discord', 'Telegram', 'Mattermost', 'Teams'],
-      'CRM': ['HubSpot', 'Salesforce', 'Pipedrive', 'Copper'],
-      'Data': ['GoogleSheets', 'Airtable', 'Mysql', 'Postgres'],
-      'Development': ['GitHub', 'GitLab', 'Jira', 'Trello'],
-      'Marketing': ['Mailchimp', 'Sendinblue', 'Typeform', 'Webflow'],
-      'Storage': ['GoogleDrive', 'Dropbox', 'OneDrive', 'AWS S3'],
-      'Other': []
-    };
-    
-    // Categorize workflows
-    const categorizedWorkflows = {};
-    Object.keys(categories).forEach(category => {
-      categorizedWorkflows[category] = [];
-    });
-    
-    workflows.forEach(workflow => {
-      let categorized = false;
-      
-      // Check each integration against categories
-      workflow.integrations.forEach(integration => {
-        Object.entries(categories).forEach(([category, services]) => {
-          if (services.some(service => 
-            integration.toLowerCase().includes(service.toLowerCase())
-          )) {
-            categorizedWorkflows[category].push(workflow);
-            categorized = true;
-          }
-        });
-      });
-      
-      // If not categorized, add to Other
-      if (!categorized) {
-        categorizedWorkflows['Other'].push(workflow);
+    if (fs.existsSync(uniqueCategoriesPath)) {
+      const categories = JSON.parse(fs.readFileSync(uniqueCategoriesPath, 'utf8'));
+      res.json({ categories });
+    } else {
+      // Fallback to extracting from search_categories.json
+      const searchCategoriesPath = path.join(__dirname, '../context/search_categories.json');
+      if (fs.existsSync(searchCategoriesPath)) {
+        const searchCategories = JSON.parse(fs.readFileSync(searchCategoriesPath, 'utf8'));
+        const uniqueCategories = [...new Set(searchCategories.map(item => item.category))].sort();
+        res.json({ categories: uniqueCategories });
+      } else {
+        res.status(404).json({ error: 'Categories data not found' });
       }
-    });
-    
-    res.json(categorizedWorkflows);
+    }
   } catch (error) {
     console.error('Error fetching categories:', error);
     res.status(500).json({ error: 'Error fetching categories', details: error.message });
+  }
+});
+
+// Get category mappings (filename to category mapping)
+app.get('/api/category-mappings', async (req, res) => {
+  try {
+    const searchCategoriesPath = path.join(__dirname, '../context/search_categories.json');
+    
+    if (!fs.existsSync(searchCategoriesPath)) {
+      return res.status(404).json({ error: 'Category mappings data not found' });
+    }
+    
+    const searchCategories = JSON.parse(fs.readFileSync(searchCategoriesPath, 'utf8'));
+    
+    // Convert array to filename -> category mapping object
+    const mappings = {};
+    searchCategories.forEach(item => {
+      mappings[item.filename] = item.category;
+    });
+    
+    res.json({ mappings });
+  } catch (error) {
+    console.error('Error fetching category mappings:', error);
+    res.status(500).json({ error: 'Error fetching category mappings', details: error.message });
   }
 });
 
