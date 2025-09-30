@@ -8,7 +8,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple, Optional, Union
 from collections import defaultdict, Counter
 from datetime import datetime
 import concurrent.futures
@@ -27,9 +27,24 @@ class ValidationResult:
 
 class FinalValidator:
     """Final validator for n8n workflows"""
-    
-    def __init__(self, workflows_dir="C:\\Users\\sahii\\OneDrive\\Saved Games\\Microsoft Edge Drop Files\\Documents\\Cline\\n8n-workflows\\workflows", max_workers=8):
-        self.workflows_dir = Path(workflows_dir)
+
+    def __init__(
+        self,
+        workflows_dir: Optional[Union[str, Path]] = None,
+        max_workers: int = 8,
+    ):
+        """Create a validator bound to the repository workflows directory by default."""
+
+        if workflows_dir is None:
+            workflows_dir = Path(__file__).resolve().parent / "workflows"
+
+        self.workflows_dir = Path(workflows_dir).expanduser().resolve()
+
+        if not self.workflows_dir.exists():
+            raise FileNotFoundError(
+                f"Workflows directory not found: {self.workflows_dir}"
+            )
+
         self.max_workers = max_workers
         self.validation_stats = defaultdict(int)
         self.thread_lock = threading.Lock()
