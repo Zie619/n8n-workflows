@@ -59,7 +59,7 @@ def categorize_by_filename(filename):
         return "Technical Infrastructure & DevOps"
 
     # Data Processing & File Operations
-    if any(word in filename_lower for word in ['process', 'writebinaryfile', 'readbinaryfile', 'extractfromfile', 'converttofile', 'googlefirebasecloudfirestore', 'supabase', 'surveymonkey', 'renamekeys', 'readpdf', 'wufoo', 'splitinbatches', 'airtop', 'comparedatasets', 'spreadsheetfile']):
+    if any(word in filename_lower for word in ['process', 'writebinaryfile', 'readbinaryfile', 'extractfromfile', 'converttofile', 'googlefirebasecloudfirestore', 'supabase', 'surveymonkey', 'renamekeys', 'readpdf', 'wufoo', 'splitinbatches', 'airtop', 'comparedatasets', 'spreadsheetfile', 'calcslive']):
         return "Data Processing & Analysis"
 
     # Utility & Business Process Automation

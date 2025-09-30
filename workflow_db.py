@@ -199,8 +199,12 @@ class WorkflowDatabase:
         workflow['trigger_type'] = trigger_type
         workflow['integrations'] = list(integrations)
         
-        # Generate description
-        workflow['description'] = self.generate_description(workflow, trigger_type, integrations)
+        # Use JSON description if available, otherwise generate one
+        json_description = data.get('description', '').strip()
+        if json_description:
+            workflow['description'] = json_description
+        else:
+            workflow['description'] = self.generate_description(workflow, trigger_type, integrations)
         
         return workflow
     
@@ -353,7 +357,7 @@ class WorkflowDatabase:
                 service_name = service_mappings.get(raw_service, raw_service.title() if raw_service else None)
             
             # Handle custom nodes
-            elif '-' in node_type:
+            elif '-' in node_type or '@' in node_type:
                 # Try to extract service name from custom node names like "n8n-nodes-youtube-transcription-kasha.youtubeTranscripter"
                 parts = node_type.lower().split('.')
                 for part in parts:
@@ -366,10 +370,16 @@ class WorkflowDatabase:
                     elif 'discord' in part:
                         service_name = 'Discord'
                         break
+                    elif 'calcslive' in part:
+                        service_name = 'CalcsLive'
+                        break
             
-            # Also check node names for service hints
+            # Also check node names for service hints (but avoid false positives)
             for service_key, service_value in service_mappings.items():
                 if service_key in node_name and service_value:
+                    # Avoid false positive: "cal" in calcslive-related terms should not match "Cal.com"
+                    if service_key == 'cal' and any(term in node_name.lower() for term in ['calcslive', 'calc', 'calculation']):
+                        continue
                     service_name = service_value
                     break
             
@@ -649,7 +659,7 @@ class WorkflowDatabase:
             'cloud_storage': ['Google Drive', 'Google Docs', 'Google Sheets', 'Dropbox', 'OneDrive', 'Box'],
             'database': ['PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Airtable', 'Notion'],
             'project_management': ['Jira', 'GitHub', 'GitLab', 'Trello', 'Asana', 'Monday.com'],
-            'ai_ml': ['OpenAI', 'Anthropic', 'Hugging Face'],
+            'ai_ml': ['OpenAI', 'Anthropic', 'Hugging Face', 'CalcsLive'],
             'social_media': ['LinkedIn', 'Twitter/X', 'Facebook', 'Instagram'],
             'ecommerce': ['Shopify', 'Stripe', 'PayPal'],
             'analytics': ['Google Analytics', 'Mixpanel'],

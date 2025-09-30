@@ -1,0 +1,61 @@
+name: Update README Stats
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'workflows/**'
+  schedule:
+    # Run weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate workflow statistics
+        run: |
+          # Create database directory
+          mkdir -p database
+
+          # Index all workflows to get latest stats
+          python workflow_db.py --index --force
+
+          # Generate categories
+          python create_categories.py
+
+          # Get stats and update README
+          python scripts/update_readme_stats.py
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          if git diff --staged --quiet; then
+            echo "No changes to README.md"
+          else
+            git commit -m "📊 Update workflow statistics
+
+            - Updated workflow counts and statistics
+            - Generated from latest workflow analysis
+
+            🤖 Automated update via GitHub Actions"
+            git push
+          fi
