@@ -2,13 +2,22 @@
 
 This workflow automates the creation and publishing of memes to multiple social media platforms, optimized specifically for deployment on Heroku's free/hobby tier.
 
-## 🎯 What This Workflow Does
+## 🎯 What These Workflows Do
 
+### Image Memes (Workflows 2055-2057)
 1. **Generates** meme concepts automatically using predefined topics
 2. **Creates** meme images using ImgFlip API (free tier)
-3. **Hosts** images on Cloudinary CDN (free tier)
-4. **Publishes** to Instagram automatically
-5. **Runs** every 12 hours (2 posts per day)
+3. **Hosts** images on Cloudinary CDN (optional, free tier)
+4. **Publishes** to Instagram feed automatically
+5. **Runs** every 6-12 hours (2-4 posts per day)
+
+### Video Memes (Workflow 2058) 🎬 NEW!
+1. **Generates** video meme concepts with AI-optimized prompts
+2. **Creates** short videos using external APIs (Replicate, Runway ML, or others)
+3. **No local processing** - all video generation happens via API
+4. **Publishes** to Instagram Reels automatically
+5. **Runs** every 8 hours (3 video posts per day)
+6. **Cost**: ~$13/month total (Heroku + API costs)
 
 ## 🏗️ Why Heroku-Optimized?
 
@@ -35,6 +44,7 @@ This workflow is specifically designed for Heroku's limitations:
 - **2055_Meme_Instagram_Automation_Scheduled.json** - Full-featured workflow with Cloudinary
 - **2056_Meme_Instagram_Minimal_Scheduled.json** - Ultra-minimal workflow (5 nodes only)
 - **2057_Meme_Instagram_EcoDyno_PostgreSQL_Scheduled.json** - **RECOMMENDED** for Eco Dyno with PostgreSQL
+- **2058_Meme_Video_API_Instagram_Reels_Scheduled.json** - 🎬 **NEW!** Video generation with external APIs
 
 ### Documentation
 - **README.md** - This file (overview and quick start)
@@ -42,8 +52,10 @@ This workflow is specifically designed for Heroku's limitations:
 - **HEROKU_DEPLOYMENT.md** - Complete deployment guide for Heroku Free/Hobby tier
 - **HEROKU_CLI_GUIDE.md** - Step-by-step CLI deployment guide (in Spanish)
 - **ECO_DYNO_POSTGRES_GUIDE.md** - Specific guide for Eco Dyno + PostgreSQL setup
+- **VIDEO_API_GUIDE.md** - 🎬 **NEW!** Complete guide for video generation APIs
 - **.env.example** - Environment variables template
-- **setup_postgres.sql** - PostgreSQL database setup script
+- **setup_postgres.sql** - PostgreSQL database setup script (for image memes)
+- **setup_video_postgres.sql** - 🎬 **NEW!** PostgreSQL setup for video memes
 - **validate.sh** - Validation script for pre-deployment checks
 - **deploy-heroku.sh** - Interactive deployment helper script
 

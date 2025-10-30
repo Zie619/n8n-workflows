@@ -1,0 +1,555 @@
+{
+  "name": "Meme Video Automation - API-Based Video Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 8
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Every 8 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "notes": "3 video posts per day - optimized for API rate limits"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Generate video meme concept\nconst topics = [\n  {topic: 'ai coding', prompt: 'Split screen: Left side shows person typing code manually with frustrated expression. Right side shows same person relaxing while AI writes perfect code. Text overlay: CODING BEFORE vs AFTER AI', style: 'comparison'},\n  {topic: 'remote work', prompt: 'Camera zooms from professional Zoom background to reveal messy bedroom, person in pajamas. Text overlay: WORKING FROM HOME REALITY', style: 'reveal'},\n  {topic: 'coffee', prompt: 'Person transforms from zombie to energetic superhero after drinking coffee. Animated transformation with energy effects. Text: COFFEE POWER ACTIVATE', style: 'transformation'},\n  {topic: 'monday', prompt: 'Weekend fun montage quickly transitions to alarm clock, dark monday morning. Person dramatically falls back into bed. Text: MONDAY STRIKES AGAIN', style: 'transition'},\n  {topic: 'debugging', prompt: 'Developer frantically searches through code, suddenly has eureka moment, finds it was just a missing semicolon. Comedic timing. Text: 3 HOURS LATER...', style: 'reveal'},\n  {topic: 'deployment', prompt: 'Split screen: Top shows Deploy button being clicked confidently. Bottom shows servers catching fire. Text: DEPLOY ON FRIDAY', style: 'comparison'},\n  {topic: 'meetings', prompt: 'Person in video call nodding seriously while actually playing video game off camera. Quick cuts between professional face and gaming. Text: CAMERAS OFF = FREEDOM', style: 'split'},\n  {topic: 'productivity', prompt: 'Time-lapse of person starting work focused, gradually surrounded by distractions, ends scrolling social media. Text: PRODUCTIVITY JOURNEY', style: 'timelapse'}\n];\n\nconst meme = topics[Math.floor(Math.random() * topics.length)];\n\nreturn {\n  topic: meme.topic,\n  video_prompt: meme.prompt,\n  style: meme.style,\n  duration: 15,\n  hashtags: `#${meme.topic.replace(' ', '')} #meme #viral #shorts #reels`\n};"
+      },
+      "id": "generate-concept",
+      "name": "Generate Video Concept",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300],
+      "notes": "8 video meme concepts optimized for short-form content"
+    },
+    {
+      "parameters": {
+        "content": "## 🎬 Video Generation APIs\n\n**Available Options:**\n\n**1. Replicate (Recommended)**\n- API: https://replicate.com\n- Models: Stable Video Diffusion, others\n- Free tier: $0 + credits\n- Pro: $0.006/second of video\n- Best for: Quick iterations\n\n**2. Runway ML**\n- API: https://runwayml.com\n- Gen-2 video generation\n- Credits-based pricing\n- Best for: High quality\n\n**3. Pika Labs**\n- Web API (unofficial)\n- Text-to-video\n- Free tier available\n- Best for: Creative style\n\n**4. Stability AI**\n- Stable Video Diffusion API\n- Via replicate.com\n- $0.01 per generation\n- Best for: Cost-effective\n\n**5. Google Veo (Future)**\n- When API available\n- Will integrate here\n- Expected: Vertex AI\n\n**Current Implementation:**\nUsing Replicate as it has:\n- Simple API\n- Multiple models\n- Good free tier\n- No local processing",
+        "height": 558.4,
+        "width": 345.6,
+        "color": 4
+      },
+      "id": "video-api-note",
+      "name": "Note: Video API Options",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [580, 60]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.replicate.com/v1/predictions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Token {{ $env.REPLICATE_API_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "version",
+              "value": "={{ $env.REPLICATE_MODEL_VERSION || '3d2a62f9bcc9d32c63e8263bfa3cd790e1f42b9d9f55617d59a1e16f00fb2ea2' }}"
+            },
+            {
+              "name": "input",
+              "value": "={{ JSON.stringify({ prompt: $json.video_prompt, num_frames: 75, fps: 5 }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "create-video-replicate",
+      "name": "Create Video (Replicate API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 300],
+      "notes": "Starts video generation, returns prediction ID"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "prediction-id",
+              "name": "prediction_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "prediction-url",
+              "name": "prediction_url",
+              "value": "={{ $json.urls.get }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "save-prediction",
+      "name": "Save Prediction ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "id": "wait-generation",
+      "name": "Wait for Generation",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1000, 300],
+      "webhookId": "video-gen-wait",
+      "notes": "Wait while video generates (async)"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Save Prediction ID').item.json.prediction_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Token {{ $env.REPLICATE_API_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "check-video-status",
+      "name": "Check Video Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 300],
+      "notes": "Poll for completion"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-success",
+      "name": "Video Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1400, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "video-url",
+              "name": "video_url",
+              "value": "={{ $json.output[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "caption",
+              "name": "caption",
+              "value": "={{ $('Generate Video Concept').item.json.video_prompt.split('.')[0] }}\\n\\n{{ $('Generate Video Concept').item.json.hashtags }} #ai #automation",
+              "type": "string"
+            },
+            {
+              "id": "topic",
+              "name": "topic",
+              "value": "={{ $('Generate Video Concept').item.json.topic }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-video-data",
+      "name": "Prepare Video Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1600, 200],
+      "notes": "Extract video URL and prepare metadata"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "video_url",
+              "value": "={{ $json.video_url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "instagram-create-reel",
+      "name": "Instagram: Create Reel Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 200],
+      "notes": "Create Instagram Reel from video URL"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "instagram-publish-reel",
+      "name": "Instagram: Publish Reel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 200],
+      "notes": "Publish to Instagram Reels"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "meme_videos",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "topic": "={{ $('Prepare Video Data').item.json.topic }}",
+            "video_prompt": "={{ $('Generate Video Concept').item.json.video_prompt }}",
+            "video_url": "={{ $('Prepare Video Data').item.json.video_url }}",
+            "instagram_id": "={{ $json.id }}",
+            "success": true
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "save-to-postgres",
+      "name": "Save to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2200, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_default",
+          "name": "PostgreSQL account"
+        }
+      },
+      "notes": "Track video posts in database"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "success",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "=Video meme posted: {{ $('Generate Video Concept').item.json.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "instagram-id",
+              "name": "instagram_reel_id",
+              "value": "={{ $('Instagram: Publish Reel').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "video-url",
+              "name": "video_url",
+              "value": "={{ $('Prepare Video Data').item.json.video_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "success-summary",
+      "name": "Success Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2400, 200]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "retry-wait",
+      "name": "Wait & Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1400, 450],
+      "webhookId": "video-retry-wait",
+      "notes": "Video still processing, wait and check again"
+    },
+    {
+      "parameters": {
+        "content": "## 🔄 Video Generation Flow\n\n**Process:**\n1. Generate concept\n2. Call Replicate API\n3. Wait 10s (async)\n4. Check status\n5. If ready → Post to Instagram\n6. If processing → Wait 5s more\n\n**Why This Works on Eco Dyno:**\n- No local video processing\n- All generation is external API\n- Wait nodes are lightweight\n- Memory stays < 150MB\n- CPU usage minimal\n\n**Timing:**\n- Initial API call: ~2s\n- Video generation: 10-30s (external)\n- Status checks: ~1s each\n- Instagram upload: ~5s\n- Total workflow: ~20-40s\n\n**Eco Dyno Safe:**\n✓ No file downloads\n✓ External processing\n✓ Lightweight polling\n✓ Fast API calls only",
+        "height": 518.4,
+        "width": 345.6,
+        "color": 5
+      },
+      "id": "flow-note",
+      "name": "Note: Workflow Flow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [960, 60]
+    }
+  ],
+  "connections": {
+    "Schedule Every 8 Hours": {
+      "main": [
+        [
+          {
+            "node": "Generate Video Concept",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Video Concept": {
+      "main": [
+        [
+          {
+            "node": "Create Video (Replicate API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Video (Replicate API)": {
+      "main": [
+        [
+          {
+            "node": "Save Prediction ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Prediction ID": {
+      "main": [
+        [
+          {
+            "node": "Wait for Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Generation": {
+      "main": [
+        [
+          {
+            "node": "Check Video Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Video Status": {
+      "main": [
+        [
+          {
+            "node": "Video Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Ready?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Video Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait & Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Video Data": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Create Reel Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Create Reel Container": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Publish Reel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Publish Reel": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Success Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait & Retry": {
+      "main": [
+        [
+          {
+            "node": "Check Video Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-10-30T18:00:00.000Z",
+      "updatedAt": "2025-10-30T18:00:00.000Z",
+      "id": "video-generation",
+      "name": "Video Generation"
+    },
+    {
+      "createdAt": "2025-10-30T18:00:00.000Z",
+      "updatedAt": "2025-10-30T18:00:00.000Z",
+      "id": "api-based",
+      "name": "API Based"
+    },
+    {
+      "createdAt": "2025-10-30T18:00:00.000Z",
+      "updatedAt": "2025-10-30T18:00:00.000Z",
+      "id": "eco-dyno",
+      "name": "Eco Dyno"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-30T18:00:00.000Z",
+  "versionId": "1",
+  "active": false
+}
