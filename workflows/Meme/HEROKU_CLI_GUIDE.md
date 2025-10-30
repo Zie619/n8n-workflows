@@ -654,10 +654,13 @@ heroku pg:psql -a your-meme-bot-n8n -c "SELECT COUNT(*) FROM meme_posts;"
 
 ```bash
 # Agregar a ~/.bashrc o ~/.zshrc
-alias meme-logs="heroku logs --tail -a your-meme-bot-n8n"
-alias meme-status="heroku ps -a your-meme-bot-n8n"
-alias meme-db="heroku pg:psql -a your-meme-bot-n8n"
-alias meme-restart="heroku restart -a your-meme-bot-n8n"
+# Reemplaza YOUR_APP_NAME con el nombre real de tu app
+export MEME_APP_NAME="your-meme-bot-n8n"
+
+alias meme-logs="heroku logs --tail -a \$MEME_APP_NAME"
+alias meme-status="heroku ps -a \$MEME_APP_NAME"
+alias meme-db="heroku pg:psql -a \$MEME_APP_NAME"
+alias meme-restart="heroku restart -a \$MEME_APP_NAME"
 ```
 
 ---

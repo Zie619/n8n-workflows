@@ -162,6 +162,11 @@ heroku config:set \
   GENERIC_TIMEZONE=America/New_York \
   -a "$APP_NAME"
 
+# Clear sensitive variables from memory
+unset IMGFLIP_PASS
+unset IG_TOKEN
+unset N8N_PASS
+
 print_success "Variables de entorno configuradas"
 
 # Step 6: Deploy n8n
@@ -310,13 +315,16 @@ echo ""
 print_success "¡Listo! Tu bot de memes está en la nube 🎉🤖"
 echo ""
 
-# Save app info to file
+# Save app info to file (non-sensitive data only)
 cat > ".heroku-app-info" << EOF
+# WARNING: This file contains app info. Do not commit to git!
 APP_NAME=$APP_NAME
 N8N_URL=https://${APP_NAME}.herokuapp.com
-N8N_USER=$N8N_USER
 DEPLOYED_AT=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+# Note: Credentials are stored securely in Heroku config
+# View with: heroku config -a $APP_NAME
 EOF
 
-print_info "Info guardada en: .heroku-app-info"
+print_info "Info guardada en: .heroku-app-info (non-sensitive data only)"
+print_warning "Este archivo está en .gitignore - no lo commitees accidentalmente"
 echo ""
