@@ -1,0 +1,516 @@
+{
+  "name": "Meme Video - Perplexity AI Ideas with Multi-Platform",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 8
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Every 8 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 400],
+      "notes": "3 AI-powered video posts per day to all platforms + Google Drive"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.PERPLEXITY_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama-3.1-sonar-large-128k-online"
+            },
+            {
+              "name": "messages",
+              "value": "={{ JSON.stringify([{ role: 'system', content: 'You are a creative meme expert who finds trending topics and creates viral video concepts.' }, { role: 'user', content: 'Search for the top 3 trending topics right now in tech, lifestyle, or pop culture that would make great short video memes. For each topic, provide: 1) The trending topic/hashtag 2) A creative 10-15 second video concept with cinematic description 3) A catchy title 4) Engaging description 5) 5 relevant hashtags. Format as JSON array with fields: topic, prompt, title, description, tags, style, duration, drive_folder' }]) }}"
+            },
+            {
+              "name": "temperature",
+              "value": "0.7"
+            },
+            {
+              "name": "max_tokens",
+              "value": "2000"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "perplexity-search",
+      "name": "Perplexity AI - Search Trending Topics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 400],
+      "notes": "Use Perplexity to find trending meme-worthy topics"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse Perplexity response\nconst response = $input.item.json;\nlet concepts = [];\n\ntry {\n  // Extract JSON from Perplexity response\n  const content = response.choices[0].message.content;\n  \n  // Try to parse JSON array from response\n  const jsonMatch = content.match(/\\[\\s*{[\\s\\S]*}\\s*\\]/);\n  if (jsonMatch) {\n    concepts = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON array found in response');\n  }\n} catch (error) {\n  console.log('Perplexity parsing failed, using fallback concepts:', error);\n  \n  // Fallback to curated concepts if Perplexity fails\n  concepts = [\n    {\n      topic: 'ai_revolution',\n      prompt: 'Cinematic shot: Developer at desk typing code, camera slowly zooms out revealing AI assistant writing perfect code on adjacent screen. Text overlay fades in: \"THE FUTURE IS NOW\". Professional lighting, 4K quality.',\n      title: 'AI is Changing How We Code',\n      description: 'Watch how AI transforms programming!',\n      tags: ['ai', 'coding', 'technology', 'programming', 'automation'],\n      style: 'cinematic',\n      duration: 10,\n      drive_folder: 'AI & Technology'\n    },\n    {\n      topic: 'coffee_power',\n      prompt: 'Dramatic transformation scene: Tired person in dark room holding coffee cup. As they drink, warm golden light floods the scene, person becomes energized and glowing. Epic orchestral swell. Text: \"JAVA POWER LEVEL: 9000\"',\n      title: 'Coffee: The Ultimate Power-Up',\n      description: 'Every developer needs this! ☕',\n      tags: ['coffee', 'productivity', 'energy', 'developer', 'lifestyle'],\n      style: 'dramatic',\n      duration: 8,\n      drive_folder: 'Lifestyle'\n    },\n    {\n      topic: 'remote_work_reality',\n      prompt: 'Split screen reveal: Top half shows professional home office setup during Zoom call. Camera pans down to reveal messy bedroom, person in pajamas, cat walking across keyboard. Comedy timing. Text: \"EXPECTATIONS VS REALITY\"',\n      title: 'Remote Work Reality Check',\n      description: 'This is too real! 😂',\n      tags: ['remotework', 'wfh', 'workfromhome', 'relatable', 'comedy'],\n      style: 'comedic',\n      duration: 10,\n      drive_folder: 'Comedy'\n    }\n  ];\n}\n\n// Select one trending concept randomly\nconst selected = concepts[Math.floor(Math.random() * concepts.length)];\n\n// Enhance prompt for video generation\nconst veoPrompt = `${selected.prompt}\\n\\nStyle: ${selected.style || 'cinematic'}. Camera: smooth movements. Lighting: professional. Quality: 1080p. Aspect ratio: 9:16 vertical for social media.`;\n\n// Platform-specific formatting\nconst instagramCaption = `${selected.description}\\n\\n#${selected.tags.join(' #')} #viral #reels #trending`;\nconst youtubeTitle = `${selected.title} #Shorts`;\nconst youtubeDescription = `${selected.description}\\n\\n${selected.tags.map(t => '#' + t).join(' ')}\\n\\nSubscribe for more trending content!`;\nconst tiktokCaption = `${selected.description} ${selected.tags.map(t => '#' + t).join(' ')}`;\n\n// Google Drive filename (with timestamp for uniqueness)\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];\nconst driveFilename = `${selected.topic}_${timestamp}_${Date.now()}.mp4`;\n\nreturn {\n  topic: selected.topic,\n  video_prompt: selected.prompt,\n  veo_prompt: veoPrompt,\n  style: selected.style || 'cinematic',\n  duration: selected.duration || 10,\n  // Platform-specific data\n  instagram_caption: instagramCaption,\n  youtube_title: youtubeTitle,\n  youtube_description: youtubeDescription,\n  youtube_tags: selected.tags,\n  tiktok_caption: tiktokCaption,\n  preferred_api: 'veo2',\n  // Google Drive data\n  drive_filename: driveFilename,\n  drive_folder: selected.drive_folder || 'Trending',\n  drive_description: `Generated: ${new Date().toISOString()}\\nTopic: ${selected.topic}\\nStyle: ${selected.style || 'cinematic'}\\nTags: ${selected.tags.join(', ')}\\nSource: Perplexity AI`,\n  // Perplexity metadata\n  perplexity_source: true,\n  trending_topic: true\n};"
+      },
+      "id": "parse-and-select",
+      "name": "Parse AI Ideas & Select Concept",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 400],
+      "notes": "Parse trending topics from Perplexity and select one for video"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "api-check",
+              "leftValue": "={{ $json.preferred_api }}",
+              "rightValue": "veo",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "route-api",
+      "name": "Route to Video API",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [800, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{ $env.GOOGLE_CLOUD_REGION || 'us-central1' }}-aiplatform.googleapis.com/v1/projects/{{ $env.GOOGLE_CLOUD_PROJECT }}/locations/{{ $env.GOOGLE_CLOUD_REGION || 'us-central1' }}/publishers/google/models/veo-002:predict",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "instances",
+              "value": "={{ JSON.stringify([{ prompt: $json.veo_prompt, parameters: { aspectRatio: '9:16', durationSeconds: $json.duration } }]) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "create-video-veo",
+      "name": "Create Video (Veo 2)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300],
+      "notes": "Generate video with Google Veo 2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.replicate.com/v1/predictions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Token {{ $env.REPLICATE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "version",
+              "value": "9f747673945c62801b13b84701c783929c0ee784e4748ec062204894dda1a351"
+            },
+            {
+              "name": "input",
+              "value": "={{ JSON.stringify({ prompt: $json.veo_prompt, duration: $json.duration, aspect_ratio: '9:16' }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "create-video-replicate",
+      "name": "Create Video (Replicate Fallback)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 500],
+      "notes": "Fallback to Replicate if Veo fails"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract video URL from API response\nconst response = $input.item.json;\nlet videoUrl = '';\n\nif (response.predictions && response.predictions[0]) {\n  // Google Veo response\n  videoUrl = response.predictions[0].videoUrl;\n} else if (response.output) {\n  // Replicate response\n  videoUrl = Array.isArray(response.output) ? response.output[0] : response.output;\n}\n\nreturn {\n  ...($input.item.json),\n  video_url: videoUrl,\n  api_provider: response.predictions ? 'veo2' : 'replicate'\n};"
+      },
+      "id": "extract-video-url",
+      "name": "Extract Video URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "multipart/related; boundary=boundary123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "bodyParametersJson": "=--boundary123\\nContent-Type: application/json; charset=UTF-8\\n\\n{\\n  \\\"name\\\": \\\"{{ $json.drive_filename }}\\\",\\n  \\\"parents\\\": [\\\"{{ $env['GOOGLE_DRIVE_FOLDER_' + $json.drive_folder.toUpperCase().replace(/ & /g, '_').replace(/ /g, '_')] || $env.GOOGLE_DRIVE_FOLDER_ID }}\\\"],\\n  \\\"description\\\": \\\"{{ $json.drive_description }}\\\"\\n}\\n\\n--boundary123\\nContent-Type: video/mp4\\nContent-Transfer-Encoding: binary\\n\\n{{ $json.video_url }}\\n\\n--boundary123--",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "upload-to-drive",
+      "name": "Upload to Google Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 250],
+      "notes": "Backup to Google Drive organized by topic folder"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_ACCOUNT_ID }}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "media_type",
+              "value": "REELS"
+            },
+            {
+              "name": "video_url",
+              "value": "={{ $json.video_url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.instagram_caption }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "post-instagram",
+      "name": "Post to Instagram Reels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 350]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "snippet",
+              "value": "={{ JSON.stringify({ title: $json.youtube_title, description: $json.youtube_description, tags: $json.youtube_tags, categoryId: '23' }) }}"
+            },
+            {
+              "name": "status",
+              "value": "={{ JSON.stringify({ privacyStatus: 'public', madeForKids: false }) }}"
+            },
+            {
+              "name": "videoUrl",
+              "value": "={{ $json.video_url }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "post-youtube",
+      "name": "Post to YouTube Shorts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.tiktokapis.com/v2/post/publish/video/init/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "post_info",
+              "value": "={{ JSON.stringify({ title: $json.tiktok_caption, privacy_level: 'PUBLIC_TO_EVERYONE', disable_duet: false, disable_comment: false, disable_stitch: false }) }}"
+            },
+            {
+              "name": "source_info",
+              "value": "={{ JSON.stringify({ source: 'PULL_FROM_URL', video_url: $json.video_url }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "post-tiktok",
+      "name": "Post to TikTok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 550]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO meme_videos_multiplatform_gdrive_perplexity (topic, video_prompt, video_url, instagram_id, youtube_id, tiktok_id, google_drive_id, google_drive_url, drive_folder, platforms_posted, api_provider, perplexity_source, posted_at, success) VALUES ('{{ $json.topic }}', '{{ $json.video_prompt }}', '{{ $json.video_url }}', '{{ $json.instagram_id }}', '{{ $json.youtube_id }}', '{{ $json.tiktok_id }}', '{{ $json.drive_id }}', '{{ $json.drive_url }}', '{{ $json.drive_folder }}', ARRAY['instagram', 'youtube', 'tiktok', 'google_drive'], '{{ $json.api_provider }}', {{ $json.perplexity_source }}, NOW(), true)"
+      },
+      "id": "save-to-db",
+      "name": "Save to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1600, 400],
+      "credentials": {
+        "postgres": {
+          "id": "heroku-postgres",
+          "name": "Heroku PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Every 8 Hours": {
+      "main": [
+        [
+          {
+            "node": "Perplexity AI - Search Trending Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity AI - Search Trending Topics": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Ideas & Select Concept",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Ideas & Select Concept": {
+      "main": [
+        [
+          {
+            "node": "Route to Video API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route to Video API": {
+      "main": [
+        [
+          {
+            "node": "Create Video (Veo 2)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Video (Replicate Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Video (Veo 2)": {
+      "main": [
+        [
+          {
+            "node": "Extract Video URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Video (Replicate Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Extract Video URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Video URL": {
+      "main": [
+        [
+          {
+            "node": "Upload to Google Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to Instagram Reels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to YouTube Shorts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Instagram Reels": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to YouTube Shorts": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to TikTok": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-30T18:45:00.000Z",
+  "versionId": "1"
+}

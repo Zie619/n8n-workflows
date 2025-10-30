@@ -11,22 +11,30 @@ This workflow automates the creation and publishing of memes to multiple social 
 4. **Publishes** to Instagram feed automatically
 5. **Runs** every 6-12 hours (2-4 posts per day)
 
-### Video Memes (Workflows 2058-2061) 🎬 NEW!
+### Video Memes (Workflows 2058-2062) 🎬
 1. **Generates** video meme concepts with AI-optimized prompts
 2. **Creates** short videos using external APIs (Replicate, Runway ML, Google Veo 2/3)
 3. **No local processing** - all video generation happens via API
 4. **Publishes** to Instagram Reels, YouTube Shorts, and/or TikTok
-5. **Backs up** to Google Drive (2TB available!) - Workflow 2061 📦
+5. **Backs up** to Google Drive (2TB available!) - Workflows 2061-2062 📦
 6. **Runs** every 8 hours (3 video posts per day)
-7. **Cost**: ~$13-32/month total (Heroku + API costs)
+7. **Cost**: ~$13-37/month total (Heroku + API costs)
 
-### Google Drive Backup (Workflow 2061) 📦 NEW!
+### Google Drive Backup (Workflows 2061-2062) 📦
 1. **Automatic backup** of every generated video to Google Drive
 2. **2TB storage** = ~200,000 videos = 182 years of daily posting!
 3. **Organized folders** by topic (AI, Comedy, Lifestyle, etc.)
 4. **Permanent archive** - recover deleted content anytime
 5. **Zero cost** - included with your Google account
 6. **No performance impact** - only +5-8 seconds per execution
+
+### Perplexity AI Ideas (Workflow 2062) 🤖 NEW!
+1. **Real-time trending topics** - Perplexity searches the web for what's hot NOW
+2. **AI-generated concepts** - Creative video ideas you wouldn't think of
+3. **SEO optimized** - Uses hashtags and keywords that are actually trending
+4. **Automatic fallback** - Uses curated concepts if Perplexity fails
+5. **Higher engagement** - Trending content performs better than static concepts
+6. **Cost**: ~$5-10/month additional (300 searches = 100 ideas/month)
 
 ## 🏗️ Why Heroku-Optimized?
 
@@ -56,7 +64,8 @@ This workflow is specifically designed for Heroku's limitations:
 - **2058_Meme_Video_API_Instagram_Reels_Scheduled.json** - 🎬 Video generation with Replicate API
 - **2059_Meme_Video_GoogleVeo_MultiAPI_Scheduled.json** - 🎬 Video with Google Veo 2/3 + fallback
 - **2060_Meme_Video_MultiPlatform_All_Scheduled.json** - 🚀 Posts to Instagram + YouTube Shorts + TikTok
-- **2061_Meme_Video_MultiPlatform_GoogleDrive_Scheduled.json** - 📦 **NEW!** Multi-platform + Google Drive backup (2TB storage!)
+- **2061_Meme_Video_MultiPlatform_GoogleDrive_Scheduled.json** - 📦 Multi-platform + Google Drive backup (2TB storage!)
+- **2062_Meme_Video_Perplexity_AI_Ideas_Scheduled.json** - 🤖 **NEW!** AI-powered trending ideas with Perplexity + all platforms + Drive backup
 
 ### Documentation
 - **README.md** - This file (overview and quick start)
@@ -67,12 +76,14 @@ This workflow is specifically designed for Heroku's limitations:
 - **VIDEO_API_GUIDE.md** - 🎬 Complete guide for video generation APIs
 - **GOOGLE_VEO_SETUP.md** - 🎬 Google Veo 2/3 setup for Google Pro users
 - **MULTIPLATFORM_GUIDE.md** - 🚀 Setup for YouTube Shorts + TikTok posting
-- **GOOGLE_DRIVE_SETUP.md** - 📦 **NEW!** Google Drive backup setup (2TB storage!)
+- **GOOGLE_DRIVE_SETUP.md** - 📦 Google Drive backup setup (2TB storage!)
+- **PERPLEXITY_AI_SETUP.md** - 🤖 **NEW!** Perplexity AI integration for trending ideas
 - **.env.example** - Environment variables template
 - **setup_postgres.sql** - PostgreSQL database setup script (for image memes)
 - **setup_video_postgres.sql** - 🎬 PostgreSQL setup for video memes
 - **setup_multiplatform_postgres.sql** - 🚀 PostgreSQL for multi-platform tracking
-- **setup_gdrive_postgres.sql** - 📦 **NEW!** PostgreSQL for Google Drive backup tracking
+- **setup_gdrive_postgres.sql** - 📦 PostgreSQL for Google Drive backup tracking
+- **setup_perplexity_postgres.sql** - 🤖 **NEW!** PostgreSQL for Perplexity AI tracking
 - **validate.sh** - Validation script for pre-deployment checks
 - **deploy-heroku.sh** - Interactive deployment helper script
 
