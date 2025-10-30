@@ -44,7 +44,9 @@ This workflow is specifically designed for Heroku's limitations:
 - **2055_Meme_Instagram_Automation_Scheduled.json** - Full-featured workflow with Cloudinary
 - **2056_Meme_Instagram_Minimal_Scheduled.json** - Ultra-minimal workflow (5 nodes only)
 - **2057_Meme_Instagram_EcoDyno_PostgreSQL_Scheduled.json** - **RECOMMENDED** for Eco Dyno with PostgreSQL
-- **2058_Meme_Video_API_Instagram_Reels_Scheduled.json** - 🎬 **NEW!** Video generation with external APIs
+- **2058_Meme_Video_API_Instagram_Reels_Scheduled.json** - 🎬 Video generation with Replicate API
+- **2059_Meme_Video_GoogleVeo_MultiAPI_Scheduled.json** - 🎬 Video with Google Veo 2/3 + fallback
+- **2060_Meme_Video_MultiPlatform_All_Scheduled.json** - 🚀 **NEW!** Posts to Instagram + YouTube Shorts + TikTok
 
 ### Documentation
 - **README.md** - This file (overview and quick start)
@@ -52,10 +54,13 @@ This workflow is specifically designed for Heroku's limitations:
 - **HEROKU_DEPLOYMENT.md** - Complete deployment guide for Heroku Free/Hobby tier
 - **HEROKU_CLI_GUIDE.md** - Step-by-step CLI deployment guide (in Spanish)
 - **ECO_DYNO_POSTGRES_GUIDE.md** - Specific guide for Eco Dyno + PostgreSQL setup
-- **VIDEO_API_GUIDE.md** - 🎬 **NEW!** Complete guide for video generation APIs
+- **VIDEO_API_GUIDE.md** - 🎬 Complete guide for video generation APIs
+- **GOOGLE_VEO_SETUP.md** - 🎬 Google Veo 2/3 setup for Google Pro users
+- **MULTIPLATFORM_GUIDE.md** - 🚀 **NEW!** Setup for YouTube Shorts + TikTok posting
 - **.env.example** - Environment variables template
 - **setup_postgres.sql** - PostgreSQL database setup script (for image memes)
-- **setup_video_postgres.sql** - 🎬 **NEW!** PostgreSQL setup for video memes
+- **setup_video_postgres.sql** - 🎬 PostgreSQL setup for video memes
+- **setup_multiplatform_postgres.sql** - 🚀 **NEW!** PostgreSQL for multi-platform tracking
 - **validate.sh** - Validation script for pre-deployment checks
 - **deploy-heroku.sh** - Interactive deployment helper script
 
