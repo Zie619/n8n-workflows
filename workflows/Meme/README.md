@@ -28,13 +28,21 @@ This workflow automates the creation and publishing of memes to multiple social 
 5. **Zero cost** - included with your Google account
 6. **No performance impact** - only +5-8 seconds per execution
 
-### Perplexity AI Ideas (Workflow 2062) 🤖 NEW!
+### Perplexity AI Ideas (Workflow 2062) 🤖
 1. **Real-time trending topics** - Perplexity searches the web for what's hot NOW
 2. **AI-generated concepts** - Creative video ideas you wouldn't think of
 3. **SEO optimized** - Uses hashtags and keywords that are actually trending
 4. **Automatic fallback** - Uses curated concepts if Perplexity fails
 5. **Higher engagement** - Trending content performs better than static concepts
 6. **Cost**: ~$5-10/month additional (300 searches = 100 ideas/month)
+
+### Grok AI Ideas (Workflow 2063) 🤖🔥 NEW!
+1. **Less censored content** - Grok provides more authentic, edgy concepts
+2. **X/Twitter trends** - Native integration with real-time X (Twitter) trending topics
+3. **Viral potential** - Bold, controversial (but legal) content for maximum shareability
+4. **Unlimited requests** - Flat $5/month fee vs pay-per-use
+5. **Internet culture fluent** - Understands Gen-Z humor and meme formats
+6. **Cost**: $5/month unlimited (vs $0.005/request for Perplexity)
 
 ## 🏗️ Why Heroku-Optimized?
 
@@ -65,7 +73,8 @@ This workflow is specifically designed for Heroku's limitations:
 - **2059_Meme_Video_GoogleVeo_MultiAPI_Scheduled.json** - 🎬 Video with Google Veo 2/3 + fallback
 - **2060_Meme_Video_MultiPlatform_All_Scheduled.json** - 🚀 Posts to Instagram + YouTube Shorts + TikTok
 - **2061_Meme_Video_MultiPlatform_GoogleDrive_Scheduled.json** - 📦 Multi-platform + Google Drive backup (2TB storage!)
-- **2062_Meme_Video_Perplexity_AI_Ideas_Scheduled.json** - 🤖 **NEW!** AI-powered trending ideas with Perplexity + all platforms + Drive backup
+- **2062_Meme_Video_Perplexity_AI_Ideas_Scheduled.json** - 🤖 AI-powered trending ideas (safe) + all platforms + Drive backup
+- **2063_Meme_Video_Grok_AI_Ideas_Scheduled.json** - 🤖🔥 **NEW!** Grok AI unfiltered ideas (edgy) + all platforms + Drive backup
 
 ### Documentation
 - **README.md** - This file (overview and quick start)
@@ -77,13 +86,15 @@ This workflow is specifically designed for Heroku's limitations:
 - **GOOGLE_VEO_SETUP.md** - 🎬 Google Veo 2/3 setup for Google Pro users
 - **MULTIPLATFORM_GUIDE.md** - 🚀 Setup for YouTube Shorts + TikTok posting
 - **GOOGLE_DRIVE_SETUP.md** - 📦 Google Drive backup setup (2TB storage!)
-- **PERPLEXITY_AI_SETUP.md** - 🤖 **NEW!** Perplexity AI integration for trending ideas
+- **PERPLEXITY_AI_SETUP.md** - 🤖 Perplexity AI integration (safe trending)
+- **GROK_AI_SETUP.md** - 🤖🔥 **NEW!** Grok AI integration (edgy viral content)
 - **.env.example** - Environment variables template
 - **setup_postgres.sql** - PostgreSQL database setup script (for image memes)
 - **setup_video_postgres.sql** - 🎬 PostgreSQL setup for video memes
 - **setup_multiplatform_postgres.sql** - 🚀 PostgreSQL for multi-platform tracking
 - **setup_gdrive_postgres.sql** - 📦 PostgreSQL for Google Drive backup tracking
-- **setup_perplexity_postgres.sql** - 🤖 **NEW!** PostgreSQL for Perplexity AI tracking
+- **setup_perplexity_postgres.sql** - 🤖 PostgreSQL for Perplexity AI tracking
+- **setup_grok_postgres.sql** - 🤖🔥 **NEW!** PostgreSQL for Grok AI tracking + AI comparison
 - **validate.sh** - Validation script for pre-deployment checks
 - **deploy-heroku.sh** - Interactive deployment helper script
 

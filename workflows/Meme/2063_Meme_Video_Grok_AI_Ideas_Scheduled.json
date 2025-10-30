@@ -1,0 +1,413 @@
+{
+  "name": "2063 Meme Video - Grok AI Ideas - Multi-Platform + Google Drive (Scheduled)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 8
+            }
+          ]
+        }
+      },
+      "name": "Schedule Every 8 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.x.ai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GROK_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "grok-beta"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\":\"system\",\"content\":\"You are Grok, X.AI's unfiltered creative assistant. Generate viral, edgy meme video concepts based on real-time X (Twitter) trends. Be bold, authentic, and slightly controversial but legal. Focus on Gen-Z humor and internet culture.\"},{\"role\":\"user\",\"content\":\"Search X/Twitter for trending topics and generate 3 viral-worthy meme video concepts (12-15 seconds each). For each concept provide: topic (snake_case), prompt (cinematic description), title (catchy), description (engaging), tags (5 trending hashtags), style (cinematic/comedy/chaotic), duration (seconds). Topics can be edgy but must comply with platform TOS. Focus on relatable fails, hot takes, or internet culture. Return as JSON array.\"}]"
+            },
+            {
+              "name": "temperature",
+              "value": "0.9"
+            },
+            {
+              "name": "max_tokens",
+              "value": "1500"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Grok AI - Get Trending Ideas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "notes": "Calls Grok AI to get 3 edgy, trending meme concepts from X/Twitter"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Grok AI response and select random concept\nconst response = $input.first().json;\n\ntry {\n  // Extract content from Grok response\n  const content = response.choices[0].message.content;\n  \n  // Parse JSON from content (Grok returns markdown code blocks)\n  const jsonMatch = content.match(/```json\\n([\\s\\S]*?)\\n```/) || content.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  const concepts = jsonMatch ? JSON.parse(jsonMatch[1] || jsonMatch[0]) : JSON.parse(content);\n  \n  // Select random concept from the 3 provided\n  const selected = concepts[Math.floor(Math.random() * concepts.length)];\n  \n  // Add metadata\n  selected.ai_provider = 'grok';\n  selected.content_style = selected.style.includes('edgy') || selected.style.includes('controversial') ? 'edgy' : 'safe';\n  selected.viral_score = Math.floor(Math.random() * 3) + 8; // Grok concepts are high viral potential (8-10)\n  selected.source = 'grok_ai';\n  \n  return { json: selected };\n  \n} catch (error) {\n  // Fallback to curated edgy concept if Grok fails\n  console.error('Grok parsing failed, using fallback:', error);\n  \n  const fallbackConcepts = [\n    {\n      topic: 'ai_takeover_memes',\n      prompt: 'Split screen: Human struggling with simple task vs AI instantly solving it, ending with AI looking smug. Comedic timing, relatable frustration.',\n      title: 'AI vs Humans: Who Won?',\n      description: 'We\\'re not ready for this conversation 💀',\n      tags: ['ai', 'technology', 'relatable', 'comedy', 'aivshumans'],\n      style: 'comedy',\n      duration: 12,\n      ai_provider: 'manual_fallback',\n      content_style: 'edgy',\n      viral_score: 7,\n      source: 'fallback'\n    },\n    {\n      topic: 'monday_morning_chaos',\n      prompt: 'POV: Monday morning - alarm goes off, snooze 5 times, rush to get ready, spill coffee, everything goes wrong. Fast-paced chaos ending in resigned acceptance.',\n      title: 'Every Single Monday',\n      description: 'Why is Monday like this? 😭',\n      tags: ['monday', 'relatable', 'worklife', 'comedy', 'mondaymood'],\n      style: 'chaotic comedy',\n      duration: 13,\n      ai_provider: 'manual_fallback',\n      content_style: 'safe',\n      viral_score: 8,\n      source: 'fallback'\n    }\n  ];\n  \n  const selected = fallbackConcepts[Math.floor(Math.random() * fallbackConcepts.length)];\n  return { json: selected };\n}\n"
+      },
+      "name": "Parse Grok Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "notes": "Parses Grok AI response, selects 1 of 3 concepts randomly, adds metadata"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.replicate.com/v1/predictions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.REPLICATE_API_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "version",
+              "value": "=stable-video-diffusion-img2vid-xt"
+            },
+            {
+              "name": "input",
+              "value": "={{\"prompt\": $json.prompt + \" \" + $json.style + \" style. 9:16 vertical format. Duration: \" + $json.duration + \" seconds.\", \"aspect_ratio\": \"9:16\", \"duration\": $json.duration}}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Generate Video - Replicate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300],
+      "notes": "Generates video using Replicate API (fallback from Veo)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/{{$env.INSTAGRAM_ACCOUNT_ID}}/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{$env.INSTAGRAM_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "video_url",
+              "value": "={{$json.video_url}}"
+            },
+            {
+              "name": "caption",
+              "value": "={{$json.description}}\\n\\n#{{$json.tags.join(' #')}} #viral #reels #grokpowered"
+            },
+            {
+              "name": "media_type",
+              "value": "REELS"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Post to Instagram Reels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 200],
+      "notes": "Posts video to Instagram Reels"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status",
+        "authentication": "googleOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "snippet",
+              "value": "={{\"title\": $json.title + \" #Shorts\", \"description\": $json.description + \"\\n\\nGenerated by Grok AI. Subscribe for more!\", \"tags\": $json.tags, \"categoryId\": \"23\"}}"
+            },
+            {
+              "name": "status",
+              "value": "={\"privacyStatus\": \"public\", \"madeForKids\": false}"
+            },
+            {
+              "name": "videoUrl",
+              "value": "={{$json.video_url}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Post to YouTube Shorts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 300],
+      "notes": "Posts video to YouTube Shorts"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.tiktokapis.com/v2/post/publish/video/init/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "post_info",
+              "value": "={{\"title\": $json.title, \"description\": $json.description, \"privacy_level\": \"PUBLIC_TO_EVERYONE\", \"disable_duet\": false, \"disable_comment\": false, \"disable_stitch\": false, \"video_cover_timestamp_ms\": 1000}}"
+            },
+            {
+              "name": "source_info",
+              "value": "={{\"source\": \"PULL_FROM_URL\", \"video_url\": $json.video_url}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Post to TikTok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 400],
+      "notes": "Posts video to TikTok"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+        "authentication": "googleOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{$json.topic}}_{{$now.toFormat('yyyy-MM-dd_HHmmss')}}.mp4"
+            },
+            {
+              "name": "parents",
+              "value": "=[\"{{$env.GOOGLE_DRIVE_FOLDER_ID}}\"]"
+            },
+            {
+              "name": "description",
+              "value": "={{$json.description}} - Generated by Grok AI"
+            },
+            {
+              "name": "videoUrl",
+              "value": "={{$json.video_url}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Backup to Google Drive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 300],
+      "notes": "Backs up video to Google Drive (2TB storage)"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO meme_videos_ai_powered (\n  topic, \n  video_prompt, \n  video_url, \n  instagram_id, \n  youtube_id, \n  tiktok_id, \n  google_drive_id,\n  google_drive_url,\n  drive_folder,\n  platforms_posted, \n  api_provider, \n  ai_provider,\n  content_style,\n  viral_score,\n  estimated_cost,\n  posted_at, \n  success\n) VALUES (\n  '{{$json.topic}}',\n  '{{$json.prompt}}',\n  '{{$json.video_url}}',\n  '{{$json.instagram_id}}',\n  '{{$json.youtube_id}}',\n  '{{$json.tiktok_id}}',\n  '{{$json.google_drive_id}}',\n  '{{$json.google_drive_url}}',\n  '{{$json.drive_folder}}',\n  ARRAY['instagram', 'youtube', 'tiktok', 'google_drive'],\n  'replicate',\n  'grok',\n  '{{$json.content_style}}',\n  {{$json.viral_score}},\n  0.35,\n  NOW(),\n  TRUE\n);",
+        "options": {}
+      },
+      "name": "Save to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.2,
+      "position": [1450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      },
+      "notes": "Saves post metadata to PostgreSQL with AI provider tracking"
+    }
+  ],
+  "connections": {
+    "Schedule Every 8 Hours": {
+      "main": [
+        [
+          {
+            "node": "Grok AI - Get Trending Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Grok AI - Get Trending Ideas": {
+      "main": [
+        [
+          {
+            "node": "Parse Grok Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Grok Response": {
+      "main": [
+        [
+          {
+            "node": "Generate Video - Replicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Video - Replicate": {
+      "main": [
+        [
+          {
+            "node": "Backup to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Post to Instagram Reels",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to YouTube Shorts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Instagram Reels": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to YouTube Shorts": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to TikTok": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-10-30T19:00:00.000Z",
+      "updatedAt": "2025-10-30T19:00:00.000Z",
+      "id": "10",
+      "name": "meme-automation"
+    },
+    {
+      "createdAt": "2025-10-30T19:00:00.000Z",
+      "updatedAt": "2025-10-30T19:00:00.000Z",
+      "id": "11",
+      "name": "grok-ai"
+    }
+  ],
+  "pinData": {},
+  "versionId": "1",
+  "triggerCount": 0,
+  "createdAt": "2025-10-30T19:00:00.000Z",
+  "updatedAt": "2025-10-30T19:00:00.000Z"
+}
