@@ -14,18 +14,34 @@ This workflow automates the creation and publishing of memes to multiple social 
 
 This workflow is specifically designed for Heroku's limitations:
 
-- **Memory Efficient**: Uses < 200MB RAM (Heroku free tier: 512MB)
+- **Memory Efficient**: Uses < 200MB RAM (Free tier: 512MB, Eco tier: 512MB)
 - **Fast Execution**: Completes in < 25 seconds (Heroku timeout: 30s)
 - **No Local Storage**: All files hosted externally (Heroku ephemeral filesystem)
-- **Minimal CPU**: Simple operations, no heavy processing
+- **Minimal CPU**: Simple operations, perfect for shared CPU (Eco dyno)
 - **Free APIs**: All services have generous free tiers
+- **PostgreSQL Ready**: Optional database integration for tracking and deduplication
+
+### Recommended Setup by Heroku Tier
+
+| Tier | Workflow | Frequency | Features |
+|------|----------|-----------|----------|
+| **Free** | 2056 (Minimal) | 1x/day | Basic posting |
+| **Eco** | 2057 (PostgreSQL) | 4x/day | Full tracking, dedup |
+| **Hobby** | 2055 (Full) | 4-6x/day | Cloudinary, advanced |
 
 ## 📁 Files in This Directory
 
-- **2055_Meme_Instagram_Automation_Scheduled.json** - Main n8n workflow file
-- **HEROKU_DEPLOYMENT.md** - Complete deployment guide for Heroku
+### Workflows
+- **2055_Meme_Instagram_Automation_Scheduled.json** - Full-featured workflow with Cloudinary
+- **2056_Meme_Instagram_Minimal_Scheduled.json** - Ultra-minimal workflow (5 nodes only)
+- **2057_Meme_Instagram_EcoDyno_PostgreSQL_Scheduled.json** - **RECOMMENDED** for Eco Dyno with PostgreSQL
+
+### Documentation
+- **README.md** - This file (overview and quick start)
+- **HEROKU_DEPLOYMENT.md** - Complete deployment guide for Heroku Free/Hobby tier
+- **ECO_DYNO_POSTGRES_GUIDE.md** - Specific guide for Eco Dyno + PostgreSQL setup
 - **.env.example** - Environment variables template
-- **README.md** - This file
+- **validate.sh** - Validation script for pre-deployment checks
 
 ## 🚀 Quick Start
 

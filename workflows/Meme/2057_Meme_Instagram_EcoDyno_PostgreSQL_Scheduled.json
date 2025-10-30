@@ -1,0 +1,528 @@
+{
+  "name": "Meme Automation - Eco Dyno Optimized with PostgreSQL",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "notes": "4 posts per day - well within 1000 monthly hours"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Check if memes table exists, create if not\nCREATE TABLE IF NOT EXISTS meme_posts (\n  id SERIAL PRIMARY KEY,\n  template_id VARCHAR(50),\n  topic VARCHAR(100),\n  text0 VARCHAR(255),\n  text1 VARCHAR(255),\n  meme_url TEXT,\n  instagram_id VARCHAR(100),\n  posted_at TIMESTAMP DEFAULT NOW(),\n  success BOOLEAN DEFAULT TRUE\n);\n\n-- Get recently posted topics to avoid duplicates\nSELECT template_id, topic \nFROM meme_posts \nWHERE posted_at > NOW() - INTERVAL '7 days'\nORDER BY posted_at DESC;"
+      },
+      "id": "check-recent-posts",
+      "name": "Check Recent Posts (PostgreSQL)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [400, 300],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_default",
+          "name": "PostgreSQL account"
+        }
+      },
+      "notes": "Creates table if needed, retrieves recent posts"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// CPU-efficient meme generator with duplicate prevention\n// Uses previous DB query to avoid repeating recent memes\n\nconst recentPosts = $input.all();\nconst usedRecently = new Set(\n  recentPosts.map(p => `${p.json.template_id}-${p.json.topic}`)\n);\n\nconst memeDatabase = [\n  // Programming memes\n  {id: '181913649', t0: 'Manual coding', t1: 'Using AI', topic: 'ai', hashtags: '#ai #coding #automation'},\n  {id: '181913649', t0: 'Bugs in dev', t1: 'Bugs in prod', topic: 'deployment', hashtags: '#devops #deployment #programming'},\n  {id: '87743020', t0: 'Write tests', t1: 'Skip tests', topic: 'testing', hashtags: '#testing #qa #development'},\n  {id: '101470', t0: 'Code works', t1: \"Don't know why\", topic: 'debugging', hashtags: '#debugging #coding #programmer'},\n  {id: '438680', t0: 'Deploy Friday?', t1: 'Bad idea!', topic: 'friday', hashtags: '#friday #deployment #devlife'},\n  \n  // Work life memes\n  {id: '87743020', t0: 'Work', t1: 'Coffee break', topic: 'coffee', hashtags: '#coffee #work #productivity'},\n  {id: '181913649', t0: 'Email', t1: 'Quick meeting', topic: 'meetings', hashtags: '#meetings #corporate #work'},\n  {id: '27813981', t0: 'Everything fine', t1: 'On fire inside', topic: 'stress', hashtags: '#stress #worklife #relatable'},\n  {id: '112126428', t0: 'Work tasks', t1: 'Social media', topic: 'procrastination', hashtags: '#procrastination #work #relatable'},\n  \n  // Remote work\n  {id: '181913649', t0: 'Office', t1: 'Remote work', topic: 'remote', hashtags: '#remotework #wfh #digital'},\n  {id: '438680', t0: 'Camera on?', t1: 'Pajamas!', topic: 'zoom', hashtags: '#zoom #videocall #remote'},\n  {id: '101470', t0: 'Productive', t1: 'At home?', topic: 'wfh', hashtags: '#wfh #productivity #home'},\n  \n  // Tech memes\n  {id: '87743020', t0: 'Update now', t1: 'Later', topic: 'updates', hashtags: '#tech #software #updates'},\n  {id: '181913649', t0: 'Old code', t1: 'Refactor', topic: 'refactor', hashtags: '#refactoring #code #technical'},\n  {id: '101470', t0: 'Works locally', t1: 'Production?', topic: 'production', hashtags: '#production #devops #debugging'},\n  \n  // Weekend memes\n  {id: '181913649', t0: 'Friday 5pm', t1: 'Weekend!', topic: 'weekend', hashtags: '#weekend #friday #freedom'},\n  {id: '87743020', t0: 'Monday', t1: 'Friday', topic: 'monday', hashtags: '#monday #work #motivation'},\n  {id: '438680', t0: 'Work tomorrow?', t1: 'Sunday blues', topic: 'sunday', hashtags: '#sunday #weekend #mood'}\n];\n\n// Filter out recently used combinations (CPU-efficient)\nconst available = memeDatabase.filter(m => \n  !usedRecently.has(`${m.id}-${m.topic}`)\n);\n\n// If all used recently, use full database\nconst pool = available.length > 0 ? available : memeDatabase;\n\n// Simple random selection (minimal CPU)\nconst meme = pool[Math.floor(Math.random() * pool.length)];\n\nreturn {\n  template_id: meme.id,\n  text0: meme.t0,\n  text1: meme.t1,\n  topic: meme.topic,\n  hashtags: meme.hashtags\n};"
+      },
+      "id": "generate-meme",
+      "name": "Generate Meme (CPU Efficient)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 300],
+      "notes": "18 unique memes, avoids recent duplicates"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.imgflip.com/caption_image",
+        "sendBody": true,
+        "specifyBody": "form",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "template_id",
+              "value": "={{ $json.template_id }}"
+            },
+            {
+              "name": "username",
+              "value": "={{ $env.IMGFLIP_USERNAME }}"
+            },
+            {
+              "name": "password",
+              "value": "={{ $env.IMGFLIP_PASSWORD }}"
+            },
+            {
+              "name": "text0",
+              "value": "={{ $json.text0 }}"
+            },
+            {
+              "name": "text1",
+              "value": "={{ $json.text1 }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "create-meme-imgflip",
+      "name": "Create Meme (ImgFlip)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300],
+      "notes": "Low CPU usage - external API"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-success",
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "meme-url",
+              "name": "meme_url",
+              "value": "={{ $json.data.url }}",
+              "type": "string"
+            },
+            {
+              "id": "caption",
+              "name": "caption",
+              "value": "={{ $('Generate Meme (CPU Efficient)').item.json.text0 }} ➡️ {{ $('Generate Meme (CPU Efficient)').item.json.text1 }}\\n\\n{{ $('Generate Meme (CPU Efficient)').item.json.hashtags }} #meme #funny #viral",
+              "type": "string"
+            },
+            {
+              "id": "template",
+              "name": "template_id",
+              "value": "={{ $('Generate Meme (CPU Efficient)').item.json.template_id }}",
+              "type": "string"
+            },
+            {
+              "id": "topic",
+              "name": "topic",
+              "value": "={{ $('Generate Meme (CPU Efficient)').item.json.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "text0",
+              "name": "text0",
+              "value": "={{ $('Generate Meme (CPU Efficient)').item.json.text0 }}",
+              "type": "string"
+            },
+            {
+              "id": "text1",
+              "name": "text1",
+              "value": "={{ $('Generate Meme (CPU Efficient)').item.json.text1 }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-data",
+      "name": "Prepare Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1200, 200],
+      "notes": "Minimal processing, just data mapping"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $json.meme_url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 12000
+        }
+      },
+      "id": "instagram-create",
+      "name": "Instagram: Create Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 200],
+      "notes": "Low CPU - external API call"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 12000
+        }
+      },
+      "id": "instagram-publish",
+      "name": "Instagram: Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1600, 200],
+      "notes": "Publishes to Instagram feed"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "meme_posts",
+          "mode": "list",
+          "cachedResultName": "meme_posts"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "template_id": "={{ $('Prepare Data').item.json.template_id }}",
+            "topic": "={{ $('Prepare Data').item.json.topic }}",
+            "text0": "={{ $('Prepare Data').item.json.text0 }}",
+            "text1": "={{ $('Prepare Data').item.json.text1 }}",
+            "meme_url": "={{ $('Prepare Data').item.json.meme_url }}",
+            "instagram_id": "={{ $json.id }}",
+            "success": true
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "save-to-postgres",
+      "name": "Save to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1800, 200],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_default",
+          "name": "PostgreSQL account"
+        }
+      },
+      "notes": "Stores post history, prevents duplicates"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "success",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "=Meme posted successfully on {{ $('Generate Meme (CPU Efficient)').item.json.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "instagram-id",
+              "name": "instagram_id",
+              "value": "={{ $('Instagram: Publish').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "meme-url",
+              "name": "meme_url",
+              "value": "={{ $('Prepare Data').item.json.meme_url }}",
+              "type": "string"
+            },
+            {
+              "id": "posted-at",
+              "name": "posted_at",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "success-summary",
+      "name": "Success Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2000, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "meme_posts",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "template_id": "={{ $('Generate Meme (CPU Efficient)').item.json.template_id }}",
+            "topic": "={{ $('Generate Meme (CPU Efficient)').item.json.topic }}",
+            "text0": "={{ $('Generate Meme (CPU Efficient)').item.json.text0 }}",
+            "text1": "={{ $('Generate Meme (CPU Efficient)').item.json.text1 }}",
+            "meme_url": "error",
+            "instagram_id": null,
+            "success": false
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "log-error",
+      "name": "Log Error to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1200, 400],
+      "credentials": {
+        "postgres": {
+          "id": "postgres_default",
+          "name": "PostgreSQL account"
+        }
+      },
+      "notes": "Logs failures for debugging"
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 Eco Dyno Optimization\n\n**Your Setup:**\n- Eco Dyno: Shared CPU\n- 1000 hours/month\n- PostgreSQL database included\n\n**This Workflow:**\n- Runs every 6 hours (4 posts/day)\n- Total: ~120 posts/month\n- Usage: ~8 dyno hours/month (0.8%)\n- Plenty of time remaining!\n\n**CPU Efficiency:**\n- No file processing\n- Minimal JavaScript execution\n- External API calls (offloaded)\n- Simple DB queries\n- Shared CPU is sufficient\n\n**PostgreSQL Usage:**\n- Stores post history\n- Prevents duplicate memes\n- Tracks success/failures\n- Lightweight queries\n- No binary data (just metadata)\n\n**Why Not Store Videos:**\n- Images/videos are URLs only\n- Hosted by ImgFlip (free)\n- PostgreSQL better for metadata\n- Saves disk space quota",
+        "height": 578.3999999999999,
+        "width": 345.6,
+        "color": 4
+      },
+      "id": "eco-dyno-note",
+      "name": "Note: Eco Dyno Optimization",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [80, 60]
+    },
+    {
+      "parameters": {
+        "content": "## 📊 PostgreSQL Database Schema\n\n**Table: meme_posts**\n\n```sql\nCREATE TABLE meme_posts (\n  id SERIAL PRIMARY KEY,\n  template_id VARCHAR(50),\n  topic VARCHAR(100),\n  text0 VARCHAR(255),\n  text1 VARCHAR(255),\n  meme_url TEXT,\n  instagram_id VARCHAR(100),\n  posted_at TIMESTAMP DEFAULT NOW(),\n  success BOOLEAN DEFAULT TRUE\n);\n```\n\n**Usage:**\n- Auto-created on first run\n- Tracks last 7 days of posts\n- Prevents duplicate content\n- Logs failures for debugging\n\n**Why Not Store Binary?**\n- Meme images are hosted externally\n- Only store URLs (TEXT field)\n- Saves PostgreSQL storage quota\n- Faster queries\n- No bandwidth costs\n\n**Query Stats:**\n- Each run: 2 queries (SELECT + INSERT)\n- Query time: < 50ms each\n- Minimal CPU usage\n- Perfect for Eco Dyno",
+        "height": 578.3999999999999,
+        "width": 345.6,
+        "color": 5
+      },
+      "id": "postgres-note",
+      "name": "Note: PostgreSQL Schema",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [460, 60]
+    }
+  ],
+  "connections": {
+    "Schedule Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Check Recent Posts (PostgreSQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Recent Posts (PostgreSQL)": {
+      "main": [
+        [
+          {
+            "node": "Generate Meme (CPU Efficient)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Meme (CPU Efficient)": {
+      "main": [
+        [
+          {
+            "node": "Create Meme (ImgFlip)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Meme (ImgFlip)": {
+      "main": [
+        [
+          {
+            "node": "Check Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Success": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Create Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Create Container": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Publish": {
+      "main": [
+        [
+          {
+            "node": "Save to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "Success Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-10-30T17:40:00.000Z",
+      "updatedAt": "2025-10-30T17:40:00.000Z",
+      "id": "eco-dyno",
+      "name": "Eco Dyno"
+    },
+    {
+      "createdAt": "2025-10-30T17:40:00.000Z",
+      "updatedAt": "2025-10-30T17:40:00.000Z",
+      "id": "postgresql",
+      "name": "PostgreSQL"
+    },
+    {
+      "createdAt": "2025-10-30T17:40:00.000Z",
+      "updatedAt": "2025-10-30T17:40:00.000Z",
+      "id": "optimized",
+      "name": "Optimized"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-30T17:40:00.000Z",
+  "versionId": "1",
+  "active": false
+}

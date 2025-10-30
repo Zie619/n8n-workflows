@@ -1,0 +1,202 @@
+{
+  "name": "Meme Automation - Minimal (Ultra-Lightweight)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "schedule",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Ultra-minimal meme generator\nconst memes = [\n  {id: '181913649', t0: 'Manual coding', t1: 'Using AI', topic: 'ai'},\n  {id: '87743020', t0: 'Work', t1: 'Coffee break', topic: 'work'},\n  {id: '101470', t0: 'Bugs', t1: 'Caused by code', topic: 'coding'},\n  {id: '438680', t0: 'Deploy on Friday?', t1: 'Bad idea!', topic: 'deployment'}\n];\n\nconst m = memes[Math.floor(Math.random() * memes.length)];\nreturn {template_id: m.id, text0: m.t0, text1: m.t1, topic: m.topic};"
+      },
+      "id": "generate",
+      "name": "Generate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.imgflip.com/caption_image",
+        "sendBody": true,
+        "specifyBody": "form",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "template_id",
+              "value": "={{ $json.template_id }}"
+            },
+            {
+              "name": "username",
+              "value": "={{ $env.IMGFLIP_USERNAME }}"
+            },
+            {
+              "name": "password",
+              "value": "={{ $env.IMGFLIP_PASSWORD }}"
+            },
+            {
+              "name": "text0",
+              "value": "={{ $json.text0 }}"
+            },
+            {
+              "name": "text1",
+              "value": "={{ $json.text1 }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "imgflip",
+      "name": "Create Meme",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $json.data.url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Generate').item.json.text0 }} ➡️ {{ $('Generate').item.json.text1 }}\\n\\n#meme #{{ $('Generate').item.json.topic }} #funny #viral"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 12000
+        }
+      },
+      "id": "ig-create",
+      "name": "IG Create",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.INSTAGRAM_USER_ID }}/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 12000
+        }
+      },
+      "id": "ig-publish",
+      "name": "IG Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300]
+    }
+  ],
+  "connections": {
+    "schedule": {
+      "main": [
+        [
+          {
+            "node": "generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate": {
+      "main": [
+        [
+          {
+            "node": "imgflip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "imgflip": {
+      "main": [
+        [
+          {
+            "node": "ig-create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ig-create": {
+      "main": [
+        [
+          {
+            "node": "ig-publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-10-30T17:29:00.000Z",
+      "updatedAt": "2025-10-30T17:29:00.000Z",
+      "id": "minimal",
+      "name": "Minimal"
+    },
+    {
+      "createdAt": "2025-10-30T17:29:00.000Z",
+      "updatedAt": "2025-10-30T17:29:00.000Z",
+      "id": "heroku",
+      "name": "Heroku"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-30T17:29:00.000Z",
+  "versionId": "1",
+  "active": false
+}
