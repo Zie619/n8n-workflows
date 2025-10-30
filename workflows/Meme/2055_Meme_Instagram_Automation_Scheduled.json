@@ -1,0 +1,486 @@
+{
+  "name": "Automated Meme Creation - Heroku Optimized",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Lightweight meme concept generator optimized for Heroku\n// Uses minimal memory and simple random selection\n\nconst topics = [\n  'coding', 'remote work', 'monday', 'coffee', 'deadline',\n  'meeting', 'bug', 'weekend', 'ai', 'tech'\n];\n\nconst templates = [\n  '181913649', // Drake meme\n  '87743020',  // Two buttons\n  '101470',    // Ancient aliens\n  '438680',    // Batman slapping Robin\n  '27813981'   // Hide the pain Harold\n];\n\n// Simple random selection to minimize CPU\nconst topic = topics[Math.floor(Math.random() * topics.length)];\nconst template = templates[Math.floor(Math.random() * templates.length)];\n\n// Generate short texts to minimize payload\nconst texts = {\n  'coding': ['Writing code', 'It works!'],\n  'remote work': ['Office', 'Work from home'],\n  'monday': ['Friday', 'Monday'],\n  'coffee': ['Before coffee', 'After coffee'],\n  'deadline': ['Start of sprint', 'End of sprint'],\n  'meeting': ['Email', 'Meeting'],\n  'bug': ['Deploy on Friday', 'Bug on Monday'],\n  'weekend': ['Working', 'Weekend'],\n  'ai': ['Manual work', 'AI automation'],\n  'tech': ['Old tech', 'New tech']\n};\n\nconst topicTexts = texts[topic] || ['Before', 'After'];\n\nreturn {\n  topic: topic,\n  template_id: template,\n  text0: topicTexts[0],\n  text1: topicTexts[1],\n  hashtags: `#meme #${topic} #funny #viral`\n};"
+      },
+      "id": "generate-meme-concept",
+      "name": "Generate Meme Concept",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "content": "## ⚡ Heroku Optimization Strategy\n\n**Memory Optimization:**\n- Use ImgFlip API (returns URLs, not files)\n- Avoid downloading/processing videos locally\n- Process one platform at a time to reduce memory\n- Use streaming where possible\n\n**Performance:**\n- Reduced schedule: 12 hours (vs 6 hours)\n- Lightweight text generation (no AI calls)\n- Direct API uploads (no intermediate storage)\n- Minimal node count\n\n**Heroku Limits:**\n- Free/Hobby: 512MB RAM\n- Request timeout: 30 seconds\n- Daily restart (workflow state lost)\n\n**Cost Savings:**\n- ImgFlip: Free tier (100 req/day)\n- No video processing server needed\n- No storage services required\n- Minimal dyno hours usage",
+        "height": 438.4,
+        "width": 345.6,
+        "color": 4
+      },
+      "id": "heroku-optimization-note",
+      "name": "Note: Heroku Optimization",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [140, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.imgflip.com/caption_image",
+        "sendBody": true,
+        "specifyBody": "form",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "template_id",
+              "value": "={{ $json.template_id }}"
+            },
+            {
+              "name": "username",
+              "value": "your_imgflip_username"
+            },
+            {
+              "name": "password",
+              "value": "your_imgflip_password"
+            },
+            {
+              "name": "text0",
+              "value": "={{ $json.text0 }}"
+            },
+            {
+              "name": "text1",
+              "value": "={{ $json.text1 }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "generate-meme",
+      "name": "Generate Meme (ImgFlip)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "notes": "ImgFlip free tier: 100 requests/day. Replace credentials in production."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-meme-success",
+      "name": "Check Meme Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "meme-url",
+              "name": "meme_url",
+              "value": "={{ $json.data.url }}",
+              "type": "string"
+            },
+            {
+              "id": "caption",
+              "name": "caption",
+              "value": "={{ $('Generate Meme Concept').item.json.text0 }} vs {{ $('Generate Meme Concept').item.json.text1 }} 😄\\n\\n{{ $('Generate Meme Concept').item.json.hashtags }}",
+              "type": "string"
+            },
+            {
+              "id": "short-caption",
+              "name": "short_caption",
+              "value": "={{ $('Generate Meme Concept').item.json.hashtags }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-post-data",
+      "name": "Prepare Post Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "content": "## 📱 YouTube Shorts - Lightweight\n\n**Heroku-Optimized Approach:**\n\n❌ **Don't:** Upload video files (memory intensive)\n✅ **Do:** Use YouTube API with URL reference\n\n**Alternative for Images:**\n1. Convert image to short video using external service\n2. Use Cloudinary/ImageKit free tier\n3. Or skip YouTube and focus on image platforms\n\n**API Endpoint:**\n```\nPOST https://www.googleapis.com/youtube/v3/videos\n```\n\n**Optimization:**\n- Set timeout to 25s (under Heroku 30s limit)\n- Use async upload if available\n- Handle failures gracefully\n- Don't retry immediately (save dyno hours)\n\n**Credentials needed:**\n- Google OAuth2 (YouTube Data API v3)\n- Scope: youtube.upload",
+        "height": 458.4,
+        "width": 345.6,
+        "color": 5
+      },
+      "id": "youtube-note",
+      "name": "Note: YouTube Strategy",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1200, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload",
+        "sendBody": true,
+        "specifyBody": "form",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "={{ $json.meme_url }}"
+            },
+            {
+              "name": "upload_preset",
+              "value": "your_upload_preset"
+            },
+            {
+              "name": "resource_type",
+              "value": "image"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "upload-to-cloudinary",
+      "name": "Upload to Cloudinary (Free CDN)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 200],
+      "notes": "Free tier: 25GB storage, 25GB bandwidth/month. Use for hosting before social media."
+    },
+    {
+      "parameters": {
+        "content": "## 📸 Instagram - Optimized Flow\n\n**Memory-Friendly Approach:**\n\nInstagram requires public URL for media.\nUse Cloudinary URL from previous step.\n\n**Instagram Graph API:**\n1. Create container with image URL\n2. Publish container (no file upload needed)\n\n**API Calls (2 total):**\n```\nPOST /media (create container)\nPOST /media_publish (publish)\n```\n\n**Optimization:**\n- Use carousel for multiple images (batch posting)\n- Set short timeout (15s per request)\n- Handle rate limits (25 posts/day free)\n\n**Requirements:**\n- Instagram Business Account\n- Facebook Developer App\n- Access Token with instagram_content_publish\n- Public image URL",
+        "height": 458.4,
+        "width": 345.6,
+        "color": 6
+      },
+      "id": "instagram-note",
+      "name": "Note: Instagram Optimized",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1580, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/YOUR_IG_USER_ID/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $json.secure_url || $json.meme_url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $('Prepare Post Data').item.json.caption }}"
+            },
+            {
+              "name": "access_token",
+              "value": "YOUR_INSTAGRAM_ACCESS_TOKEN"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "instagram-create",
+      "name": "Instagram: Create Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1610, 200],
+      "notes": "Step 1: Create media container"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/YOUR_IG_USER_ID/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "access_token",
+              "value": "YOUR_INSTAGRAM_ACCESS_TOKEN"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "instagram-publish",
+      "name": "Instagram: Publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1810, 200],
+      "notes": "Step 2: Publish to Instagram feed"
+    },
+    {
+      "parameters": {
+        "content": "## 🎵 TikTok - Lightweight Alternative\n\n**Heroku Challenge:**\nTikTok API requires video file upload\nwhich is memory-intensive.\n\n**Optimized Alternatives:**\n\n**Option 1: Skip TikTok**\n- Focus on Instagram & YouTube\n- Save memory and API complexity\n\n**Option 2: Use TikTok Later**\n- Queue for manual upload\n- Use TikTok's mobile app\n- Or use Zapier/Make.com integration\n\n**Option 3: External Service**\n- Use Publer.io or Buffer (paid)\n- They handle TikTok complexity\n- API-based scheduling\n\n**For now: Skipping TikTok to optimize**\n\nRecommendation: Add TikTok when scaling\nto a paid Heroku dyno with more RAM.",
+        "height": 458.4,
+        "width": 345.6,
+        "color": 7
+      },
+      "id": "tiktok-note",
+      "name": "Note: TikTok Strategy",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1980, 80]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result-meme",
+              "name": "meme_url",
+              "value": "={{ $('Prepare Post Data').item.json.meme_url }}",
+              "type": "string"
+            },
+            {
+              "id": "result-instagram",
+              "name": "instagram_published",
+              "value": "={{ $('Instagram: Publish').item.json.id ? true : false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "result-timestamp",
+              "name": "published_at",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "result-topic",
+              "name": "topic",
+              "value": "={{ $('Generate Meme Concept').item.json.topic }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "summary",
+      "name": "Publish Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2010, 200]
+    },
+    {
+      "parameters": {
+        "content": "## ⚠️ Error Handling",
+        "height": 80,
+        "width": 150,
+        "color": 2
+      },
+      "id": "error-note",
+      "name": "Error Path",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1050, 380]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Log error for debugging\nconsole.error('Meme generation failed:', $input.item.json);\n\nreturn {\n  error: true,\n  message: 'Failed to generate meme',\n  details: $input.item.json\n};"
+      },
+      "id": "handle-error",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "content": "## 🚀 Heroku Deployment Checklist\n\n**Environment Variables:**\n```\nIMGFLIP_USERNAME=your_username\nIMGFLIP_PASSWORD=your_password\nCLOUDINARY_CLOUD_NAME=your_cloud\nCLOUDINARY_PRESET=your_preset\nINSTAGRAM_USER_ID=your_id\nINSTAGRAM_ACCESS_TOKEN=your_token\n```\n\n**Heroku Config:**\n```bash\nheroku config:set IMGFLIP_USERNAME=xxx\nheroku config:set IMGFLIP_PASSWORD=xxx\n# ... add all credentials\n```\n\n**Optimization Settings:**\n- Schedule: Every 12 hours (2 posts/day)\n- Timeout: 25s per HTTP request\n- Memory: < 200MB per execution\n- Platforms: Instagram + (optional) YouTube\n- Storage: External (Cloudinary free tier)\n\n**Monitoring:**\n- Check Heroku logs: `heroku logs --tail`\n- Monitor API usage (free tier limits)\n- Track success rate\n\n**Scaling:**\n- Free tier: 550 dyno hours/month\n- Hobby tier ($7/mo): More reliable\n- Standard: For production use",
+        "height": 618.4,
+        "width": 345.6,
+        "color": 3
+      },
+      "id": "deployment-note",
+      "name": "Note: Deployment Guide",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2240, 80]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Meme Concept",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Meme Concept": {
+      "main": [
+        [
+          {
+            "node": "Generate Meme (ImgFlip)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Meme (ImgFlip)": {
+      "main": [
+        [
+          {
+            "node": "Check Meme Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Meme Success": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Post Data": {
+      "main": [
+        [
+          {
+            "node": "Upload to Cloudinary (Free CDN)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Cloudinary (Free CDN)": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Create Container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Create Container": {
+      "main": [
+        [
+          {
+            "node": "Instagram: Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram: Publish": {
+      "main": [
+        [
+          {
+            "node": "Publish Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": false,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrencyRules": []
+    }
+  },
+  "tags": [
+    {
+      "createdAt": "2025-10-30T17:29:00.000Z",
+      "updatedAt": "2025-10-30T17:29:00.000Z",
+      "id": "heroku-optimized",
+      "name": "Heroku Optimized"
+    },
+    {
+      "createdAt": "2025-10-30T17:29:00.000Z",
+      "updatedAt": "2025-10-30T17:29:00.000Z",
+      "id": "meme-automation",
+      "name": "Meme Automation"
+    },
+    {
+      "createdAt": "2025-10-30T17:29:00.000Z",
+      "updatedAt": "2025-10-30T17:29:00.000Z",
+      "id": "lightweight",
+      "name": "Lightweight"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-10-30T17:29:00.000Z",
+  "versionId": "1",
+  "active": false
+}
