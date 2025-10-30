@@ -11,13 +11,22 @@ This workflow automates the creation and publishing of memes to multiple social 
 4. **Publishes** to Instagram feed automatically
 5. **Runs** every 6-12 hours (2-4 posts per day)
 
-### Video Memes (Workflow 2058) 🎬 NEW!
+### Video Memes (Workflows 2058-2061) 🎬 NEW!
 1. **Generates** video meme concepts with AI-optimized prompts
-2. **Creates** short videos using external APIs (Replicate, Runway ML, or others)
+2. **Creates** short videos using external APIs (Replicate, Runway ML, Google Veo 2/3)
 3. **No local processing** - all video generation happens via API
-4. **Publishes** to Instagram Reels automatically
-5. **Runs** every 8 hours (3 video posts per day)
-6. **Cost**: ~$13/month total (Heroku + API costs)
+4. **Publishes** to Instagram Reels, YouTube Shorts, and/or TikTok
+5. **Backs up** to Google Drive (2TB available!) - Workflow 2061 📦
+6. **Runs** every 8 hours (3 video posts per day)
+7. **Cost**: ~$13-32/month total (Heroku + API costs)
+
+### Google Drive Backup (Workflow 2061) 📦 NEW!
+1. **Automatic backup** of every generated video to Google Drive
+2. **2TB storage** = ~200,000 videos = 182 years of daily posting!
+3. **Organized folders** by topic (AI, Comedy, Lifestyle, etc.)
+4. **Permanent archive** - recover deleted content anytime
+5. **Zero cost** - included with your Google account
+6. **No performance impact** - only +5-8 seconds per execution
 
 ## 🏗️ Why Heroku-Optimized?
 
@@ -46,7 +55,8 @@ This workflow is specifically designed for Heroku's limitations:
 - **2057_Meme_Instagram_EcoDyno_PostgreSQL_Scheduled.json** - **RECOMMENDED** for Eco Dyno with PostgreSQL
 - **2058_Meme_Video_API_Instagram_Reels_Scheduled.json** - 🎬 Video generation with Replicate API
 - **2059_Meme_Video_GoogleVeo_MultiAPI_Scheduled.json** - 🎬 Video with Google Veo 2/3 + fallback
-- **2060_Meme_Video_MultiPlatform_All_Scheduled.json** - 🚀 **NEW!** Posts to Instagram + YouTube Shorts + TikTok
+- **2060_Meme_Video_MultiPlatform_All_Scheduled.json** - 🚀 Posts to Instagram + YouTube Shorts + TikTok
+- **2061_Meme_Video_MultiPlatform_GoogleDrive_Scheduled.json** - 📦 **NEW!** Multi-platform + Google Drive backup (2TB storage!)
 
 ### Documentation
 - **README.md** - This file (overview and quick start)
@@ -56,11 +66,13 @@ This workflow is specifically designed for Heroku's limitations:
 - **ECO_DYNO_POSTGRES_GUIDE.md** - Specific guide for Eco Dyno + PostgreSQL setup
 - **VIDEO_API_GUIDE.md** - 🎬 Complete guide for video generation APIs
 - **GOOGLE_VEO_SETUP.md** - 🎬 Google Veo 2/3 setup for Google Pro users
-- **MULTIPLATFORM_GUIDE.md** - 🚀 **NEW!** Setup for YouTube Shorts + TikTok posting
+- **MULTIPLATFORM_GUIDE.md** - 🚀 Setup for YouTube Shorts + TikTok posting
+- **GOOGLE_DRIVE_SETUP.md** - 📦 **NEW!** Google Drive backup setup (2TB storage!)
 - **.env.example** - Environment variables template
 - **setup_postgres.sql** - PostgreSQL database setup script (for image memes)
 - **setup_video_postgres.sql** - 🎬 PostgreSQL setup for video memes
-- **setup_multiplatform_postgres.sql** - 🚀 **NEW!** PostgreSQL for multi-platform tracking
+- **setup_multiplatform_postgres.sql** - 🚀 PostgreSQL for multi-platform tracking
+- **setup_gdrive_postgres.sql** - 📦 **NEW!** PostgreSQL for Google Drive backup tracking
 - **validate.sh** - Validation script for pre-deployment checks
 - **deploy-heroku.sh** - Interactive deployment helper script
 
