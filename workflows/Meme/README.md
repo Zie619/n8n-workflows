@@ -38,10 +38,14 @@ This workflow is specifically designed for Heroku's limitations:
 
 ### Documentation
 - **README.md** - This file (overview and quick start)
+- **QUICK_REFERENCE.md** - One-page cheat sheet for common tasks
 - **HEROKU_DEPLOYMENT.md** - Complete deployment guide for Heroku Free/Hobby tier
+- **HEROKU_CLI_GUIDE.md** - Step-by-step CLI deployment guide (in Spanish)
 - **ECO_DYNO_POSTGRES_GUIDE.md** - Specific guide for Eco Dyno + PostgreSQL setup
 - **.env.example** - Environment variables template
+- **setup_postgres.sql** - PostgreSQL database setup script
 - **validate.sh** - Validation script for pre-deployment checks
+- **deploy-heroku.sh** - Interactive deployment helper script
 
 ## 🚀 Quick Start
 
@@ -50,29 +54,64 @@ This workflow is specifically designed for Heroku's limitations:
 1. Heroku account (free tier works)
 2. n8n instance running on Heroku
 3. ImgFlip account (free)
-4. Cloudinary account (free)
+4. Cloudinary account (free) - only for workflow 2055
 5. Instagram Business account
 
-### Installation
+### Installation Options
+
+#### Option 1: Automated Script (Recommended)
+```bash
+# Make script executable
+chmod +x workflows/Meme/deploy-heroku.sh
+
+# Run interactive deployment
+./workflows/Meme/deploy-heroku.sh
+
+# Follow the prompts - it will:
+# - Create Heroku app
+# - Add PostgreSQL
+# - Configure environment variables
+# - Deploy n8n
+# - Setup database
+```
+
+#### Option 2: Heroku CLI (Manual)
+See complete guide: [HEROKU_CLI_GUIDE.md](./HEROKU_CLI_GUIDE.md)
+
+```bash
+# Quick version:
+heroku create your-meme-bot
+heroku addons:create heroku-postgresql:mini -a your-meme-bot
+heroku config:set IMGFLIP_USERNAME=xxx IMGFLIP_PASSWORD=xxx -a your-meme-bot
+# ... (see full guide for all variables)
+git clone https://github.com/n8n-io/n8n-heroku.git
+cd n8n-heroku && heroku git:remote -a your-meme-bot
+git push heroku main
+heroku ps:scale web=1:eco -a your-meme-bot
+```
+
+#### Option 3: Heroku Web UI
+See: [HEROKU_DEPLOYMENT.md](./HEROKU_DEPLOYMENT.md)
+
+### Post-Installation
 
 ```bash
 # 1. Import workflow to your n8n instance
-# Download: 2055_Meme_Instagram_Automation_Scheduled.json
+# Download: 2057_Meme_Instagram_EcoDyno_PostgreSQL_Scheduled.json
 # In n8n: Workflows → Import from File
 
-# 2. Set up environment variables (see .env.example)
-heroku config:set IMGFLIP_USERNAME=your_username
-heroku config:set IMGFLIP_PASSWORD=your_password
-# ... (see .env.example for all variables)
+# 2. Configure PostgreSQL credentials in n8n UI
+# Get DATABASE_URL: heroku config:get DATABASE_URL -a your-app
+# In n8n: Credentials → New → Postgres
 
-# 3. Configure workflow credentials in n8n UI
-# Edit imported workflow and update all credential placeholders
-
-# 4. Activate workflow
+# 3. Activate workflow
 # Toggle "Active" in the workflow editor
+
+# 4. Monitor
+heroku logs --tail -a your-app
 ```
 
-For detailed instructions, see [HEROKU_DEPLOYMENT.md](./HEROKU_DEPLOYMENT.md)
+For detailed instructions, see [HEROKU_CLI_GUIDE.md](./HEROKU_CLI_GUIDE.md)
 
 ## 🎨 Features
 
