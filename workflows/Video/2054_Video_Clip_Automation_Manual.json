@@ -1,0 +1,204 @@
+{
+  "name": "Video Clip Automation (Cost-Optimized)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/audio/transcriptions",
+        "authentication": "headerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "openai/whisper-large-v3"
+            }
+          ]
+        },
+        "sendMultipartFile": true,
+        "multipartBody": {
+          "fields": [
+            {
+              "fieldName": "file",
+              "dataMode": "file",
+              "fileData": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2",
+      "name": "Transcribe Video (OpenRouter)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        440,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "[YOUR_OPENROUTER_API_KEY]",
+          "name": "OpenRouter API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "headerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "google/gemini-pro"
+            },
+            {
+              "name": "messages",
+              "value": [
+                {
+                  "role": "system",
+                  "content": "You are an expert video editor. Your task is to analyze a video transcript and identify the most engaging and viral-worthy segments to be turned into short clips. Please return a JSON array of objects, where each object contains a \"start\" and \"end\" time in seconds for a recommended clip. For example: [{\"start\": 120.5, \"end\": 185.2}]"
+                },
+                {
+                  "role": "user",
+                  "content": "Here is the transcript: {{ $json.text }}"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3",
+      "name": "Identify Key Moments (OpenRouter)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        640,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "[YOUR_OPENROUTER_API_KEY]",
+          "name": "OpenRouter API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "python scripts/clip_video.py \"{{ $json.path }}\" '{{ $json.choices[0].message.content }}' clips"
+      },
+      "id": "4",
+      "name": "Clip Video",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "5",
+      "name": "Merge Clip Data and File Path",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileName": "{{ $binary.data.fileName }}"
+      },
+      "id": "6",
+      "name": "Save Video to Temp File",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [
+        440,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Video (OpenRouter)",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "node": "Save Video to Temp File",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Transcribe Video (OpenRouter)": {
+      "main": [
+        [
+          {
+            "node": "Identify Key Moments (OpenRouter)",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Identify Key Moments (OpenRouter)": {
+      "main": [
+        [
+          {
+            "node": "Merge Clip Data and File Path",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Video to Temp File": {
+      "main": [
+        [
+          {
+            "node": "Merge Clip Data and File Path",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Clip Data and File Path": {
+      "main": [
+        [
+          {
+            "node": "Clip Video",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
