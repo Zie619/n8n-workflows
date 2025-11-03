@@ -101,9 +101,15 @@ jobs:
         echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
         sudo apt-get update
         sudo apt-get install trivy
-        
-        # Scan the built image
-        trivy image --exit-code 0 --severity HIGH,CRITICAL workflows-doc:test
+
+        # Scan the built image using our configuration
+        # Exit code 0 = report only mode (won't fail the build)
+        trivy image \
+          --config trivy.yaml \
+          --ignorefile .trivyignore \
+          --exit-code 0 \
+          --severity HIGH,CRITICAL \
+          workflows-doc:test
 
   multi-platform:
     name: Test Multi-platform Build
@@ -113,6 +119,11 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: linux/arm64
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -125,3 +136,5 @@ jobs:
         tags: workflows-doc:multi-platform
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        # Don't load multi-platform images (not supported)
+        push: false

@@ -1,5 +1,5 @@
-# Use official Python runtime as base image - stable and secure version
-FROM python:3.11-slim-bookworm AS base
+# Use official Python runtime as base image - latest secure version
+FROM python:3.12.7-slim-bookworm AS base
 
 # Security: Set up non-root user first
 RUN groupadd -g 1001 appuser && \
@@ -13,15 +13,18 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=100 \
     PIP_ROOT_USER_ACTION=ignore \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    PYTHONIOENCODING=utf-8
 
 # Install security updates and minimal dependencies
+# Use specific versions to avoid CVEs
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-    ca-certificates \
+    ca-certificates=20230311 \
+    && apt-get autoremove -y \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache \
     && update-ca-certificates
 
 # Create app directory with correct permissions
@@ -31,9 +34,11 @@ RUN chown -R appuser:appuser /app
 # Copy requirements as root to ensure they're readable
 COPY --chown=appuser:appuser requirements.txt .
 
-# Install Python dependencies as root for system-wide access
-RUN pip install --no-cache-dir --upgrade pip==24.3.1 && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with security hardening
+RUN python -m pip install --no-cache-dir --upgrade pip==24.3.1 setuptools==75.3.0 wheel==0.44.0 && \
+    python -m pip install --no-cache-dir --no-compile -r requirements.txt && \
+    find /usr/local -type f -name '*.pyc' -delete && \
+    find /usr/local -type d -name '__pycache__' -delete
 
 # Copy application code with correct ownership
 COPY --chown=appuser:appuser . .
