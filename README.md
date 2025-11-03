@@ -3,7 +3,7 @@
 <div align="center">
 
 ![n8n Workflows](https://img.shields.io/badge/n8n-Workflows-orange?style=for-the-badge&logo=n8n)
-![Workflows](https://img.shields.io/badge/Workflows-2057+-blue?style=for-the-badge)
+![Workflows](https://img.shields.io/badge/Workflows-4343+-blue?style=for-the-badge)
 ![Integrations](https://img.shields.io/badge/Integrations-365+-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/zie619)
@@ -45,7 +45,7 @@ Visit **[zie619.github.io/n8n-workflows](https://zie619.github.io/n8n-workflows)
 <td width="50%">
 
 ### 📊 By The Numbers
-- **2,057** Production-Ready Workflows
+- **4,343** Production-Ready Workflows
 - **365** Unique Integrations
 - **29,445** Total Nodes
 - **15** Organized Categories
@@ -149,7 +149,7 @@ graph LR
 
 ```
 n8n-workflows/
-├── workflows/           # 2,057 workflow JSON files
+├── workflows/           # 4,343 workflow JSON files
 │   └── [category]/     # Organized by integration
 ├── docs/               # GitHub Pages site
 ├── src/                # Python source code
