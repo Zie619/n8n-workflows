@@ -6,6 +6,7 @@ Multi-user access control and authentication.
 
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr
 from typing import List, Dict, Any, Optional
 import sqlite3

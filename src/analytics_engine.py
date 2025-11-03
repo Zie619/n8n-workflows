@@ -5,6 +5,7 @@ Provides insights, patterns, and usage analytics.
 """
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import sqlite3
