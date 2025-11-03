@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -7,8 +7,11 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_TRUSTED_HOST="pypi.org pypi.python.org files.pythonhosted.org"
 
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Create non-root user for security with explicit UID/GID
+RUN groupadd -g 1001 appuser && \
+    useradd -r -u 1001 -g appuser appuser && \
+    mkdir -p /app && \
+    chown -R appuser:appuser /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
