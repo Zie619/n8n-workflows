@@ -5,6 +5,7 @@ Real-time metrics, monitoring, and alerting.
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import asyncio
@@ -15,6 +16,7 @@ from datetime import datetime, timedelta
 import json
 import threading
 import queue
+import os
 
 class PerformanceMetrics(BaseModel):
     timestamp: str

@@ -5,6 +5,7 @@ Connect with external platforms and services.
 """
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import httpx

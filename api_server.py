@@ -4,7 +4,7 @@ FastAPI Server for N8N Workflow Documentation
 High-performance API with sub-100ms response times.
 """
 
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,8 +14,12 @@ from typing import Optional, List, Dict, Any
 import json
 import os
 import asyncio
+import re
+import urllib.parse
 from pathlib import Path
 import uvicorn
+import time
+from collections import defaultdict
 
 from workflow_db import WorkflowDatabase
 
@@ -26,18 +30,103 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Security: Rate limiting storage
+rate_limit_storage = defaultdict(list)
+MAX_REQUESTS_PER_MINUTE = 60  # Configure as needed
+
 # Add middleware for performance
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Security: Configure CORS properly - restrict origins in production
+# For local development, you can use localhost
+# For production, replace with your actual domain
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://localhost:8080",
+    "https://zie619.github.io",  # GitHub Pages
+    "https://n8n-workflows-1-xxgm.onrender.com",  # Community deployment
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,  # Security fix: Restrict origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],  # Security fix: Only allow needed methods
+    allow_headers=["Content-Type", "Authorization"],  # Security fix: Restrict headers
 )
 
 # Initialize database
 db = WorkflowDatabase()
+
+# Security: Helper function for rate limiting
+def check_rate_limit(client_ip: str) -> bool:
+    """Check if client has exceeded rate limit."""
+    current_time = time.time()
+    # Clean old entries
+    rate_limit_storage[client_ip] = [
+        timestamp for timestamp in rate_limit_storage[client_ip]
+        if current_time - timestamp < 60
+    ]
+    # Check rate limit
+    if len(rate_limit_storage[client_ip]) >= MAX_REQUESTS_PER_MINUTE:
+        return False
+    # Add current request
+    rate_limit_storage[client_ip].append(current_time)
+    return True
+
+# Security: Helper function to validate and sanitize filenames
+def validate_filename(filename: str) -> bool:
+    """
+    Validate filename to prevent path traversal attacks.
+    Returns True if filename is safe, False otherwise.
+    """
+    # Decode URL encoding multiple times to catch encoded traversal attempts
+    decoded = filename
+    for _ in range(3):  # Decode up to 3 times to catch nested encodings
+        try:
+            decoded = urllib.parse.unquote(decoded, errors='strict')
+        except:
+            return False  # Invalid encoding
+
+    # Check for path traversal patterns
+    dangerous_patterns = [
+        '..',  # Parent directory
+        '..\\',  # Windows parent directory
+        '../',  # Unix parent directory
+        '\\',  # Backslash (Windows path separator)
+        '/',  # Forward slash (Unix path separator)
+        '\x00',  # Null byte
+        '\n', '\r',  # Newlines
+        '~',  # Home directory
+        ':',  # Drive letter or stream (Windows)
+        '|', '<', '>',  # Shell redirection
+        '*', '?',  # Wildcards
+        '$',  # Variable expansion
+        ';', '&',  # Command separators
+    ]
+
+    for pattern in dangerous_patterns:
+        if pattern in decoded:
+            return False
+
+    # Check for absolute paths
+    if decoded.startswith('/') or decoded.startswith('\\'):
+        return False
+
+    # Check for Windows drive letters
+    if len(decoded) >= 2 and decoded[1] == ':':
+        return False
+
+    # Only allow alphanumeric, dash, underscore, and .json extension
+    if not re.match(r'^[a-zA-Z0-9_\-]+\.json$', decoded):
+        return False
+
+    # Additional check: filename should end with .json
+    if not decoded.endswith('.json'):
+        return False
+
+    return True
 
 # Startup function to verify database
 @app.on_event("startup")
@@ -194,35 +283,51 @@ async def search_workflows(
         raise HTTPException(status_code=500, detail=f"Error searching workflows: {str(e)}")
 
 @app.get("/api/workflows/{filename}")
-async def get_workflow_detail(filename: str):
+async def get_workflow_detail(filename: str, request: Request):
     """Get detailed workflow information including raw JSON."""
     try:
+        # Security: Validate filename to prevent path traversal
+        if not validate_filename(filename):
+            print(f"Security: Blocked path traversal attempt for filename: {filename}")
+            raise HTTPException(status_code=400, detail="Invalid filename format")
+
+        # Security: Rate limiting
+        client_ip = request.client.host if request.client else "unknown"
+        if not check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+
         # Get workflow metadata from database
         workflows, _ = db.search_workflows(f'filename:"{filename}"', limit=1)
         if not workflows:
             raise HTTPException(status_code=404, detail="Workflow not found in database")
-        
+
         workflow_meta = workflows[0]
-        
-        # file_path = Path(__file__).parent / "workflows" / workflow_meta.name / filename
-        # print(f"当前工作目录: {workflow_meta}")
-        # Load raw JSON from file
-        workflows_path = Path('workflows')
-        json_files = list(workflows_path.rglob("*.json"))
-        matching_files = [f for f in json_files if f.name == filename]
-        
-        if not matching_files:
+
+        # Load raw JSON from file with security checks
+        workflows_path = Path('workflows').resolve()
+
+        # Find the file safely
+        matching_file = None
+        for subdir in workflows_path.iterdir():
+            if subdir.is_dir():
+                target_file = subdir / filename
+                if target_file.exists() and target_file.is_file():
+                    # Verify the file is actually within workflows directory
+                    try:
+                        target_file.resolve().relative_to(workflows_path)
+                        matching_file = target_file
+                        break
+                    except ValueError:
+                        print(f"Security: Blocked access to file outside workflows: {target_file}")
+                        continue
+
+        if not matching_file:
             print(f"Warning: File {filename} not found in workflows directory")
             raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
-        
-        file_path = matching_files[0]
-        if not file_path.exists():
-            print(f"Warning: File {file_path} not found on filesystem but exists in database")
-            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
+
+        with open(matching_file, 'r', encoding='utf-8') as f:
             raw_json = json.load(f)
-        
+
         return {
             "metadata": workflow_meta,
             "raw_json": raw_json
@@ -233,65 +338,109 @@ async def get_workflow_detail(filename: str):
         raise HTTPException(status_code=500, detail=f"Error loading workflow: {str(e)}")
 
 @app.get("/api/workflows/{filename}/download")
-async def download_workflow(filename: str):
-    """Download workflow JSON file."""
+async def download_workflow(filename: str, request: Request):
+    """Download workflow JSON file with security validation."""
     try:
-        workflows_path = Path('workflows')
-        json_files = list(workflows_path.rglob("*.json"))
-        matching_files = [f for f in json_files if f.name == filename]
-        
-        if not matching_files:
-            print(f"Warning: File {filename} not found in workflows directory")
-            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
-        
-        file_path = matching_files[0]
-        if not os.path.exists(file_path):
-            print(f"Warning: Download requested for missing file: {file_path}")
-            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
-        
+        # Security: Validate filename to prevent path traversal
+        if not validate_filename(filename):
+            print(f"Security: Blocked path traversal attempt for filename: {filename}")
+            raise HTTPException(status_code=400, detail="Invalid filename format")
+
+        # Security: Rate limiting
+        client_ip = request.client.host if request.client else "unknown"
+        if not check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+
+        # Only search within the workflows directory
+        workflows_path = Path('workflows').resolve()  # Get absolute path
+
+        # Find the file safely
+        json_files = []
+        for subdir in workflows_path.iterdir():
+            if subdir.is_dir():
+                target_file = subdir / filename
+                if target_file.exists() and target_file.is_file():
+                    # Verify the file is actually within workflows directory (defense in depth)
+                    try:
+                        target_file.resolve().relative_to(workflows_path)
+                        json_files.append(target_file)
+                    except ValueError:
+                        # File is outside workflows directory
+                        print(f"Security: Blocked access to file outside workflows: {target_file}")
+                        continue
+
+        if not json_files:
+            print(f"File {filename} not found in workflows directory")
+            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found")
+
+        file_path = json_files[0]
+
+        # Final security check: Ensure file is within workflows directory
+        try:
+            file_path.resolve().relative_to(workflows_path)
+        except ValueError:
+            print(f"Security: Blocked final attempt to access file outside workflows: {file_path}")
+            raise HTTPException(status_code=403, detail="Access denied")
+
         return FileResponse(
-            file_path,
+            str(file_path),
             media_type="application/json",
             filename=filename
         )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found")
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error downloading workflow {filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error downloading workflow: {str(e)}")
 
 @app.get("/api/workflows/{filename}/diagram")
-async def get_workflow_diagram(filename: str):
+async def get_workflow_diagram(filename: str, request: Request):
     """Get Mermaid diagram code for workflow visualization."""
     try:
-        workflows_path = Path('workflows')
-        json_files = list(workflows_path.rglob("*.json"))
-        matching_files = [f for f in json_files if f.name == filename]
-        
-        if not matching_files:
+        # Security: Validate filename to prevent path traversal
+        if not validate_filename(filename):
+            print(f"Security: Blocked path traversal attempt for filename: {filename}")
+            raise HTTPException(status_code=400, detail="Invalid filename format")
+
+        # Security: Rate limiting
+        client_ip = request.client.host if request.client else "unknown"
+        if not check_rate_limit(client_ip):
+            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+
+        # Only search within the workflows directory
+        workflows_path = Path('workflows').resolve()
+
+        # Find the file safely
+        matching_file = None
+        for subdir in workflows_path.iterdir():
+            if subdir.is_dir():
+                target_file = subdir / filename
+                if target_file.exists() and target_file.is_file():
+                    # Verify the file is actually within workflows directory
+                    try:
+                        target_file.resolve().relative_to(workflows_path)
+                        matching_file = target_file
+                        break
+                    except ValueError:
+                        print(f"Security: Blocked access to file outside workflows: {target_file}")
+                        continue
+
+        if not matching_file:
             print(f"Warning: File {filename} not found in workflows directory")
             raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
-        
-        file_path = matching_files[0]
-        print(f'{file_path}')
-        if not file_path.exists():
-            print(f"Warning: Diagram requested for missing file: {file_path}")
-            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
+
+        with open(matching_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
         nodes = data.get('nodes', [])
         connections = data.get('connections', {})
-        
+
         # Generate Mermaid diagram
         diagram = generate_mermaid_diagram(nodes, connections)
-        
+
         return {"diagram": diagram}
     except HTTPException:
         raise
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found")
     except json.JSONDecodeError as e:
         print(f"Error parsing JSON in {filename}: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Invalid JSON in workflow file: {str(e)}")
@@ -368,13 +517,44 @@ def generate_mermaid_diagram(nodes: List[Dict], connections: Dict) -> str:
     return "\n".join(mermaid_code)
 
 @app.post("/api/reindex")
-async def reindex_workflows(background_tasks: BackgroundTasks, force: bool = False):
-    """Trigger workflow reindexing in the background."""
+async def reindex_workflows(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    force: bool = False,
+    admin_token: Optional[str] = Query(None, description="Admin authentication token")
+):
+    """Trigger workflow reindexing in the background (requires authentication)."""
+    # Security: Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+
+    # Security: Basic authentication check
+    # In production, use proper authentication (JWT, OAuth, etc.)
+    # For now, check for environment variable or disable endpoint
+    import os
+    expected_token = os.environ.get("ADMIN_TOKEN", None)
+
+    if not expected_token:
+        # If no token is configured, disable the endpoint for security
+        raise HTTPException(
+            status_code=503,
+            detail="Reindexing endpoint is disabled. Set ADMIN_TOKEN environment variable to enable."
+        )
+
+    if admin_token != expected_token:
+        print(f"Security: Unauthorized reindex attempt from {client_ip}")
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+
     def run_indexing():
-        db.index_all_workflows(force_reindex=force)
-    
+        try:
+            db.index_all_workflows(force_reindex=force)
+            print(f"Reindexing completed successfully (requested by {client_ip})")
+        except Exception as e:
+            print(f"Error during reindexing: {e}")
+
     background_tasks.add_task(run_indexing)
-    return {"message": "Reindexing started in background"}
+    return {"message": "Reindexing started in background", "requested_by": client_ip}
 
 @app.get("/api/integrations")
 async def get_integrations():

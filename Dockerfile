@@ -1,48 +1,60 @@
-FROM python:3.11-slim
+# Use official Python runtime as base image - stable secure version
+FROM python:3.11-slim-bookworm AS base
 
-# Set environment variables
+# Security: Set up non-root user first
+RUN groupadd -g 1001 appuser && \
+    useradd -m -u 1001 -g appuser appuser
+
+# Set environment variables for security and performance
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONHASHSEED=random \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_TRUSTED_HOST="pypi.org pypi.python.org files.pythonhosted.org"
+    PIP_DEFAULT_TIMEOUT=100 \
+    PIP_ROOT_USER_ACTION=ignore \
+    DEBIAN_FRONTEND=noninteractive \
+    PYTHONIOENCODING=utf-8
 
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    --no-install-recommends \
-    curl \
+# Install security updates and minimal dependencies
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache \
     && update-ca-certificates
 
-# Set work directory
+# Create app directory with correct permissions
 WORKDIR /app
+RUN chown -R appuser:appuser /app
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy requirements as root to ensure they're readable
+COPY --chown=appuser:appuser requirements.txt .
 
-# Install Python dependencies
-RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --no-cache-dir -r requirements.txt
+# Install Python dependencies with security hardening
+RUN python -m pip install --no-cache-dir --upgrade pip==24.3.1 setuptools==75.3.0 wheel==0.44.0 && \
+    python -m pip install --no-cache-dir --no-compile -r requirements.txt && \
+    find /usr/local -type f -name '*.pyc' -delete && \
+    find /usr/local -type d -name '__pycache__' -delete
 
-# Copy application code
-COPY . .
+# Copy application code with correct ownership
+COPY --chown=appuser:appuser . .
 
-# Create necessary directories and set permissions
-RUN mkdir -p database static logs && \
+# Create necessary directories with correct permissions
+RUN mkdir -p /app/database /app/workflows /app/static /app/src && \
     chown -R appuser:appuser /app
 
-# Switch to non-root user
+# Security: Switch to non-root user
 USER appuser
 
-# Health check
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/stats || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:8000/api/stats')" || exit 1
 
-# Expose port
+# Expose port (informational)
 EXPOSE 8000
 
-# Start application
-ENTRYPOINT ["python", "run.py", "--host", "0.0.0.0", "--port", "8000"]
+# Security: Run with minimal privileges
+CMD ["python", "-u", "run.py", "--host", "0.0.0.0", "--port", "8000"]
