@@ -15,9 +15,10 @@ import secrets
 import jwt
 from datetime import datetime, timedelta
 import json
+import os
 
-# Configuration
-SECRET_KEY = "your-secret-key-change-in-production"
+# Configuration - Use environment variables for security
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", secrets.token_urlsafe(32))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -116,16 +117,22 @@ class UserManager:
         admin_count = cursor.fetchone()[0]
         
         if admin_count == 0:
-            admin_password = "admin123"  # Change in production
+            # Use environment variable or generate secure random password
+            admin_password = os.environ.get("ADMIN_PASSWORD", secrets.token_urlsafe(16))
             password_hash = self.hash_password(admin_password)
-            
+
             cursor.execute("""
                 INSERT INTO users (username, email, full_name, password_hash, role)
                 VALUES (?, ?, ?, ?, ?)
             """, ("admin", "admin@n8n-workflows.com", "System Administrator", password_hash, "admin"))
-            
+
             conn.commit()
-            print("Default admin user created: admin/admin123")
+            # Only print password if it was auto-generated (not from env)
+            if "ADMIN_PASSWORD" not in os.environ:
+                print(f"Default admin user created: admin/{admin_password}")
+                print("WARNING: Please change this password immediately after first login!")
+            else:
+                print("Default admin user created with environment-configured password")
         
         conn.close()
     
