@@ -1,5 +1,5 @@
-# Use official Python runtime as base image - latest secure version
-FROM python:3.12.7-slim-bookworm AS base
+# Use official Python runtime as base image - stable secure version
+FROM python:3.11-slim-bookworm AS base
 
 # Security: Set up non-root user first
 RUN groupadd -g 1001 appuser && \
@@ -17,11 +17,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=utf-8
 
 # Install security updates and minimal dependencies
-# Use specific versions to avoid CVEs
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-    ca-certificates=20230311 \
+    ca-certificates \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache \
