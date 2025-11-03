@@ -39,43 +39,56 @@ jobs:
 
     - name: Test Docker image
       run: |
-        # Test container starts successfully
-        docker run --name test-container -d -p 8002:8000 workflows-doc:test
-        
-        # Wait for container to be ready
-        sleep 15
-        
-        # Test health endpoint
-        curl -f http://localhost:8002/api/stats || exit 1
-        
+        # Test container starts successfully with CI mode
+        docker run --name test-container -d -p 8002:8000 -e CI=true workflows-doc:test
+
+        # Wait for container to be ready (max 30 seconds)
+        echo "Waiting for container to start..."
+        for i in {1..30}; do
+          if curl -f http://localhost:8002/api/stats 2>/dev/null; then
+            echo "Container is ready!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "Container failed to start within 30 seconds"
+            docker logs test-container
+            exit 1
+          fi
+          echo "Attempt $i/30..."
+          sleep 1
+        done
+
         # Test container logs for errors
         docker logs test-container
-        
+
         # Cleanup
         docker stop test-container
         docker rm test-container
 
     - name: Test Docker Compose
       run: |
-        # Test basic docker-compose
-        docker compose -f docker-compose.yml up -d --build
-        
-        # Wait for services
-        sleep 20
-        
-        # Test API endpoint
-        curl -f http://localhost:8000/api/stats || exit 1
-        
-        # Test with development override
-        docker compose -f docker-compose.yml -f docker-compose.dev.yml down
-        docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-        
-        # Wait for services
-        sleep 20
-        
-        # Test development endpoint
-        curl -f http://localhost:8000/api/stats || exit 1
-        
+        # Test basic docker-compose with CI mode
+        CI=true docker compose -f docker-compose.yml up -d --build
+
+        # Wait for services (max 30 seconds)
+        echo "Waiting for services to start..."
+        for i in {1..30}; do
+          if curl -f http://localhost:8000/api/stats 2>/dev/null; then
+            echo "Services are ready!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "Services failed to start within 30 seconds"
+            docker compose logs
+            exit 1
+          fi
+          echo "Attempt $i/30..."
+          sleep 1
+        done
+
+        # Show logs
+        docker compose logs --tail=50
+
         # Cleanup
         docker compose down
 

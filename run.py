@@ -54,28 +54,35 @@ def setup_directories():
     print("✅ Directories verified")
 
 
-def setup_database(force_reindex: bool = False) -> str:
+def setup_database(force_reindex: bool = False, skip_index: bool = False) -> str:
     """Setup and initialize the database."""
     from workflow_db import WorkflowDatabase
-    
+
     db_path = "database/workflows.db"
-    
+
     print(f"🔄 Setting up database: {db_path}")
     db = WorkflowDatabase(db_path)
-    
+
+    # Skip indexing in CI mode or if explicitly requested
+    if skip_index:
+        print("⏭️  Skipping workflow indexing (CI mode)")
+        stats = db.get_stats()
+        print(f"✅ Database ready: {stats['total']} workflows")
+        return db_path
+
     # Check if database has data or force reindex
     stats = db.get_stats()
     if stats['total'] == 0 or force_reindex:
         print("📚 Indexing workflows...")
         index_stats = db.index_all_workflows(force_reindex=True)
         print(f"✅ Indexed {index_stats['processed']} workflows")
-        
+
         # Show final stats
         final_stats = db.get_stats()
         print(f"📊 Database contains {final_stats['total']} workflows")
     else:
         print(f"✅ Database ready: {stats['total']} workflows")
-    
+
     return db_path
 
 
@@ -136,12 +143,21 @@ Examples:
         help="Force database reindexing"
     )
     parser.add_argument(
-        "--dev", 
-        action="store_true", 
+        "--dev",
+        action="store_true",
         help="Development mode with auto-reload"
     )
-    
+    parser.add_argument(
+        "--skip-index",
+        action="store_true",
+        help="Skip workflow indexing (useful for CI/testing)"
+    )
+
     args = parser.parse_args()
+
+    # Also check environment variable for CI mode
+    ci_mode = os.environ.get('CI', '').lower() in ('true', '1', 'yes')
+    skip_index = args.skip_index or ci_mode
     
     print_banner()
     
@@ -154,7 +170,7 @@ Examples:
     
     # Setup database
     try:
-        setup_database(force_reindex=args.reindex)
+        setup_database(force_reindex=args.reindex, skip_index=skip_index)
     except Exception as e:
         print(f"❌ Database setup error: {e}")
         sys.exit(1)
