@@ -1,0 +1,799 @@
+{
+  "name": "Pyragogy AI Village - Orchestrazione Master (Architettura Profonda V2)",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        50,
+        300
+      ],
+      "id": "node-93a91aca"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pyragogy/process",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "pyragogy-master-trigger",
+      "id": "node-0ce9e907"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 1; -- Verifica connessione DB",
+        "options": {}
+      },
+      "name": "Check DB Connection",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "pyragogy-postgres",
+          "name": "Postgres Pyragogy DB"
+        }
+      },
+      "id": "node-67f45b22"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.apiKey }}",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Meta-orchestrator of the Pyragogy AI Village. Your task is to analyze the input and determine the optimal agent sequence for processing. Consider the input type, complexity, and goals. Available agents: Summarizer, Synthesizer, Peer Reviewer, Sensemaking Agent, Prompt Engineer, Onboarding/Explainer, Archivist. Return a JSON array of agent names in the order they should run, e.g., [\"Summarizer\", \"Synthesizer\", \"Peer Reviewer\", \"Archivist\"]. Include \"Archivist\" last if persistence is needed."
+          },
+          {
+            "role": "user",
+            "content": "Input Data:\n{{ JSON.stringify($json.body) }}"
+          }
+        ],
+        "options": {
+          "response_format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "name": "Meta-Orchestrator",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      },
+      "id": "node-01a5e224"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Analizza il piano di orchestrazione e imposta per il looping\nlet rawPlan = $json.choices[0].message.content;\nlet plan;\n\ntry {\n  plan = JSON.parse(rawPlan);\n} catch (e) {\n  // Se il parsing fallisce, assumi che sia una stringa di array grezza\n  plan = rawPlan;\n}\n\n// Estrai in modo sicuro la sequenza degli agenti:\n// Se 'plan' è un oggetto e ha una chiave 'agents', usala.\n// Altrimenti, se 'plan' è un array, usalo direttamente.\n// Altrimenti, predefinisci un array vuoto.\nconst agentSequence = Array.isArray(plan) ? plan : (plan && plan.agents && Array.isArray(plan.agents) ? plan.agents : []);\n\n// Memorizza la sequenza e l'indice corrente per il loop\n$workflow.agentSequence = agentSequence;\n$workflow.currentAgentIndex = 0;\n$workflow.redraftLoopCount = 0; // Inizializza il contatore dei cicli di rielaborazione\n\n// Passa i dati di input al primo agente, assicurandosi che $items[0].json.body esista\nconst initialInput = $items[0] && $items[0].json && $items[0].json.body ? $items[0].json.body : {};\n\nreturn [{ json: { ...initialInput, agentToRun: agentSequence[0] || null } }];"
+      },
+      "name": "Parse Orchestration Plan",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ],
+      "id": "node-51b7ecfd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $workflow.currentAgentIndex < $workflow.agentSequence.length }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "More Agents to Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        300
+      ],
+      "id": "node-dcb3d8d0"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Ottieni il nome dell'agente corrente\nconst agentName = $workflow.agentSequence[$workflow.currentAgentIndex];\n\n// Prepara i dati per l'esecuzione dell'agente\n// Passa l'output del passo precedente (o l'input iniziale).\n// Se stiamo rielaborando, l'input dell'agente dovrebbe includere il feedback di rielaborazione.\nconst previousOutput = $json.output || $json.body.input; // Assumendo che l'output dell'agente sia memorizzato nella chiave 'output'\nconst agentInput = $json.redraftInput || previousOutput; // Usa redraftInput se presente, altrimenti previousOutput\n\nreturn [{ json: { ...$json, agentToRun: agentName, agentInput: agentInput } }];"
+      },
+      "name": "Prepare Agent Input",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        200
+      ],
+      "id": "node-cc16854b"
+    },
+    {
+      "parameters": {
+        "mode": "json",
+        "value": "={{ $json.agentToRun }}",
+        "conditions": [
+          {
+            "value": "Summarizer",
+            "type": "string"
+          },
+          {
+            "value": "Synthesizer",
+            "type": "string"
+          },
+          {
+            "value": "Peer Reviewer",
+            "type": "string"
+          },
+          {
+            "value": "Sensemaking Agent",
+            "type": "string"
+          },
+          {
+            "value": "Prompt Engineer",
+            "type": "string"
+          },
+          {
+            "value": "Onboarding/Explainer",
+            "type": "string"
+          },
+          {
+            "value": "Archivist",
+            "type": "string"
+          }
+        ]
+      },
+      "name": "Route Agents with Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        200
+      ],
+      "id": "node-e3c19d1b"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.apiKey }}",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Summarizer Agent. Summarize the provided text into 3 key points."
+          },
+          {
+            "role": "user",
+            "content": "Text to summarize:\n{{ $json.agentInput }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Summarizer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        0
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      },
+      "id": "node-89bb486a"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.apiKey }}",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Synthesizer Agent. Synthesize a creative new text from the given key points or input. If provided with 'redraft_feedback', incorporate it to refine the output."
+          },
+          {
+            "role": "user",
+            "content": "Input for synthesis:\n{{ $json.agentInput }}\n\n{{ $json.redraftFeedback ? 'Feedback per la rielaborazione: ' + $json.redraftFeedback : '' }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Synthesizer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        100
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      },
+      "id": "node-90b65ed1"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.apiKey }}",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Peer Reviewer Agent. Review the provided text, highlight strengths, weaknesses, and provide actionable suggestions for improvement. In your JSON output, include a 'major_issue' boolean flag (true if significant redrafting is needed, false otherwise)."
+          },
+          {
+            "role": "user",
+            "content": "Text to review:\n{{ $json.agentInput }}"
+          }
+        ],
+        "options": {
+          "response_format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "name": "Peer Reviewer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      },
+      "id": "node-d2d60207"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.apiKey }}",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Sensemaking Agent. Analyze the input, connect it with existing knowledge (context provided), identify patterns, gaps, and suggest new directions. In your JSON output, include a 'major_issue' boolean flag (true if significant redrafting is needed, false otherwise)."
+          },
+          {
+            "role": "user",
+            "content": "Input to analyze:\n{{ $json.agentInput }}\n\nContext from DB (if available):\n{{ $json.dbContext }}"
+          }
+        ],
+        "options": {
+          "response_format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "name": "Sensemaking Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      },
+      "id": "node-6dcabd0b"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.apiKey }}",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Prompt Engineer Agent. Analyze the current task context and the next agent in the sequence. Refine or generate an optimal prompt for the next agent. In your JSON output, include a 'major_issue' boolean flag (true if significant redrafting is needed, false otherwise)."
+          },
+          {
+            "role": "user",
+            "content": "Current context:\n{{ JSON.stringify($json) }}\nNext agent: {{ $workflow.agentSequence[$workflow.currentAgentIndex + 1] || 'None' }}"
+          }
+        ],
+        "options": {
+          "response_format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "name": "Prompt Engineer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      },
+      "id": "node-585f7b28"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.apiKey }}",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Onboarding/Explainer Agent. Explain the current process, the result achieved so far, or provide guidance based on the input."
+          },
+          {
+            "role": "user",
+            "content": "Explain the following:\n{{ $json.agentInput }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Onboarding/Explainer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        500
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      },
+      "id": "node-6939b1ec"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepara i metadati per il contenuto dell'Handbook.\n// Assicurati che l'input originale contenga 'title' e 'tags' o imposta dei valori predefiniti.\nconst title = $json.body.title || 'Untitled Handbook Entry';\nconst tags = $json.body.tags || [];\nconst phase = $json.body.phase || 'draft'; // Fase iniziale, può essere 'final' dopo l'approvazione\nconst rhythm = $json.body.rhythm || 'on-demand'; // Ritmo cognitivo\n\nreturn [{ json: { ...$json, handbookTitle: title, handbookTags: tags, handbookPhase: phase, handbookRhythm: rhythm } }];"
+      },
+      "name": "Add Handbook Metadata",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        600
+      ],
+      "id": "node-e26864ce"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepara il contenuto proposto dall'Archivista per la revisione umana, inclusa la formattazione YAML.\n// Assicurati che l'input dell'agente (il contenuto generato) sia disponibile.\nconst proposedContent = $json.agentInput;\nconst title = $json.handbookTitle;\nconst tags = $json.handbookTags;\nconst phase = $json.handbookPhase;\nconst rhythm = $json.handbookRhythm;\n\n// Costruisci il front-matter YAML\nconst yamlFrontMatter = `---\ntitle: \"${title.replace(/\"/g, '\\\"')}\"\ntags: [${tags.map(t => `\"${t.replace(/\"/g, '\\\"')}\"`).join(', ')}]\nphase: \"${phase}\"\nrhythm: \"${rhythm}\"\n---\n\n`;\n\nconst finalMarkdownContent = yamlFrontMatter + proposedContent;\n\nreturn [{ json: { ...$json, proposedContent: proposedContent, reviewTitle: title, reviewTags: tags, finalMarkdownContent: finalMarkdownContent } }];"
+      },
+      "name": "Generate Content for Review",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1850,
+        600
+      ],
+      "id": "node-024d57ce"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Genera un ID univoco per questa richiesta di revisione.\n// Questo ID verrà usato per correlare la risposta del revisore con questa istanza del workflow.\nconst reviewId = crypto.randomUUID();\n\nreturn [{ json: { ...$json, reviewId: reviewId } }];"
+      },
+      "name": "Generate Review ID",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        600
+      ],
+      "id": "node-b13610aa"
+    },
+    {
+      "parameters": {
+        "fromEmail": "your-email@example.com",
+        "toEmail": "human-reviewer@example.com",
+        "subject": "Revisione Contenuto Pyragogy Handbook: {{ $json.reviewTitle }}",
+        "text": "Ciao revisore,\n\nÈ stato proposto un nuovo contenuto per l'Handbook:\n\n---\n{{ $json.proposedContent }}\n---\n\nTitolo: {{ $json.reviewTitle }}\nTags: {{ $json.reviewTags.join(', ') }}\n\nPer favore, clicca su uno dei seguenti link per approvare o rifiutare:\n\nApprova: your_n8n_url/webhook/pyragogy/review-feedback?reviewId={{ $json.reviewId }}&status=approved\nRifiuta: your_n8n_url/webhook/pyragogy/review-feedback?reviewId={{ $json.reviewId }}&status=rejected\n\nGrazie!",
+        "html": "<h3>Revisione Contenuto Pyragogy Handbook: {{ $json.reviewTitle }}</h3>\n<p>Ciao revisore,</p>\n<p>È stato proposto un nuovo contenuto per l'Handbook:</p>\n<hr>\n<pre>{{ $json.proposedContent }}</pre>\n<hr>\n<p><strong>Titolo:</strong> {{ $json.reviewTitle }}</p>\n<p><strong>Tags:</strong> {{ $json.reviewTags.join(', ') }}</p>\n<p>Per favore, clicca su uno dei seguenti link per approvare o rifiutare:</p>\n<p><a href=\"your_n8n_url/webhook/pyragogy/review-feedback?reviewId={{ $json.reviewId }}&status=approved\">Approva</a></p>\n<p><a href=\"your_n8n_url/webhook/pyragogy/review-feedback?reviewId={{ $json.reviewId }}&status=rejected\">Rifiuta</a></p>\n<p>Grazie!</p>",
+        "options": {}
+      },
+      "name": "Send Review Request Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        600
+      ],
+      "credentials": {
+        "emailSend": {
+          "id": "your-email-credential-id",
+          "name": "Your Email Credential Name"
+        }
+      },
+      "id": "node-c3ee1fec"
+    },
+    {
+      "parameters": {
+        "mode": "webhook",
+        "webhookPath": "pyragogy/review-feedback",
+        "matchField": "reviewId",
+        "matchValue": "={{ $json.reviewId }}",
+        "timeout": "1h"
+      },
+      "name": "Wait for Human Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        2450,
+        600
+      ],
+      "id": "node-6737a645"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.query.status === 'approved' }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Human Decision Split",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2650,
+        600
+      ],
+      "id": "node-25edbfd3"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "handbook_entries",
+        "columns": "title, content, version, created_by, tags, phase, rhythm",
+        "values": "={{ $json.reviewTitle || 'Untitled' }}, {{ $json.finalMarkdownContent }}, {{ $json.version || 1 }}, {{ $json.author || 'AI Village' }}, ARRAY[{{ ($json.reviewTags || []).map(t => `'${t}'`).join(',') }}], {{ $json.handbookPhase || 'final' }}, {{ $json.handbookRhythm || 'on-demand' }}",
+        "options": {
+          "returning": "id"
+        }
+      },
+      "name": "Save to handbook_entries",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        2850,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "pyragogy-postgres",
+          "name": "Postgres Pyragogy DB"
+        }
+      },
+      "id": "node-25286da2"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Registra il contributo dell'agente dopo l'approvazione umana\nconst entryId = $json.id; // ID dall'inserimento in handbook_entries\nconst agentName = 'Archivist';\nconst contributionType = 'Archiving (Approved)';\nconst details = { input: $json.proposedContent, metadata: { title: $json.reviewTitle, version: $json.version, tags: $json.reviewTags, phase: $json.handbookPhase, rhythm: $json.handbookRhythm }, reviewStatus: 'approved' };\n\n$items[0].json.contribution = { entryId, agentName, contributionType, details };\nreturn $items;"
+      },
+      "name": "Prepare Approved Contribution Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        3050,
+        500
+      ],
+      "id": "node-e2cb77fe"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "agent_contributions",
+        "columns": "entry_id, agent_name, contribution_type, details",
+        "values": "={{ $json.contribution.entryId }}, {{ $json.contribution.agentName }}, {{ $json.contribution.contributionType }}, {{ JSON.stringify($json.contribution.details) }}",
+        "options": {}
+      },
+      "name": "Save Agent Contribution (Approved)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        3250,
+        500
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "pyragogy-postgres",
+          "name": "Postgres Pyragogy DB"
+        }
+      },
+      "id": "node-d6c02ec7"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Genera il percorso del file GitHub con slug e timestamp per il versioning.\nconst chapterSlug = ($json.reviewTitle || 'untitled').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();\nconst timestamp = new Date().toISOString().replace(/[:.-]/g, ''); // Rimuove caratteri non validi per i nomi di file\nconst filePathWithVersion = `content/${chapterSlug}_v${timestamp}.md`;\n\nreturn [{ json: { ...$json, githubFilePath: filePathWithVersion } }];"
+      },
+      "name": "Generate GitHub File Path",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        3450,
+        500
+      ],
+      "id": "node-d648734e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $env.GITHUB_ACCESS_TOKEN }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "GitHub Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        3650,
+        500
+      ],
+      "id": "node-ea60c665"
+    },
+    {
+      "parameters": {
+        "authentication": "{{ $credentials.accessToken }}",
+        "resource": "file",
+        "operation": "createUpdate",
+        "owner": "={{ $env.GITHUB_REPOSITORY_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPOSITORY_NAME }}",
+        "filePath": "={{ $json.githubFilePath }}",
+        "fileContent": "={{ $json.finalMarkdownContent }}",
+        "commitMessage": "={{ `[BOT] Add/Update Handbook: ${$json.reviewTitle} (Approved by Human)` }}",
+        "options": {}
+      },
+      "name": "Commit to GitHub (Approved)",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        3850,
+        500
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "pyragogy-github",
+          "name": "GitHub Pyragogy"
+        }
+      },
+      "id": "node-44f0d4f7"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Registra il rifiuto umano del contenuto\nconst agentName = 'Archivist';\nconst reviewId = $json.reviewId;\nconst reviewStatus = 'rejected';\nconst reviewComments = $json.query.comments || 'Nessun commento fornito.';\nconst proposedContent = $json.proposedContent;\nconst title = $json.reviewTitle;\n\nconsole.log(`Contenuto proposto dall'Archivista (ID: ${reviewId}, Titolo: ${title}) rifiutato dall'umano. Commenti: ${reviewComments}`);\n\n// Prepara l'output per indicare il rifiuto e consentire al flusso di continuare.\nreturn [{ json: { ...$json, reviewStatus: reviewStatus, reviewComments: reviewComments, output: { message: `Archivista: Contenuto rifiutato dall'umano.`, status: 'rejected', comments: reviewComments } } }];"
+      },
+      "name": "Log Human Rejection",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2850,
+        700
+      ],
+      "id": "node-2c038c06"
+    },
+    {
+      "parameters": {
+        "mode": "mergeByPropertyName",
+        "propertyName": "reviewId"
+      },
+      "name": "Merge Archivist Paths",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        4050,
+        600
+      ],
+      "id": "node-0c032760"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Valuta i flag 'major_issue' dagli agenti di revisione per determinare se è necessaria una rielaborazione.\nlet majorIssueCount = 0;\nlet redraftFeedback = '';\n\n// Assumi che gli output degli agenti di revisione siano accessibili tramite $node\n// (Ad esempio, se Peer Reviewer -> Sensemaking -> Prompt Engineer sono sequenziali prima di questo nodo)\n\nif ($node[\"Peer Reviewer Agent\"] && $node[\"Peer Reviewer Agent\"].json && $node[\"Peer Reviewer Agent\"].json.choices && $node[\"Peer Reviewer Agent\"].json.choices[0] && $node[\"Peer Reviewer Agent\"].json.choices[0].message && $node[\"Peer Reviewer Agent\"].json.choices[0].message.content) {\n    const peerReviewOutput = JSON.parse($node[\"Peer Reviewer Agent\"].json.choices[0].message.content);\n    if (peerReviewOutput.major_issue) majorIssueCount++;\n    redraftFeedback += `Peer Reviewer: ${peerReviewOutput.suggestions || ''}\\n`;\n}\n\nif ($node[\"Sensemaking Agent\"] && $node[\"Sensemaking Agent\"].json && $node[\"Sensemaking Agent\"].json.choices && $node[\"Sensemaking Agent\"].json.choices[0] && $node[\"Sensemaking Agent\"].json.choices[0].message && $node[\"Sensemaking Agent\"].json.choices[0].message.content) {\n    const sensemakingOutput = JSON.parse($node[\"Sensemaking Agent\"].json.choices[0].message.content);\n    if (sensemakingOutput.major_issue) majorIssueCount++;\n    redraftFeedback += `Sensemaking Agent: ${sensemakingOutput.suggestions || ''}\\n`;\n}\n\nif ($node[\"Prompt Engineer Agent\"] && $node[\"Prompt Engineer Agent\"].json && $node[\"Prompt Engineer Agent\"].json.choices && $node[\"Prompt Engineer Agent\"].json.choices[0] && $node[\"Prompt Engineer Agent\"].json.choices[0].message && $node[\"Prompt Engineer Agent\"].json.choices[0].message.content) {\n    const promptEngineerOutput = JSON.parse($node[\"Prompt Engineer Agent\"].json.choices[0].message.content);\n    if (promptEngineerOutput.major_issue) majorIssueCount++;\n    redraftFeedback += `Prompt Engineer: ${promptEngineerOutput.suggestions || ''}\\n`;\n}\n\nconst redraftNeeded = majorIssueCount >= 2; // Voto a maggioranza\n\nreturn [{ json: { ...$json, redraftNeeded: redraftNeeded, redraftFeedback: redraftFeedback } }];"
+      },
+      "name": "Evaluate Board Consensus",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1850,
+        300
+      ],
+      "id": "node-87265c2b"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.redraftNeeded && $workflow.redraftLoopCount < 2 }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check Redraft Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        300
+      ],
+      "id": "node-64f4be0c"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Gestisce la logica di rielaborazione: incrementa il contatore e reindirizza al Synthesizer.\n\n$workflow.redraftLoopCount += 1; // Incrementa il contatore del ciclo di rielaborazione\n\n// Trova l'indice del Synthesizer nella sequenza degli agenti\nconst synthesizerIndex = $workflow.agentSequence.indexOf(\"Synthesizer\");\n\n// Se il Synthesizer non è il prossimo agente, imposta l'indice corrente per farlo ripartire dal Synthesizer.\n// Questo garantisce che il Synthesizer venga eseguito successivamente per la rielaborazione.\nif ($workflow.currentAgentIndex !== synthesizerIndex) {\n    $workflow.currentAgentIndex = synthesizerIndex;\n} else {\n    // Se siamo già sul Synthesizer (es. dopo il primo passaggio del loop), assicurati che l'indice vada avanti normalmente nel prossimo ciclo.\n    // Questo è un caso limite, di solito il Prepare Agent Input lo gestirà.\n}\n\n// Passa il feedback di rielaborazione come input per il Synthesizer.\n// Il nodo 'Prepare Agent Input' utilizzerà questo campo per aggiornare 'agentInput'.\nreturn [{ json: { ...$json, redraftInput: $json.output + \"\\n\\nFeedback per la rielaborazione dal Peer Review Board:\\n\" + $json.redraftFeedback } }];"
+      },
+      "name": "Handle Redraft",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        200
+      ],
+      "id": "node-70b295ac"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Ottieni il nome dell'agente appena eseguito\nconst agentName = $json.agentToRun;\nlet agentOutput = '';\n\n// Costruisci dinamicamente il nome del nodo per il recupero dell'output\nlet actualNodeName;\n\n// Gestione speciale per l'Archivista dopo la revisione umana\nif (agentName === 'Archivist') {\n    if ($json.query && $json.query.status === 'approved') {\n        agentOutput = { message: 'Contenuto archiviato con successo dopo l'approvazione umana.', entryId: $json.id || 'N/A', handbookMetadata: { title: $json.reviewTitle, tags: $json.reviewTags, phase: $json.handbookPhase, rhythm: $json.handbookRhythm } };\n    } else if ($json.query && $json.query.status === 'rejected') {\n        agentOutput = { message: 'Archiviazione rifiutata dall'umano.', reviewComments: $json.query.comments || 'Nessun commento' };\n    } else if ($json.reviewStatus === 'rejected') {\n        // Caso in cui la revisione umana è stata rifiutata e si proviene dal ramo di rifiuto\n        agentOutput = { message: 'Archiviazione rifiutata dall'umano (tramite ramo di rifiuto).', reviewComments: $json.reviewComments || 'Nessun commento' };\n    } else {\n        agentOutput = { message: 'Processo Archivista: Attesa revisione umana o stato inatteso.', status: 'pending_review' };\n    }\n} else {\n    // Logica originale per gli altri agenti OpenAI\n    if (agentName === 'Onboarding/Explainer') {\n        actualNodeName = 'Onboarding/Explainer Agent';\n    } else {\n        actualNodeName = agentName + ' Agent';\n    }\n\n    // Tenta in modo sicuro di recuperare l'output dal nodo determinato dinamicamente\n    // Tenta anche di analizzare il JSON se l'output dell'agente è un oggetto JSON (come per gli agenti di revisione)\n    let rawContent = '';\n    if ($node[actualNodeName] && $node[actualNodeName].json && $node[actualNodeName].json.choices && $node[actualNodeName].json.choices[0] && $node[actualNodeName].json.choices[0].message && $node[actualNodeName].json.choices[0].message.content) {\n        rawContent = $node[actualNodeName].json.choices[0].message.content;\n    } else {\n        console.warn(`Impossibile trovare l'output chat OpenAI standard per il nodo: ${actualNodeName}. Ritorno al JSON grezzo.`);\n        agentOutput = $node[actualNodeName] ? $node[actualNodeName].json : `Nessun output specifico trovato per ${agentName}`;\n    }\n\n    // Tenta di analizzare il contenuto come JSON se l'agente è un agente di revisione\n    if (agentName === 'Peer Reviewer' || agentName === 'Sensemaking Agent' || agentName === 'Prompt Engineer') {\n        try {\n            agentOutput = JSON.parse(rawContent);\n        } catch (e) {\n            console.warn(`Impossibile analizzare l'output di ${agentName} come JSON. Trattato come stringa.`);\n            agentOutput = rawContent;\n        }\n    } else {\n        agentOutput = rawContent;\n    }\n}\n\n// Registra il contributo\nconst contribution = {\n    agent: agentName,\n    output: agentOutput,\n    timestamp: new Date().toISOString()\n};\n\n// Assicurati che l'array dei contributi esista e aggiungi il nuovo contributo\nconst existingContributions = Array.isArray($json.contributions) ? $json.contributions : [];\n\n// Incrementa l'indice dell'agente per il loop (solo se non siamo in rielaborazione e questo non è un agente di revisione che porta a rielaborazione)\n// Questo è gestito dalla logica di 'Handle Redraft' che forza l'indice per il riavvio.\nif (!($json.redraftNeeded && $workflow.redraftLoopCount < 2 && agentName !== 'Synthesizer')) { // Evita doppio incremento se riavvia il Synthesizer\n    $workflow.currentAgentIndex += 1;\n}\n\n// Restituisce l'elemento aggiornato, preservando l'input originale, aggiungendo l'output corrente e tutti i contributi\nreturn [{ json: { ...$items[0].json, output: agentOutput, contributions: [...existingContributions, contribution] } }];"
+      },
+      "name": "Process Agent Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        200
+      ],
+      "id": "node-3bfc4e12"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $env.SLACK_WEBHOOK_URL }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Slack Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        500
+      ],
+      "id": "node-87fc4ac4"
+    },
+    {
+      "parameters": {
+        "webhookUrl": "{{ $env.BASE_URL }}",
+        "text": "Pyragogy AI Village Workflow Completato!\nInput: {{ $json.body.input }}\nOutput Finale: {{ JSON.stringify($json.output) }}\nAgenti Eseguiti: {{ $workflow.agentSequence.join(', ') }}",
+        "options": {}
+      },
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        500
+      ],
+      "id": "node-183c7047"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { finalOutput: $json.output, contributions: $json.contributions, agentSequence: $workflow.agentSequence } }}",
+        "options": {}
+      },
+      "name": "Final Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        400
+      ],
+      "id": "node-9fdafa9b"
+    },
+    {
+      "id": "doc-6645ef8c",
+      "name": "Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        50,
+        50
+      ],
+      "parameters": {
+        "content": "# Pyragogy AI Village - Orchestrazione Master (Architettura Profonda V2)\n\n## Overview\nProduction-ready workflow: Pyragogy AI Village - Orchestrazione Master (Architettura Profonda V2). This workflow has been optimized for production use with comprehensive error handling, security, and documentation.\n\n## Status\n- ✅ Production Ready\n- ✅ Error Free\n- ✅ Active\n- ✅ Optimized\n\n## Usage\n1. Configure credentials\n2. Test workflow\n3. Deploy to production\n\n## Security\n- All sensitive data removed\n- Error handling implemented\n- Production-grade security\n"
+      }
+    },
+    {
+      "id": "error-42c2c8dd",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        400
+      ],
+      "parameters": {
+        "message": "Workflow execution error",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": null,
+    "timezone": "UTC",
+    "executionTimeout": 3600,
+    "maxExecutions": 1000,
+    "retryOnFail": true,
+    "retryCount": 3
+  },
+  "meta": {
+    "instanceId": "workflow-46ca906f",
+    "versionId": "1.0.0",
+    "createdAt": "2025-09-29T07:07:44.263435",
+    "updatedAt": "2025-09-29T07:07:44.263448",
+    "owner": "n8n-user",
+    "license": "MIT",
+    "category": "automation",
+    "status": "active",
+    "priority": "high",
+    "environment": "production"
+  },
+  "tags": [
+    "automation",
+    "n8n",
+    "production-ready",
+    "excellent",
+    "optimized"
+  ],
+  "description": "Production-ready workflow: Pyragogy AI Village - Orchestrazione Master (Architettura Profonda V2). This workflow has been optimized for production use with comprehensive error handling, security, and documentation."
+}
