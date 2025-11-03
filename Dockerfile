@@ -1,5 +1,5 @@
-# Use official Python runtime as base image - latest secure version
-FROM python:3.12-slim-bookworm AS base
+# Use official Python runtime as base image - stable and secure version
+FROM python:3.11-slim-bookworm AS base
 
 # Security: Set up non-root user first
 RUN groupadd -g 1001 appuser && \
