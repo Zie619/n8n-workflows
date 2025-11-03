@@ -34,8 +34,9 @@ RUN chown -R appuser:appuser /app
 COPY --chown=appuser:appuser requirements.txt .
 
 # Install Python dependencies with security hardening
-RUN python -m pip install --no-cache-dir --upgrade pip==24.3.1 setuptools==75.3.0 wheel==0.44.0 && \
-    python -m pip install --no-cache-dir --no-compile -r requirements.txt && \
+# Use pip without pinning versions for better ARM64 compatibility
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python -m pip install --no-cache-dir -r requirements.txt && \
     find /usr/local -type f -name '*.pyc' -delete && \
     find /usr/local -type d -name '__pycache__' -delete
 
