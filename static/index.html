@@ -26,6 +26,7 @@
       --text: #1e293b;
       --text-secondary: #64748b;
       --text-muted: #94a3b8;
+      --text-modal: #4a5568;
       --border: #e2e8f0;
       --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
       --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -422,6 +423,10 @@
       justify-content: center;
       z-index: 1000;
       padding: 1rem;
+    }
+
+    .modal-overlay {
+      color: var(--text-modal);
     }
 
     .modal-content {
@@ -945,7 +950,7 @@
           const selectedCategory = e.target.value;
           console.log(`Category filter changed to: ${selectedCategory}`);
           console.log('Current category map size:', this.state.categoryMap.size);
-          
+
           this.state.filters.category = selectedCategory;
           this.state.currentPage = 1;
           this.resetAndSearch();
@@ -1018,7 +1023,7 @@
           if (e.key === 'Escape') {
             this.closeModal();
           }
-          
+
           // Zoom shortcuts when diagram is visible
           if (!this.elements.diagramSection.classList.contains('hidden')) {
             if (e.key === '+' || e.key === '=') {
@@ -1084,10 +1089,10 @@
           // Load categories first, then stats and workflows
           console.log('Loading categories...');
           await this.loadCategories();
-          
+
           console.log('Categories loaded, populating filter...');
           this.populateCategoryFilter();
-          
+
           // Load stats and workflows in parallel
           console.log('Loading stats and workflows...');
           const [stats] = await Promise.all([
@@ -1106,29 +1111,29 @@
       async loadCategories() {
         try {
           console.log('Loading categories from API...');
-          
+
           // Load categories and mappings in parallel from API
           const [categoriesResponse, mappingsResponse] = await Promise.all([
             this.apiCall('/categories'),
             this.apiCall('/category-mappings')
           ]);
-          
+
           // Set categories from API
           this.state.categories = categoriesResponse.categories || ['Uncategorized'];
-          
+
           // Build category map from API mappings
           const categoryMap = new Map();
           const mappings = mappingsResponse.mappings || {};
-          
+
           Object.entries(mappings).forEach(([filename, category]) => {
             categoryMap.set(filename, category || 'Uncategorized');
           });
-          
+
           this.state.categoryMap = categoryMap;
-          
+
           console.log(`Successfully loaded ${this.state.categories.length} categories from API:`, this.state.categories);
           console.log(`Loaded ${categoryMap.size} category mappings from API`);
-          
+
           return { categories: this.state.categories, mappings: mappings };
         } catch (error) {
           console.error('Failed to load categories from API:', error);
@@ -1141,24 +1146,24 @@
 
       populateCategoryFilter() {
         const select = this.elements.categoryFilter;
-        
+
         if (!select) {
           console.error('Category filter element not found');
           return;
         }
-        
+
         console.log('Populating category filter with:', this.state.categories);
-        
+
         // Clear existing options except "All Categories"
         while (select.children.length > 1) {
           select.removeChild(select.lastChild);
         }
-        
+
         if (this.state.categories.length === 0) {
           console.warn('No categories available to populate filter');
           return;
         }
-        
+
         // Add categories in alphabetical order
         this.state.categories.forEach(category => {
           const option = document.createElement('option');
@@ -1167,7 +1172,7 @@
           select.appendChild(option);
           console.log(`Added category option: ${category}`);
         });
-        
+
         console.log(`Category filter populated with ${select.options.length - 1} categories`);
       }
 
@@ -1182,35 +1187,35 @@
         try {
           // If category filtering is active, we need to load all workflows to filter properly
           const needsAllWorkflows = this.state.filters.category !== 'all' && reset;
-          
+
           let allWorkflows = [];
           let totalCount = 0;
           let totalPages = 1;
-          
+
           if (needsAllWorkflows) {
             // Load all workflows in batches for category filtering
             console.log('Loading all workflows for category filtering...');
             allWorkflows = await this.loadAllWorkflowsForCategoryFiltering();
-            
+
             // Apply client-side category filtering
             console.log(`Filtering ${allWorkflows.length} workflows for category: ${this.state.filters.category}`);
             console.log('Category map size:', this.state.categoryMap.size);
-            
+
             let matchCount = 0;
             const filteredWorkflows = allWorkflows.filter(workflow => {
               const workflowCategory = this.getWorkflowCategory(workflow.filename);
               const matches = workflowCategory === this.state.filters.category;
-              
+
               // Debug: log first few matches/non-matches
               if (matchCount < 5 || (!matches && matchCount < 3)) {
                 console.log(`${workflow.filename}: ${workflowCategory} ${matches ? '===' : '!=='} ${this.state.filters.category}`);
               }
-              
+
               if (matches) matchCount++;
-              
+
               return matches;
             });
-            
+
             console.log(`Filtered from ${allWorkflows.length} to ${filteredWorkflows.length} workflows`);
             allWorkflows = filteredWorkflows;
             totalCount = filteredWorkflows.length;
@@ -1253,7 +1258,7 @@
         const allWorkflows = [];
         let currentPage = 1;
         const maxPerPage = 100; // API limit
-        
+
         while (true) {
           const params = new URLSearchParams({
             q: this.state.searchQuery,
@@ -1266,16 +1271,16 @@
 
           const response = await this.apiCall(`/workflows?${params}`);
           allWorkflows.push(...response.workflows);
-          
+
           console.log(`Loaded page ${currentPage}/${response.pages} (${response.workflows.length} workflows)`);
-          
+
           if (currentPage >= response.pages) {
             break;
           }
-          
+
           currentPage++;
         }
-        
+
         console.log(`Loaded total of ${allWorkflows.length} workflows for filtering`);
         return allWorkflows;
       }
@@ -1320,9 +1325,9 @@
         const count = this.state.totalCount;
         const query = this.state.searchQuery;
         const category = this.state.filters.category;
-        
+
         let text = `${count.toLocaleString()} workflows`;
-        
+
         if (query && category !== 'all') {
           text += ` found for "${query}" in "${category}"`;
         } else if (query) {
@@ -1330,7 +1335,7 @@
         } else if (category !== 'all') {
           text += ` in "${category}"`;
         }
-        
+
         this.elements.resultsCount.textContent = text;
       }
 
@@ -1493,7 +1498,7 @@
             // Re-initialize Mermaid for the new diagram
             if (typeof mermaid !== 'undefined') {
               mermaid.init(undefined, this.elements.diagramViewer.querySelector('.mermaid'));
-              
+
               // Store reference to SVG and reset zoom
               setTimeout(() => {
                 this.diagramSvg = this.elements.diagramViewer.querySelector('.mermaid svg');
@@ -1510,10 +1515,10 @@
 
       zoomDiagram(factor) {
         if (!this.diagramSvg) return;
-        
+
         this.diagramZoom *= factor;
         this.diagramZoom = Math.max(0.1, Math.min(10, this.diagramZoom)); // Limit zoom between 10% and 1000%
-        
+
         this.applyDiagramTransform();
       }
 
@@ -1525,7 +1530,7 @@
 
       applyDiagramTransform() {
         if (!this.diagramSvg) return;
-        
+
         const transform = `scale(${this.diagramZoom}) translate(${this.diagramPan.x}px, ${this.diagramPan.y}px)`;
         this.diagramSvg.style.transform = transform;
         this.diagramSvg.style.transformOrigin = 'center center';
@@ -1610,7 +1615,7 @@
       stopDragging() {
         this.isDragging = false;
         this.elements.diagramContainer.classList.remove('dragging');
-      }      updateLoadMoreButton() {
+      } updateLoadMoreButton() {
         const hasMore = this.state.currentPage < this.state.totalPages;
 
         if (hasMore && this.state.workflows.length > 0) {
