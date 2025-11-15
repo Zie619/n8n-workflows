@@ -4,15 +4,13 @@ Integration Hub for N8N Workflows
 Connect with external platforms and services.
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import httpx
-import json
-import asyncio
 from datetime import datetime
-import os
+
 
 class IntegrationConfig(BaseModel):
     name: str
@@ -20,48 +18,50 @@ class IntegrationConfig(BaseModel):
     base_url: str
     enabled: bool = True
 
+
 class WebhookPayload(BaseModel):
     event: str
     data: Dict[str, Any]
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
+
 class IntegrationHub:
     def __init__(self):
         self.integrations = {}
         self.webhook_endpoints = {}
-    
+
     def register_integration(self, config: IntegrationConfig):
         """Register a new integration."""
         self.integrations[config.name] = config
-    
+
     async def sync_with_github(self, repo: str, token: str) -> Dict[str, Any]:
         """Sync workflows with GitHub repository."""
         try:
             async with httpx.AsyncClient() as client:
                 headers = {"Authorization": f"token {token}"}
-                
+
                 # Get repository contents
                 response = await client.get(
                     f"https://api.github.com/repos/{repo}/contents/workflows",
-                    headers=headers
+                    headers=headers,
                 )
-                
+
                 if response.status_code == 200:
                     files = response.json()
-                    workflow_files = [f for f in files if f['name'].endswith('.json')]
-                    
+                    workflow_files = [f for f in files if f["name"].endswith(".json")]
+
                     return {
                         "status": "success",
                         "repository": repo,
                         "workflow_files": len(workflow_files),
-                        "files": [f['name'] for f in workflow_files]
+                        "files": [f["name"] for f in workflow_files],
                     }
                 else:
                     return {"status": "error", "message": "Failed to access repository"}
-                    
+
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    
+
     async def sync_with_slack(self, webhook_url: str, message: str) -> Dict[str, Any]:
         """Send notification to Slack."""
         try:
@@ -69,149 +69,169 @@ class IntegrationHub:
                 payload = {
                     "text": message,
                     "username": "N8N Workflows Bot",
-                    "icon_emoji": ":robot_face:"
+                    "icon_emoji": ":robot_face:",
                 }
-                
+
                 response = await client.post(webhook_url, json=payload)
-                
+
                 if response.status_code == 200:
-                    return {"status": "success", "message": "Notification sent to Slack"}
+                    return {
+                        "status": "success",
+                        "message": "Notification sent to Slack",
+                    }
                 else:
                     return {"status": "error", "message": "Failed to send to Slack"}
-                    
+
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    
+
     async def sync_with_discord(self, webhook_url: str, message: str) -> Dict[str, Any]:
         """Send notification to Discord."""
         try:
             async with httpx.AsyncClient() as client:
-                payload = {
-                    "content": message,
-                    "username": "N8N Workflows Bot"
-                }
-                
+                payload = {"content": message, "username": "N8N Workflows Bot"}
+
                 response = await client.post(webhook_url, json=payload)
-                
+
                 if response.status_code == 204:
-                    return {"status": "success", "message": "Notification sent to Discord"}
+                    return {
+                        "status": "success",
+                        "message": "Notification sent to Discord",
+                    }
                 else:
                     return {"status": "error", "message": "Failed to send to Discord"}
-                    
+
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    
-    async def export_to_airtable(self, base_id: str, table_name: str, api_key: str, workflows: List[Dict]) -> Dict[str, Any]:
+
+    async def export_to_airtable(
+        self, base_id: str, table_name: str, api_key: str, workflows: List[Dict]
+    ) -> Dict[str, Any]:
         """Export workflows to Airtable."""
         try:
             async with httpx.AsyncClient() as client:
                 headers = {"Authorization": f"Bearer {api_key}"}
-                
+
                 records = []
                 for workflow in workflows:
                     record = {
                         "fields": {
-                            "Name": workflow.get('name', ''),
-                            "Description": workflow.get('description', ''),
-                            "Trigger Type": workflow.get('trigger_type', ''),
-                            "Complexity": workflow.get('complexity', ''),
-                            "Node Count": workflow.get('node_count', 0),
-                            "Active": workflow.get('active', False),
-                            "Integrations": ", ".join(workflow.get('integrations', [])),
-                            "Last Updated": datetime.now().isoformat()
+                            "Name": workflow.get("name", ""),
+                            "Description": workflow.get("description", ""),
+                            "Trigger Type": workflow.get("trigger_type", ""),
+                            "Complexity": workflow.get("complexity", ""),
+                            "Node Count": workflow.get("node_count", 0),
+                            "Active": workflow.get("active", False),
+                            "Integrations": ", ".join(workflow.get("integrations", [])),
+                            "Last Updated": datetime.now().isoformat(),
                         }
                     }
                     records.append(record)
-                
+
                 # Create records in batches
                 batch_size = 10
                 created_records = 0
-                
+
                 for i in range(0, len(records), batch_size):
-                    batch = records[i:i + batch_size]
-                    
+                    batch = records[i : i + batch_size]
+
                     response = await client.post(
                         f"https://api.airtable.com/v0/{base_id}/{table_name}",
                         headers=headers,
-                        json={"records": batch}
+                        json={"records": batch},
                     )
-                    
+
                     if response.status_code == 200:
                         created_records += len(batch)
                     else:
-                        return {"status": "error", "message": f"Failed to create records: {response.text}"}
-                
+                        return {
+                            "status": "error",
+                            "message": f"Failed to create records: {response.text}",
+                        }
+
                 return {
                     "status": "success",
-                    "message": f"Exported {created_records} workflows to Airtable"
+                    "message": f"Exported {created_records} workflows to Airtable",
                 }
-                
+
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    
-    async def sync_with_notion(self, database_id: str, token: str, workflows: List[Dict]) -> Dict[str, Any]:
+
+    async def sync_with_notion(
+        self, database_id: str, token: str, workflows: List[Dict]
+    ) -> Dict[str, Any]:
         """Sync workflows with Notion database."""
         try:
             async with httpx.AsyncClient() as client:
                 headers = {
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json",
-                    "Notion-Version": "2022-06-28"
+                    "Notion-Version": "2022-06-28",
                 }
-                
+
                 created_pages = 0
-                
+
                 for workflow in workflows:
                     page_data = {
                         "parent": {"database_id": database_id},
                         "properties": {
                             "Name": {
-                                "title": [{"text": {"content": workflow.get('name', '')}}]
+                                "title": [
+                                    {"text": {"content": workflow.get("name", "")}}
+                                ]
                             },
                             "Description": {
-                                "rich_text": [{"text": {"content": workflow.get('description', '')}}]
+                                "rich_text": [
+                                    {
+                                        "text": {
+                                            "content": workflow.get("description", "")
+                                        }
+                                    }
+                                ]
                             },
                             "Trigger Type": {
-                                "select": {"name": workflow.get('trigger_type', '')}
+                                "select": {"name": workflow.get("trigger_type", "")}
                             },
                             "Complexity": {
-                                "select": {"name": workflow.get('complexity', '')}
+                                "select": {"name": workflow.get("complexity", "")}
                             },
-                            "Node Count": {
-                                "number": workflow.get('node_count', 0)
-                            },
-                            "Active": {
-                                "checkbox": workflow.get('active', False)
-                            },
+                            "Node Count": {"number": workflow.get("node_count", 0)},
+                            "Active": {"checkbox": workflow.get("active", False)},
                             "Integrations": {
-                                "multi_select": [{"name": integration} for integration in workflow.get('integrations', [])]
-                            }
-                        }
+                                "multi_select": [
+                                    {"name": integration}
+                                    for integration in workflow.get("integrations", [])
+                                ]
+                            },
+                        },
                     }
-                    
+
                     response = await client.post(
                         "https://api.notion.com/v1/pages",
                         headers=headers,
-                        json=page_data
+                        json=page_data,
                     )
-                    
+
                     if response.status_code == 200:
                         created_pages += 1
                     else:
-                        return {"status": "error", "message": f"Failed to create page: {response.text}"}
-                
+                        return {
+                            "status": "error",
+                            "message": f"Failed to create page: {response.text}",
+                        }
+
                 return {
                     "status": "success",
-                    "message": f"Synced {created_pages} workflows to Notion"
+                    "message": f"Synced {created_pages} workflows to Notion",
                 }
-                
+
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    
+
     def register_webhook(self, endpoint: str, handler):
         """Register a webhook endpoint."""
         self.webhook_endpoints[endpoint] = handler
-    
+
     async def handle_webhook(self, endpoint: str, payload: WebhookPayload):
         """Handle incoming webhook."""
         if endpoint in self.webhook_endpoints:
@@ -219,11 +239,13 @@ class IntegrationHub:
         else:
             return {"status": "error", "message": "Webhook endpoint not found"}
 
+
 # Initialize integration hub
 integration_hub = IntegrationHub()
 
 # FastAPI app for Integration Hub
 integration_app = FastAPI(title="N8N Integration Hub", version="1.0.0")
+
 
 @integration_app.post("/integrations/github/sync")
 async def sync_github(repo: str, token: str):
@@ -234,6 +256,7 @@ async def sync_github(repo: str, token: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @integration_app.post("/integrations/slack/notify")
 async def notify_slack(webhook_url: str, message: str):
     """Send notification to Slack."""
@@ -242,6 +265,7 @@ async def notify_slack(webhook_url: str, message: str):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @integration_app.post("/integrations/discord/notify")
 async def notify_discord(webhook_url: str, message: str):
@@ -252,32 +276,30 @@ async def notify_discord(webhook_url: str, message: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @integration_app.post("/integrations/airtable/export")
 async def export_airtable(
-    base_id: str,
-    table_name: str,
-    api_key: str,
-    workflows: List[Dict]
+    base_id: str, table_name: str, api_key: str, workflows: List[Dict]
 ):
     """Export workflows to Airtable."""
     try:
-        result = await integration_hub.export_to_airtable(base_id, table_name, api_key, workflows)
+        result = await integration_hub.export_to_airtable(
+            base_id, table_name, api_key, workflows
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @integration_app.post("/integrations/notion/sync")
-async def sync_notion(
-    database_id: str,
-    token: str,
-    workflows: List[Dict]
-):
+async def sync_notion(database_id: str, token: str, workflows: List[Dict]):
     """Sync workflows with Notion database."""
     try:
         result = await integration_hub.sync_with_notion(database_id, token, workflows)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @integration_app.post("/webhooks/{endpoint}")
 async def handle_webhook_endpoint(endpoint: str, payload: WebhookPayload):
@@ -288,14 +310,16 @@ async def handle_webhook_endpoint(endpoint: str, payload: WebhookPayload):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @integration_app.get("/integrations/status")
 async def get_integration_status():
     """Get status of all integrations."""
     return {
         "integrations": list(integration_hub.integrations.keys()),
         "webhook_endpoints": list(integration_hub.webhook_endpoints.keys()),
-        "status": "operational"
+        "status": "operational",
     }
+
 
 @integration_app.get("/integrations/dashboard")
 async def get_integration_dashboard():
@@ -623,6 +647,8 @@ async def get_integration_dashboard():
     """
     return HTMLResponse(content=html_content)
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(integration_app, host="127.0.0.1", port=8003)

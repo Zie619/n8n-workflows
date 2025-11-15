@@ -6,10 +6,10 @@ Addresses Issues #115 and #129.
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 import re
+
 
 def update_html_timestamp(html_file: str):
     """Update the timestamp in the HTML file to current date."""
@@ -20,7 +20,7 @@ def update_html_timestamp(html_file: str):
         return False
 
     # Read the HTML file
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Get current month and year
@@ -29,21 +29,24 @@ def update_html_timestamp(html_file: str):
     # Replace the hardcoded timestamp
     # Look for pattern like "Last updated: Month Year"
     pattern = r'(<p class="footer-meta">Last updated:)\s*([^<]+)'
-    replacement = f'\\1 {current_date}'
+    replacement = f"\\1 {current_date}"
 
     updated_content = re.sub(pattern, replacement, content)
 
     # Also add a meta tag with the exact timestamp for better tracking
     if '<meta name="last-updated"' not in updated_content:
-        timestamp_meta = f'    <meta name="last-updated" content="{datetime.now().isoformat()}">\n'
-        updated_content = updated_content.replace('</head>', f'{timestamp_meta}</head>')
+        timestamp_meta = (
+            f'    <meta name="last-updated" content="{datetime.now().isoformat()}">\n'
+        )
+        updated_content = updated_content.replace("</head>", f"{timestamp_meta}</head>")
 
     # Write back the updated content
-    with open(file_path, 'w', encoding='utf-8') as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(updated_content)
 
     print(f"✅ Updated timestamp in {html_file} to: {current_date}")
     return True
+
 
 def update_api_timestamp(api_dir: str):
     """Update timestamp in API JSON files."""
@@ -57,29 +60,30 @@ def update_api_timestamp(api_dir: str):
         "last_updated": datetime.now().isoformat(),
         "last_updated_readable": datetime.now().strftime("%B %d, %Y at %H:%M UTC"),
         "version": "2.0.1",
-        "deployment_type": "github_pages"
+        "deployment_type": "github_pages",
     }
 
-    metadata_file = api_path / 'metadata.json'
-    with open(metadata_file, 'w', encoding='utf-8') as f:
+    metadata_file = api_path / "metadata.json"
+    with open(metadata_file, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
 
     print(f"✅ Created metadata file: {metadata_file}")
 
     # Update stats.json if it exists
-    stats_file = api_path / 'stats.json'
+    stats_file = api_path / "stats.json"
     if stats_file.exists():
-        with open(stats_file, 'r', encoding='utf-8') as f:
+        with open(stats_file, "r", encoding="utf-8") as f:
             stats = json.load(f)
 
-        stats['last_updated'] = datetime.now().isoformat()
+        stats["last_updated"] = datetime.now().isoformat()
 
-        with open(stats_file, 'w', encoding='utf-8') as f:
+        with open(stats_file, "w", encoding="utf-8") as f:
             json.dump(stats, f, indent=2)
 
         print(f"✅ Updated stats file: {stats_file}")
 
     return True
+
 
 def create_github_pages_config():
     """Create necessary GitHub Pages configuration files."""
@@ -113,13 +117,13 @@ exclude:
   - .devcontainer/
 """
 
-    config_file = Path('docs/_config.yml')
-    with open(config_file, 'w', encoding='utf-8') as f:
+    config_file = Path("docs/_config.yml")
+    with open(config_file, "w", encoding="utf-8") as f:
         f.write(config_content)
     print(f"✅ Created Jekyll config: {config_file}")
 
     # Create .nojekyll file to bypass Jekyll processing (for pure HTML/JS site)
-    nojekyll_file = Path('docs/.nojekyll')
+    nojekyll_file = Path("docs/.nojekyll")
     nojekyll_file.touch()
     print(f"✅ Created .nojekyll file: {nojekyll_file}")
 
@@ -170,23 +174,24 @@ exclude:
 </body>
 </html>"""
 
-    error_file = Path('docs/404.html')
-    with open(error_file, 'w', encoding='utf-8') as f:
+    error_file = Path("docs/404.html")
+    with open(error_file, "w", encoding="utf-8") as f:
         f.write(error_page_content)
     print(f"✅ Created 404 page: {error_file}")
+
 
 def verify_github_pages_structure():
     """Verify that all necessary files exist for GitHub Pages deployment."""
 
     required_files = [
-        'docs/index.html',
-        'docs/css/styles.css',
-        'docs/js/app.js',
-        'docs/js/search.js',
-        'docs/api/search-index.json',
-        'docs/api/stats.json',
-        'docs/api/categories.json',
-        'docs/api/integrations.json'
+        "docs/index.html",
+        "docs/css/styles.css",
+        "docs/js/app.js",
+        "docs/js/search.js",
+        "docs/api/search-index.json",
+        "docs/api/stats.json",
+        "docs/api/categories.json",
+        "docs/api/integrations.json",
     ]
 
     missing_files = []
@@ -208,13 +213,14 @@ def verify_github_pages_structure():
     print("\n✅ All required files present for GitHub Pages deployment")
     return True
 
+
 def fix_base_url_references():
     """Fix any hardcoded URLs to use relative paths for GitHub Pages."""
 
     # Update index.html to use relative paths
-    index_file = Path('docs/index.html')
+    index_file = Path("docs/index.html")
     if index_file.exists():
-        with open(index_file, 'r', encoding='utf-8') as f:
+        with open(index_file, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Replace absolute paths with relative ones
@@ -229,16 +235,16 @@ def fix_base_url_references():
         for old, new in replacements:
             content = content.replace(old, new)
 
-        with open(index_file, 'w', encoding='utf-8') as f:
+        with open(index_file, "w", encoding="utf-8") as f:
             f.write(content)
         print("✅ Fixed URL references in index.html")
 
     # Update JavaScript files
-    js_files = ['docs/js/app.js', 'docs/js/search.js']
+    js_files = ["docs/js/app.js", "docs/js/search.js"]
     for js_file in js_files:
         js_path = Path(js_file)
         if js_path.exists():
-            with open(js_path, 'r', encoding='utf-8') as f:
+            with open(js_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
             # Fix API endpoint references
@@ -247,9 +253,10 @@ def fix_base_url_references():
             content = content.replace("'/api/", "'api/")
             content = content.replace('"/api/', '"api/')
 
-            with open(js_path, 'w', encoding='utf-8') as f:
+            with open(js_path, "w", encoding="utf-8") as f:
                 f.write(content)
             print(f"✅ Fixed URL references in {js_file}")
+
 
 def main():
     """Main function to update GitHub Pages deployment."""
@@ -259,8 +266,8 @@ def main():
 
     # Step 1: Update timestamps
     print("\n📅 Updating timestamps...")
-    update_html_timestamp('docs/index.html')
-    update_api_timestamp('docs/api')
+    update_html_timestamp("docs/index.html")
+    update_api_timestamp("docs/api")
 
     # Step 2: Create GitHub Pages configuration
     print("\n⚙️  Creating GitHub Pages configuration...")
@@ -276,9 +283,12 @@ def main():
         print("\n✨ GitHub Pages setup complete!")
         print("\nDeployment will be available at:")
         print("   https://zie619.github.io/n8n-workflows/")
-        print("\nNote: It may take a few minutes for changes to appear after pushing to GitHub.")
+        print(
+            "\nNote: It may take a few minutes for changes to appear after pushing to GitHub."
+        )
     else:
         print("\n⚠️  Some files are missing. Please generate them first.")
+
 
 if __name__ == "__main__":
     main()

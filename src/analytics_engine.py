@@ -7,12 +7,12 @@ Provides insights, patterns, and usage analytics.
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import sqlite3
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import Counter, defaultdict
-import statistics
+
 
 class AnalyticsResponse(BaseModel):
     overview: Dict[str, Any]
@@ -21,26 +21,29 @@ class AnalyticsResponse(BaseModel):
     recommendations: List[str]
     generated_at: str
 
+
 class WorkflowAnalytics:
     def __init__(self, db_path: str = "workflows.db"):
         self.db_path = db_path
-    
+
     def get_db_connection(self):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
-    
+
     def get_workflow_analytics(self) -> Dict[str, Any]:
         """Get comprehensive workflow analytics."""
         conn = self.get_db_connection()
-        
+
         # Basic statistics
         cursor = conn.execute("SELECT COUNT(*) as total FROM workflows")
-        total_workflows = cursor.fetchone()['total']
-        
-        cursor = conn.execute("SELECT COUNT(*) as active FROM workflows WHERE active = 1")
-        active_workflows = cursor.fetchone()['active']
-        
+        total_workflows = cursor.fetchone()["total"]
+
+        cursor = conn.execute(
+            "SELECT COUNT(*) as active FROM workflows WHERE active = 1"
+        )
+        active_workflows = cursor.fetchone()["active"]
+
         # Trigger type distribution
         cursor = conn.execute("""
             SELECT trigger_type, COUNT(*) as count 
@@ -48,8 +51,10 @@ class WorkflowAnalytics:
             GROUP BY trigger_type 
             ORDER BY count DESC
         """)
-        trigger_distribution = {row['trigger_type']: row['count'] for row in cursor.fetchall()}
-        
+        trigger_distribution = {
+            row["trigger_type"]: row["count"] for row in cursor.fetchall()
+        }
+
         # Complexity distribution
         cursor = conn.execute("""
             SELECT complexity, COUNT(*) as count 
@@ -57,8 +62,10 @@ class WorkflowAnalytics:
             GROUP BY complexity 
             ORDER BY count DESC
         """)
-        complexity_distribution = {row['complexity']: row['count'] for row in cursor.fetchall()}
-        
+        complexity_distribution = {
+            row["complexity"]: row["count"] for row in cursor.fetchall()
+        }
+
         # Node count statistics
         cursor = conn.execute("""
             SELECT 
@@ -69,47 +76,54 @@ class WorkflowAnalytics:
             FROM workflows
         """)
         node_stats = dict(cursor.fetchone())
-        
+
         # Integration analysis
-        cursor = conn.execute("SELECT integrations FROM workflows WHERE integrations IS NOT NULL")
+        cursor = conn.execute(
+            "SELECT integrations FROM workflows WHERE integrations IS NOT NULL"
+        )
         all_integrations = []
         for row in cursor.fetchall():
-            integrations = json.loads(row['integrations'] or '[]')
+            integrations = json.loads(row["integrations"] or "[]")
             all_integrations.extend(integrations)
-        
+
         integration_counts = Counter(all_integrations)
         top_integrations = dict(integration_counts.most_common(10))
-        
+
         # Workflow patterns
         patterns = self.analyze_workflow_patterns(conn)
-        
+
         # Recommendations
         recommendations = self.generate_recommendations(
-            total_workflows, active_workflows, trigger_distribution, 
-            complexity_distribution, top_integrations
+            total_workflows,
+            active_workflows,
+            trigger_distribution,
+            complexity_distribution,
+            top_integrations,
         )
-        
+
         conn.close()
-        
+
         return {
             "overview": {
                 "total_workflows": total_workflows,
                 "active_workflows": active_workflows,
-                "activation_rate": round((active_workflows / total_workflows) * 100, 2) if total_workflows > 0 else 0,
+                "activation_rate": round((active_workflows / total_workflows) * 100, 2)
+                if total_workflows > 0
+                else 0,
                 "unique_integrations": len(integration_counts),
-                "avg_nodes_per_workflow": round(node_stats['avg_nodes'], 2),
-                "most_complex_workflow": node_stats['max_nodes']
+                "avg_nodes_per_workflow": round(node_stats["avg_nodes"], 2),
+                "most_complex_workflow": node_stats["max_nodes"],
             },
             "distributions": {
                 "trigger_types": trigger_distribution,
                 "complexity_levels": complexity_distribution,
-                "top_integrations": top_integrations
+                "top_integrations": top_integrations,
             },
             "patterns": patterns,
             "recommendations": recommendations,
-            "generated_at": datetime.now().isoformat()
+            "generated_at": datetime.now().isoformat(),
         }
-    
+
     def analyze_workflow_patterns(self, conn) -> Dict[str, Any]:
         """Analyze common workflow patterns and relationships."""
         # Integration co-occurrence analysis
@@ -118,27 +132,27 @@ class WorkflowAnalytics:
             FROM workflows 
             WHERE integrations IS NOT NULL
         """)
-        
+
         integration_pairs = defaultdict(int)
         service_categories = defaultdict(int)
-        
+
         for row in cursor.fetchall():
-            integrations = json.loads(row['integrations'] or '[]')
-            
+            integrations = json.loads(row["integrations"] or "[]")
+
             # Count service categories
             for integration in integrations:
                 category = self.categorize_service(integration)
                 service_categories[category] += 1
-            
+
             # Find integration pairs
             for i in range(len(integrations)):
                 for j in range(i + 1, len(integrations)):
                     pair = tuple(sorted([integrations[i], integrations[j]]))
                     integration_pairs[pair] += 1
-        
+
         # Most common integration pairs
         top_pairs = dict(Counter(integration_pairs).most_common(5))
-        
+
         # Workflow complexity patterns
         cursor = conn.execute("""
             SELECT 
@@ -150,46 +164,61 @@ class WorkflowAnalytics:
             GROUP BY trigger_type, complexity
             ORDER BY count DESC
         """)
-        
+
         complexity_patterns = []
         for row in cursor.fetchall():
-            complexity_patterns.append({
-                "trigger_type": row['trigger_type'],
-                "complexity": row['complexity'],
-                "avg_nodes": round(row['avg_nodes'], 2),
-                "frequency": row['count']
-            })
-        
+            complexity_patterns.append(
+                {
+                    "trigger_type": row["trigger_type"],
+                    "complexity": row["complexity"],
+                    "avg_nodes": round(row["avg_nodes"], 2),
+                    "frequency": row["count"],
+                }
+            )
+
         return {
             "integration_pairs": top_pairs,
             "service_categories": dict(service_categories),
-            "complexity_patterns": complexity_patterns[:10]
+            "complexity_patterns": complexity_patterns[:10],
         }
-    
+
     def categorize_service(self, service: str) -> str:
         """Categorize a service into a broader category."""
         service_lower = service.lower()
-        
-        if any(word in service_lower for word in ['slack', 'telegram', 'discord', 'whatsapp']):
+
+        if any(
+            word in service_lower
+            for word in ["slack", "telegram", "discord", "whatsapp"]
+        ):
             return "Communication"
-        elif any(word in service_lower for word in ['openai', 'ai', 'chat', 'gpt']):
+        elif any(word in service_lower for word in ["openai", "ai", "chat", "gpt"]):
             return "AI/ML"
-        elif any(word in service_lower for word in ['google', 'microsoft', 'office']):
+        elif any(word in service_lower for word in ["google", "microsoft", "office"]):
             return "Productivity"
-        elif any(word in service_lower for word in ['shopify', 'woocommerce', 'stripe']):
+        elif any(
+            word in service_lower for word in ["shopify", "woocommerce", "stripe"]
+        ):
             return "E-commerce"
-        elif any(word in service_lower for word in ['airtable', 'notion', 'database']):
+        elif any(word in service_lower for word in ["airtable", "notion", "database"]):
             return "Data Management"
-        elif any(word in service_lower for word in ['twitter', 'facebook', 'instagram']):
+        elif any(
+            word in service_lower for word in ["twitter", "facebook", "instagram"]
+        ):
             return "Social Media"
         else:
             return "Other"
-    
-    def generate_recommendations(self, total: int, active: int, triggers: Dict, 
-                               complexity: Dict, integrations: Dict) -> List[str]:
+
+    def generate_recommendations(
+        self,
+        total: int,
+        active: int,
+        triggers: Dict,
+        complexity: Dict,
+        integrations: Dict,
+    ) -> List[str]:
         """Generate actionable recommendations based on analytics."""
         recommendations = []
-        
+
         # Activation rate recommendations
         activation_rate = (active / total) * 100 if total > 0 else 0
         if activation_rate < 20:
@@ -202,11 +231,11 @@ class WorkflowAnalytics:
                 f"High activation rate ({activation_rate:.1f}%)! Your workflows are well-maintained. "
                 "Consider documenting successful patterns for team sharing."
             )
-        
+
         # Trigger type recommendations
-        webhook_count = triggers.get('Webhook', 0)
-        scheduled_count = triggers.get('Scheduled', 0)
-        
+        webhook_count = triggers.get("Webhook", 0)
+        scheduled_count = triggers.get("Scheduled", 0)
+
         if webhook_count > scheduled_count * 2:
             recommendations.append(
                 "You have many webhook-triggered workflows. Consider adding scheduled workflows "
@@ -217,30 +246,30 @@ class WorkflowAnalytics:
                 "You have many scheduled workflows. Consider adding webhook-triggered workflows "
                 "for real-time integrations and event-driven automation."
             )
-        
+
         # Integration recommendations
-        if 'OpenAI' in integrations and integrations['OpenAI'] > 5:
+        if "OpenAI" in integrations and integrations["OpenAI"] > 5:
             recommendations.append(
                 "You're using OpenAI extensively. Consider creating AI workflow templates "
                 "for common use cases like content generation and data analysis."
             )
-        
-        if 'Slack' in integrations and 'Telegram' in integrations:
+
+        if "Slack" in integrations and "Telegram" in integrations:
             recommendations.append(
                 "You're using multiple communication platforms. Consider creating unified "
                 "notification workflows that can send to multiple channels."
             )
-        
+
         # Complexity recommendations
-        high_complexity = complexity.get('high', 0)
+        high_complexity = complexity.get("high", 0)
         if high_complexity > total * 0.3:
             recommendations.append(
                 "You have many high-complexity workflows. Consider breaking them down into "
                 "smaller, reusable components for better maintainability."
             )
-        
+
         return recommendations
-    
+
     def get_trend_analysis(self, days: int = 30) -> Dict[str, Any]:
         """Analyze trends over time (simulated for demo)."""
         # In a real implementation, this would analyze historical data
@@ -248,24 +277,24 @@ class WorkflowAnalytics:
             "workflow_growth": {
                 "daily_average": 2.3,
                 "growth_rate": 15.2,
-                "trend": "increasing"
+                "trend": "increasing",
             },
             "popular_integrations": {
                 "trending_up": ["OpenAI", "Slack", "Google Sheets"],
                 "trending_down": ["Twitter", "Facebook"],
-                "stable": ["Telegram", "Airtable"]
+                "stable": ["Telegram", "Airtable"],
             },
             "complexity_trends": {
                 "average_nodes": 12.5,
                 "complexity_increase": 8.3,
-                "automation_maturity": "intermediate"
-            }
+                "automation_maturity": "intermediate",
+            },
         }
-    
+
     def get_usage_insights(self) -> Dict[str, Any]:
         """Get usage insights and patterns."""
         conn = self.get_db_connection()
-        
+
         # Active vs inactive analysis
         cursor = conn.execute("""
             SELECT 
@@ -276,23 +305,29 @@ class WorkflowAnalytics:
             FROM workflows 
             GROUP BY trigger_type, complexity
         """)
-        
+
         usage_patterns = []
         for row in cursor.fetchall():
-            activation_rate = (row['active_count'] / row['total']) * 100 if row['total'] > 0 else 0
-            usage_patterns.append({
-                "trigger_type": row['trigger_type'],
-                "complexity": row['complexity'],
-                "total_workflows": row['total'],
-                "active_workflows": row['active_count'],
-                "activation_rate": round(activation_rate, 2)
-            })
-        
+            activation_rate = (
+                (row["active_count"] / row["total"]) * 100 if row["total"] > 0 else 0
+            )
+            usage_patterns.append(
+                {
+                    "trigger_type": row["trigger_type"],
+                    "complexity": row["complexity"],
+                    "total_workflows": row["total"],
+                    "active_workflows": row["active_count"],
+                    "activation_rate": round(activation_rate, 2),
+                }
+            )
+
         # Most effective patterns
-        effective_patterns = sorted(usage_patterns, key=lambda x: x['activation_rate'], reverse=True)[:5]
-        
+        effective_patterns = sorted(
+            usage_patterns, key=lambda x: x["activation_rate"], reverse=True
+        )[:5]
+
         conn.close()
-        
+
         return {
             "usage_patterns": usage_patterns,
             "most_effective_patterns": effective_patterns,
@@ -300,15 +335,17 @@ class WorkflowAnalytics:
                 "Webhook-triggered workflows have higher activation rates",
                 "Medium complexity workflows are most commonly used",
                 "AI-powered workflows show increasing adoption",
-                "Communication integrations are most popular"
-            ]
+                "Communication integrations are most popular",
+            ],
         }
+
 
 # Initialize analytics engine
 analytics_engine = WorkflowAnalytics()
 
 # FastAPI app for Analytics
 analytics_app = FastAPI(title="N8N Analytics Engine", version="1.0.0")
+
 
 @analytics_app.get("/analytics/overview", response_model=AnalyticsResponse)
 async def get_analytics_overview():
@@ -317,16 +354,17 @@ async def get_analytics_overview():
         analytics_data = analytics_engine.get_workflow_analytics()
         trends = analytics_engine.get_trend_analysis()
         insights = analytics_engine.get_usage_insights()
-        
+
         return AnalyticsResponse(
             overview=analytics_data["overview"],
             trends=trends,
             patterns=analytics_data["patterns"],
             recommendations=analytics_data["recommendations"],
-            generated_at=analytics_data["generated_at"]
+            generated_at=analytics_data["generated_at"],
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analytics error: {str(e)}")
+
 
 @analytics_app.get("/analytics/trends")
 async def get_trend_analysis(days: int = Query(30, ge=1, le=365)):
@@ -336,6 +374,7 @@ async def get_trend_analysis(days: int = Query(30, ge=1, le=365)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Trend analysis error: {str(e)}")
 
+
 @analytics_app.get("/analytics/insights")
 async def get_usage_insights():
     """Get usage insights and patterns."""
@@ -343,6 +382,7 @@ async def get_usage_insights():
         return analytics_engine.get_usage_insights()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Insights error: {str(e)}")
+
 
 @analytics_app.get("/analytics/dashboard")
 async def get_analytics_dashboard():
@@ -583,6 +623,8 @@ async def get_analytics_dashboard():
     """
     return HTMLResponse(content=html_content)
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(analytics_app, host="127.0.0.1", port=8002)

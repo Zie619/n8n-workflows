@@ -8,13 +8,12 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 import sqlite3
 import hashlib
 import secrets
 import jwt
 from datetime import datetime, timedelta
-import json
 import os
 
 # Configuration - Use environment variables for security
@@ -25,6 +24,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # Security
 security = HTTPBearer()
 
+
 class User(BaseModel):
     id: Optional[int] = None
     username: str
@@ -34,6 +34,7 @@ class User(BaseModel):
     active: bool = True
     created_at: Optional[str] = None
 
+
 class UserCreate(BaseModel):
     username: str
     email: EmailStr
@@ -41,9 +42,11 @@ class UserCreate(BaseModel):
     password: str
     role: str = "user"
 
+
 class UserLogin(BaseModel):
     username: str
     password: str
+
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -51,21 +54,23 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     active: Optional[bool] = None
 
+
 class Token(BaseModel):
     access_token: str
     token_type: str
     expires_in: int
 
+
 class UserManager:
     def __init__(self, db_path: str = "users.db"):
         self.db_path = db_path
         self.init_database()
-    
+
     def init_database(self):
         """Initialize user database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +84,7 @@ class UserManager:
                 last_login TIMESTAMP
             )
         """)
-        
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,7 +95,7 @@ class UserManager:
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
-        
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_permissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,72 +106,93 @@ class UserManager:
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
-        
+
         conn.commit()
         conn.close()
-        
+
         # Create default admin user if none exists
         self.create_default_admin()
-    
+
     def create_default_admin(self):
         """Create default admin user if none exists."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'")
         admin_count = cursor.fetchone()[0]
-        
+
         if admin_count == 0:
             # Use environment variable or generate secure random password
             admin_password = os.environ.get("ADMIN_PASSWORD", secrets.token_urlsafe(16))
             password_hash = self.hash_password(admin_password)
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO users (username, email, full_name, password_hash, role)
                 VALUES (?, ?, ?, ?, ?)
-            """, ("admin", "admin@n8n-workflows.com", "System Administrator", password_hash, "admin"))
+            """,
+                (
+                    "admin",
+                    "admin@n8n-workflows.com",
+                    "System Administrator",
+                    password_hash,
+                    "admin",
+                ),
+            )
 
             conn.commit()
             # Only print password if it was auto-generated (not from env)
             if "ADMIN_PASSWORD" not in os.environ:
                 print(f"Default admin user created: admin/{admin_password}")
-                print("WARNING: Please change this password immediately after first login!")
+                print(
+                    "WARNING: Please change this password immediately after first login!"
+                )
             else:
                 print("Default admin user created with environment-configured password")
-        
+
         conn.close()
-    
+
     def hash_password(self, password: str) -> str:
         """Hash password using SHA-256."""
         return hashlib.sha256(password.encode()).hexdigest()
-    
+
     def verify_password(self, password: str, hashed: str) -> bool:
         """Verify password against hash."""
         return self.hash_password(password) == hashed
-    
+
     def create_user(self, user_data: UserCreate) -> User:
         """Create a new user."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         try:
             # Check if username or email already exists
-            cursor.execute("SELECT COUNT(*) FROM users WHERE username = ? OR email = ?", 
-                         (user_data.username, user_data.email))
+            cursor.execute(
+                "SELECT COUNT(*) FROM users WHERE username = ? OR email = ?",
+                (user_data.username, user_data.email),
+            )
             if cursor.fetchone()[0] > 0:
                 raise ValueError("Username or email already exists")
-            
+
             password_hash = self.hash_password(user_data.password)
-            
-            cursor.execute("""
+
+            cursor.execute(
+                """
                 INSERT INTO users (username, email, full_name, password_hash, role)
                 VALUES (?, ?, ?, ?, ?)
-            """, (user_data.username, user_data.email, user_data.full_name, 
-                  password_hash, user_data.role))
-            
+            """,
+                (
+                    user_data.username,
+                    user_data.email,
+                    user_data.full_name,
+                    password_hash,
+                    user_data.role,
+                ),
+            )
+
             user_id = cursor.lastrowid
             conn.commit()
-            
+
             return User(
                 id=user_id,
                 username=user_data.username,
@@ -174,28 +200,31 @@ class UserManager:
                 full_name=user_data.full_name,
                 role=user_data.role,
                 active=True,
-                created_at=datetime.now().isoformat()
+                created_at=datetime.now().isoformat(),
             )
-            
+
         except Exception as e:
             conn.rollback()
             raise e
         finally:
             conn.close()
-    
+
     def authenticate_user(self, username: str, password: str) -> Optional[User]:
         """Authenticate user and return user data."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             SELECT id, username, email, full_name, password_hash, role, active
             FROM users WHERE username = ? AND active = 1
-        """, (username,))
-        
+        """,
+            (username,),
+        )
+
         row = cursor.fetchone()
         conn.close()
-        
+
         if row and self.verify_password(password, row[4]):
             return User(
                 id=row[0],
@@ -203,11 +232,11 @@ class UserManager:
                 email=row[2],
                 full_name=row[3],
                 role=row[5],
-                active=bool(row[6])
+                active=bool(row[6]),
             )
-        
+
         return None
-    
+
     def create_access_token(self, user: User) -> str:
         """Create JWT access token."""
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -215,10 +244,10 @@ class UserManager:
             "sub": str(user.id),
             "username": user.username,
             "role": user.role,
-            "exp": expire
+            "exp": expire,
         }
         return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    
+
     def verify_token(self, token: str) -> Optional[User]:
         """Verify JWT token and return user data."""
         try:
@@ -226,31 +255,30 @@ class UserManager:
             user_id = payload.get("sub")
             username = payload.get("username")
             role = payload.get("role")
-            
+
             if user_id is None or username is None:
                 return None
-            
-            return User(
-                id=int(user_id),
-                username=username,
-                role=role
-            )
+
+            return User(id=int(user_id), username=username, role=role)
         except jwt.PyJWTError:
             return None
-    
+
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Get user by ID."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             SELECT id, username, email, full_name, role, active, created_at
             FROM users WHERE id = ?
-        """, (user_id,))
-        
+        """,
+            (user_id,),
+        )
+
         row = cursor.fetchone()
         conn.close()
-        
+
         if row:
             return User(
                 id=row[0],
@@ -259,84 +287,86 @@ class UserManager:
                 full_name=row[3],
                 role=row[4],
                 active=bool(row[5]),
-                created_at=row[6]
+                created_at=row[6],
             )
-        
+
         return None
-    
+
     def get_all_users(self) -> List[User]:
         """Get all users."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             SELECT id, username, email, full_name, role, active, created_at
             FROM users ORDER BY created_at DESC
         """)
-        
+
         users = []
         for row in cursor.fetchall():
-            users.append(User(
-                id=row[0],
-                username=row[1],
-                email=row[2],
-                full_name=row[3],
-                role=row[4],
-                active=bool(row[5]),
-                created_at=row[6]
-            ))
-        
+            users.append(
+                User(
+                    id=row[0],
+                    username=row[1],
+                    email=row[2],
+                    full_name=row[3],
+                    role=row[4],
+                    active=bool(row[5]),
+                    created_at=row[6],
+                )
+            )
+
         conn.close()
         return users
-    
+
     def update_user(self, user_id: int, update_data: UserUpdate) -> Optional[User]:
         """Update user data."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         try:
             # Build update query dynamically
             updates = []
             params = []
-            
+
             if update_data.full_name is not None:
                 updates.append("full_name = ?")
                 params.append(update_data.full_name)
-            
+
             if update_data.email is not None:
                 updates.append("email = ?")
                 params.append(update_data.email)
-            
+
             if update_data.role is not None:
                 updates.append("role = ?")
                 params.append(update_data.role)
-            
+
             if update_data.active is not None:
                 updates.append("active = ?")
                 params.append(update_data.active)
-            
+
             if not updates:
                 return self.get_user_by_id(user_id)
-            
+
             params.append(user_id)
             query = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
-            
+
             cursor.execute(query, params)
             conn.commit()
-            
+
             return self.get_user_by_id(user_id)
-            
+
         except Exception as e:
             conn.rollback()
             raise e
         finally:
             conn.close()
-    
+
     def delete_user(self, user_id: int) -> bool:
         """Delete user (soft delete by setting active=False)."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         try:
             cursor.execute("UPDATE users SET active = 0 WHERE id = ?", (user_id,))
             conn.commit()
@@ -347,34 +377,39 @@ class UserManager:
         finally:
             conn.close()
 
+
 # Initialize user manager
 user_manager = UserManager()
 
 # FastAPI app for User Management
 user_app = FastAPI(title="N8N User Management", version="1.0.0")
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> User:
     """Get current authenticated user."""
     token = credentials.credentials
     user = user_manager.verify_token(token)
-    
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     return user
+
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Require admin role."""
     if current_user.role != "admin":
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
         )
     return current_user
+
 
 @user_app.post("/auth/register", response_model=User)
 async def register_user(user_data: UserCreate):
@@ -387,35 +422,39 @@ async def register_user(user_data: UserCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @user_app.post("/auth/login", response_model=Token)
 async def login_user(login_data: UserLogin):
     """Login user and return access token."""
     user = user_manager.authenticate_user(login_data.username, login_data.password)
-    
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token = user_manager.create_access_token(user)
-    
+
     return Token(
         access_token=access_token,
         token_type="bearer",
-        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+
 
 @user_app.get("/auth/me", response_model=User)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """Get current user information."""
     return current_user
 
+
 @user_app.get("/users", response_model=List[User])
 async def get_all_users(admin: User = Depends(require_admin)):
     """Get all users (admin only)."""
     return user_manager.get_all_users()
+
 
 @user_app.get("/users/{user_id}", response_model=User)
 async def get_user(user_id: int, current_user: User = Depends(get_current_user)):
@@ -423,30 +462,35 @@ async def get_user(user_id: int, current_user: User = Depends(get_current_user))
     # Users can only view their own profile unless they're admin
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     user = user_manager.get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return user
 
+
 @user_app.put("/users/{user_id}", response_model=User)
-async def update_user(user_id: int, update_data: UserUpdate, 
-                     current_user: User = Depends(get_current_user)):
+async def update_user(
+    user_id: int,
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+):
     """Update user data."""
     # Users can only update their own profile unless they're admin
     if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     # Non-admin users cannot change roles
     if current_user.role != "admin" and update_data.role is not None:
         raise HTTPException(status_code=403, detail="Cannot change role")
-    
+
     user = user_manager.update_user(user_id, update_data)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return user
+
 
 @user_app.delete("/users/{user_id}")
 async def delete_user(user_id: int, admin: User = Depends(require_admin)):
@@ -454,8 +498,9 @@ async def delete_user(user_id: int, admin: User = Depends(require_admin)):
     success = user_manager.delete_user(user_id)
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     return {"message": "User deleted successfully"}
+
 
 @user_app.get("/auth/dashboard")
 async def get_auth_dashboard():
@@ -841,6 +886,8 @@ async def get_auth_dashboard():
     """
     return HTMLResponse(content=html_content)
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(user_app, host="127.0.0.1", port=8004)
