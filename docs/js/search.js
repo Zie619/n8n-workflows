@@ -269,6 +269,7 @@ class WorkflowSearch {
             max-height: 80vh;
             overflow-y: auto;
             position: relative;
+            color: black;
         `;
 
         const allIntegrations = workflow.integrations
