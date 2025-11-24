@@ -42,20 +42,27 @@ class WorkflowAssistant:
         keywords = self.extract_keywords(query)
         intent = self.detect_intent(query)
         
-        # Build search query
-        search_terms = []
-        for keyword in keywords:
-            search_terms.append(f"name LIKE '%{keyword}%' OR description LIKE '%{keyword}%'")
+        # Build search query with parameterized placeholders
+        search_conditions = []
+        params = []
         
-        where_clause = " OR ".join(search_terms) if search_terms else "1=1"
+        for keyword in keywords:
+            search_conditions.append("(name LIKE ? OR description LIKE ?)")
+            keyword_pattern = f"%{keyword}%"
+            params.extend([keyword_pattern, keyword_pattern])
+        
+        where_clause = " OR ".join(search_conditions) if search_conditions else "1=1"
         
         # Add intent-based filtering
         if intent == "automation":
-            where_clause += " AND (trigger_type = 'Scheduled' OR trigger_type = 'Complex')"
+            where_clause += " AND (trigger_type = ? OR trigger_type = ?)"
+            params.extend(['Scheduled', 'Complex'])
         elif intent == "integration":
-            where_clause += " AND trigger_type = 'Webhook'"
+            where_clause += " AND trigger_type = ?"
+            params.append('Webhook')
         elif intent == "manual":
-            where_clause += " AND trigger_type = 'Manual'"
+            where_clause += " AND trigger_type = ?"
+            params.append('Manual')
         
         query_sql = f"""
             SELECT * FROM workflows 
@@ -63,10 +70,11 @@ class WorkflowAssistant:
             ORDER BY 
                 CASE WHEN active = 1 THEN 1 ELSE 2 END,
                 node_count DESC
-            LIMIT {limit}
+            LIMIT ?
         """
+        params.append(limit)
         
-        cursor = conn.execute(query_sql)
+        cursor = conn.execute(query_sql, params)
         workflows = []
         for row in cursor.fetchall():
             workflow = dict(row)
