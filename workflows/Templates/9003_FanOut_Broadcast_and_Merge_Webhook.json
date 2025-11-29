@@ -1,0 +1,84 @@
+{
+  "name": "Fan-Out Broadcast and Merge",
+  "nodes": [
+    {
+      "id": "fan-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [200, 300],
+      "webhookId": "b2e3f4a5-6b7c-8d9e-0f1a-bc2345678903",
+      "parameters": {
+        "path": "template/broadcast",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "fan-0002",
+      "name": "Notas & Testes",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-120, 80],
+      "parameters": {
+        "color": 7,
+        "width": 740,
+        "height": 360,
+        "content": "## Template: Fan-out/merge para broadcast multi-canal\n\n- Objetivo: Disparar em paralelo para múltiplos canais e consolidar.\n- Teste rápido:\n```bash\ncurl -X POST http://<SEU_N8N>/webhook/template/broadcast \\\n -H 'Content-Type: application/json' \\\n -d '{\\\"message\\\":\\\"Hello world\\\"}'\n```\n- Produção: troque 'Broadcast A/B' por Slack/Discord/Telegram (HTTP/API)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "fan-0003",
+      "name": "Prepare Message",
+      "type": "n8n-nodes-base.set",
+      "position": [460, 300],
+      "parameters": {
+        "options": {},
+        "assignments": {"assignments": [
+          {"id": "msg", "name": "message", "type": "string", "value": "={{ $json.body?.message || 'Hello from n8n' }}"}
+        ]}
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "fan-0004",
+      "name": "Broadcast A",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [720, 220],
+      "parameters": {"url": "https://httpbin.org/post", "method": "POST", "specifyBody": "json", "sendBody": true, "jsonBody": "={{ { text: $json.message, channel: 'alpha' } }}", "options": {"retryOnFail": true, "maxRetries": 2}},
+      "typeVersion": 4.2
+    },
+    {
+      "id": "fan-0005",
+      "name": "Broadcast B",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [720, 380],
+      "parameters": {"url": "https://httpbin.org/post", "method": "POST", "specifyBody": "json", "sendBody": true, "jsonBody": "={{ { text: $json.message, channel: 'beta' } }}", "options": {"retryOnFail": true, "maxRetries": 2}},
+      "typeVersion": 4.2
+    },
+    {
+      "id": "fan-0006",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "position": [980, 300],
+      "parameters": {"mode": "combine", "options": {}, "combineBy": "combineByPosition"},
+      "typeVersion": 3
+    },
+    {
+      "id": "fan-0007",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [1240, 300],
+      "parameters": {"respondWith": "json", "responseBody": "={{ $json }}", "options": {}},
+      "typeVersion": 1.1
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Prepare Message", "type": "main", "index": 0}]]},
+    "Prepare Message": {"main": [[{"node": "Broadcast A", "type": "main", "index": 0}, {"node": "Broadcast B", "type": "main", "index": 0}]]},
+    "Broadcast A": {"main": [[{"node": "Merge Results", "type": "main", "index": 0}]]},
+    "Broadcast B": {"main": [[{"node": "Merge Results", "type": "main", "index": 1}]]},
+    "Merge Results": {"main": [[{"node": "Respond", "type": "main", "index": 0}]]}
+  }
+}
