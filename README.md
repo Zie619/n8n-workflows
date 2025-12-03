@@ -272,3 +272,9 @@ If you find this project helpful, please consider:
 Made with ❤️ by [Zie619](https://github.com/Zie619) and [contributors](https://github.com/Zie619/n8n-workflows/graphs/contributors)
 
 </div>
+
+<div align = "center"> 
+### Open Source Licence 
+MIT Licence 
+
+</div>
