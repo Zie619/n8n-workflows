@@ -7,16 +7,16 @@ Real-time metrics, monitoring, and alerting.
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import asyncio
 import time
 import psutil
-import sqlite3
 from datetime import datetime, timedelta
 import json
 import threading
 import queue
 import os
+
 
 class PerformanceMetrics(BaseModel):
     timestamp: str
@@ -30,6 +30,7 @@ class PerformanceMetrics(BaseModel):
     workflow_executions: int
     error_rate: float
 
+
 class Alert(BaseModel):
     id: str
     type: str
@@ -37,6 +38,7 @@ class Alert(BaseModel):
     message: str
     timestamp: str
     resolved: bool = False
+
 
 class PerformanceMonitor:
     def __init__(self, db_path: str = "workflows.db"):
@@ -46,79 +48,81 @@ class PerformanceMonitor:
         self.websocket_connections = []
         self.monitoring_active = False
         self.metrics_queue = queue.Queue()
-        
+
     def start_monitoring(self):
         """Start performance monitoring in background thread."""
         if not self.monitoring_active:
             self.monitoring_active = True
             monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
             monitor_thread.start()
-    
+
     def _monitor_loop(self):
         """Main monitoring loop."""
         while self.monitoring_active:
             try:
                 metrics = self._collect_metrics()
                 self.metrics_history.append(metrics)
-                
+
                 # Keep only last 1000 metrics
                 if len(self.metrics_history) > 1000:
                     self.metrics_history = self.metrics_history[-1000:]
-                
+
                 # Check for alerts
                 self._check_alerts(metrics)
-                
+
                 # Send to websocket connections
                 self._broadcast_metrics(metrics)
-                
+
                 time.sleep(5)  # Collect metrics every 5 seconds
-                
+
             except Exception as e:
                 print(f"Monitoring error: {e}")
                 time.sleep(10)
-    
+
     def _collect_metrics(self) -> PerformanceMetrics:
         """Collect current system metrics."""
         # CPU and Memory
         cpu_usage = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
         memory_usage = memory.percent
-        
+
         # Disk usage
-        disk = psutil.disk_usage('/')
+        disk = psutil.disk_usage("/")
         disk_usage = (disk.used / disk.total) * 100
-        
+
         # Network I/O
         network = psutil.net_io_counters()
         network_io = {
             "bytes_sent": network.bytes_sent,
             "bytes_recv": network.bytes_recv,
             "packets_sent": network.packets_sent,
-            "packets_recv": network.packets_recv
+            "packets_recv": network.packets_recv,
         }
-        
+
         # API response times (simulated)
         api_response_times = {
             "/api/stats": self._measure_api_time("/api/stats"),
             "/api/workflows": self._measure_api_time("/api/workflows"),
-            "/api/search": self._measure_api_time("/api/workflows?q=test")
+            "/api/search": self._measure_api_time("/api/workflows?q=test"),
         }
-        
+
         # Active connections
         active_connections = len(psutil.net_connections())
-        
+
         # Database size
         try:
-            db_size = os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+            db_size = (
+                os.path.getsize(self.db_path) if os.path.exists(self.db_path) else 0
+            )
         except:
             db_size = 0
-        
+
         # Workflow executions (simulated)
         workflow_executions = self._get_workflow_executions()
-        
+
         # Error rate (simulated)
         error_rate = self._calculate_error_rate()
-        
+
         return PerformanceMetrics(
             timestamp=datetime.now().isoformat(),
             cpu_usage=cpu_usage,
@@ -129,50 +133,65 @@ class PerformanceMonitor:
             active_connections=active_connections,
             database_size=db_size,
             workflow_executions=workflow_executions,
-            error_rate=error_rate
+            error_rate=error_rate,
         )
-    
+
     def _measure_api_time(self, endpoint: str) -> float:
         """Measure API response time (simulated)."""
         # In a real implementation, this would make actual HTTP requests
         import random
+
         return round(random.uniform(10, 100), 2)
-    
+
     def _get_workflow_executions(self) -> int:
         """Get number of workflow executions (simulated)."""
         # In a real implementation, this would query execution logs
         import random
+
         return random.randint(0, 50)
-    
+
     def _calculate_error_rate(self) -> float:
         """Calculate error rate (simulated)."""
         # In a real implementation, this would analyze error logs
         import random
+
         return round(random.uniform(0, 5), 2)
-    
+
     def _check_alerts(self, metrics: PerformanceMetrics):
         """Check metrics against alert thresholds."""
         # CPU alert
         if metrics.cpu_usage > 80:
-            self._create_alert("high_cpu", "warning", f"High CPU usage: {metrics.cpu_usage}%")
-        
+            self._create_alert(
+                "high_cpu", "warning", f"High CPU usage: {metrics.cpu_usage}%"
+            )
+
         # Memory alert
         if metrics.memory_usage > 85:
-            self._create_alert("high_memory", "warning", f"High memory usage: {metrics.memory_usage}%")
-        
+            self._create_alert(
+                "high_memory", "warning", f"High memory usage: {metrics.memory_usage}%"
+            )
+
         # Disk alert
         if metrics.disk_usage > 90:
-            self._create_alert("high_disk", "critical", f"High disk usage: {metrics.disk_usage}%")
-        
+            self._create_alert(
+                "high_disk", "critical", f"High disk usage: {metrics.disk_usage}%"
+            )
+
         # API response time alert
         for endpoint, response_time in metrics.api_response_times.items():
             if response_time > 1000:  # 1 second
-                self._create_alert("slow_api", "warning", f"Slow API response: {endpoint} ({response_time}ms)")
-        
+                self._create_alert(
+                    "slow_api",
+                    "warning",
+                    f"Slow API response: {endpoint} ({response_time}ms)",
+                )
+
         # Error rate alert
         if metrics.error_rate > 10:
-            self._create_alert("high_error_rate", "critical", f"High error rate: {metrics.error_rate}%")
-    
+            self._create_alert(
+                "high_error_rate", "critical", f"High error rate: {metrics.error_rate}%"
+            )
+
     def _create_alert(self, alert_type: str, severity: str, message: str):
         """Create a new alert."""
         alert = Alert(
@@ -180,32 +199,28 @@ class PerformanceMonitor:
             type=alert_type,
             severity=severity,
             message=message,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
-        
+
         # Check if similar alert already exists
-        existing_alert = next((a for a in self.alerts if a.type == alert_type and not a.resolved), None)
+        existing_alert = next(
+            (a for a in self.alerts if a.type == alert_type and not a.resolved), None
+        )
         if not existing_alert:
             self.alerts.append(alert)
             self._broadcast_alert(alert)
-    
+
     def _broadcast_metrics(self, metrics: PerformanceMetrics):
         """Broadcast metrics to all websocket connections."""
         if self.websocket_connections:
-            message = {
-                "type": "metrics",
-                "data": metrics.dict()
-            }
+            message = {"type": "metrics", "data": metrics.dict()}
             self._broadcast_to_websockets(message)
-    
+
     def _broadcast_alert(self, alert: Alert):
         """Broadcast alert to all websocket connections."""
-        message = {
-            "type": "alert",
-            "data": alert.dict()
-        }
+        message = {"type": "alert", "data": alert.dict()}
         self._broadcast_to_websockets(message)
-    
+
     def _broadcast_to_websockets(self, message: dict):
         """Broadcast message to all websocket connections."""
         disconnected = []
@@ -214,40 +229,47 @@ class PerformanceMonitor:
                 asyncio.create_task(websocket.send_text(json.dumps(message)))
             except:
                 disconnected.append(websocket)
-        
+
         # Remove disconnected connections
         for ws in disconnected:
             self.websocket_connections.remove(ws)
-    
+
     def get_metrics_summary(self) -> Dict[str, Any]:
         """Get performance metrics summary."""
         if not self.metrics_history:
             return {"message": "No metrics available"}
-        
+
         latest = self.metrics_history[-1]
-        avg_cpu = sum(m.cpu_usage for m in self.metrics_history[-10:]) / min(10, len(self.metrics_history))
-        avg_memory = sum(m.memory_usage for m in self.metrics_history[-10:]) / min(10, len(self.metrics_history))
-        
+        avg_cpu = sum(m.cpu_usage for m in self.metrics_history[-10:]) / min(
+            10, len(self.metrics_history)
+        )
+        avg_memory = sum(m.memory_usage for m in self.metrics_history[-10:]) / min(
+            10, len(self.metrics_history)
+        )
+
         return {
             "current": latest.dict(),
             "averages": {
                 "cpu_usage": round(avg_cpu, 2),
-                "memory_usage": round(avg_memory, 2)
+                "memory_usage": round(avg_memory, 2),
             },
             "alerts": [alert.dict() for alert in self.alerts[-10:]],
-            "status": "healthy" if latest.cpu_usage < 80 and latest.memory_usage < 85 else "warning"
+            "status": "healthy"
+            if latest.cpu_usage < 80 and latest.memory_usage < 85
+            else "warning",
         }
-    
+
     def get_historical_metrics(self, hours: int = 24) -> List[Dict]:
         """Get historical metrics for specified hours."""
         cutoff_time = datetime.now() - timedelta(hours=hours)
         cutoff_timestamp = cutoff_time.isoformat()
-        
+
         return [
-            metrics.dict() for metrics in self.metrics_history
+            metrics.dict()
+            for metrics in self.metrics_history
             if metrics.timestamp >= cutoff_timestamp
         ]
-    
+
     def resolve_alert(self, alert_id: str) -> bool:
         """Resolve an alert."""
         for alert in self.alerts:
@@ -256,6 +278,7 @@ class PerformanceMonitor:
                 return True
         return False
 
+
 # Initialize performance monitor
 performance_monitor = PerformanceMonitor()
 performance_monitor.start_monitoring()
@@ -263,20 +286,24 @@ performance_monitor.start_monitoring()
 # FastAPI app for Performance Monitoring
 monitor_app = FastAPI(title="N8N Performance Monitor", version="1.0.0")
 
+
 @monitor_app.get("/monitor/metrics")
 async def get_current_metrics():
     """Get current performance metrics."""
     return performance_monitor.get_metrics_summary()
+
 
 @monitor_app.get("/monitor/history")
 async def get_historical_metrics(hours: int = 24):
     """Get historical performance metrics."""
     return performance_monitor.get_historical_metrics(hours)
 
+
 @monitor_app.get("/monitor/alerts")
 async def get_alerts():
     """Get current alerts."""
     return [alert.dict() for alert in performance_monitor.alerts if not alert.resolved]
+
 
 @monitor_app.post("/monitor/alerts/{alert_id}/resolve")
 async def resolve_alert(alert_id: str):
@@ -287,18 +314,20 @@ async def resolve_alert(alert_id: str):
     else:
         return {"message": "Alert not found"}
 
+
 @monitor_app.websocket("/monitor/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time metrics."""
     await websocket.accept()
     performance_monitor.websocket_connections.append(websocket)
-    
+
     try:
         while True:
             # Keep connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
         performance_monitor.websocket_connections.remove(websocket)
+
 
 @monitor_app.get("/monitor/dashboard")
 async def get_monitoring_dashboard():
@@ -722,6 +751,8 @@ async def get_monitoring_dashboard():
     """
     return HTMLResponse(content=html_content)
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(monitor_app, host="127.0.0.1", port=8005)
