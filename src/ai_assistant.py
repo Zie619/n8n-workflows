@@ -57,7 +57,8 @@ class WorkflowAssistant:
                 " AND (trigger_type = 'Scheduled' OR trigger_type = 'Complex')"
             )
         elif intent == "integration":
-            where_clause += " AND trigger_type = 'Webhook'"
+            where_clause += " AND trigger_type = ?"
+            params.append('Webhook')
         elif intent == "manual":
             where_clause += " AND trigger_type = 'Manual'"
 
@@ -67,7 +68,7 @@ class WorkflowAssistant:
             ORDER BY 
                 CASE WHEN active = 1 THEN 1 ELSE 2 END,
                 node_count DESC
-            LIMIT {limit}
+            LIMIT ?
         """
 
         cursor = conn.execute(query_sql)
