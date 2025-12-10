@@ -13,7 +13,6 @@ from pydantic import BaseModel, field_validator
 from typing import Optional, List, Dict, Any
 import json
 import os
-import asyncio
 import re
 import urllib.parse
 from pathlib import Path
@@ -27,7 +26,7 @@ from workflow_db import WorkflowDatabase
 app = FastAPI(
     title="N8N Workflow Documentation API",
     description="Fast API for browsing and searching workflow documentation",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 # Security: Rate limiting storage
@@ -59,13 +58,15 @@ app.add_middleware(
 # Initialize database
 db = WorkflowDatabase()
 
+
 # Security: Helper function for rate limiting
 def check_rate_limit(client_ip: str) -> bool:
     """Check if client has exceeded rate limit."""
     current_time = time.time()
     # Clean old entries
     rate_limit_storage[client_ip] = [
-        timestamp for timestamp in rate_limit_storage[client_ip]
+        timestamp
+        for timestamp in rate_limit_storage[client_ip]
         if current_time - timestamp < 60
     ]
     # Check rate limit
@@ -74,6 +75,7 @@ def check_rate_limit(client_ip: str) -> bool:
     # Add current request
     rate_limit_storage[client_ip].append(current_time)
     return True
+
 
 # Security: Helper function to validate and sanitize filenames
 def validate_filename(filename: str) -> bool:
@@ -85,25 +87,30 @@ def validate_filename(filename: str) -> bool:
     decoded = filename
     for _ in range(3):  # Decode up to 3 times to catch nested encodings
         try:
-            decoded = urllib.parse.unquote(decoded, errors='strict')
+            decoded = urllib.parse.unquote(decoded, errors="strict")
         except:
             return False  # Invalid encoding
 
     # Check for path traversal patterns
     dangerous_patterns = [
-        '..',  # Parent directory
-        '..\\',  # Windows parent directory
-        '../',  # Unix parent directory
-        '\\',  # Backslash (Windows path separator)
-        '/',  # Forward slash (Unix path separator)
-        '\x00',  # Null byte
-        '\n', '\r',  # Newlines
-        '~',  # Home directory
-        ':',  # Drive letter or stream (Windows)
-        '|', '<', '>',  # Shell redirection
-        '*', '?',  # Wildcards
-        '$',  # Variable expansion
-        ';', '&',  # Command separators
+        "..",  # Parent directory
+        "..\\",  # Windows parent directory
+        "../",  # Unix parent directory
+        "\\",  # Backslash (Windows path separator)
+        "/",  # Forward slash (Unix path separator)
+        "\x00",  # Null byte
+        "\n",
+        "\r",  # Newlines
+        "~",  # Home directory
+        ":",  # Drive letter or stream (Windows)
+        "|",
+        "<",
+        ">",  # Shell redirection
+        "*",
+        "?",  # Wildcards
+        "$",  # Variable expansion
+        ";",
+        "&",  # Command separators
     ]
 
     for pattern in dangerous_patterns:
@@ -111,22 +118,23 @@ def validate_filename(filename: str) -> bool:
             return False
 
     # Check for absolute paths
-    if decoded.startswith('/') or decoded.startswith('\\'):
+    if decoded.startswith("/") or decoded.startswith("\\"):
         return False
 
     # Check for Windows drive letters
-    if len(decoded) >= 2 and decoded[1] == ':':
+    if len(decoded) >= 2 and decoded[1] == ":":
         return False
 
     # Only allow alphanumeric, dash, underscore, and .json extension
-    if not re.match(r'^[a-zA-Z0-9_\-]+\.json$', decoded):
+    if not re.match(r"^[a-zA-Z0-9_\-]+\.json$", decoded):
         return False
 
     # Additional check: filename should end with .json
-    if not decoded.endswith('.json'):
+    if not decoded.endswith(".json"):
         return False
 
     return True
+
 
 # Startup function to verify database
 @app.on_event("startup")
@@ -134,13 +142,14 @@ async def startup_event():
     """Verify database connectivity on startup."""
     try:
         stats = db.get_stats()
-        if stats['total'] == 0:
+        if stats["total"] == 0:
             print("⚠️  Warning: No workflows found in database. Run indexing first.")
         else:
             print(f"✅ Database connected: {stats['total']} workflows indexed")
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         raise
+
 
 # Response models
 class WorkflowSummary(BaseModel):
@@ -156,18 +165,18 @@ class WorkflowSummary(BaseModel):
     tags: List[str] = []
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
-    
+
     class Config:
         # Allow conversion of int to bool for active field
         validate_assignment = True
-        
-    @field_validator('active', mode='before')
+
+    @field_validator("active", mode="before")
     @classmethod
     def convert_active(cls, v):
         if isinstance(v, int):
             return bool(v)
         return v
-    
+
 
 class SearchResponse(BaseModel):
     workflows: List[WorkflowSummary]
@@ -177,6 +186,7 @@ class SearchResponse(BaseModel):
     pages: int
     query: str
     filters: Dict[str, Any]
+
 
 class StatsResponse(BaseModel):
     total: int
@@ -188,25 +198,32 @@ class StatsResponse(BaseModel):
     unique_integrations: int
     last_indexed: str
 
+
 @app.get("/")
 async def root():
     """Serve the main documentation page."""
     static_dir = Path("static")
     index_file = static_dir / "index.html"
     if not index_file.exists():
-        return HTMLResponse("""
+        return HTMLResponse(
+            """
         <html><body>
         <h1>Setup Required</h1>
         <p>Static files not found. Please ensure the static directory exists with index.html</p>
-        <p>Current directory: """ + str(Path.cwd()) + """</p>
+        <p>Current directory: """
+            + str(Path.cwd())
+            + """</p>
         </body></html>
-        """)
+        """
+        )
     return FileResponse(str(index_file))
+
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "message": "N8N Workflow API is running"}
+
 
 @app.get("/api/stats", response_model=StatsResponse)
 async def get_stats():
@@ -217,6 +234,7 @@ async def get_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
 
+
 @app.get("/api/workflows", response_model=SearchResponse)
 async def search_workflows(
     q: str = Query("", description="Search query"),
@@ -224,48 +242,50 @@ async def search_workflows(
     complexity: str = Query("all", description="Filter by complexity"),
     active_only: bool = Query(False, description="Show only active workflows"),
     page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(20, ge=1, le=100, description="Items per page")
+    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
 ):
     """Search and filter workflows with pagination."""
     try:
         offset = (page - 1) * per_page
-        
+
         workflows, total = db.search_workflows(
             query=q,
             trigger_filter=trigger,
             complexity_filter=complexity,
             active_only=active_only,
             limit=per_page,
-            offset=offset
+            offset=offset,
         )
-        
+
         # Convert to Pydantic models with error handling
         workflow_summaries = []
         for workflow in workflows:
             try:
                 # Remove extra fields that aren't in the model
                 clean_workflow = {
-                    'id': workflow.get('id'),
-                    'filename': workflow.get('filename', ''),
-                    'name': workflow.get('name', ''),
-                    'active': workflow.get('active', False),
-                    'description': workflow.get('description', ''),
-                    'trigger_type': workflow.get('trigger_type', 'Manual'),
-                    'complexity': workflow.get('complexity', 'low'),
-                    'node_count': workflow.get('node_count', 0),
-                    'integrations': workflow.get('integrations', []),
-                    'tags': workflow.get('tags', []),
-                    'created_at': workflow.get('created_at'),
-                    'updated_at': workflow.get('updated_at')
+                    "id": workflow.get("id"),
+                    "filename": workflow.get("filename", ""),
+                    "name": workflow.get("name", ""),
+                    "active": workflow.get("active", False),
+                    "description": workflow.get("description", ""),
+                    "trigger_type": workflow.get("trigger_type", "Manual"),
+                    "complexity": workflow.get("complexity", "low"),
+                    "node_count": workflow.get("node_count", 0),
+                    "integrations": workflow.get("integrations", []),
+                    "tags": workflow.get("tags", []),
+                    "created_at": workflow.get("created_at"),
+                    "updated_at": workflow.get("updated_at"),
                 }
                 workflow_summaries.append(WorkflowSummary(**clean_workflow))
             except Exception as e:
-                print(f"Error converting workflow {workflow.get('filename', 'unknown')}: {e}")
+                print(
+                    f"Error converting workflow {workflow.get('filename', 'unknown')}: {e}"
+                )
                 # Continue with other workflows instead of failing completely
                 continue
-        
+
         pages = (total + per_page - 1) // per_page  # Ceiling division
-        
+
         return SearchResponse(
             workflows=workflow_summaries,
             total=total,
@@ -276,11 +296,14 @@ async def search_workflows(
             filters={
                 "trigger": trigger,
                 "complexity": complexity,
-                "active_only": active_only
-            }
+                "active_only": active_only,
+            },
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error searching workflows: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error searching workflows: {str(e)}"
+        )
+
 
 @app.get("/api/workflows/{filename}")
 async def get_workflow_detail(filename: str, request: Request):
@@ -294,17 +317,21 @@ async def get_workflow_detail(filename: str, request: Request):
         # Security: Rate limiting
         client_ip = request.client.host if request.client else "unknown"
         if not check_rate_limit(client_ip):
-            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+            raise HTTPException(
+                status_code=429, detail="Rate limit exceeded. Please try again later."
+            )
 
         # Get workflow metadata from database
         workflows, _ = db.search_workflows(f'filename:"{filename}"', limit=1)
         if not workflows:
-            raise HTTPException(status_code=404, detail="Workflow not found in database")
+            raise HTTPException(
+                status_code=404, detail="Workflow not found in database"
+            )
 
         workflow_meta = workflows[0]
 
         # Load raw JSON from file with security checks
-        workflows_path = Path('workflows').resolve()
+        workflows_path = Path("workflows").resolve()
 
         # Find the file safely
         matching_file = None
@@ -318,24 +345,27 @@ async def get_workflow_detail(filename: str, request: Request):
                         matching_file = target_file
                         break
                     except ValueError:
-                        print(f"Security: Blocked access to file outside workflows: {target_file}")
+                        print(
+                            f"Security: Blocked access to file outside workflows: {target_file}"
+                        )
                         continue
 
         if not matching_file:
             print(f"Warning: File {filename} not found in workflows directory")
-            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workflow file '{filename}' not found on filesystem",
+            )
 
-        with open(matching_file, 'r', encoding='utf-8') as f:
+        with open(matching_file, "r", encoding="utf-8") as f:
             raw_json = json.load(f)
 
-        return {
-            "metadata": workflow_meta,
-            "raw_json": raw_json
-        }
+        return {"metadata": workflow_meta, "raw_json": raw_json}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading workflow: {str(e)}")
+
 
 @app.get("/api/workflows/{filename}/download")
 async def download_workflow(filename: str, request: Request):
@@ -349,10 +379,12 @@ async def download_workflow(filename: str, request: Request):
         # Security: Rate limiting
         client_ip = request.client.host if request.client else "unknown"
         if not check_rate_limit(client_ip):
-            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+            raise HTTPException(
+                status_code=429, detail="Rate limit exceeded. Please try again later."
+            )
 
         # Only search within the workflows directory
-        workflows_path = Path('workflows').resolve()  # Get absolute path
+        workflows_path = Path("workflows").resolve()  # Get absolute path
 
         # Find the file safely
         json_files = []
@@ -366,12 +398,16 @@ async def download_workflow(filename: str, request: Request):
                         json_files.append(target_file)
                     except ValueError:
                         # File is outside workflows directory
-                        print(f"Security: Blocked access to file outside workflows: {target_file}")
+                        print(
+                            f"Security: Blocked access to file outside workflows: {target_file}"
+                        )
                         continue
 
         if not json_files:
             print(f"File {filename} not found in workflows directory")
-            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Workflow file '{filename}' not found"
+            )
 
         file_path = json_files[0]
 
@@ -379,19 +415,22 @@ async def download_workflow(filename: str, request: Request):
         try:
             file_path.resolve().relative_to(workflows_path)
         except ValueError:
-            print(f"Security: Blocked final attempt to access file outside workflows: {file_path}")
+            print(
+                f"Security: Blocked final attempt to access file outside workflows: {file_path}"
+            )
             raise HTTPException(status_code=403, detail="Access denied")
 
         return FileResponse(
-            str(file_path),
-            media_type="application/json",
-            filename=filename
+            str(file_path), media_type="application/json", filename=filename
         )
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error downloading workflow {filename}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error downloading workflow: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error downloading workflow: {str(e)}"
+        )
+
 
 @app.get("/api/workflows/{filename}/diagram")
 async def get_workflow_diagram(filename: str, request: Request):
@@ -405,10 +444,12 @@ async def get_workflow_diagram(filename: str, request: Request):
         # Security: Rate limiting
         client_ip = request.client.host if request.client else "unknown"
         if not check_rate_limit(client_ip):
-            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+            raise HTTPException(
+                status_code=429, detail="Rate limit exceeded. Please try again later."
+            )
 
         # Only search within the workflows directory
-        workflows_path = Path('workflows').resolve()
+        workflows_path = Path("workflows").resolve()
 
         # Find the file safely
         matching_file = None
@@ -422,18 +463,23 @@ async def get_workflow_diagram(filename: str, request: Request):
                         matching_file = target_file
                         break
                     except ValueError:
-                        print(f"Security: Blocked access to file outside workflows: {target_file}")
+                        print(
+                            f"Security: Blocked access to file outside workflows: {target_file}"
+                        )
                         continue
 
         if not matching_file:
             print(f"Warning: File {filename} not found in workflows directory")
-            raise HTTPException(status_code=404, detail=f"Workflow file '{filename}' not found on filesystem")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workflow file '{filename}' not found on filesystem",
+            )
 
-        with open(matching_file, 'r', encoding='utf-8') as f:
+        with open(matching_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        nodes = data.get('nodes', [])
-        connections = data.get('connections', {})
+        nodes = data.get("nodes", [])
+        connections = data.get("connections", {})
 
         # Generate Mermaid diagram
         diagram = generate_mermaid_diagram(nodes, connections)
@@ -443,103 +489,113 @@ async def get_workflow_diagram(filename: str, request: Request):
         raise
     except json.JSONDecodeError as e:
         print(f"Error parsing JSON in {filename}: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Invalid JSON in workflow file: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid JSON in workflow file: {str(e)}"
+        )
     except Exception as e:
         print(f"Error generating diagram for {filename}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error generating diagram: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error generating diagram: {str(e)}"
+        )
+
 
 def generate_mermaid_diagram(nodes: List[Dict], connections: Dict) -> str:
     """Generate Mermaid.js flowchart code from workflow nodes and connections."""
     if not nodes:
         return "graph TD\n  EmptyWorkflow[No nodes found in workflow]"
-    
+
     # Create mapping for node names to ensure valid mermaid IDs
     mermaid_ids = {}
     for i, node in enumerate(nodes):
         node_id = f"node{i}"
-        node_name = node.get('name', f'Node {i}')
+        node_name = node.get("name", f"Node {i}")
         mermaid_ids[node_name] = node_id
-    
+
     # Start building the mermaid diagram
     mermaid_code = ["graph TD"]
-    
+
     # Add nodes with styling
     for node in nodes:
-        node_name = node.get('name', 'Unnamed')
+        node_name = node.get("name", "Unnamed")
         node_id = mermaid_ids[node_name]
-        node_type = node.get('type', '').replace('n8n-nodes-base.', '')
-        
+        node_type = node.get("type", "").replace("n8n-nodes-base.", "")
+
         # Determine node style based on type
         style = ""
-        if any(x in node_type.lower() for x in ['trigger', 'webhook', 'cron']):
+        if any(x in node_type.lower() for x in ["trigger", "webhook", "cron"]):
             style = "fill:#b3e0ff,stroke:#0066cc"  # Blue for triggers
-        elif any(x in node_type.lower() for x in ['if', 'switch']):
+        elif any(x in node_type.lower() for x in ["if", "switch"]):
             style = "fill:#ffffb3,stroke:#e6e600"  # Yellow for conditional nodes
-        elif any(x in node_type.lower() for x in ['function', 'code']):
+        elif any(x in node_type.lower() for x in ["function", "code"]):
             style = "fill:#d9b3ff,stroke:#6600cc"  # Purple for code nodes
-        elif 'error' in node_type.lower():
+        elif "error" in node_type.lower():
             style = "fill:#ffb3b3,stroke:#cc0000"  # Red for error handlers
         else:
             style = "fill:#d9d9d9,stroke:#666666"  # Gray for other nodes
-        
+
         # Add node with label (escaping special characters)
         clean_name = node_name.replace('"', "'")
         clean_type = node_type.replace('"', "'")
         label = f"{clean_name}<br>({clean_type})"
-        mermaid_code.append(f"  {node_id}[\"{label}\"]")
+        mermaid_code.append(f'  {node_id}["{label}"]')
         mermaid_code.append(f"  style {node_id} {style}")
-    
+
     # Add connections between nodes
     for source_name, source_connections in connections.items():
         if source_name not in mermaid_ids:
             continue
-        
-        if isinstance(source_connections, dict) and 'main' in source_connections:
-            main_connections = source_connections['main']
-            
+
+        if isinstance(source_connections, dict) and "main" in source_connections:
+            main_connections = source_connections["main"]
+
             for i, output_connections in enumerate(main_connections):
                 if not isinstance(output_connections, list):
                     continue
-                    
+
                 for connection in output_connections:
-                    if not isinstance(connection, dict) or 'node' not in connection:
+                    if not isinstance(connection, dict) or "node" not in connection:
                         continue
-                        
-                    target_name = connection['node']
+
+                    target_name = connection["node"]
                     if target_name not in mermaid_ids:
                         continue
-                        
+
                     # Add arrow with output index if multiple outputs
                     label = f" -->|{i}| " if len(main_connections) > 1 else " --> "
-                    mermaid_code.append(f"  {mermaid_ids[source_name]}{label}{mermaid_ids[target_name]}")
-    
+                    mermaid_code.append(
+                        f"  {mermaid_ids[source_name]}{label}{mermaid_ids[target_name]}"
+                    )
+
     # Format the final mermaid diagram code
     return "\n".join(mermaid_code)
+
 
 @app.post("/api/reindex")
 async def reindex_workflows(
     background_tasks: BackgroundTasks,
     request: Request,
     force: bool = False,
-    admin_token: Optional[str] = Query(None, description="Admin authentication token")
+    admin_token: Optional[str] = Query(None, description="Admin authentication token"),
 ):
     """Trigger workflow reindexing in the background (requires authentication)."""
     # Security: Rate limiting
     client_ip = request.client.host if request.client else "unknown"
     if not check_rate_limit(client_ip):
-        raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+        raise HTTPException(
+            status_code=429, detail="Rate limit exceeded. Please try again later."
+        )
 
     # Security: Basic authentication check
     # In production, use proper authentication (JWT, OAuth, etc.)
     # For now, check for environment variable or disable endpoint
-    import os
+
     expected_token = os.environ.get("ADMIN_TOKEN", None)
 
     if not expected_token:
         # If no token is configured, disable the endpoint for security
         raise HTTPException(
             status_code=503,
-            detail="Reindexing endpoint is disabled. Set ADMIN_TOKEN environment variable to enable."
+            detail="Reindexing endpoint is disabled. Set ADMIN_TOKEN environment variable to enable.",
         )
 
     if admin_token != expected_token:
@@ -556,15 +612,19 @@ async def reindex_workflows(
     background_tasks.add_task(run_indexing)
     return {"message": "Reindexing started in background", "requested_by": client_ip}
 
+
 @app.get("/api/integrations")
 async def get_integrations():
     """Get list of all unique integrations."""
     try:
         stats = db.get_stats()
         # For now, return basic info. Could be enhanced to return detailed integration stats
-        return {"integrations": [], "count": stats['unique_integrations']}
+        return {"integrations": [], "count": stats["unique_integrations"]}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching integrations: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching integrations: {str(e)}"
+        )
+
 
 @app.get("/api/categories")
 async def get_categories():
@@ -573,32 +633,35 @@ async def get_categories():
         # Try to load from the generated unique categories file
         categories_file = Path("context/unique_categories.json")
         if categories_file.exists():
-            with open(categories_file, 'r', encoding='utf-8') as f:
+            with open(categories_file, "r", encoding="utf-8") as f:
                 categories = json.load(f)
             return {"categories": categories}
         else:
             # Fallback: extract categories from search_categories.json
             search_categories_file = Path("context/search_categories.json")
             if search_categories_file.exists():
-                with open(search_categories_file, 'r', encoding='utf-8') as f:
+                with open(search_categories_file, "r", encoding="utf-8") as f:
                     search_data = json.load(f)
-                
+
                 unique_categories = set()
                 for item in search_data:
-                    if item.get('category'):
-                        unique_categories.add(item['category'])
+                    if item.get("category"):
+                        unique_categories.add(item["category"])
                     else:
-                        unique_categories.add('Uncategorized')
-                
+                        unique_categories.add("Uncategorized")
+
                 categories = sorted(list(unique_categories))
                 return {"categories": categories}
             else:
                 # Last resort: return basic categories
                 return {"categories": ["Uncategorized"]}
-                
+
     except Exception as e:
         print(f"Error loading categories: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching categories: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching categories: {str(e)}"
+        )
+
 
 @app.get("/api/category-mappings")
 async def get_category_mappings():
@@ -607,65 +670,68 @@ async def get_category_mappings():
         search_categories_file = Path("context/search_categories.json")
         if not search_categories_file.exists():
             return {"mappings": {}}
-        
-        with open(search_categories_file, 'r', encoding='utf-8') as f:
+
+        with open(search_categories_file, "r", encoding="utf-8") as f:
             search_data = json.load(f)
-        
+
         # Convert to a simple filename -> category mapping
         mappings = {}
         for item in search_data:
-            filename = item.get('filename')
-            category = item.get('category') or 'Uncategorized'
+            filename = item.get("filename")
+            category = item.get("category") or "Uncategorized"
             if filename:
                 mappings[filename] = category
-        
+
         return {"mappings": mappings}
-        
+
     except Exception as e:
         print(f"Error loading category mappings: {e}")
-        raise HTTPException(status_code=500, detail=f"Error fetching category mappings: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching category mappings: {str(e)}"
+        )
+
 
 @app.get("/api/workflows/category/{category}", response_model=SearchResponse)
 async def search_workflows_by_category(
     category: str,
     page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(20, ge=1, le=100, description="Items per page")
+    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
 ):
     """Search workflows by service category (messaging, database, ai_ml, etc.)."""
     try:
         offset = (page - 1) * per_page
-        
+
         workflows, total = db.search_by_category(
-            category=category,
-            limit=per_page,
-            offset=offset
+            category=category, limit=per_page, offset=offset
         )
-        
+
         # Convert to Pydantic models with error handling
         workflow_summaries = []
         for workflow in workflows:
             try:
                 clean_workflow = {
-                    'id': workflow.get('id'),
-                    'filename': workflow.get('filename', ''),
-                    'name': workflow.get('name', ''),
-                    'active': workflow.get('active', False),
-                    'description': workflow.get('description', ''),
-                    'trigger_type': workflow.get('trigger_type', 'Manual'),
-                    'complexity': workflow.get('complexity', 'low'),
-                    'node_count': workflow.get('node_count', 0),
-                    'integrations': workflow.get('integrations', []),
-                    'tags': workflow.get('tags', []),
-                    'created_at': workflow.get('created_at'),
-                    'updated_at': workflow.get('updated_at')
+                    "id": workflow.get("id"),
+                    "filename": workflow.get("filename", ""),
+                    "name": workflow.get("name", ""),
+                    "active": workflow.get("active", False),
+                    "description": workflow.get("description", ""),
+                    "trigger_type": workflow.get("trigger_type", "Manual"),
+                    "complexity": workflow.get("complexity", "low"),
+                    "node_count": workflow.get("node_count", 0),
+                    "integrations": workflow.get("integrations", []),
+                    "tags": workflow.get("tags", []),
+                    "created_at": workflow.get("created_at"),
+                    "updated_at": workflow.get("updated_at"),
                 }
                 workflow_summaries.append(WorkflowSummary(**clean_workflow))
             except Exception as e:
-                print(f"Error converting workflow {workflow.get('filename', 'unknown')}: {e}")
+                print(
+                    f"Error converting workflow {workflow.get('filename', 'unknown')}: {e}"
+                )
                 continue
-        
+
         pages = (total + per_page - 1) // per_page
-        
+
         return SearchResponse(
             workflows=workflow_summaries,
             total=total,
@@ -673,18 +739,21 @@ async def search_workflows_by_category(
             per_page=per_page,
             pages=pages,
             query=f"category:{category}",
-            filters={"category": category}
+            filters={"category": category},
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error searching by category: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error searching by category: {str(e)}"
+        )
+
 
 # Custom exception handler for better error responses
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     return JSONResponse(
-        status_code=500,
-        content={"detail": f"Internal server error: {str(exc)}"}
+        status_code=500, content={"detail": f"Internal server error: {str(exc)}"}
     )
+
 
 # Mount static files AFTER all routes are defined
 static_dir = Path("static")
@@ -694,22 +763,24 @@ if static_dir.exists():
 else:
     print(f"❌ Warning: Static directory not found at {static_dir.absolute()}")
 
+
 def create_static_directory():
     """Create static directory if it doesn't exist."""
     static_dir = Path("static")
     static_dir.mkdir(exist_ok=True)
     return static_dir
 
+
 def run_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
     """Run the FastAPI server."""
     # Ensure static directory exists
     create_static_directory()
-    
+
     # Debug: Check database connectivity
     try:
         stats = db.get_stats()
         print(f"✅ Database connected: {stats['total']} workflows found")
-        if stats['total'] == 0:
+        if stats["total"] == 0:
             print("🔄 Database is empty. Indexing workflows...")
             db.index_all_workflows()
             stats = db.get_stats()
@@ -722,8 +793,8 @@ def run_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
             print(f"✅ Database created: {stats['total']} workflows indexed")
         except Exception as e2:
             print(f"❌ Failed to create database: {e2}")
-            stats = {'total': 0}
-    
+            stats = {"total": 0}
+
     # Debug: Check static files
     static_path = Path("static")
     if static_path.exists():
@@ -731,29 +802,34 @@ def run_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
         print(f"✅ Static files found: {[f.name for f in files]}")
     else:
         print(f"❌ Static directory not found at: {static_path.absolute()}")
-    
-    print(f"🚀 Starting N8N Workflow Documentation API")
+
+    print("🚀 Starting N8N Workflow Documentation API")
     print(f"📊 Database contains {stats['total']} workflows")
     print(f"🌐 Server will be available at: http://{host}:{port}")
     print(f"📁 Static files at: http://{host}:{port}/static/")
-    
+
     uvicorn.run(
         "api_server:app",
         host=host,
         port=port,
         reload=reload,
         access_log=True,  # Enable access logs for debugging
-        log_level="info"
+        log_level="info",
     )
+
 
 if __name__ == "__main__":
     import argparse
-    
-    parser = argparse.ArgumentParser(description='N8N Workflow Documentation API Server')
-    parser.add_argument('--host', default='127.0.0.1', help='Host to bind to')
-    parser.add_argument('--port', type=int, default=8000, help='Port to bind to')
-    parser.add_argument('--reload', action='store_true', help='Enable auto-reload for development')
-    
+
+    parser = argparse.ArgumentParser(
+        description="N8N Workflow Documentation API Server"
+    )
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
+    parser.add_argument(
+        "--reload", action="store_true", help="Enable auto-reload for development"
+    )
+
     args = parser.parse_args()
-    
+
     run_server(host=args.host, port=args.port, reload=args.reload)
