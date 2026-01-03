@@ -1,356 +1,184 @@
+# 🎯 N8N 工作流模板
 
+# 概述
+此目录包含可重用的工作流模板，展示了 n8n 工作流集合中的常见自动化模式。这些模板设计为易于定制和部署。
 
-# 🎯 N8N Workflow Templates
+# 模板分类
 
-#
+## 📧 通信与消息模板
 
-# Overview
-This directory contains reusable workflow templates that demonstrate common automation patterns found in the n8n workflows collection. These templates are designed to be easily customizable and deployable.
+- **Telegram AI 机器人**
+- 带有图像生成功能的完整 AI 聊天机器人
 
-#
+- **Slack 自动化**
+- 高级 Slack 集成模式
 
-# Template Categories
+- **电子邮件处理**
+- 自动化电子邮件处理和响应
 
-#
+- **WhatsApp 集成**
+- 商业消息自动化
 
-## 📧 Communication & Messaging Templates
+## 🔄 数据处理模板
 
-- **Telegram AI Bot*
+- **Google Sheets 自动化**
+- 高级电子表格操作
 
-* 
+- **数据库同步**
+- 多数据库同步模式
 
-- Complete AI chatbot with image generation
+- **数据转换**
+- 复杂数据处理工作流
 
-- **Slack Automation*
+- **文件处理**
+- 自动化文件处理和转换
 
-* 
+## 🛒 电子商务模板
 
-- Advanced Slack integration patterns
+- **Shopify 集成**
+- 完整的电子商务自动化
 
-- **Email Processing*
+- **WooCommerce 自动化**
+- WordPress 电子商务工作流
 
-* 
+- **库存管理**
+- 库存跟踪和警报
 
-- Automated email handling and responses
+- **订单处理**
+- 自动化订单履行
 
-- **WhatsApp Integration*
+## 📊 业务流程模板
 
-* 
+- **CRM 自动化**
+- 客户关系管理
 
-- Business messaging automation
+- **线索生成**
+- 自动化线索捕获和处理
 
-#
+- **项目管理**
+- 任务和项目自动化
 
-## 🔄 Data Processing Templates
+- **报告生成**
+- 自动化报告生成
 
-- **Google Sheets Automation*
+## 🤖 AI 与自动化模板
 
-* 
+- **OpenAI 集成**
+- 高级 AI 工作流
 
-- Advanced spreadsheet operations
+- **内容生成**
+- 自动化内容创建
 
-- **Database Sync*
+- **语言处理**
+- 文本分析和翻译
 
-* 
+- **图像处理**
+- 自动化图像处理
 
-- Multi-database synchronization patterns
+# 模板结构
 
-- **Data Transformation*
+每个模板包含：
 
-* 
+- **模板文件**
+- n8n 工作流 JSON
 
-- Complex data processing workflows
+- **文档**
+- 设置说明和定制指南
 
-- **File Processing*
+- **配置**
+- 所需的环境变量和凭证
 
-* 
+- **示例**
+- 真实世界使用场景
 
-- Automated file handling and conversion
+- **定制指南**
+- 如何根据特定需求进行修改
 
-#
+# 使用说明
 
-## 🛒 E-commerce Templates
+1. **选择模板**
+- 浏览上面的分类
 
-- **Shopify Integration*
+2. **阅读文档**
+- 查看设置要求
 
-* 
+3. **配置凭证**
+- 设置所需的 API 密钥
 
-- Complete e-commerce automation
+4. **导入到 n8n**
+- 将模板加载到您的 n8n 实例
 
-- **WooCommerce Automation*
+5. **定制**
+- 根据您的特定需求进行修改
 
-* 
+6. **激活**
+- 测试并激活工作流
 
-- WordPress e-commerce workflows
+# 最佳实践
 
-- **Inventory Management*
+## 使用模板前
 
-* 
+- ✅ 查看所有凭证要求
+- ✅ 首先在开发环境中测试
+- ✅ 理解工作流逻辑
+- ✅ 针对您的特定用例进行定制
+- ✅ 设置适当的错误处理
 
-- Stock tracking and alerts
+## 安全考虑
 
-- **Order Processing*
+- 🔒 永远不要将 API 密钥提交到版本控制
+- 🔒 对敏感数据使用环境变量
+- 🔒 首先使用有限权限测试工作流
+- 🔒 监控异常活动
+- 🔒 定期安全审计
 
-* 
+# 贡献模板
 
-- Automated order fulfillment
+我们欢迎新模板的贡献！请遵循以下指南：
 
-#
+1. **使用清晰的命名**
+- 描述性、可搜索的名称
 
-## 📊 Business Process Templates
+2. **包含文档**
+- 全面的设置指南
 
-- **CRM Automation*
+3. **彻底测试**
+- 确保模板正常工作
 
-* 
+4. **遵循标准**
+- 使用一致的结构和格式
 
-- Customer relationship management
+5. **提供示例**
+- 包括真实世界的使用案例
 
-- **Lead Generation*
+# 模板开发状态
 
-* 
+- ✅ **通信模板**
+- 12 个模板已就绪
 
-- Automated lead capture and processing
+- ✅ **数据处理模板**
+- 8 个模板已就绪
 
-- **Project Management*
+- ✅ **电子商务模板**
+- 6 个模板已就绪
 
-* 
+- ✅ **业务流程模板**
+- 10 个模板已就绪
 
-- Task and project automation
+- ✅ **AI 与自动化模板**
+- 7 个模板已就绪
 
-- **Reporting*
+**可用模板总数：43**
 
-* 
+# 支持
 
-- Automated report generation
+如需模板支持和问题解答：
 
-#
-
-## 🤖 AI & Automation Templates
-
-- **OpenAI Integration*
-
-* 
-
-- Advanced AI workflows
-
-- **Content Generation*
-
-* 
-
-- Automated content creation
-
-- **Language Processing*
-
-* 
-
-- Text analysis and translation
-
-- **Image Processing*
-
-* 
-
-- Automated image manipulation
-
-#
-
-# Template Structure
-
-Each template includes:
-
-- **Template File*
-
-* 
-
-- The n8n workflow JSON
-
-- **Documentation*
-
-* 
-
-- Setup instructions and customization guide
-
-- **Configuration*
-
-* 
-
-- Environment variables and credentials needed
-
-- **Examples*
-
-* 
-
-- Real-world usage scenarios
-
-- **Customization Guide*
-
-* 
-
-- How to modify for specific needs
-
-#
-
-# Usage Instructions
-
-1. **Choose a Template*
-
-* 
-
-- Browse the categories above
-
-2. **Read Documentation*
-
-* 
-
-- Review setup requirements
-
-3. **Configure Credentials*
-
-* 
-
-- Set up required API keys
-
-4. **Import to n8n*
-
-* 
-
-- Load the template into your n8n instance
-
-5. **Customize*
-
-* 
-
-- Modify according to your specific needs
-
-6. **Activate*
-
-* 
-
-- Test and activate the workflow
-
-#
-
-# Best Practices
-
-#
-
-## Before Using Templates
-
-- ✅ Review all credential requirements
-
-- ✅ Test in development environment first
-
-- ✅ Understand the workflow logic
-
-- ✅ Customize for your specific use case
-
-- ✅ Set up proper error handling
-
-#
-
-## Security Considerations
-
-- 🔒 Never commit API keys to version control
-
-- 🔒 Use environment variables for sensitive data
-
-- 🔒 Test workflows with limited permissions first
-
-- 🔒 Monitor for unusual activity
-
-- 🔒 Regular security audits
-
-#
-
-# Contributing Templates
-
-We welcome contributions of new templates! Please follow these guidelines:
-
-1. **Use Clear Naming*
-
-* 
-
-- Descriptive, searchable names
-
-2. **Include Documentation*
-
-* 
-
-- Comprehensive setup guides
-
-3. **Test Thoroughly*
-
-* 
-
-- Ensure templates work correctly
-
-4. **Follow Standards*
-
-* 
-
-- Use consistent structure and formatting
-
-5. **Provide Examples*
-
-* 
-
-- Include real-world use cases
-
-#
-
-# Template Development Status
-
-- ✅ **Communication Templates*
-
-* 
-
-- 12 templates ready
-
-- ✅ **Data Processing Templates*
-
-* 
-
-- 8 templates ready
-
-- ✅ **E-commerce Templates*
-
-* 
-
-- 6 templates ready
-
-- ✅ **Business Process Templates*
-
-* 
-
-- 10 templates ready
-
-- ✅ **AI & Automation Templates*
-
-* 
-
-- 7 templates ready
-
-**Total Templates Available: 43*
-
-*
-
-#
-
-# Support
-
-For template support and questions:
-
-- 📖 Check the documentation in each template folder
-
-- 🔍 Search existing issues and discussions
-
-- 💬 Join the community discussions
-
-- 🐛 Report issues with specific templates
+- 📖 查看每个模板文件夹中的文档
+- 🔍 搜索现有问题和讨论
+- 💬 加入社区讨论
+- 🐛 报告特定模板的问题
 
 --
 
--
-
-*Templates are continuously updated and improved based on community feedback and new automation patterns.
-
-*
+*模板会根据社区反馈和新的自动化模式不断更新和改进。*

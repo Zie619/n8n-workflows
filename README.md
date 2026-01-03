@@ -1,4 +1,4 @@
-# 🚀 n8n Workflow Collection
+# 🚀 n8n 工作流集合
 
 <div align="center">
 
@@ -8,58 +8,58 @@
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/zie619)
 
-### 🌟 The Ultimate Collection of n8n Automation Workflows
+### 🌟 n8n 自动化工作流终极集合
 
-**[🔍 Browse Online](https://zie619.github.io/n8n-workflows)** • **[📚 Documentation](#documentation)** • **[🤝 Contributing](#contributing)** • **[📄 License](#license)**
+**[🔍 在线浏览](https://zie619.github.io/n8n-workflows)** • **[📚 文档](#文档)** • **[🤝 贡献](#贡献)** • **[📄 许可证](#许可证)**
 
 </div>
 
 ---
 
-## ✨ What's New
+## ✨ 最新动态
 
-### 🎉 Latest Updates (November 2025)
-- **🔒 Enhanced Security**: Full security audit completed, all CVEs resolved
-- **🐳 Docker Support**: Multi-platform builds for linux/amd64 and linux/arm64
-- **📊 GitHub Pages**: Live searchable interface at [zie619.github.io/n8n-workflows](https://zie619.github.io/n8n-workflows)
-- **⚡ Performance**: 100x faster search with SQLite FTS5 integration
-- **🎨 Modern UI**: Completely redesigned interface with dark/light mode
-
----
-
-## 🌐 Quick Access
-
-### 🔥 Use Online (No Installation)
-Visit **[zie619.github.io/n8n-workflows](https://zie619.github.io/n8n-workflows)** for instant access to:
-- 🔍 **Smart Search** - Find workflows instantly
-- 📂 **15+ Categories** - Browse by use case
-- 📱 **Mobile Ready** - Works on any device
-- ⬇️ **Direct Downloads** - Get workflow JSONs instantly
+### 🎉 最新更新 (2025年11月)
+- **🔒 增强安全性**: 完成全面安全审计，解决所有 CVE 漏洞
+- **🐳 Docker 支持**: 支持 linux/amd64 和 linux/arm64 的多平台构建
+- **📊 GitHub Pages**: 在 [zie619.github.io/n8n-workflows](https://zie619.github.io/n8n-workflows) 提供实时可搜索界面
+- **⚡ 性能提升**: 集成 SQLite FTS5 实现 100 倍搜索速度提升
+- **🎨 现代 UI**: 完全重新设计的界面，支持深色/浅色模式
 
 ---
 
-## 🚀 Features
+## 🌐 快速访问
+
+### 🔥 在线使用（无需安装）
+访问 **[zie619.github.io/n8n-workflows](https://zie619.github.io/n8n-workflows)** 即可立即使用：
+- 🔍 **智能搜索** - 立即找到所需工作流
+- 📂 **15+ 分类** - 按使用场景浏览
+- 📱 **移动适配** - 支持任何设备
+- ⬇️ **直接下载** - 立即获取工作流 JSON 文件
+
+---
+
+## 🚀 功能特性
 
 <table>
 <tr>
 <td width="50%">
 
-### 📊 By The Numbers
-- **4,343** Production-Ready Workflows
-- **365** Unique Integrations
-- **29,445** Total Nodes
-- **15** Organized Categories
-- **100%** Import Success Rate
+### 📊 数据统计
+- **4,343** 个生产就绪工作流
+- **365** 个独特集成
+- **29,445** 个节点总数
+- **15** 个组织分类
+- **100%** 导入成功率
 
 </td>
 <td width="50%">
 
-### ⚡ Performance
-- **< 100ms** Search Response
-- **< 50MB** Memory Usage
-- **700x** Smaller Than v1
-- **10x** Faster Load Times
-- **40x** Less RAM Usage
+### ⚡ 性能表现
+- **< 100ms** 搜索响应
+- **< 50MB** 内存占用
+- **700倍** 小于 v1 版本
+- **10倍** 加载速度提升
+- **40倍** 内存使用减少
 
 </td>
 </tr>
@@ -67,152 +67,152 @@ Visit **[zie619.github.io/n8n-workflows](https://zie619.github.io/n8n-workflows)
 
 ---
 
-## 💻 Local Installation
+## 💻 本地安装
 
-### Prerequisites
+### 前置要求
 - Python 3.9+
-- pip (Python package manager)
-- 100MB free disk space
+- pip (Python 包管理器)
+- 100MB 可用磁盘空间
 
-### Quick Start
+### 快速开始
 ```bash
-# Clone the repository
+# 克隆仓库
 git clone https://github.com/Zie619/n8n-workflows.git
 cd n8n-workflows
 
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 
-# Start the server
+# 启动服务器
 python run.py
 
-# Open in browser
+# 在浏览器中打开
 # http://localhost:8000
 ```
 
-### 🐳 Docker Installation
+### 🐳 Docker 安装
 ```bash
-# Using Docker Hub
+# 使用 Docker Hub
 docker run -p 8000:8000 zie619/n8n-workflows:latest
 
-# Or build locally
+# 或本地构建
 docker build -t n8n-workflows .
 docker run -p 8000:8000 n8n-workflows
 ```
 
 ---
 
-## 📚 Documentation
+## 📚 文档
 
-### API Endpoints
+### API 端点
 
-| Endpoint | Method | Description |
+| 端点 | 方法 | 描述 |
 |----------|--------|-------------|
-| `/` | GET | Web interface |
-| `/api/search` | GET | Search workflows |
-| `/api/stats` | GET | Repository statistics |
-| `/api/workflow/{id}` | GET | Get workflow JSON |
-| `/api/categories` | GET | List all categories |
-| `/api/export` | GET | Export workflows |
+| `/` | GET | Web 界面 |
+| `/api/search` | GET | 搜索工作流 |
+| `/api/stats` | GET | 仓库统计信息 |
+| `/api/workflow/{id}` | GET | 获取工作流 JSON |
+| `/api/categories` | GET | 列出所有分类 |
+| `/api/export` | GET | 导出工作流 |
 
-### Search Features
-- **Full-text search** across names, descriptions, and nodes
-- **Category filtering** (Marketing, Sales, DevOps, etc.)
-- **Complexity filtering** (Low, Medium, High)
-- **Trigger type filtering** (Webhook, Schedule, Manual, etc.)
-- **Service filtering** (365+ integrations)
+### 搜索功能
+- **全文搜索** - 搜索名称、描述和节点
+- **分类筛选** (营销、销售、DevOps 等)
+- **复杂度筛选** (低、中、高)
+- **触发器类型筛选** (Webhook、定时、手动等)
+- **服务筛选** (365+ 集成)
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ 架构
 
 ```mermaid
 graph LR
-    A[User] --> B[Web Interface]
-    B --> C[FastAPI Server]
+    A[用户] --> B[Web 界面]
+    B --> C[FastAPI 服务器]
     C --> D[SQLite FTS5]
-    D --> E[Workflow Database]
-    C --> F[Static Files]
-    F --> G[Workflow JSONs]
+    D --> E[工作流数据库]
+    C --> F[静态文件]
+    F --> G[工作流 JSON 文件]
 ```
 
-### Tech Stack
-- **Backend**: Python, FastAPI, SQLite with FTS5
-- **Frontend**: Vanilla JS, Tailwind CSS
-- **Database**: SQLite with Full-Text Search
-- **Deployment**: Docker, GitHub Actions, GitHub Pages
-- **Security**: Trivy scanning, CORS protection, Input validation
+### 技术栈
+- **后端**: Python, FastAPI, SQLite with FTS5
+- **前端**: Vanilla JS, Tailwind CSS
+- **数据库**: SQLite with Full-Text Search
+- **部署**: Docker, GitHub Actions, GitHub Pages
+- **安全**: Trivy 扫描, CORS 保护, 输入验证
 
 ---
 
-## 📂 Repository Structure
+## 📂 仓库结构
 
 ```
 n8n-workflows/
-├── workflows/           # 4,343 workflow JSON files
-│   └── [category]/     # Organized by integration
-├── docs/               # GitHub Pages site
-├── src/                # Python source code
-├── scripts/            # Utility scripts
-├── api_server.py       # FastAPI application
-├── run.py              # Server launcher
-├── workflow_db.py      # Database manager
-└── requirements.txt    # Python dependencies
+├── workflows/           # 4,343 个工作流 JSON 文件
+│   └── [category]/     # 按集成分类组织
+├── docs/               # GitHub Pages 站点
+├── src/                # Python 源代码
+├── scripts/            # 实用脚本
+├── api_server.py       # FastAPI 应用
+├── run.py              # 服务器启动器
+├── workflow_db.py      # 数据库管理器
+└── requirements.txt    # Python 依赖
 ```
 
 ---
 
-## 🤝 Contributing
+## 🤝 贡献
 
-We love contributions! Here's how you can help:
+我们欢迎贡献！以下是您可以帮助的方式：
 
-### Ways to Contribute
-- 🐛 **Report bugs** via [Issues](https://github.com/Zie619/n8n-workflows/issues)
-- 💡 **Suggest features** in [Discussions](https://github.com/Zie619/n8n-workflows/discussions)
-- 📝 **Improve documentation**
-- 🔧 **Submit workflow fixes**
-- ⭐ **Star the repository**
+### 贡献方式
+- 🐛 **报告错误** - 通过 [Issues](https://github.com/Zie619/n8n-workflows/issues)
+- 💡 **建议功能** - 在 [Discussions](https://github.com/Zie619/n8n-workflows/discussions) 中
+- 📝 **改进文档**
+- 🔧 **提交工作流修复**
+- ⭐ **为仓库点赞**
 
-### Development Setup
+### 开发设置
 ```bash
-# Fork and clone
+# Fork 并克隆
 git clone https://github.com/YOUR_USERNAME/n8n-workflows.git
 
-# Create branch
+# 创建分支
 git checkout -b feature/amazing-feature
 
-# Make changes and test
+# 进行更改并测试
 python run.py --debug
 
-# Commit and push
+# 提交并推送
 git add .
 git commit -m "feat: add amazing feature"
 git push origin feature/amazing-feature
 
-# Open PR
+# 打开 PR
 ```
 
 ---
 
-## 🔒 Security
+## 🔒 安全
 
-### Security Features
-- ✅ **Path traversal protection**
-- ✅ **Input validation & sanitization**
-- ✅ **CORS protection**
-- ✅ **Rate limiting**
-- ✅ **Docker security hardening**
-- ✅ **Non-root container user**
-- ✅ **Regular security scanning**
+### 安全特性
+- ✅ **路径遍历保护**
+- ✅ **输入验证与净化**
+- ✅ **CORS 保护**
+- ✅ **速率限制**
+- ✅ **Docker 安全加固**
+- ✅ **非 root 容器用户**
+- ✅ **定期安全扫描**
 
-### Reporting Security Issues
-Please report security vulnerabilities to the maintainers via [Security Advisory](https://github.com/Zie619/n8n-workflows/security/advisories/new).
+### 报告安全问题
+请通过 [Security Advisory](https://github.com/Zie619/n8n-workflows/security/advisories/new) 向维护者报告安全漏洞。
 
 ---
 
-## 📄 License
+## 📄 许可证
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ```
 MIT License
@@ -226,9 +226,9 @@ in the Software without restriction...
 
 ---
 
-## 💖 Support
+## 💖 支持
 
-If you find this project helpful, please consider:
+如果您觉得这个项目有帮助，请考虑：
 
 <div align="center">
 
@@ -240,7 +240,7 @@ If you find this project helpful, please consider:
 
 ---
 
-## 📊 Stats & Badges
+## 📊 统计与徽章
 
 <div align="center">
 
@@ -256,19 +256,19 @@ If you find this project helpful, please consider:
 
 ---
 
-## 🙏 Acknowledgments
+## 🙏 致谢
 
-- **n8n** - For creating an amazing automation platform
-- **Contributors** - Everyone who has helped improve this collection
-- **Community** - For feedback and support
-- **You** - For using and supporting this project!
+- **n8n** - 创造了令人惊叹的自动化平台
+- **贡献者** - 所有帮助改进此集合的人
+- **社区** - 提供反馈和支持
+- **您** - 使用和支持这个项目！
 
 ---
 
 <div align="center">
 
-### ⭐ Star us on GitHub — it motivates us a lot!
+### ⭐ 在 GitHub 上给我们点赞 — 这对我们是很大的鼓励！
 
-Made with ❤️ by [Zie619](https://github.com/Zie619) and [contributors](https://github.com/Zie619/n8n-workflows/graphs/contributors)
+由 [Zie619](https://github.com/Zie619) 和 [贡献者](https://github.com/Zie619/n8n-workflows/graphs/contributors) 用 ❤️ 制作
 
 </div>
