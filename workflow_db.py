@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Fast N8N Workflow Database
-SQLite-based workflow indexer and search engine for instant performance.
+快速 N8N 工作流数据库
+基于 SQLite 的工作流索引器和搜索引擎，提供即时性能。
 """
 
 import sqlite3
@@ -14,10 +14,10 @@ from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
 
 class WorkflowDatabase:
-    """High-performance SQLite database for workflow metadata and search."""
+    """高性能的 SQLite 数据库，用于工作流元数据和搜索。"""
     
     def __init__(self, db_path: str = None):
-        # Use environment variable if no path provided
+        # 如果没有提供路径，则使用环境变量
         if db_path is None:
             db_path = os.environ.get('WORKFLOW_DB_PATH', 'workflows.db')
         self.db_path = db_path
@@ -25,14 +25,14 @@ class WorkflowDatabase:
         self.init_database()
     
     def init_database(self):
-        """Initialize SQLite database with optimized schema and indexes."""
+        """使用优化的架构和索引初始化 SQLite 数据库。"""
         conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode=WAL")  # Write-ahead logging for performance
+        conn.execute("PRAGMA journal_mode=WAL")  # 启用预写日志以提高性能
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA cache_size=10000")
         conn.execute("PRAGMA temp_store=MEMORY")
         
-        # Create main workflows table
+        # 创建主工作流表
         conn.execute("""
             CREATE TABLE IF NOT EXISTS workflows (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,7 +54,7 @@ class WorkflowDatabase:
             )
         """)
         
-        # Create FTS5 table for full-text search
+        # 创建用于全文搜索的 FTS5 表
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS workflows_fts USING fts5(
                 filename,
@@ -67,14 +67,14 @@ class WorkflowDatabase:
             )
         """)
         
-        # Create indexes for fast filtering
+        # 创建索引以加快过滤速度
         conn.execute("CREATE INDEX IF NOT EXISTS idx_trigger_type ON workflows(trigger_type)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_complexity ON workflows(complexity)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_active ON workflows(active)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_node_count ON workflows(node_count)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_filename ON workflows(filename)")
         
-        # Create triggers to keep FTS table in sync
+        # 创建触发器以保持 FTS 表同步
         conn.execute("""
             CREATE TRIGGER IF NOT EXISTS workflows_ai AFTER INSERT ON workflows BEGIN
                 INSERT INTO workflows_fts(rowid, filename, name, description, integrations, tags)
@@ -102,7 +102,7 @@ class WorkflowDatabase:
         conn.close()
     
     def get_file_hash(self, file_path: str) -> str:
-        """Get MD5 hash of file for change detection."""
+        """获取文件的 MD5 哈希值用于变更检测。"""
         hash_md5 = hashlib.md5()
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
@@ -110,21 +110,21 @@ class WorkflowDatabase:
         return hash_md5.hexdigest()
     
     def format_workflow_name(self, filename: str) -> str:
-        """Convert filename to readable workflow name."""
-        # Remove .json extension
+        """将文件名转换为可读的工作流名称。"""
+        # 移除 .json 扩展名
         name = filename.replace('.json', '')
         
-        # Split by underscores
+        # 按下划线分割
         parts = name.split('_')
         
-        # Skip the first part if it's just a number
+        # 如果第一部分只是数字则跳过
         if len(parts) > 1 and parts[0].isdigit():
             parts = parts[1:]
         
-        # Convert parts to title case and join with spaces
+        # 将各部分转换为标题大小写并使用空格连接
         readable_parts = []
         for part in parts:
-            # Special handling for common terms
+            # 对常见术语进行特殊处理
             if part.lower() == 'http':
                 readable_parts.append('HTTP')
             elif part.lower() == 'api':
@@ -142,25 +142,25 @@ class WorkflowDatabase:
             elif part.lower() == 'manual':
                 readable_parts.append('Manual')
             else:
-                # Capitalize first letter
+                # 首字母大写
                 readable_parts.append(part.capitalize())
         
         return ' '.join(readable_parts)
     
     def analyze_workflow_file(self, file_path: str) -> Optional[Dict[str, Any]]:
-        """Analyze a single workflow file and extract metadata."""
+        """分析单个工作流文件并提取元数据。"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            print(f"Error reading {file_path}: {str(e)}")
+            print(f"读取 {file_path} 时出错: {str(e)}")
             return None
         
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path)
         file_hash = self.get_file_hash(file_path)
         
-        # Extract basic metadata
+        # 提取基本元数据
         workflow = {
             'filename': filename,
             'name': self.format_workflow_name(filename),
@@ -175,17 +175,17 @@ class WorkflowDatabase:
             'file_size': file_size
         }
         
-        # Use JSON name if available and meaningful, otherwise use formatted filename
+        # 如果 JSON 名称可用且有意义，则使用它，否则使用格式化的文件名
         json_name = data.get('name', '').strip()
         if json_name and json_name != filename.replace('.json', '') and not json_name.startswith('My workflow'):
             workflow['name'] = json_name
-        # If no meaningful JSON name, use formatted filename (already set above)
+        # 如果没有有意义的 JSON 名称，则使用格式化的文件名（已在上面设置）
         
-        # Analyze nodes
+        # 分析节点
         node_count = len(workflow['nodes'])
         workflow['node_count'] = node_count
         
-        # Determine complexity
+        # 确定复杂度
         if node_count <= 5:
             complexity = 'low'
         elif node_count <= 15:
@@ -194,12 +194,12 @@ class WorkflowDatabase:
             complexity = 'high'
         workflow['complexity'] = complexity
         
-        # Find trigger type and integrations
+        # 查找触发器类型和集成
         trigger_type, integrations = self.analyze_nodes(workflow['nodes'])
         workflow['trigger_type'] = trigger_type
         workflow['integrations'] = list(integrations)
         
-        # Use JSON description if available, otherwise generate one
+        # 如果有 JSON 描述则使用，否则生成一个
         json_description = data.get('description', '').strip()
         if json_description:
             workflow['description'] = json_description
@@ -209,13 +209,13 @@ class WorkflowDatabase:
         return workflow
     
     def analyze_nodes(self, nodes: List[Dict]) -> Tuple[str, set]:
-        """Analyze nodes to determine trigger type and integrations."""
+        """分析节点以确定触发器类型和集成。"""
         trigger_type = 'Manual'
         integrations = set()
         
-        # Enhanced service mapping for better recognition
+        # 增强的服务映射以提高识别率
         service_mappings = {
-            # Messaging & Communication
+            # 消息与通信
             'telegram': 'Telegram',
             'telegramTrigger': 'Telegram',
             'discord': 'Discord',
@@ -225,14 +225,14 @@ class WorkflowDatabase:
             'teams': 'Microsoft Teams',
             'rocketchat': 'Rocket.Chat',
             
-            # Email
+            # 电子邮件
             'gmail': 'Gmail',
             'mailjet': 'Mailjet',
             'emailreadimap': 'Email (IMAP)',
             'emailsendsmt': 'Email (SMTP)',
             'outlook': 'Outlook',
             
-            # Cloud Storage
+            # 云存储
             'googledrive': 'Google Drive',
             'googledocs': 'Google Docs',
             'googlesheets': 'Google Sheets',
@@ -240,7 +240,7 @@ class WorkflowDatabase:
             'onedrive': 'OneDrive',
             'box': 'Box',
             
-            # Databases
+            # 数据库
             'postgres': 'PostgreSQL',
             'mysql': 'MySQL',
             'mongodb': 'MongoDB',
@@ -248,7 +248,7 @@ class WorkflowDatabase:
             'airtable': 'Airtable',
             'notion': 'Notion',
             
-            # Project Management
+            # 项目管理
             'jira': 'Jira',
             'github': 'GitHub',
             'gitlab': 'GitLab',
@@ -256,44 +256,44 @@ class WorkflowDatabase:
             'asana': 'Asana',
             'mondaycom': 'Monday.com',
             
-            # AI/ML Services
+            # AI/ML 服务
             'openai': 'OpenAI',
             'anthropic': 'Anthropic',
             'huggingface': 'Hugging Face',
             
-            # Social Media
+            # 社交媒体
             'linkedin': 'LinkedIn',
             'twitter': 'Twitter/X',
             'facebook': 'Facebook',
             'instagram': 'Instagram',
             
-            # E-commerce
+            # 电子商务
             'shopify': 'Shopify',
             'stripe': 'Stripe',
             'paypal': 'PayPal',
             
-            # Analytics
+            # 分析
             'googleanalytics': 'Google Analytics',
             'mixpanel': 'Mixpanel',
             
-            # Calendar & Tasks
+            # 日历与任务
             'googlecalendar': 'Google Calendar', 
             'googletasks': 'Google Tasks',
             'cal': 'Cal.com',
             'calendly': 'Calendly',
             
-            # Forms & Surveys
+            # 表单与调查
             'typeform': 'Typeform',
             'googleforms': 'Google Forms',
             'form': 'Form Trigger',
             
-            # Development Tools
+            # 开发工具
             'webhook': 'Webhook',
             'httpRequest': 'HTTP Request',
             'graphql': 'GraphQL',
             'sse': 'Server-Sent Events',
             
-            # Utility nodes (exclude from integrations)
+            # 工具节点（从集成中排除）
             'set': None,
             'function': None,
             'code': None,
@@ -332,7 +332,7 @@ class WorkflowDatabase:
             node_type = node.get('type', '')
             node_name = node.get('name', '').lower()
             
-            # Determine trigger type
+            # 确定触发器类型
             if 'webhook' in node_type.lower() or 'webhook' in node_name:
                 trigger_type = 'Webhook'
             elif 'cron' in node_type.lower() or 'schedule' in node_type.lower():
@@ -341,24 +341,24 @@ class WorkflowDatabase:
                 if 'manual' not in node_type.lower():
                     trigger_type = 'Webhook'
             
-            # Extract integrations with enhanced mapping
+            # 使用增强映射提取集成
             service_name = None
             
-            # Handle n8n-nodes-base nodes
+            # 处理 n8n-nodes-base 节点
             if node_type.startswith('n8n-nodes-base.'):
                 raw_service = node_type.replace('n8n-nodes-base.', '').lower()
                 raw_service = raw_service.replace('trigger', '')
                 service_name = service_mappings.get(raw_service, raw_service.title() if raw_service else None)
             
-            # Handle @n8n/ namespaced nodes
+            # 处理 @n8n/ 命名空间节点
             elif node_type.startswith('@n8n/'):
                 raw_service = node_type.split('.')[-1].lower() if '.' in node_type else node_type.lower()
                 raw_service = raw_service.replace('trigger', '')
                 service_name = service_mappings.get(raw_service, raw_service.title() if raw_service else None)
             
-            # Handle custom nodes
+            # 处理自定义节点
             elif '-' in node_type or '@' in node_type:
-                # Try to extract service name from custom node names like "n8n-nodes-youtube-transcription-kasha.youtubeTranscripter"
+                # 尝试从自定义节点名称（如 "n8n-nodes-youtube-transcription-kasha.youtubeTranscripter"）中提取服务名称
                 parts = node_type.lower().split('.')
                 for part in parts:
                     if 'youtube' in part:
@@ -374,31 +374,31 @@ class WorkflowDatabase:
                         service_name = 'CalcsLive'
                         break
             
-            # Also check node names for service hints (but avoid false positives)
+            # 还检查节点名称以获取服务提示（但避免误报）
             for service_key, service_value in service_mappings.items():
                 if service_key in node_name and service_value:
-                    # Avoid false positive: "cal" in calcslive-related terms should not match "Cal.com"
+                    # 避免误报：calcslive相关术语中的 "cal" 不应匹配 "Cal.com"
                     if service_key == 'cal' and any(term in node_name.lower() for term in ['calcslive', 'calc', 'calculation']):
                         continue
                     service_name = service_value
                     break
             
-            # Add to integrations if valid service found
+            # 如果找到有效服务，则添加到集成列表
             if service_name and service_name not in ['None', None]:
                 integrations.add(service_name)
         
-        # Determine if complex based on node variety and count
+        # 根据节点多样性和数量确定是否复杂
         if len(nodes) > 10 and len(integrations) > 3:
             trigger_type = 'Complex'
         
         return trigger_type, integrations
     
     def generate_description(self, workflow: Dict, trigger_type: str, integrations: set) -> str:
-        """Generate a descriptive summary of the workflow."""
+        """生成工作流的描述性摘要。"""
         name = workflow['name']
         node_count = workflow['node_count']
         
-        # Start with trigger description
+        # 以触发器描述开始
         trigger_descriptions = {
             'Webhook': "Webhook-triggered automation that",
             'Scheduled': "Scheduled automation that", 
@@ -406,7 +406,7 @@ class WorkflowDatabase:
         }
         desc = trigger_descriptions.get(trigger_type, "Manual workflow that")
         
-        # Add functionality based on name and integrations
+        # 根据名称和集成添加功能描述
         if integrations:
             main_services = list(integrations)[:3]
             if len(main_services) == 1:
@@ -416,7 +416,7 @@ class WorkflowDatabase:
             else:
                 desc += f" orchestrates {', '.join(main_services[:-1])}, and {main_services[-1]}"
         
-        # Add workflow purpose hints from name
+        # 根据名称添加工作流用途提示
         name_lower = name.lower()
         if 'create' in name_lower:
             desc += " to create new records"
@@ -440,19 +440,19 @@ class WorkflowDatabase:
         return desc + "."
     
     def index_all_workflows(self, force_reindex: bool = False) -> Dict[str, int]:
-        """Index all workflow files. Only reprocesses changed files unless force_reindex=True."""
+        """索引所有工作流文件。除非设置 force_reindex=True，否则仅重新处理已更改的文件。"""
         if not os.path.exists(self.workflows_dir):
-            print(f"Warning: Workflows directory '{self.workflows_dir}' not found.")
+            print(f"警告: 工作流目录 '{self.workflows_dir}' 未找到。")
             return {'processed': 0, 'skipped': 0, 'errors': 0}
         
         workflows_path = Path(self.workflows_dir)
         json_files = [str(p) for p in workflows_path.rglob("*.json")]
         
         if not json_files:
-            print(f"Warning: No JSON files found in '{self.workflows_dir}' directory.")
+            print(f"警告: 在 '{self.workflows_dir}' 目录中未找到 JSON 文件。")
             return {'processed': 0, 'skipped': 0, 'errors': 0}
         
-        print(f"Indexing {len(json_files)} workflow files...")
+        print(f"正在索引 {len(json_files)} 个工作流文件...")
         
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -463,7 +463,7 @@ class WorkflowDatabase:
             filename = os.path.basename(file_path)
             
             try:
-                # Check if file needs to be reprocessed
+                # 检查文件是否需要重新处理
                 if not force_reindex:
                     current_hash = self.get_file_hash(file_path)
                     cursor = conn.execute(
@@ -475,13 +475,13 @@ class WorkflowDatabase:
                         stats['skipped'] += 1
                         continue
                 
-                # Analyze workflow
+                # 分析工作流
                 workflow_data = self.analyze_workflow_file(file_path)
                 if not workflow_data:
                     stats['errors'] += 1
                     continue
                 
-                # Insert or update in database
+                # 在数据库中插入或更新
                 conn.execute("""
                     INSERT OR REPLACE INTO workflows (
                         filename, name, workflow_id, active, description, trigger_type,
@@ -508,24 +508,24 @@ class WorkflowDatabase:
                 stats['processed'] += 1
                 
             except Exception as e:
-                print(f"Error processing {file_path}: {str(e)}")
+                print(f"处理 {file_path} 时出错: {str(e)}")
                 stats['errors'] += 1
                 continue
         
         conn.commit()
         conn.close()
         
-        print(f"✅ Indexing complete: {stats['processed']} processed, {stats['skipped']} skipped, {stats['errors']} errors")
+        print(f"✅ 索引完成: {stats['processed']} 已处理, {stats['skipped']} 已跳过, {stats['errors']} 个错误")
         return stats
     
     def search_workflows(self, query: str = "", trigger_filter: str = "all", 
                         complexity_filter: str = "all", active_only: bool = False,
                         limit: int = 50, offset: int = 0) -> Tuple[List[Dict], int]:
-        """Fast search with filters and pagination."""
+        """带筛选和分页的快速搜索。"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         
-        # Build WHERE clause
+        # 构建 WHERE 子句
         where_conditions = []
         params = []
         
@@ -540,9 +540,9 @@ class WorkflowDatabase:
             where_conditions.append("w.complexity = ?")
             params.append(complexity_filter)
         
-        # Use FTS search if query provided
+        # 如果提供了查询，使用 FTS 搜索
         if query.strip():
-            # FTS search with ranking
+            # 带排序的 FTS 搜索
             base_query = """
                 SELECT w.*, rank
                 FROM workflows_fts fts
@@ -551,7 +551,7 @@ class WorkflowDatabase:
             """
             params.insert(0, query)
         else:
-            # Regular query without FTS
+            # 不使用 FTS 的常规查询
             base_query = """
                 SELECT w.*, 0 as rank
                 FROM workflows w
@@ -561,12 +561,12 @@ class WorkflowDatabase:
         if where_conditions:
             base_query += " AND " + " AND ".join(where_conditions)
         
-        # Count total results
+        # 统计总结果数
         count_query = f"SELECT COUNT(*) as total FROM ({base_query}) t"
         cursor = conn.execute(count_query, params)
         total = cursor.fetchone()['total']
         
-        # Get paginated results
+        # 获取分页结果
         if query.strip():
             base_query += " ORDER BY rank"
         else:
@@ -577,18 +577,18 @@ class WorkflowDatabase:
         cursor = conn.execute(base_query, params)
         rows = cursor.fetchall()
         
-        # Convert to dictionaries and parse JSON fields
+        # 转换为字典并解析 JSON 字段
         results = []
         for row in rows:
             workflow = dict(row)
             workflow['integrations'] = json.loads(workflow['integrations'] or '[]')
             
-            # Parse tags and convert dict tags to strings
+            # 解析标签并将字典标签转换为字符串
             raw_tags = json.loads(workflow['tags'] or '[]')
             clean_tags = []
             for tag in raw_tags:
                 if isinstance(tag, dict):
-                    # Extract name from tag dict if available
+                    # 如果有标签字典，则提取名称
                     clean_tags.append(tag.get('name', str(tag.get('id', 'tag'))))
                 else:
                     clean_tags.append(str(tag))
@@ -600,18 +600,18 @@ class WorkflowDatabase:
         return results, total
     
     def get_stats(self) -> Dict[str, Any]:
-        """Get database statistics."""
+        """获取数据库统计信息。"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         
-        # Basic counts
+        # 基本统计
         cursor = conn.execute("SELECT COUNT(*) as total FROM workflows")
         total = cursor.fetchone()['total']
         
         cursor = conn.execute("SELECT COUNT(*) as active FROM workflows WHERE active = 1")
         active = cursor.fetchone()['active']
         
-        # Trigger type breakdown
+        # 触发器类型分类
         cursor = conn.execute("""
             SELECT trigger_type, COUNT(*) as count 
             FROM workflows 
@@ -619,7 +619,7 @@ class WorkflowDatabase:
         """)
         triggers = {row['trigger_type']: row['count'] for row in cursor.fetchall()}
         
-        # Complexity breakdown
+        # 复杂度分类
         cursor = conn.execute("""
             SELECT complexity, COUNT(*) as count 
             FROM workflows 
@@ -627,11 +627,11 @@ class WorkflowDatabase:
         """)
         complexity = {row['complexity']: row['count'] for row in cursor.fetchall()}
         
-        # Node stats
+        # 节点统计
         cursor = conn.execute("SELECT SUM(node_count) as total_nodes FROM workflows")
         total_nodes = cursor.fetchone()['total_nodes'] or 0
         
-        # Unique integrations count
+        # 唯一集成数量
         cursor = conn.execute("SELECT integrations FROM workflows WHERE integrations != '[]'")
         all_integrations = set()
         for row in cursor.fetchall():
@@ -652,7 +652,7 @@ class WorkflowDatabase:
         }
 
     def get_service_categories(self) -> Dict[str, List[str]]:
-        """Get service categories for enhanced filtering."""
+        """获取服务类别以增强过滤功能。"""
         return {
             'messaging': ['Telegram', 'Discord', 'Slack', 'WhatsApp', 'Mattermost', 'Microsoft Teams', 'Rocket.Chat'],
             'email': ['Gmail', 'Mailjet', 'Email (IMAP)', 'Email (SMTP)', 'Outlook'],
@@ -669,7 +669,7 @@ class WorkflowDatabase:
         }
 
     def search_by_category(self, category: str, limit: int = 50, offset: int = 0) -> Tuple[List[Dict], int]:
-        """Search workflows by service category."""
+        """按服务类别搜索工作流。"""
         categories = self.get_service_categories()
         if category not in categories:
             return [], 0
@@ -678,7 +678,7 @@ class WorkflowDatabase:
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         
-        # Build OR conditions for all services in category
+        # 为类别中的所有服务构建OR条件
         service_conditions = []
         params = []
         for service in services:
@@ -687,12 +687,12 @@ class WorkflowDatabase:
         
         where_clause = " OR ".join(service_conditions)
         
-        # Count total results
+        # 计算总结果数
         count_query = f"SELECT COUNT(*) as total FROM workflows WHERE {where_clause}"
         cursor = conn.execute(count_query, params)
         total = cursor.fetchone()['total']
         
-        # Get paginated results
+        # 获取分页结果
         query = f"""
             SELECT * FROM workflows 
             WHERE {where_clause}
@@ -703,7 +703,7 @@ class WorkflowDatabase:
         cursor = conn.execute(query, params)
         rows = cursor.fetchall()
         
-        # Convert to dictionaries and parse JSON fields
+        # 转换为字典并解析JSON字段
         results = []
         for row in rows:
             workflow = dict(row)
@@ -723,14 +723,14 @@ class WorkflowDatabase:
 
 
 def main():
-    """Command-line interface for workflow database."""
+    """工作流数据库的命令行界面。"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='N8N Workflow Database')
-    parser.add_argument('--index', action='store_true', help='Index all workflows')
-    parser.add_argument('--force', action='store_true', help='Force reindex all files')
-    parser.add_argument('--search', help='Search workflows')
-    parser.add_argument('--stats', action='store_true', help='Show database statistics')
+    parser = argparse.ArgumentParser(description='N8N 工作流数据库')
+    parser.add_argument('--index', action='store_true', help='索引所有工作流')
+    parser.add_argument('--force', action='store_true', help='强制重新索引所有文件')
+    parser.add_argument('--search', help='搜索工作流')
+    parser.add_argument('--stats', action='store_true', help='显示数据库统计信息')
     
     args = parser.parse_args()
     
@@ -738,22 +738,22 @@ def main():
     
     if args.index:
         stats = db.index_all_workflows(force_reindex=args.force)
-        print(f"Indexed {stats['processed']} workflows")
+        print(f"已索引 {stats['processed']} 个工作流")
     
     elif args.search:
         results, total = db.search_workflows(args.search, limit=10)
-        print(f"Found {total} workflows:")
+        print(f"找到 {total} 个工作流:")
         for workflow in results:
-            print(f"  - {workflow['name']} ({workflow['trigger_type']}, {workflow['node_count']} nodes)")
+            print(f"  - {workflow['name']} ({workflow['trigger_type']}, {workflow['node_count']} 个节点)")
     
     elif args.stats:
         stats = db.get_stats()
-        print(f"Database Statistics:")
-        print(f"  Total workflows: {stats['total']}")
-        print(f"  Active: {stats['active']}")
-        print(f"  Total nodes: {stats['total_nodes']}")
-        print(f"  Unique integrations: {stats['unique_integrations']}")
-        print(f"  Trigger types: {stats['triggers']}")
+        print(f"数据库统计信息:")
+        print(f"  总工作流数: {stats['total']}")
+        print(f"  活跃工作流: {stats['active']}")
+        print(f"  总节点数: {stats['total_nodes']}")
+        print(f"  唯一集成数: {stats['unique_integrations']}")
+        print(f"  触发器类型: {stats['triggers']}")
     
     else:
         parser.print_help()

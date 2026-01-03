@@ -1,60 +1,60 @@
-# N8N Workflows Documentation Platform - Deployment Guide
+# N8N 工作流文档平台 - 部署指南
 
-This guide covers deploying the N8N Workflows Documentation Platform in various environments.
+本指南介绍了在各种环境中部署 N8N 工作流文档平台的方法。
 
-## Quick Start (Docker)
+## 快速开始（Docker）
 
-### Development Environment
+### 开发环境
 ```bash
-# Clone repository
+# 克隆仓库
 git clone <repository-url>
 cd n8n-workflows-1
 
-# Start development environment
+# 启动开发环境
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-### Production Environment
+### 生产环境
 ```bash
-# Production deployment
+# 生产部署
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
-# With monitoring
+# 带有监控功能
 docker compose --profile monitoring up -d
 ```
 
-## Deployment Options
+## 部署选项
 
-### 1. Docker Compose (Recommended)
+### 1. Docker Compose（推荐）
 
-#### Development
+#### 开发环境
 ```bash
-# Start development environment with auto-reload
+# 启动带有自动重载功能的开发环境
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
-# With additional dev tools (DB admin, file watcher)
+# 使用额外的开发工具（数据库管理、文件监控器）
 docker compose --profile dev-tools up
 ```
 
-#### Production
+#### 生产环境
 ```bash
-# Basic production deployment
+# 基础生产部署
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
-# With reverse proxy and SSL
+# 带有反向代理和SSL
 docker compose --profile production up -d
 
-# With monitoring stack
+# 带有监控栈
 docker compose --profile monitoring up -d
 ```
 
-### 2. Standalone Docker
+### 2. 独立Docker
 
 ```bash
-# Build image
+# 构建镜像
 docker build -t workflows-doc:latest .
 
-# Run container
+# 运行容器
 docker run -d \
   --name n8n-workflows-docs \
   -p 8000:8000 \
@@ -64,36 +64,36 @@ docker run -d \
   workflows-doc:latest
 ```
 
-### 3. Python Direct Deployment
+### 3. Python直接部署
 
-#### Prerequisites
+#### 先决条件
 - Python 3.11+
 - pip
 
-#### Installation
+#### 安装
 ```bash
-# Install dependencies
+# 安装依赖
 pip install -r requirements.txt
 
-# Development mode
+# 开发模式
 python run.py --dev
 
-# Production mode
+# 生产模式
 python run.py --host 0.0.0.0 --port 8000
 ```
 
-#### Production with Gunicorn
+#### 使用Gunicorn的生产环境
 ```bash
-# Install gunicorn
+# 安装gunicorn
 pip install gunicorn
 
-# Start with gunicorn
+# 使用gunicorn启动
 gunicorn -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 api_server:app
 ```
 
-### 4. Kubernetes Deployment
+### 4. Kubernetes部署
 
-#### Basic Deployment
+#### 基础部署
 ```bash
 # Apply Kubernetes manifests
 kubectl apply -f k8s/namespace.yaml
@@ -109,28 +109,28 @@ kubectl apply -f k8s/ingress.yaml
 helm install n8n-workflows-docs ./helm/workflows-docs
 ```
 
-## Environment Configuration
+## 环境配置
 
-### Environment Variables
+### 环境变量
 
-| Variable | Description | Default | Required |
+| 变量 | 描述 | 默认值 | 是否必需 |
 |----------|-------------|---------|----------|
-| `ENVIRONMENT` | Deployment environment | `development` | No |
-| `LOG_LEVEL` | Logging level | `info` | No |
-| `HOST` | Bind host | `127.0.0.1` | No |
-| `PORT` | Bind port | `8000` | No |
-| `DATABASE_PATH` | SQLite database path | `database/workflows.db` | No |
-| `WORKFLOWS_PATH` | Workflows directory | `workflows` | No |
-| `ENABLE_METRICS` | Enable Prometheus metrics | `false` | No |
-| `MAX_WORKERS` | Max worker processes | `1` | No |
-| `DEBUG` | Enable debug mode | `false` | No |
-| `RELOAD` | Enable auto-reload | `false` | No |
+| `ENVIRONMENT` | 部署环境 | `development` | 否 |
+| `LOG_LEVEL` | 日志级别 | `info` | 否 |
+| `HOST` | 绑定主机 | `127.0.0.1` | 否 |
+| `PORT` | 绑定端口 | `8000` | 否 |
+| `DATABASE_PATH` | SQLite数据库路径 | `database/workflows.db` | 否 |
+| `WORKFLOWS_PATH` | 工作流目录 | `workflows` | 否 |
+| `ENABLE_METRICS` | 启用Prometheus指标 | `false` | 否 |
+| `MAX_WORKERS` | 最大工作进程数 | `1` | 否 |
+| `DEBUG` | 启用调试模式 | `false` | 否 |
+| `RELOAD` | 启用自动重载 | `false` | 否 |
 
-### Configuration Files
+### 配置文件
 
-Create environment-specific configuration:
+创建特定环境的配置：
 
-#### `.env` (Development)
+#### `.env`（开发环境）
 ```bash
 ENVIRONMENT=development
 LOG_LEVEL=debug
@@ -138,7 +138,7 @@ DEBUG=true
 RELOAD=true
 ```
 
-#### `.env.production` (Production)
+#### `.env.production`（生产环境）
 ```bash
 ENVIRONMENT=production
 LOG_LEVEL=warning
@@ -146,9 +146,9 @@ ENABLE_METRICS=true
 MAX_WORKERS=4
 ```
 
-## Security Configuration
+## 安全配置
 
-### 1. Reverse Proxy Setup (Traefik)
+### 1. 反向代理设置（Traefik）
 
 ```yaml
 # traefik/config/dynamic.yml
@@ -157,7 +157,7 @@ http:
     auth:
       basicAuth:
         users:
-          - "admin:$2y$10$..."  # Generate with htpasswd
+          - "admin:$2y$10$..."  # 使用htpasswd生成
     security-headers:
       headers:
         customRequestHeaders:
@@ -168,35 +168,35 @@ http:
         sslRedirect: true
 ```
 
-### 2. SSL/TLS Configuration
+### 2. SSL/TLS配置
 
-#### Let's Encrypt (Automatic)
+#### Let's Encrypt（自动）
 ```yaml
-# In docker-compose.prod.yml
+# 在docker-compose.prod.yml中
 command:
   - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
   - "--certificatesresolvers.myresolver.acme.email=admin@yourdomain.com"
 ```
 
-#### Custom SSL Certificate
+#### 自定义SSL证书
 ```yaml
 volumes:
   - ./ssl:/ssl:ro
 ```
 
-### 3. Basic Authentication
+### 3. 基本认证
 
 ```bash
-# Generate htpasswd entry
+# 生成htpasswd条目
 htpasswd -nb admin yourpassword
 
-# Add to Traefik labels
+# 添加到Traefik标签
 - "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$10$$..."
 ```
 
-## Performance Optimization
+## 性能优化
 
-### 1. Resource Limits
+### 1. 资源限制
 
 ```yaml
 # docker-compose.prod.yml
@@ -210,20 +210,20 @@ deploy:
       cpus: '0.25'
 ```
 
-### 2. Database Optimization
+### 2. 数据库优化
 
 ```bash
-# Force reindex for better performance
+# 强制重新索引以提高性能
 python run.py --reindex
 
-# Or via API
+# 或通过API
 curl -X POST http://localhost:8000/api/reindex
 ```
 
-### 3. Caching Headers
+### 3. 缓存头
 
 ```yaml
-# Traefik middleware for static files
+# Traefik静态文件中间件
 http:
   middlewares:
     cache-headers:
@@ -232,9 +232,9 @@ http:
           Cache-Control: "public, max-age=31536000"
 ```
 
-## Monitoring & Logging
+## 监控与日志
 
-### 1. Health Checks
+### 1. 健康检查
 
 ```bash
 # Docker health check
@@ -245,7 +245,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 curl http://localhost:8000/api/stats
 ```
 
-### 2. Logs
+### 2. 日志
 
 ```bash
 # View application logs
@@ -258,7 +258,7 @@ docker logs n8n-workflows-docs
 /app/logs/app.log
 ```
 
-### 3. Metrics (Prometheus)
+### 3. 指标（Prometheus）
 
 ```bash
 # Start monitoring stack
@@ -268,9 +268,9 @@ docker compose --profile monitoring up -d
 http://localhost:9090
 ```
 
-## Backup & Recovery
+## 备份与恢复
 
-### 1. Database Backup
+### 1. 数据库备份
 
 ```bash
 # Backup SQLite database
@@ -280,7 +280,7 @@ cp database/workflows.db database/workflows.db.backup
 docker exec n8n-workflows-docs cp /app/database/workflows.db /app/database/workflows.db.backup
 ```
 
-### 2. Configuration Backup
+### 2. 配置备份
 
 ```bash
 # Backup entire configuration
@@ -291,7 +291,7 @@ tar -czf n8n-workflows-backup-$(date +%Y%m%d).tar.gz \
   .env*
 ```
 
-### 3. Restore
+### 3. 恢复
 
 ```bash
 # Stop services
@@ -304,9 +304,9 @@ cp database/workflows.db.backup database/workflows.db
 docker compose up -d
 ```
 
-## Scaling & Load Balancing
+## 扩展与负载均衡
 
-### 1. Multiple Instances
+### 1. 多实例部署
 
 ```yaml
 # docker-compose.scale.yml
@@ -321,7 +321,7 @@ services:
 docker compose up --scale workflows-docs=3
 ```
 
-### 2. Load Balancer Configuration
+### 2. 负载均衡器配置
 
 ```yaml
 # Traefik load balancing
@@ -330,11 +330,11 @@ labels:
   - "traefik.http.services.workflows-docs.loadbalancer.sticky=true"
 ```
 
-## Troubleshooting
+## 故障排除
 
-### Common Issues
+### 常见问题
 
-1. **Database locked error**
+1. **数据库锁定错误**
    ```bash
    # Check file permissions
    ls -la database/
@@ -343,7 +343,7 @@ labels:
    chmod 664 database/workflows.db
    ```
 
-2. **Port already in use**
+2. **端口已被占用**
    ```bash
    # Check what's using the port
    lsof -i :8000
@@ -352,7 +352,7 @@ labels:
    docker compose up -d -p 8001:8000
    ```
 
-3. **Out of memory**
+3. **内存不足**
    ```bash
    # Check memory usage
    docker stats
@@ -361,7 +361,7 @@ labels:
    # Edit docker-compose.prod.yml resources
    ```
 
-### Logs & Debugging
+### 日志与调试
 
 ```bash
 # Application logs
@@ -374,9 +374,9 @@ docker exec workflows-docs tail -f /app/logs/app.log
 docker exec workflows-docs sqlite3 /app/database/workflows.db ".tables"
 ```
 
-## Migration & Updates
+## 迁移与更新
 
-### 1. Update Application
+### 1. 更新应用
 
 ```bash
 # Pull latest changes
@@ -387,7 +387,7 @@ docker compose down
 docker compose up -d --build
 ```
 
-### 2. Database Migration
+### 2. 数据库迁移
 
 ```bash
 # Backup current database
@@ -397,7 +397,7 @@ cp database/workflows.db database/workflows.db.backup
 python run.py --reindex
 ```
 
-### 3. Zero-downtime Updates
+### 3. 零停机更新
 
 ```bash
 # Blue-green deployment
@@ -409,32 +409,32 @@ docker compose -p n8n-workflows-green up -d --build
 docker compose -p n8n-workflows-blue down
 ```
 
-## Security Checklist
+## 安全检查清单
 
-- [ ] Use non-root user in Docker container
-- [ ] Enable HTTPS/SSL in production
-- [ ] Configure proper firewall rules
-- [ ] Use strong authentication credentials
-- [ ] Regular security updates
-- [ ] Enable access logs and monitoring
-- [ ] Backup sensitive data securely
-- [ ] Review and audit configurations regularly
+- [ ] 在Docker容器中使用非root用户
+- [ ] 在生产环境中启用HTTPS/SSL
+- [ ] 配置适当的防火墙规则
+- [ ] 使用强认证凭据
+- [ ] 定期进行安全更新
+- [ ] 启用访问日志和监控
+- [ ] 安全备份敏感数据
+- [ ] 定期审查和审计配置
 
-## Support & Maintenance
+## 支持与维护
 
-### Regular Tasks
+### 常规任务
 
-1. **Daily**
+1. **每日**
    - Monitor application health
    - Check error logs
    - Verify backup completion
 
-2. **Weekly**
+2. **每周**
    - Review performance metrics
    - Update dependencies if needed
    - Test disaster recovery procedures
 
-3. **Monthly**
+3. **每月**
    - Security audit
    - Database optimization
    - Update documentation

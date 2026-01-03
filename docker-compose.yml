@@ -1,56 +1,79 @@
-services:
-  # N8N Workflows Documentation Service
-  workflows-docs:
-    image: workflows-doc:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: n8n-workflows-docs
-    ports:
-      - "8000:8000"
-    volumes:
-      - workflows-db:/app/database
-      - workflows-logs:/app/logs
-    environment:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=info
-    restart: unless-stopped
-    networks:
-      - workflows-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.workflows-docs.rule=Host(`localhost`)"
-      - "traefik.http.services.workflows-docs.loadbalancer.server.port=8000"
+# Docker Compose配置文件 - N8N工作流文档服务
+# 用于定义和管理N8N工作流文档服务及其相关组件
 
-  # Optional: Traefik reverse proxy for production
-  reverse-proxy:
-    image: traefik:v2.10
-    command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--api.dashboard=true"
-      - "--api.insecure=true"
-      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=admin@example.com"
-      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+services:
+  # N8N工作流文档服务 - 主服务
+  workflows-docs:
+    # 使用的Docker镜像名称和标签
+    image: workflows-doc:latest
+    # 构建配置
+    build:
+      context: .  # 构建上下文（当前目录）
+      dockerfile: Dockerfile  # 使用的Dockerfile名称
+    # 容器名称
+    container_name: n8n-workflows-docs
+    # 端口映射 - 主机端口:容器端口
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"  # Traefik dashboard
+      - "8000:8000"  # 将主机的8000端口映射到容器的8000端口
+    # 卷挂载 - 持久化数据和日志
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./letsencrypt:/letsencrypt
+      - workflows-db:/app/database  # 工作流数据库持久化存储
+      - workflows-logs:/app/logs     # 日志文件持久化存储
+    # 环境变量配置
+    environment:
+      - ENVIRONMENT=production  # 运行环境设置为生产环境
+      - LOG_LEVEL=info          # 日志级别设置为info
+    # 重启策略 - 除非手动停止，否则容器退出时自动重启
+    restart: unless-stopped
+    # 网络配置 - 连接到指定网络
     networks:
       - workflows-network
+    # Traefik标签配置 - 用于反向代理集成
+    labels:
+      - "traefik.enable=true"  # 启用Traefik代理
+      - "traefik.http.routers.workflows-docs.rule=Host(`localhost`)"  # 路由规则：匹配localhost主机
+      - "traefik.http.services.workflows-docs.loadbalancer.server.port=8000"  # 负载均衡目标端口
+
+  # 可选：生产环境使用的Traefik反向代理服务
+  reverse-proxy:
+    # 使用的Traefik镜像版本
+    image: traefik:v2.10
+    # Traefik命令行参数配置
+    command:
+      - "--providers.docker=true"  # 启用Docker提供者，从Docker容器获取配置
+      - "--providers.docker.exposedbydefault=false"  # 默认不暴露所有容器
+      - "--entrypoints.web.address=:80"  # 定义HTTP入口点，监听80端口
+      - "--entrypoints.websecure.address=:443"  # 定义HTTPS入口点，监听443端口
+      - "--api.dashboard=true"  # 启用Traefik仪表盘
+      - "--api.insecure=true"  # 允许通过HTTP访问仪表盘（仅用于开发环境）
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"  # 启用ACME TLS挑战
+      - "--certificatesresolvers.myresolver.acme.email=admin@example.com"  # ACME注册邮箱
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"  # ACME证书存储位置
+    # 端口映射 - 暴露HTTP、HTTPS和仪表盘端口
+    ports:
+      - "80:80"    # HTTP端口
+      - "443:443"  # HTTPS端口
+      - "8080:8080"  # Traefik仪表盘端口
+    # 卷挂载
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # 只读访问Docker套接字，用于获取容器信息
+      - ./letsencrypt:/letsencrypt  # ACME证书持久化存储
+    # 网络配置 - 连接到与文档服务相同的网络
+    networks:
+      - workflows-network
+    # 配置文件 - 只有指定production配置文件时才启动此服务
     profiles:
       - production
 
+# 网络定义
 networks:
+  # 自定义网络，用于服务间通信
   workflows-network:
-    driver: bridge
+    driver: bridge  # 使用桥接网络驱动
 
+# 卷定义
 volumes:
+  # 工作流数据库持久化卷
   workflows-db:
+  # 日志文件持久化卷
   workflows-logs:

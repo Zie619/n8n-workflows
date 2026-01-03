@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🚀 N8N Workflows Search Engine Launcher
-Start the advanced search system with optimized performance.
+🚀 N8N工作流搜索引擎启动器
+启动性能优化的高级搜索系统。
 """
 
 import sys
@@ -11,13 +11,13 @@ from pathlib import Path
 
 
 def print_banner():
-    """Print application banner."""
-    print("🚀 n8n-workflows Advanced Search Engine")
+    """打印应用程序横幅。"""
+    print("🚀 n8n-workflows高级搜索引擎")
     print("=" * 50)
 
 
 def check_requirements() -> bool:
-    """Check if required dependencies are installed."""
+    """检查是否安装了所需的依赖项。"""
     missing_deps = []
     
     try:
@@ -36,69 +36,69 @@ def check_requirements() -> bool:
         missing_deps.append("fastapi")
     
     if missing_deps:
-        print(f"❌ Missing dependencies: {', '.join(missing_deps)}")
-        print("💡 Install with: pip install -r requirements.txt")
+        print(f"❌ 缺少依赖项: {', '.join(missing_deps)}")
+        print("💡 安装命令: pip install -r requirements.txt")
         return False
     
-    print("✅ Dependencies verified")
+    print("✅ 依赖项已验证")
     return True
 
 
 def setup_directories():
-    """Create necessary directories."""
+    """创建必要的目录。"""
     directories = ["database", "static", "workflows"]
     
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
     
-    print("✅ Directories verified")
+    print("✅ 目录已验证")
 
 
 def setup_database(force_reindex: bool = False, skip_index: bool = False) -> str:
-    """Setup and initialize the database."""
+    """设置并初始化数据库。"""
     from workflow_db import WorkflowDatabase
 
     db_path = "database/workflows.db"
 
-    print(f"🔄 Setting up database: {db_path}")
+    print(f"🔄 设置数据库: {db_path}")
     db = WorkflowDatabase(db_path)
 
-    # Skip indexing in CI mode or if explicitly requested
+    # 在CI模式或明确请求时跳过索引
     if skip_index:
-        print("⏭️  Skipping workflow indexing (CI mode)")
+        print("⏭️  跳过工作流索引 (CI模式)")
         stats = db.get_stats()
-        print(f"✅ Database ready: {stats['total']} workflows")
+        print(f"✅ 数据库已准备就绪: {stats['total']} 个工作流")
         return db_path
 
-    # Check if database has data or force reindex
+    # 检查数据库是否有数据或强制重建索引
     stats = db.get_stats()
     if stats['total'] == 0 or force_reindex:
-        print("📚 Indexing workflows...")
+        print("📚 正在为工作流建立索引...")
         index_stats = db.index_all_workflows(force_reindex=True)
-        print(f"✅ Indexed {index_stats['processed']} workflows")
+        print(f"✅ 已索引 {index_stats['processed']} 个工作流")
 
-        # Show final stats
+        # 显示最终统计信息
         final_stats = db.get_stats()
-        print(f"📊 Database contains {final_stats['total']} workflows")
+        print(f"📊 数据库包含 {final_stats['total']} 个工作流")
     else:
-        print(f"✅ Database ready: {stats['total']} workflows")
+        print(f"✅ 数据库已准备就绪: {stats['total']} 个工作流")
 
     return db_path
 
 
 def start_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
-    """Start the FastAPI server."""
-    print(f"🌐 Starting server at http://{host}:{port}")
-    print(f"📊 API Documentation: http://{host}:{port}/docs")
-    print(f"🔍 Workflow Search: http://{host}:{port}/api/workflows")
+    """启动FastAPI服务器。"""
+    print(f"🌐 服务器正在启动: http://{host}:{port}")
+    print(f"📊 API文档: http://{host}:{port}/docs")
+    print(f"🔍 工作流搜索: http://{host}:{port}/api/workflows")
     print()
-    print("Press Ctrl+C to stop the server")
+    print("按Ctrl+C停止服务器")
     print("-" * 50)
     
-    # Configure database path
+    # 配置数据库路径
     os.environ['WORKFLOW_DB_PATH'] = "database/workflows.db"
     
-    # Start uvicorn with better configuration
+    # 使用优化配置启动uvicorn
     import uvicorn
     uvicorn.run(
         "api_server:app", 
@@ -111,71 +111,71 @@ def start_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = False
 
 
 def main():
-    """Main entry point with command line arguments."""
+    """带命令行参数的主入口点。"""
     sys.stdout.reconfigure(encoding='utf-8')
     parser = argparse.ArgumentParser(
-        description="N8N Workflows Search Engine",
+        description="N8N工作流搜索引擎",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  python run.py                    # Start with default settings
-  python run.py --port 3000        # Start on port 3000
-  python run.py --host 0.0.0.0     # Accept external connections
-  python run.py --reindex          # Force database reindexing
-  python run.py --dev              # Development mode with auto-reload
+示例:
+  python run.py                    # 使用默认设置启动
+  python run.py --port 3000        # 在端口3000上启动
+  python run.py --host 0.0.0.0     # 接受外部连接
+  python run.py --reindex          # 强制数据库重建索引
+  python run.py --dev              # 开发模式，带自动重载
         """
     )
     
     parser.add_argument(
         "--host", 
         default="127.0.0.1", 
-        help="Host to bind to (default: 127.0.0.1)"
+        help="要绑定的主机 (默认: 127.0.0.1)"
     )
     parser.add_argument(
         "--port", 
         type=int, 
         default=8000, 
-        help="Port to bind to (default: 8000)"
+        help="要绑定的端口 (默认: 8000)"
     )
     parser.add_argument(
         "--reindex", 
         action="store_true", 
-        help="Force database reindexing"
+        help="强制数据库重建索引"
     )
     parser.add_argument(
         "--dev",
         action="store_true",
-        help="Development mode with auto-reload"
+        help="开发模式，带自动重载"
     )
     parser.add_argument(
         "--skip-index",
         action="store_true",
-        help="Skip workflow indexing (useful for CI/testing)"
+        help="跳过工作流索引 (对CI/测试有用)"
     )
 
     args = parser.parse_args()
 
-    # Also check environment variable for CI mode
+    # 同时检查CI模式的环境变量
     ci_mode = os.environ.get('CI', '').lower() in ('true', '1', 'yes')
     skip_index = args.skip_index or ci_mode
     
     print_banner()
     
-    # Check dependencies
+    # 检查依赖项
     if not check_requirements():
         sys.exit(1)
     
-    # Setup directories
+    # 设置目录
     setup_directories()
     
-    # Setup database
+    # 设置数据库
     try:
         setup_database(force_reindex=args.reindex, skip_index=skip_index)
     except Exception as e:
-        print(f"❌ Database setup error: {e}")
+        print(f"❌ 数据库设置错误: {e}")
         sys.exit(1)
     
-    # Start server
+    # 启动服务器
     try:
         start_server(
             host=args.host, 
@@ -183,9 +183,9 @@ Examples:
             reload=args.dev
         )
     except KeyboardInterrupt:
-        print("\n👋 Server stopped!")
+        print("\n👋 服务器已停止!")
     except Exception as e:
-        print(f"❌ Server error: {e}")
+        print(f"❌ 服务器错误: {e}")
         sys.exit(1)
 
 

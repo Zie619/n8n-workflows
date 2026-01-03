@@ -1,15 +1,15 @@
 
 
-# n8n-workflows Repository
+# n8n-workflows 仓库
 
 #
 
-# Overview
-This repository contains a collection of n8n workflow automation files. n8n is a workflow automation tool that allows creating complex automations through a visual node-based interface. Each workflow is stored as a JSON file containing node definitions, connections, and configurations.
+# 概述
+此仓库包含一系列 n8n 工作流自动化文件。n8n 是一个工作流自动化工具，允许通过可视化的基于节点的界面创建复杂的自动化流程。每个工作流都存储为一个 JSON 文件，包含节点定义、连接和配置信息。
 
 #
 
-# Repository Structure
+# 仓库结构
 ```text
 
 text
@@ -18,21 +18,21 @@ text
 n8n-workflows/
 ├── workflows/           
 
-# Main directory containing all n8n workflow JSON files
+# 包含所有 n8n 工作流 JSON 文件的主目录
 │   ├── *.json          
 
-# Individual workflow files
+# 单个工作流文件
 ├── README.md           
 
-# Repository documentation
-├── claude.md           
+# 仓库文档
+├── CLAUDE.md           
 
-# This file
+# 此文件
 
- - AI assistant context
+ - AI 助手上下文
 └── [other files]       
 
-# Additional configuration or documentation files
+# 其他配置或文档文件
 ```text
 
 text
@@ -41,186 +41,186 @@ text
 
 #
 
-# Workflow File Format
-Each workflow JSON file contains:
+# 工作流文件格式
+每个工作流 JSON 文件包含：
 
-- **name**: Workflow identifier
+- **name**：工作流标识符
 
-- **nodes**: Array of node objects defining operations
+- **nodes**：定义操作的节点对象数组
 
-- **connections**: Object defining how nodes are connected
+- **connections**：定义节点连接方式的对象
 
-- **settings**: Workflow-level configuration
+- **settings**：工作流级别的配置
 
-- **staticData**: Persistent data across executions
+- **staticData**：跨执行的持久数据
 
-- **tags**: Categorization tags
+- **tags**：分类标签
 
-- **createdAt/updatedAt**: Timestamps
-
-#
-
-# Common Node Types
-
-- **Trigger Nodes**: webhook, cron, manual
-
-- **Integration Nodes**: HTTP Request, database connectors, API integrations
-
-- **Logic Nodes**: IF, Switch, Merge, Loop
-
-- **Data Nodes**: Function, Set, Transform Data
-
-- **Communication**: Email, Slack, Discord, etc.
+- **createdAt/updatedAt**：时间戳
 
 #
 
-# Working with This Repository
+# 常见节点类型
+
+- **触发器节点**：webhook、cron、手动
+
+- **集成节点**：HTTP 请求、数据库连接器、API 集成
+
+- **逻辑节点**：IF、Switch、Merge、Loop
+
+- **数据节点**：Function、Set、Transform Data
+
+- **通信**：Email、Slack、Discord 等
 
 #
 
-#
-
-# For Analysis Tasks
-When analyzing workflows in this repository:
-
-1. Parse JSON files to understand workflow structure
-
-2. Examine node chains to determine functionality
-
-3. Identify external integrations and dependencies
-
-4. Consider the business logic implemented by node connections
+# 使用此仓库
 
 #
 
 #
 
-# For Documentation Tasks
-When documenting workflows:
+# 用于分析任务
+在分析此仓库中的工作流时：
 
-1. Verify existing descriptions against actual implementation
+1. 解析 JSON 文件以了解工作流结构
 
-2. Identify trigger mechanisms and schedules
+2. 检查节点链以确定功能
 
-3. List all external services and APIs used
+3. 识别外部集成和依赖关系
 
-4. Note data transformations and business logic
-
-5. Highlight any error handling or retry mechanisms
+4. 考虑节点连接实现的业务逻辑
 
 #
 
 #
 
-# For Modification Tasks
-When modifying workflows:
+# 用于文档任务
+在记录工作流时：
 
-1. Preserve the JSON structure and required fields
+1. 验证现有描述与实际实现是否一致
 
-2. Maintain node ID uniqueness
+2. 识别触发机制和调度
 
-3. Update connections when adding/removing nodes
+3. 列出所有使用的外部服务和 API
 
-4. Test compatibility with n8n version requirements
+4. 记录数据转换和业务逻辑
 
-#
-
-# Key Considerations
+5. 突出显示任何错误处理或重试机制
 
 #
 
 #
 
-# Security
+# 用于修改任务
+在修改工作流时：
 
-- Workflow files may contain sensitive information in webhook URLs or API configurations
+1. 保留 JSON 结构和必需字段
 
-- Credentials are typically stored separately in n8n, not in the workflow files
+2. 保持节点 ID 的唯一性
 
-- Be cautious with any hardcoded values or endpoints
+3. 添加/删除节点时更新连接
+
+4. 测试与 n8n 版本要求的兼容性
+
+#
+
+# 关键考虑因素
 
 #
 
 #
 
-# Best Practices
+# 安全性
 
-- Workflows should have clear, descriptive names
+- 工作流文件可能在 webhook URL 或 API 配置中包含敏感信息
 
-- Complex workflows benefit from documentation nodes or comments
+- 凭证通常在 n8n 中单独存储，而不是在工作流文件中
 
-- Error handling nodes improve reliability
-
-- Modular workflows (calling sub-workflows) improve maintainability
+- 对任何硬编码值或端点保持谨慎
 
 #
 
 #
 
-# Common Patterns
+# 最佳实践
 
-- **Data Pipeline**: Trigger → Fetch Data → Transform → Store/Send
+- 工作流应有清晰、描述性的名称
 
-- **Integration Sync**: Cron → API Call → Compare → Update Systems
+- 复杂工作流受益于文档节点或注释
 
-- **Automation**: Webhook → Process → Conditional Logic → Actions
+- 错误处理节点提高可靠性
 
-- **Monitoring**: Schedule → Check Status → Alert if Issues
-
-#
-
-# Helpful Context for AI Assistants
-
-When assisting with this repository:
-
-1. **Workflow Analysis**: Focus on understanding the business purpose by examining the node flow, not just individual nodes.
-
-2. **Documentation Generation**: Create descriptions that explain what the workflow accomplishes, not just what nodes it contains.
-
-3. **Troubleshooting**: Common issues include:
-
-   - Incorrect node connections
-
-   - Missing error handling
-
-   - Inefficient data processing in loops
-
-   - Hardcoded values that should be parameters
-
-4. **Optimization Suggestions**:
-
-   - Identify redundant operations
-
-   - Suggest batch processing where applicable
-
-   - Recommend error handling additions
-
-   - Propose splitting complex workflows
-
-5. **Code Generation**: When creating tools to analyze these workflows:
-
-   - Handle various n8n format versions
-
-   - Account for custom nodes
-
-   - Parse expressions in node parameters
-
-   - Consider node execution order
+- 模块化工作流（调用子工作流）提高可维护性
 
 #
 
-# Repository-Specific Information
-[Add any specific information about your workflows, naming conventions, or special considerations here]
+#
+
+# 常见模式
+
+- **数据管道**：触发 → 获取数据 → 转换 → 存储/发送
+
+- **集成同步**：定时任务 → API 调用 → 比较 → 更新系统
+
+- **自动化**：Webhook → 处理 → 条件逻辑 → 操作
+
+- **监控**：调度 → 检查状态 → 出现问题时告警
 
 #
 
-# Version Compatibility
+# AI 助手的有用上下文
 
-- n8n version: [Specify the n8n version these workflows are compatible with]
+在为此仓库提供帮助时：
 
-- Last updated: [Date of last major update]
+1. **工作流分析**：通过检查节点流来理解业务目的，而不仅仅是单个节点。
 
-- Migration notes: [Any version-specific considerations]
+2. **文档生成**：创建说明工作流实现了什么的描述，而不仅仅是它包含哪些节点。
+
+3. **故障排除**：常见问题包括：
+
+   - 节点连接不正确
+
+   - 缺少错误处理
+
+   - 循环中的数据处理效率低下
+
+   - 应该作为参数的硬编码值
+
+4. **优化建议**：
+
+   - 识别冗余操作
+
+   - 在适用的情况下建议批量处理
+
+   - 建议添加错误处理
+
+   - 建议拆分复杂工作流
+
+5. **代码生成**：创建分析这些工作流的工具时：
+
+   - 处理各种 n8n 格式版本
+
+   - 考虑自定义节点
+
+   - 解析节点参数中的表达式
+
+   - 考虑节点执行顺序
+
+#
+
+# 仓库特定信息
+[在此添加有关您的工作流、命名约定或特殊考虑因素的任何特定信息]
+
+#
+
+# 版本兼容性
+
+- n8n 版本：[指定这些工作流兼容的 n8n 版本]
+
+- 最后更新：[最后一次重大更新的日期]
+
+- 迁移说明：[任何版本特定的考虑因素]
 
 -
 

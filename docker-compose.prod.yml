@@ -1,66 +1,97 @@
+# Docker Compose 生产环境配置文件 - N8N工作流文档服务
+# 用于生产环境部署的正式配置，包含服务资源限制、安全配置和监控选项
+
 services:
+  # N8N工作流文档服务 - 生产环境配置
   workflows-docs:
+    # 重启策略 - 总是重启（即使容器正常退出）
     restart: always
+    # 生产环境特定的环境变量
     environment:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=warning
-      - ENABLE_METRICS=true
-      - MAX_WORKERS=4
+      - ENVIRONMENT=production  # 运行环境设置为生产环境
+      - LOG_LEVEL=warning       # 日志级别设置为warning（减少日志量）
+      - ENABLE_METRICS=true     # 启用指标监控
+      - MAX_WORKERS=4           # 最大工作进程数设置为4
+    # 卷挂载配置
     volumes:
-      - workflows-db:/app/database
-      - workflows-logs:/app/logs
-      - ./workflows:/app/workflows:ro  # Read-only workflow files
+      - workflows-db:/app/database       # 工作流数据库持久化存储
+      - workflows-logs:/app/logs         # 日志文件持久化存储
+      - ./workflows:/app/workflows:ro    # 工作流文件只读挂载
+    # 资源限制配置 - 生产环境优化
     deploy:
       resources:
+        # 资源上限
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 512M  # 最大内存使用限制为512MB
+          cpus: '0.5'   # 最大CPU使用率限制为50%
+        # 资源预留
         reservations:
-          memory: 256M
-          cpus: '0.25'
+          memory: 256M  # 确保预留256MB内存
+          cpus: '0.25'   # 确保预留25%的CPU使用率
+    # Traefik反向代理配置
     labels:
-      - "traefik.enable=true"
+      - "traefik.enable=true"  # 启用Traefik代理
+      # 路由规则：匹配指定的域名
       - "traefik.http.routers.workflows-docs.rule=Host(`workflows.yourdomain.com`)"
-      - "traefik.http.routers.workflows-docs.tls=true"
+      - "traefik.http.routers.workflows-docs.tls=true"  # 启用TLS加密
+      # TLS证书解析器配置
       - "traefik.http.routers.workflows-docs.tls.certresolver=myresolver"
+      # 负载均衡目标端口
       - "traefik.http.services.workflows-docs.loadbalancer.server.port=8000"
-      - "traefik.http.middlewares.workflows-docs-auth.basicauth.users=admin:$$2y$$10$$..."  # Generate with htpasswd
+      # 基本认证配置（生产环境安全措施）
+      - "traefik.http.middlewares.workflows-docs-auth.basicauth.users=admin:$$2y$$10$$..."  # 使用htpasswd生成的用户密码哈希
 
-  # Production reverse proxy
+  # 生产环境反向代理服务
   reverse-proxy:
+    # 重启策略 - 总是重启
     restart: always
+    # Traefik中间件配置 - 基本认证
+    labels:
+      # 基本认证用户配置示例（密码为'examplepassword'的哈希）
       - "traefik.http.middlewares.workflows-docs-auth.basicauth.users=admin:$$2y$$12$$eImiTXuWVxfM37uY4JANjQ=="
-      # Example hash for password 'examplepassword'. Generate your own with: htpasswd -nbB <user> <password>
-      # See: https://doc.traefik.io/traefik/middlewares/http/basicauth/
+      # 生成方式：使用命令 htpasswd -nbB <用户名> <密码>
+      # 参考文档：https://doc.traefik.io/traefik/middlewares/http/basicauth/
+    # 卷挂载配置
     volumes:
-      - ./traefik/config:/etc/traefik/dynamic:ro
-      - ./ssl:/ssl:ro
+      - ./traefik/config:/etc/traefik/dynamic:ro  # Traefik动态配置文件（只读）
+      - ./ssl:/ssl:ro                            # SSL证书文件（只读）
+    # Traefik环境变量配置
     environment:
-      - TRAEFIK_LOG_LEVEL=INFO
+      - TRAEFIK_LOG_LEVEL=INFO  # Traefik日志级别设置为INFO
+    # 资源限制配置
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: '0.25'
+          memory: 256M  # 最大内存使用限制为256MB
+          cpus: '0.25'   # 最大CPU使用率限制为25%
 
-  # Optional: Monitoring stack
+  # 可选：监控服务栈（Prometheus）
   monitoring:
+    # 使用的Prometheus镜像
     image: prom/prometheus:latest
+    # 容器名称
     container_name: prometheus
+    # Prometheus命令行参数配置
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--config.file=/etc/prometheus/prometheus.yml'          # 配置文件路径
+      - '--storage.tsdb.path=/prometheus'                       # 时序数据库存储路径
+      - '--web.console.libraries=/etc/prometheus/console_libraries'  # 控制台库路径
+      - '--web.console.templates=/etc/prometheus/consoles'      # 控制台模板路径
+    # 端口映射 - Prometheus web界面
     ports:
-      - "9090:9090"
+      - "9090:9090"  # 将主机的9090端口映射到容器的9090端口
+    # 卷挂载配置
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro  # Prometheus配置文件（只读）
+      - prometheus-data:/prometheus  # Prometheus数据持久化存储
+    # 网络配置
     networks:
-      - workflows-network
+      - workflows-network  # 连接到工作流网络
+    # 配置文件 - 仅当启用monitoring配置文件时才启动
     profiles:
       - monitoring
 
+# 数据卷定义
 volumes:
+  # Prometheus监控数据持久化卷
   prometheus-data:
