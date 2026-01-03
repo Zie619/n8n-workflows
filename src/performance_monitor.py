@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Performance Monitoring System for N8N Workflows
-Real-time metrics, monitoring, and alerting.
+N8N工作流性能监控系统
+实时指标、监控和告警功能。
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -19,6 +19,22 @@ import queue
 import os
 
 class PerformanceMetrics(BaseModel):
+    """
+    性能指标数据模型
+    用于表示系统和工作流的性能指标。
+    
+    属性:
+        timestamp: 时间戳，格式为ISO字符串
+        cpu_usage: CPU使用率，百分比
+        memory_usage: 内存使用率，百分比
+        disk_usage: 磁盘使用率，百分比
+        network_io: 网络IO数据，包含上传和下载字节数
+        api_response_times: API响应时间，键为端点名称，值为响应时间(秒)
+        active_connections: 活跃连接数
+        database_size: 数据库大小，字节
+        workflow_executions: 工作流执行次数
+        error_rate: 错误率，百分比
+    """
     timestamp: str
     cpu_usage: float
     memory_usage: float
@@ -31,6 +47,18 @@ class PerformanceMetrics(BaseModel):
     error_rate: float
 
 class Alert(BaseModel):
+    """
+    告警数据模型
+    用于表示系统生成的告警信息。
+    
+    属性:
+        id: 告警唯一标识符
+        type: 告警类型（如CPU高使用率、内存不足等）
+        severity: 告警严重程度（low, medium, high, critical）
+        message: 告警详细信息
+        timestamp: 告警生成时间戳，格式为ISO字符串
+        resolved: 告警是否已解决，默认值为False
+    """
     id: str
     type: str
     severity: str
@@ -39,6 +67,18 @@ class Alert(BaseModel):
     resolved: bool = False
 
 class PerformanceMonitor:
+    """
+    性能监控器类
+    用于收集、分析和展示N8N工作流的性能指标，并生成告警。
+    
+    属性:
+        db_path: 数据库文件路径
+        metrics_history: 性能指标历史记录
+        alerts: 告警列表
+        websocket_connections: WebSocket连接列表
+        monitoring_active: 监控是否激活
+        metrics_queue: 指标队列
+    """
     def __init__(self, db_path: str = "workflows.db"):
         self.db_path = db_path
         self.metrics_history = []
@@ -48,14 +88,14 @@ class PerformanceMonitor:
         self.metrics_queue = queue.Queue()
         
     def start_monitoring(self):
-        """Start performance monitoring in background thread."""
+        """在后台线程中启动性能监控。"""
         if not self.monitoring_active:
             self.monitoring_active = True
             monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
             monitor_thread.start()
     
     def _monitor_loop(self):
-        """Main monitoring loop."""
+        """主要监控循环。"""
         while self.monitoring_active:
             try:
                 metrics = self._collect_metrics()
@@ -78,7 +118,7 @@ class PerformanceMonitor:
                 time.sleep(10)
     
     def _collect_metrics(self) -> PerformanceMetrics:
-        """Collect current system metrics."""
+        """收集当前系统指标。"""
         # CPU and Memory
         cpu_usage = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
@@ -133,25 +173,25 @@ class PerformanceMonitor:
         )
     
     def _measure_api_time(self, endpoint: str) -> float:
-        """Measure API response time (simulated)."""
+        """测量API响应时间（模拟）。"""
         # In a real implementation, this would make actual HTTP requests
         import random
         return round(random.uniform(10, 100), 2)
     
     def _get_workflow_executions(self) -> int:
-        """Get number of workflow executions (simulated)."""
+        """获取工作流执行次数（模拟）。"""
         # In a real implementation, this would query execution logs
         import random
         return random.randint(0, 50)
     
     def _calculate_error_rate(self) -> float:
-        """Calculate error rate (simulated)."""
+        """计算错误率（模拟）。"""
         # In a real implementation, this would analyze error logs
         import random
         return round(random.uniform(0, 5), 2)
     
     def _check_alerts(self, metrics: PerformanceMetrics):
-        """Check metrics against alert thresholds."""
+        """检查指标是否超过告警阈值。"""
         # CPU alert
         if metrics.cpu_usage > 80:
             self._create_alert("high_cpu", "warning", f"High CPU usage: {metrics.cpu_usage}%")
@@ -174,7 +214,7 @@ class PerformanceMonitor:
             self._create_alert("high_error_rate", "critical", f"High error rate: {metrics.error_rate}%")
     
     def _create_alert(self, alert_type: str, severity: str, message: str):
-        """Create a new alert."""
+        """创建新告警。"""
         alert = Alert(
             id=f"{alert_type}_{int(time.time())}",
             type=alert_type,
@@ -190,7 +230,7 @@ class PerformanceMonitor:
             self._broadcast_alert(alert)
     
     def _broadcast_metrics(self, metrics: PerformanceMetrics):
-        """Broadcast metrics to all websocket connections."""
+        """向所有WebSocket连接广播指标。"""
         if self.websocket_connections:
             message = {
                 "type": "metrics",
@@ -199,7 +239,7 @@ class PerformanceMonitor:
             self._broadcast_to_websockets(message)
     
     def _broadcast_alert(self, alert: Alert):
-        """Broadcast alert to all websocket connections."""
+        """向所有WebSocket连接广播告警。"""
         message = {
             "type": "alert",
             "data": alert.dict()
@@ -207,7 +247,7 @@ class PerformanceMonitor:
         self._broadcast_to_websockets(message)
     
     def _broadcast_to_websockets(self, message: dict):
-        """Broadcast message to all websocket connections."""
+        """向所有WebSocket连接广播消息。"""
         disconnected = []
         for websocket in self.websocket_connections:
             try:
@@ -220,7 +260,7 @@ class PerformanceMonitor:
             self.websocket_connections.remove(ws)
     
     def get_metrics_summary(self) -> Dict[str, Any]:
-        """Get performance metrics summary."""
+        """获取性能指标摘要。"""
         if not self.metrics_history:
             return {"message": "No metrics available"}
         
@@ -260,27 +300,27 @@ class PerformanceMonitor:
 performance_monitor = PerformanceMonitor()
 performance_monitor.start_monitoring()
 
-# FastAPI app for Performance Monitoring
-monitor_app = FastAPI(title="N8N Performance Monitor", version="1.0.0")
+# FastAPI应用用于性能监控
+monitor_app = FastAPI(title="N8N工作流性能监控系统", version="1.0.0")
 
 @monitor_app.get("/monitor/metrics")
 async def get_current_metrics():
-    """Get current performance metrics."""
+    """获取当前性能指标。"""
     return performance_monitor.get_metrics_summary()
 
 @monitor_app.get("/monitor/history")
 async def get_historical_metrics(hours: int = 24):
-    """Get historical performance metrics."""
+    """获取历史性能指标。"""
     return performance_monitor.get_historical_metrics(hours)
 
 @monitor_app.get("/monitor/alerts")
 async def get_alerts():
-    """Get current alerts."""
+    """获取当前告警。"""
     return [alert.dict() for alert in performance_monitor.alerts if not alert.resolved]
 
 @monitor_app.post("/monitor/alerts/{alert_id}/resolve")
 async def resolve_alert(alert_id: str):
-    """Resolve an alert."""
+    """解决告警。"""
     success = performance_monitor.resolve_alert(alert_id)
     if success:
         return {"message": "Alert resolved"}
@@ -289,7 +329,7 @@ async def resolve_alert(alert_id: str):
 
 @monitor_app.websocket("/monitor/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time metrics."""
+    """用于实时指标的WebSocket端点。"""
     await websocket.accept()
     performance_monitor.websocket_connections.append(websocket)
     
@@ -302,14 +342,14 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @monitor_app.get("/monitor/dashboard")
 async def get_monitoring_dashboard():
-    """Get performance monitoring dashboard HTML."""
+    """获取性能监控仪表板HTML。"""
     html_content = """
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="zh-CN">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>N8N Performance Monitor</title>
+        <title>N8N工作流性能监控系统</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -456,32 +496,32 @@ async def get_monitoring_dashboard():
     <body>
         <div class="dashboard">
             <div class="header">
-                <h1>📊 N8N Performance Monitor</h1>
-                <p>Real-time system monitoring and alerting</p>
+                <h1>📊 N8N工作流性能监控系统</h1>
+                <p>实时系统监控和告警</p>
                 <div id="connectionStatus">
                     <span class="status-indicator" id="statusIndicator"></span>
-                    <span id="statusText">Connecting...</span>
+                    <span id="statusText">正在连接...</span>
                 </div>
             </div>
             
             <div class="metrics-grid" id="metricsGrid">
-                <div class="loading">Loading metrics...</div>
+                <div class="loading">正在加载指标...</div>
             </div>
             
             <div class="chart-container">
-                <div class="chart-title">CPU & Memory Usage</div>
+                <div class="chart-title">CPU和内存使用率</div>
                 <canvas id="performanceChart" width="400" height="200"></canvas>
             </div>
             
             <div class="chart-container">
-                <div class="chart-title">API Response Times</div>
+                <div class="chart-title">API响应时间</div>
                 <canvas id="apiChart" width="400" height="200"></canvas>
             </div>
             
             <div class="alerts-section">
-                <div class="chart-title">Active Alerts</div>
+                <div class="chart-title">活跃告警</div>
                 <div id="alertsContainer">
-                    <div class="loading">Loading alerts...</div>
+                    <div class="loading">正在加载告警...</div>
                 </div>
             </div>
         </div>
@@ -530,27 +570,27 @@ async def get_monitoring_dashboard():
                 
                 if (connected) {
                     indicator.className = 'status-indicator status-healthy';
-                    text.textContent = 'Connected';
+                    text.textContent = '已连接';
                 } else {
                     indicator.className = 'status-indicator status-critical';
-                    text.textContent = 'Disconnected';
+                    text.textContent = '已断开';
                 }
             }
             
             async function loadInitialData() {
                 try {
-                    // Load current metrics
+                    // 加载当前指标
                     const metricsResponse = await fetch('/monitor/metrics');
                     const metrics = await metricsResponse.json();
                     updateMetrics(metrics.current);
                     
-                    // Load alerts
+                    // 加载告警
                     const alertsResponse = await fetch('/monitor/alerts');
                     const alerts = await alertsResponse.json();
                     displayAlerts(alerts);
                     
                 } catch (error) {
-                    console.error('Error loading initial data:', error);
+                    console.error('加载初始数据时出错:', error);
                 }
             }
             
@@ -559,19 +599,19 @@ async def get_monitoring_dashboard():
                 grid.innerHTML = `
                     <div class="metric-card">
                         <div class="metric-value cpu">${metrics.cpu_usage?.toFixed(1) || 0}%</div>
-                        <div class="metric-label">CPU Usage</div>
+                        <div class="metric-label">CPU使用率</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-value memory">${metrics.memory_usage?.toFixed(1) || 0}%</div>
-                        <div class="metric-label">Memory Usage</div>
+                        <div class="metric-label">内存使用率</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-value disk">${metrics.disk_usage?.toFixed(1) || 0}%</div>
-                        <div class="metric-label">Disk Usage</div>
+                        <div class="metric-label">磁盘使用率</div>
                     </div>
                     <div class="metric-card">
                         <div class="metric-value network">${metrics.active_connections || 0}</div>
-                        <div class="metric-label">Active Connections</div>
+                        <div class="metric-label">活跃连接数</div>
                     </div>
                 `;
                 
@@ -613,13 +653,13 @@ async def get_monitoring_dashboard():
                     data: {
                         labels: [],
                         datasets: [{
-                            label: 'CPU Usage (%)',
+                            label: 'CPU使用率 (%)'
                             data: [],
                             borderColor: '#667eea',
                             backgroundColor: 'rgba(102, 126, 234, 0.1)',
                             tension: 0.4
                         }, {
-                            label: 'Memory Usage (%)',
+                            label: '内存使用率 (%)'
                             data: [],
                             borderColor: '#28a745',
                             backgroundColor: 'rgba(40, 167, 69, 0.1)',
@@ -645,7 +685,7 @@ async def get_monitoring_dashboard():
                     data: {
                         labels: [],
                         datasets: [{
-                            label: 'Response Time (ms)',
+                            label: '响应时间 (ms)'
                             data: [],
                             backgroundColor: '#667eea'
                         }]
@@ -665,7 +705,7 @@ async def get_monitoring_dashboard():
                 const container = document.getElementById('alertsContainer');
                 
                 if (alerts.length === 0) {
-                    container.innerHTML = '<div class="loading">No active alerts</div>';
+                    container.innerHTML = '<div class="loading">没有活跃告警</div>';
                     return;
                 }
                 
@@ -677,7 +717,7 @@ async def get_monitoring_dashboard():
                         </div>
                         <div class="alert-message">${alert.message}</div>
                         <div class="alert-timestamp">${new Date(alert.timestamp).toLocaleString()}</div>
-                        <button class="resolve-btn" onclick="resolveAlert('${alert.id}')">Resolve</button>
+                        <button class="resolve-btn" onclick="resolveAlert('${alert.id}')">解决</button>
                     </div>
                 `).join('');
             }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Integration Hub for N8N Workflows
-Connect with external platforms and services.
+N8N工作流集成中心
+与外部平台和服务进行连接。
 """
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -31,11 +31,11 @@ class IntegrationHub:
         self.webhook_endpoints = {}
     
     def register_integration(self, config: IntegrationConfig):
-        """Register a new integration."""
+        """注册一个新的集成。"""
         self.integrations[config.name] = config
     
     async def sync_with_github(self, repo: str, token: str) -> Dict[str, Any]:
-        """Sync workflows with GitHub repository."""
+        """将工作流与GitHub仓库同步。"""
         try:
             async with httpx.AsyncClient() as client:
                 headers = {"Authorization": f"token {token}"}
@@ -63,7 +63,7 @@ class IntegrationHub:
             return {"status": "error", "message": str(e)}
     
     async def sync_with_slack(self, webhook_url: str, message: str) -> Dict[str, Any]:
-        """Send notification to Slack."""
+        """向Slack发送通知。"""
         try:
             async with httpx.AsyncClient() as client:
                 payload = {
@@ -83,7 +83,7 @@ class IntegrationHub:
             return {"status": "error", "message": str(e)}
     
     async def sync_with_discord(self, webhook_url: str, message: str) -> Dict[str, Any]:
-        """Send notification to Discord."""
+        """向Discord发送通知。"""
         try:
             async with httpx.AsyncClient() as client:
                 payload = {
@@ -102,7 +102,7 @@ class IntegrationHub:
             return {"status": "error", "message": str(e)}
     
     async def export_to_airtable(self, base_id: str, table_name: str, api_key: str, workflows: List[Dict]) -> Dict[str, Any]:
-        """Export workflows to Airtable."""
+        """将工作流导出到Airtable。"""
         try:
             async with httpx.AsyncClient() as client:
                 headers = {"Authorization": f"Bearer {api_key}"}
@@ -150,7 +150,7 @@ class IntegrationHub:
             return {"status": "error", "message": str(e)}
     
     async def sync_with_notion(self, database_id: str, token: str, workflows: List[Dict]) -> Dict[str, Any]:
-        """Sync workflows with Notion database."""
+        """将工作流与Notion数据库同步。"""
         try:
             async with httpx.AsyncClient() as client:
                 headers = {
@@ -209,11 +209,11 @@ class IntegrationHub:
             return {"status": "error", "message": str(e)}
     
     def register_webhook(self, endpoint: str, handler):
-        """Register a webhook endpoint."""
+        """注册一个webhook端点。"""
         self.webhook_endpoints[endpoint] = handler
     
     async def handle_webhook(self, endpoint: str, payload: WebhookPayload):
-        """Handle incoming webhook."""
+        """处理传入的webhook。"""
         if endpoint in self.webhook_endpoints:
             return await self.webhook_endpoints[endpoint](payload)
         else:
@@ -222,12 +222,12 @@ class IntegrationHub:
 # Initialize integration hub
 integration_hub = IntegrationHub()
 
-# FastAPI app for Integration Hub
-integration_app = FastAPI(title="N8N Integration Hub", version="1.0.0")
+# FastAPI应用 - 集成中心
+integration_app = FastAPI(title="N8N集成中心", version="1.0.0")
 
 @integration_app.post("/integrations/github/sync")
 async def sync_github(repo: str, token: str):
-    """Sync workflows with GitHub repository."""
+    """将工作流与GitHub仓库同步。"""
     try:
         result = await integration_hub.sync_with_github(repo, token)
         return result
@@ -236,7 +236,7 @@ async def sync_github(repo: str, token: str):
 
 @integration_app.post("/integrations/slack/notify")
 async def notify_slack(webhook_url: str, message: str):
-    """Send notification to Slack."""
+    """向Slack发送通知。"""
     try:
         result = await integration_hub.sync_with_slack(webhook_url, message)
         return result
@@ -245,7 +245,7 @@ async def notify_slack(webhook_url: str, message: str):
 
 @integration_app.post("/integrations/discord/notify")
 async def notify_discord(webhook_url: str, message: str):
-    """Send notification to Discord."""
+    """向Discord发送通知。"""
     try:
         result = await integration_hub.sync_with_discord(webhook_url, message)
         return result
@@ -259,7 +259,7 @@ async def export_airtable(
     api_key: str,
     workflows: List[Dict]
 ):
-    """Export workflows to Airtable."""
+    """将工作流导出到Airtable。"""
     try:
         result = await integration_hub.export_to_airtable(base_id, table_name, api_key, workflows)
         return result
@@ -272,7 +272,7 @@ async def sync_notion(
     token: str,
     workflows: List[Dict]
 ):
-    """Sync workflows with Notion database."""
+    """将工作流与Notion数据库同步。"""
     try:
         result = await integration_hub.sync_with_notion(database_id, token, workflows)
         return result
@@ -281,7 +281,7 @@ async def sync_notion(
 
 @integration_app.post("/webhooks/{endpoint}")
 async def handle_webhook_endpoint(endpoint: str, payload: WebhookPayload):
-    """Handle incoming webhook."""
+    """处理传入的webhook。"""
     try:
         result = await integration_hub.handle_webhook(endpoint, payload)
         return result
@@ -290,7 +290,7 @@ async def handle_webhook_endpoint(endpoint: str, payload: WebhookPayload):
 
 @integration_app.get("/integrations/status")
 async def get_integration_status():
-    """Get status of all integrations."""
+    """获取所有集成的状态。"""
     return {
         "integrations": list(integration_hub.integrations.keys()),
         "webhook_endpoints": list(integration_hub.webhook_endpoints.keys()),
@@ -299,14 +299,14 @@ async def get_integration_status():
 
 @integration_app.get("/integrations/dashboard")
 async def get_integration_dashboard():
-    """Get integration dashboard HTML."""
+    """获取集成中心仪表板HTML。"""
     html_content = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>N8N Integration Hub</title>
+        <title>N8N集成中心</title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
@@ -430,8 +430,8 @@ async def get_integration_dashboard():
     <body>
         <div class="dashboard">
             <div class="header">
-                <h1>🔗 N8N Integration Hub</h1>
-                <p>Connect your workflows with external platforms and services</p>
+                <h1>🔗 N8N集成中心</h1>
+                <p>将您的工作流与外部平台和服务连接起来</p>
             </div>
             
             <div class="integrations-grid">
@@ -439,12 +439,12 @@ async def get_integration_dashboard():
                     <div class="integration-icon">🐙</div>
                     <div class="integration-title">GitHub</div>
                     <div class="integration-description">
-                        Sync your workflows with GitHub repositories. 
-                        Version control and collaborate on workflow development.
+                        将您的工作流与GitHub仓库同步。
+                        版本控制和协作开发工作流。
                     </div>
                     <div class="integration-actions">
-                        <button class="action-btn btn-primary" onclick="syncGitHub()">Sync Repository</button>
-                        <button class="action-btn btn-secondary" onclick="showGitHubConfig()">Configure</button>
+                        <button class="action-btn btn-primary" onclick="syncGitHub()">同步仓库</button>
+                        <button class="action-btn btn-secondary" onclick="showGitHubConfig()">配置</button>
                     </div>
                 </div>
                 
@@ -452,12 +452,12 @@ async def get_integration_dashboard():
                     <div class="integration-icon">💬</div>
                     <div class="integration-title">Slack</div>
                     <div class="integration-description">
-                        Send notifications and workflow updates to Slack channels.
-                        Keep your team informed about automation activities.
+                        向Slack频道发送通知和工作流更新。
+                        让您的团队了解自动化活动。
                     </div>
                     <div class="integration-actions">
-                        <button class="action-btn btn-primary" onclick="testSlack()">Test Notification</button>
-                        <button class="action-btn btn-secondary" onclick="showSlackConfig()">Configure</button>
+                        <button class="action-btn btn-primary" onclick="testSlack()">测试通知</button>
+                        <button class="action-btn btn-secondary" onclick="showSlackConfig()">配置</button>
                     </div>
                 </div>
                 
@@ -465,12 +465,12 @@ async def get_integration_dashboard():
                     <div class="integration-icon">🎮</div>
                     <div class="integration-title">Discord</div>
                     <div class="integration-description">
-                        Integrate with Discord servers for workflow notifications.
-                        Perfect for gaming communities and developer teams.
+                        与Discord服务器集成以获取工作流通知。
+                        适用于游戏社区和开发团队。
                     </div>
                     <div class="integration-actions">
-                        <button class="action-btn btn-primary" onclick="testDiscord()">Test Notification</button>
-                        <button class="action-btn btn-secondary" onclick="showDiscordConfig()">Configure</button>
+                        <button class="action-btn btn-primary" onclick="testDiscord()">测试通知</button>
+                        <button class="action-btn btn-secondary" onclick="showDiscordConfig()">配置</button>
                     </div>
                 </div>
                 
@@ -478,12 +478,12 @@ async def get_integration_dashboard():
                     <div class="integration-icon">📊</div>
                     <div class="integration-title">Airtable</div>
                     <div class="integration-description">
-                        Export workflow data to Airtable for project management.
-                        Create databases of your automation workflows.
+                        将工作流数据导出到Airtable进行项目管理。
+                        创建您的自动化工作流数据库。
                     </div>
                     <div class="integration-actions">
-                        <button class="action-btn btn-primary" onclick="exportAirtable()">Export Data</button>
-                        <button class="action-btn btn-secondary" onclick="showAirtableConfig()">Configure</button>
+                        <button class="action-btn btn-primary" onclick="exportAirtable()">导出数据</button>
+                        <button class="action-btn btn-secondary" onclick="showAirtableConfig()">配置</button>
                     </div>
                 </div>
                 
@@ -491,12 +491,12 @@ async def get_integration_dashboard():
                     <div class="integration-icon">📝</div>
                     <div class="integration-title">Notion</div>
                     <div class="integration-description">
-                        Sync workflows with Notion databases for documentation.
-                        Create comprehensive workflow documentation.
+                        将工作流与Notion数据库同步以进行文档记录。
+                        创建全面的工作流文档。
                     </div>
                     <div class="integration-actions">
-                        <button class="action-btn btn-primary" onclick="syncNotion()">Sync Database</button>
-                        <button class="action-btn btn-secondary" onclick="showNotionConfig()">Configure</button>
+                        <button class="action-btn btn-primary" onclick="syncNotion()">同步数据库</button>
+                        <button class="action-btn btn-secondary" onclick="showNotionConfig()">配置</button>
                     </div>
                 </div>
                 
@@ -504,19 +504,19 @@ async def get_integration_dashboard():
                     <div class="integration-icon">🔗</div>
                     <div class="integration-title">Webhooks</div>
                     <div class="integration-description">
-                        Create custom webhook endpoints for external integrations.
-                        Receive data from any service that supports webhooks.
+                        为外部集成创建自定义webhook端点。
+                        接收来自任何支持webhooks的服务的数据。
                     </div>
                     <div class="integration-actions">
-                        <button class="action-btn btn-primary" onclick="createWebhook()">Create Webhook</button>
-                        <button class="action-btn btn-secondary" onclick="showWebhookDocs()">Documentation</button>
+                        <button class="action-btn btn-primary" onclick="createWebhook()">创建Webhook</button>
+                        <button class="action-btn btn-secondary" onclick="showWebhookDocs()">文档</button>
                     </div>
                 </div>
             </div>
             
             <div class="webhook-section">
-                <h2>🔗 Webhook Endpoints</h2>
-                <p>Available webhook endpoints for external integrations:</p>
+                <h2>🔗 Webhook端点</h2>
+                <p>可供外部集成使用的webhook端点：</p>
                 <div class="webhook-endpoint">
                     POST /webhooks/workflow-update<br>
                     <small>Receive notifications when workflows are updated</small>
@@ -534,8 +534,8 @@ async def get_integration_dashboard():
         
         <script>
             async function syncGitHub() {
-                const repo = prompt('Enter GitHub repository (owner/repo):');
-                const token = prompt('Enter GitHub token:');
+                const repo = prompt('请输入GitHub仓库 (owner/repo)：');
+                const token = prompt('请输入GitHub令牌：');
                 
                 if (repo && token) {
                     try {
@@ -545,16 +545,16 @@ async def get_integration_dashboard():
                             body: JSON.stringify({repo, token})
                         });
                         const result = await response.json();
-                        alert(result.message || 'GitHub sync completed');
+                        alert(result.message || 'GitHub同步完成');
                     } catch (error) {
-                        alert('Error syncing with GitHub: ' + error.message);
+                        alert('GitHub同步错误：' + error.message);
                     }
                 }
             }
             
             async function testSlack() {
-                const webhook = prompt('Enter Slack webhook URL:');
-                const message = 'Test notification from N8N Integration Hub';
+                const webhook = prompt('请输入Slack webhook URL：');
+                const message = '来自N8N集成中心的测试通知';
                 
                 if (webhook) {
                     try {
@@ -564,16 +564,16 @@ async def get_integration_dashboard():
                             body: JSON.stringify({webhook_url: webhook, message})
                         });
                         const result = await response.json();
-                        alert(result.message || 'Slack notification sent');
+                        alert(result.message || 'Slack通知已发送');
                     } catch (error) {
-                        alert('Error sending to Slack: ' + error.message);
+                        alert('发送到Slack错误：' + error.message);
                     }
                 }
             }
             
             async function testDiscord() {
-                const webhook = prompt('Enter Discord webhook URL:');
-                const message = 'Test notification from N8N Integration Hub';
+                const webhook = prompt('请输入Discord webhook URL：');
+                const message = '来自N8N集成中心的测试通知';
                 
                 if (webhook) {
                     try {
@@ -583,39 +583,39 @@ async def get_integration_dashboard():
                             body: JSON.stringify({webhook_url: webhook, message})
                         });
                         const result = await response.json();
-                        alert(result.message || 'Discord notification sent');
+                        alert(result.message || 'Discord通知已发送');
                     } catch (error) {
-                        alert('Error sending to Discord: ' + error.message);
+                        alert('发送到Discord错误：' + error.message);
                     }
                 }
             }
             
             function showGitHubConfig() {
-                alert('GitHub Configuration:\\n\\n1. Create a GitHub token with repo access\\n2. Use format: owner/repository\\n3. Ensure workflows are in /workflows directory');
+                alert('GitHub配置：\n\n1. 创建一个具有repo访问权限的GitHub令牌\n2. 使用格式：owner/repository\n3. 确保工作流位于/workflows目录中');
             }
             
             function showSlackConfig() {
-                alert('Slack Configuration:\\n\\n1. Go to Slack App Directory\\n2. Add "Incoming Webhooks" app\\n3. Create webhook URL\\n4. Use the URL for notifications');
+                alert('Slack配置：\n\n1. 转到Slack应用目录\n2. 添加"Incoming Webhooks"应用\n3. 创建webhook URL\n4. 使用该URL发送通知');
             }
             
             function showDiscordConfig() {
-                alert('Discord Configuration:\\n\\n1. Go to Server Settings\\n2. Navigate to Integrations\\n3. Create Webhook\\n4. Copy webhook URL');
+                alert('Discord配置：\n\n1. 转到服务器设置\n2. 导航到集成\n3. 创建Webhook\n4. 复制webhook URL');
             }
             
             function showAirtableConfig() {
-                alert('Airtable Configuration:\\n\\n1. Create a new Airtable base\\n2. Get API key from account settings\\n3. Get base ID from API documentation\\n4. Configure table structure');
+                alert('Airtable配置：\n\n1. 创建一个新的Airtable工作区\n2. 从账户设置获取API密钥\n3. 从API文档获取工作区ID\n4. 配置表格结构');
             }
             
             function showNotionConfig() {
-                alert('Notion Configuration:\\n\\n1. Create a Notion integration\\n2. Get integration token\\n3. Create database with proper schema\\n4. Share database with integration');
+                alert('Notion配置：\n\n1. 创建一个Notion集成\n2. 获取集成令牌\n3. 创建具有适当架构的数据库\n4. 与集成共享数据库');
             }
             
             function createWebhook() {
-                alert('Webhook Creation:\\n\\n1. Choose endpoint name\\n2. Configure payload structure\\n3. Set up authentication\\n4. Test webhook endpoint');
+                alert('Webhook创建：\n\n1. 选择端点名称\n2. 配置负载结构\n3. 设置认证\n4. 测试webhook端点');
             }
             
             function showWebhookDocs() {
-                alert('Webhook Documentation:\\n\\nAvailable at: /docs\\n\\nEndpoints:\\n- POST /webhooks/{endpoint}\\n- Payload: {event, data, timestamp}\\n- Response: {status, message}');
+                alert('Webhook文档：\n\n可访问：/docs\n\n端点：\n- POST /webhooks/{endpoint}\n- 负载：{event, data, timestamp}\n- 响应：{status, message}');
             }
         </script>
     </body>

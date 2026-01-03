@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate Static Search Index for GitHub Pages
-Creates a lightweight JSON index for client-side search functionality.
+为 GitHub Pages 生成静态搜索索引
+创建用于客户端搜索功能的轻量级 JSON 索引。
 """
 
 import json
@@ -10,34 +10,34 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Any
 
-# Add the parent directory to path for imports
+# 将父目录添加到导入路径
 sys.path.append(str(Path(__file__).parent.parent))
 
 from workflow_db import WorkflowDatabase
 
 
 def generate_static_search_index(db_path: str, output_dir: str) -> Dict[str, Any]:
-    """Generate a static search index for client-side searching."""
+    """为客户端搜索生成静态搜索索引。"""
 
-    # Initialize database
+    # 初始化数据库
     db = WorkflowDatabase(db_path)
 
-    # Get all workflows
+    # 获取所有工作流
     workflows, total = db.search_workflows(limit=10000)  # Get all workflows
 
-    # Get statistics
+    # 获取统计信息
     stats = db.get_stats()
 
-    # Get categories from service mapping
+    # 从服务映射中获取分类
     categories = db.get_service_categories()
 
-    # Load existing categories from create_categories.py system
+    # 从 create_categories.py 系统加载现有分类
     existing_categories = load_existing_categories()
 
-    # Create simplified workflow data for search
+    # 创建简化的工作流搜索数据
     search_workflows = []
     for workflow in workflows:
-        # Create searchable text combining multiple fields
+        # 组合多个字段创建可搜索文本
         searchable_text = ' '.join([
             workflow['name'],
             workflow['description'],
@@ -46,7 +46,7 @@ def generate_static_search_index(db_path: str, output_dir: str) -> Dict[str, Any
             ' '.join(workflow['tags']) if workflow['tags'] else ''
         ]).lower()
 
-        # Use existing category from create_categories.py system, fallback to integration-based
+        # 使用 create_categories.py 系统中的现有分类，如果没有则使用基于集成的分类
         category = get_workflow_category(workflow['filename'], existing_categories, workflow['integrations'], categories)
 
         search_workflow = {
@@ -89,12 +89,12 @@ def generate_static_search_index(db_path: str, output_dir: str) -> Dict[str, Any
 
 
 def load_existing_categories() -> Dict[str, str]:
-    """Load existing categories from search_categories.json created by create_categories.py."""
+    """从 create_categories.py 创建的 search_categories.json 加载现有分类。"""
     try:
         with open('context/search_categories.json', 'r', encoding='utf-8') as f:
             categories_data = json.load(f)
 
-        # Convert to filename -> category mapping
+        # 转换为文件名 -> 分类映射
         category_mapping = {}
         for item in categories_data:
             if item.get('category'):
@@ -102,70 +102,70 @@ def load_existing_categories() -> Dict[str, str]:
 
         return category_mapping
     except FileNotFoundError:
-        print("Warning: search_categories.json not found, using integration-based categorization")
+        print("警告：未找到 search_categories.json，使用基于集成的分类")
         return {}
 
 
 def get_workflow_category(filename: str, existing_categories: Dict[str, str],
                          integrations: List[str], service_categories: Dict[str, List[str]]) -> str:
-    """Get category for workflow, preferring existing assignment over integration-based."""
+    """获取工作流的分类，优先使用现有分配而非基于集成的分类。"""
 
-    # First priority: Use existing category from create_categories.py system
+    # 第一优先级：使用 create_categories.py 系统中的现有分类
     if filename in existing_categories:
         return existing_categories[filename]
 
-    # Fallback: Use integration-based categorization
+    # 回退方案：使用基于集成的分类
     return determine_category(integrations, service_categories)
 
 
 def determine_category(integrations: List[str], categories: Dict[str, List[str]]) -> str:
-    """Determine the category for a workflow based on its integrations."""
+    """根据工作流的集成来确定其分类。"""
     if not integrations:
-        return "Uncategorized"
+        return "未分类"
 
-    # Check each category for matching integrations
+    # 检查每个分类是否有匹配的集成
     for category, services in categories.items():
         for integration in integrations:
             if integration in services:
                 return format_category_name(category)
 
-    return "Uncategorized"
+    return "未分类"
 
 
 def format_category_name(category_key: str) -> str:
-    """Format category key to display name."""
+    """将分类键格式化为显示名称。"""
     category_mapping = {
-        'messaging': 'Communication & Messaging',
-        'email': 'Communication & Messaging',
-        'cloud_storage': 'Cloud Storage & File Management',
-        'database': 'Data Processing & Analysis',
-        'project_management': 'Project Management',
-        'ai_ml': 'AI Agent Development',
-        'social_media': 'Social Media Management',
-        'ecommerce': 'E-commerce & Retail',
-        'analytics': 'Data Processing & Analysis',
-        'calendar_tasks': 'Project Management',
-        'forms': 'Data Processing & Analysis',
-        'development': 'Technical Infrastructure & DevOps'
+        'messaging': '通信与消息',
+        'email': '通信与消息',
+        'cloud_storage': '云存储与文件管理',
+        'database': '数据处理与分析',
+        'project_management': '项目管理',
+        'ai_ml': 'AI 代理开发',
+        'social_media': '社交媒体管理',
+        'ecommerce': '电子商务与零售',
+        'analytics': '数据处理与分析',
+        'calendar_tasks': '项目管理',
+        'forms': '数据处理与分析',
+        'development': '技术基础设施与开发运维'
     }
     return category_mapping.get(category_key, category_key.replace('_', ' ').title())
 
 
 def get_category_list(categories: Dict[str, List[str]]) -> List[str]:
-    """Get formatted list of all categories."""
+    """获取所有分类的格式化列表。"""
     formatted_categories = set()
     for category_key in categories.keys():
         formatted_categories.add(format_category_name(category_key))
 
-    # Add categories from the create_categories.py system
+    # 添加 create_categories.py 系统中的分类
     additional_categories = [
-        "Business Process Automation",
-        "Web Scraping & Data Extraction",
-        "Marketing & Advertising Automation",
-        "Creative Content & Video Automation",
-        "Creative Design Automation",
-        "CRM & Sales",
-        "Financial & Accounting"
+        "业务流程自动化",
+        "网页抓取与数据提取",
+        "营销与广告自动化",
+        "创意内容与视频自动化",
+        "创意设计自动化",
+        "客户关系管理与销售",
+        "财务与会计"
     ]
 
     for cat in additional_categories:
@@ -175,7 +175,7 @@ def get_category_list(categories: Dict[str, List[str]]) -> List[str]:
 
 
 def get_popular_integrations(workflows: List[Dict]) -> List[Dict[str, Any]]:
-    """Get list of popular integrations with counts."""
+    """获取带计数的热门集成列表。"""
     integration_counts = {}
 
     for workflow in workflows:
@@ -196,9 +196,9 @@ def get_popular_integrations(workflows: List[Dict]) -> List[Dict[str, Any]]:
 
 
 def extract_folder_from_filename(filename: str) -> str:
-    """Extract folder name from workflow filename."""
-    # Most workflows follow pattern: ID_Service_Purpose_Trigger.json
-    # Extract the service name as folder
+    """从工作流文件名中提取文件夹名称。"""
+    # 大多数工作流遵循模式：ID_Service_Purpose_Trigger.json
+    # 提取服务名称作为文件夹
     parts = filename.replace('.json', '').split('_')
     if len(parts) >= 2:
         return parts[1].capitalize()  # Second part is usually the service
@@ -206,56 +206,56 @@ def extract_folder_from_filename(filename: str) -> str:
 
 
 def save_search_index(search_index: Dict[str, Any], output_dir: str):
-    """Save the search index to multiple formats for different uses."""
+    """将搜索索引保存为多种格式以用于不同用途。"""
 
-    # Ensure output directory exists
+    # 确保输出目录存在
     os.makedirs(output_dir, exist_ok=True)
 
-    # Save complete index
+    # 保存完整索引
     with open(os.path.join(output_dir, 'search-index.json'), 'w', encoding='utf-8') as f:
         json.dump(search_index, f, indent=2, ensure_ascii=False)
 
-    # Save stats only (for quick loading)
+    # 仅保存统计信息（用于快速加载）
     with open(os.path.join(output_dir, 'stats.json'), 'w', encoding='utf-8') as f:
         json.dump(search_index['stats'], f, indent=2, ensure_ascii=False)
 
-    # Save categories only
+    # 仅保存分类
     with open(os.path.join(output_dir, 'categories.json'), 'w', encoding='utf-8') as f:
         json.dump(search_index['categories'], f, indent=2, ensure_ascii=False)
 
-    # Save integrations only
+    # 仅保存集成
     with open(os.path.join(output_dir, 'integrations.json'), 'w', encoding='utf-8') as f:
         json.dump(search_index['integrations'], f, indent=2, ensure_ascii=False)
 
-    print(f"Search index generated successfully:")
-    print(f"   {search_index['stats']['total_workflows']} workflows indexed")
-    print(f"   {len(search_index['categories'])} categories")
-    print(f"   {len(search_index['integrations'])} popular integrations")
-    print(f"   Files saved to: {output_dir}")
+    print(f"搜索索引生成成功：")
+    print(f"   {search_index['stats']['total_workflows']} 个工作流已索引")
+    print(f"   {len(search_index['categories'])} 个分类")
+    print(f"   {len(search_index['integrations'])} 个热门集成")
+    print(f"   文件已保存至：{output_dir}")
 
 
 def main():
-    """Main function to generate search index."""
+    """生成搜索索引的主函数。"""
 
-    # Paths
+    # 路径
     db_path = "database/workflows.db"
     output_dir = "docs/api"
 
-    # Check if database exists
+    # 检查数据库是否存在
     if not os.path.exists(db_path):
-        print(f"Database not found: {db_path}")
-        print("Run 'python run.py --reindex' first to create the database")
+        print(f"未找到数据库：{db_path}")
+        print("请先运行 'python run.py --reindex' 创建数据库")
         sys.exit(1)
 
     try:
-        print("Generating static search index...")
+        print("正在生成静态搜索索引...")
         search_index = generate_static_search_index(db_path, output_dir)
         save_search_index(search_index, output_dir)
 
-        print("Static search index ready for GitHub Pages!")
+        print("GitHub Pages 的静态搜索索引已准备就绪！")
 
     except Exception as e:
-        print(f"Error generating search index: {e}")
+        print(f"生成搜索索引时出错：{e}")
         sys.exit(1)
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Enhanced API Module for n8n Workflows Repository
-Advanced features, analytics, and performance optimizations
+n8n工作流仓库增强API模块
+高级功能、分析和性能优化
 """
 
 import sqlite3
@@ -16,50 +16,50 @@ from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 import uvicorn
 
-# Import community features
+# 导入社区功能模块
 from community_features import CommunityFeatures, create_community_api_endpoints
 
 class WorkflowSearchRequest(BaseModel):
-    """Workflow search request model"""
-    query: str
-    categories: Optional[List[str]] = None
-    trigger_types: Optional[List[str]] = None
-    complexity_levels: Optional[List[str]] = None
-    integrations: Optional[List[str]] = None
-    min_rating: Optional[float] = None
-    limit: int = 20
-    offset: int = 0
+    """工作流搜索请求模型"""
+    query: str  # 搜索查询字符串
+    categories: Optional[List[str]] = None  # 可选的分类列表
+    trigger_types: Optional[List[str]] = None  # 可选的触发器类型列表
+    complexity_levels: Optional[List[str]] = None  # 可选的复杂度级别列表
+    integrations: Optional[List[str]] = None  # 可选的集成列表
+    min_rating: Optional[float] = None  # 可选的最低评分
+    limit: int = 20  # 返回结果数量限制
+    offset: int = 0  # 结果偏移量
 
 class WorkflowRecommendationRequest(BaseModel):
-    """Workflow recommendation request model"""
-    user_interests: List[str]
-    viewed_workflows: Optional[List[str]] = None
-    preferred_complexity: Optional[str] = None
-    limit: int = 10
+    """工作流推荐请求模型"""
+    user_interests: List[str]  # 用户兴趣列表
+    viewed_workflows: Optional[List[str]] = None  # 可选的已查看工作流列表
+    preferred_complexity: Optional[str] = None  # 可选的首选复杂度
+    limit: int = 10  # 返回结果数量限制
 
 class AnalyticsRequest(BaseModel):
-    """Analytics request model"""
-    date_range: str  # "7d", "30d", "90d", "1y"
-    metrics: List[str]  # ["views", "downloads", "ratings", "searches"]
+    """分析请求模型"""
+    date_range: str  # 日期范围："7d"、"30d"、"90d"、"1y"
+    metrics: List[str]  # 指标列表：["views"、"downloads"、"ratings"、"searches"]
 
 class EnhancedAPI:
-    """Enhanced API with advanced features"""
+    """具有高级功能的增强API"""
     
     def __init__(self, db_path: str = "workflows.db"):
-        """Initialize enhanced API"""
+        """初始化增强API"""
         self.db_path = db_path
         self.community = CommunityFeatures(db_path)
         self.app = FastAPI(
-            title="N8N Workflows Enhanced API",
-            description="Advanced API for n8n workflows repository with community features",
+            title="N8N工作流增强API",
+            description="具有社区功能的n8n工作流仓库高级API",
             version="2.0.0"
         )
         self._setup_middleware()
         self._setup_routes()
     
     def _setup_middleware(self):
-        """Setup middleware for performance and security"""
-        # CORS middleware
+        """设置中间件以提升性能和安全性"""
+        # CORS（跨域资源共享）中间件
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -68,13 +68,13 @@ class EnhancedAPI:
             allow_headers=["*"],
         )
         
-        # Gzip compression
+        # Gzip压缩中间件
         self.app.add_middleware(GZipMiddleware, minimum_size=1000)
     
     def _setup_routes(self):
-        """Setup API routes"""
+        """设置API路由"""
         
-        # Core workflow endpoints
+        # 核心工作流端点
         @self.app.get("/api/v2/workflows")
         async def get_workflows_enhanced(
             search: Optional[str] = Query(None),
@@ -88,7 +88,7 @@ class EnhancedAPI:
             limit: int = Query(20, le=100),
             offset: int = Query(0, ge=0)
         ):
-            """Enhanced workflow search with multiple filters"""
+            """具有多个过滤器的增强工作流搜索"""
             start_time = time.time()
             
             try:
@@ -121,7 +121,7 @@ class EnhancedAPI:
         
         @self.app.post("/api/v2/workflows/search")
         async def advanced_workflow_search(request: WorkflowSearchRequest):
-            """Advanced workflow search with complex queries"""
+            """具有复杂查询的高级工作流搜索"""
             start_time = time.time()
             
             try:
@@ -146,7 +146,7 @@ class EnhancedAPI:
             include_ratings: bool = Query(True),
             include_related: bool = Query(True)
         ):
-            """Get detailed workflow information"""
+            """获取详细的工作流信息"""
             try:
                 workflow_data = self._get_workflow_details(
                     workflow_id, include_stats, include_ratings, include_related
@@ -160,10 +160,10 @@ class EnhancedAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
         
-        # Recommendation endpoints
+        # 推荐端点
         @self.app.post("/api/v2/recommendations")
         async def get_workflow_recommendations(request: WorkflowRecommendationRequest):
-            """Get personalized workflow recommendations"""
+            """获取个性化工作流推荐"""
             try:
                 recommendations = self._get_recommendations(request)
                 return {
@@ -177,7 +177,7 @@ class EnhancedAPI:
         
         @self.app.get("/api/v2/recommendations/trending")
         async def get_trending_workflows(limit: int = Query(10, le=50)):
-            """Get trending workflows based on recent activity"""
+            """基于最近活动获取热门工作流"""
             try:
                 trending = self._get_trending_workflows(limit)
                 return {
@@ -189,10 +189,10 @@ class EnhancedAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
         
-        # Analytics endpoints
+        # 分析端点
         @self.app.get("/api/v2/analytics/overview")
         async def get_analytics_overview():
-            """Get analytics overview"""
+            """获取分析概览"""
             try:
                 overview = self._get_analytics_overview()
                 return overview
@@ -202,7 +202,7 @@ class EnhancedAPI:
         
         @self.app.post("/api/v2/analytics/custom")
         async def get_custom_analytics(request: AnalyticsRequest):
-            """Get custom analytics data"""
+            """获取自定义分析数据"""
             try:
                 analytics = self._get_custom_analytics(request)
                 return analytics
@@ -210,10 +210,10 @@ class EnhancedAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
         
-        # Performance monitoring
+        # 性能监控
         @self.app.get("/api/v2/health")
         async def health_check():
-            """Health check with performance metrics"""
+            """具有性能指标的健康检查"""
             try:
                 health_data = self._get_health_status()
                 return health_data
@@ -221,15 +221,15 @@ class EnhancedAPI:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
         
-        # Add community endpoints
+        # 添加社区端点
         create_community_api_endpoints(self.app)
     
     def _search_workflows_enhanced(self, **kwargs) -> List[Dict]:
-        """Enhanced workflow search with multiple filters"""
+        """具有多个过滤器的增强工作流搜索"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Build dynamic query
+        # 构建动态查询
         query_parts = ["SELECT w.*, ws.average_rating, ws.total_ratings"]
         query_parts.append("FROM workflows w")
         query_parts.append("LEFT JOIN workflow_stats ws ON w.filename = ws.workflow_id")
@@ -237,7 +237,7 @@ class EnhancedAPI:
         conditions = []
         params = []
         
-        # Apply filters
+        # 应用过滤器
         if kwargs.get('search'):
             conditions.append("(w.name LIKE ? OR w.description LIKE ? OR w.integrations LIKE ?)")
             search_term = f"%{kwargs['search']}%"
@@ -263,20 +263,20 @@ class EnhancedAPI:
             conditions.append("ws.average_rating >= ?")
             params.append(kwargs['min_rating'])
         
-        # Add conditions to query
+        # 将条件添加到查询
         if conditions:
             query_parts.append("WHERE " + " AND ".join(conditions))
         
-        # Add sorting
+        # 添加排序
         sort_by = kwargs.get('sort_by', 'name')
         sort_order = kwargs.get('sort_order', 'asc').upper()
         query_parts.append(f"ORDER BY {sort_by} {sort_order}")
         
-        # Add pagination
+        # 添加分页
         query_parts.append("LIMIT ? OFFSET ?")
         params.extend([kwargs.get('limit', 20), kwargs.get('offset', 0)])
         
-        # Execute query
+        # 执行查询
         query = " ".join(query_parts)
         cursor.execute(query, params)
         
@@ -306,9 +306,9 @@ class EnhancedAPI:
         return workflows
     
     def _advanced_search(self, request: WorkflowSearchRequest) -> List[Dict]:
-        """Advanced search with complex queries"""
-        # Implementation for advanced search logic
-        # This would include semantic search, fuzzy matching, etc.
+        """具有复杂查询的高级搜索"""
+        # 高级搜索逻辑的实现
+        # 这将包括语义搜索、模糊匹配等
         return self._search_workflows_enhanced(
             search=request.query,
             category=request.categories[0] if request.categories else None,
@@ -320,11 +320,11 @@ class EnhancedAPI:
     
     def _get_workflow_details(self, workflow_id: str, include_stats: bool, 
                             include_ratings: bool, include_related: bool) -> Dict:
-        """Get detailed workflow information"""
+        """获取详细的工作流信息"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Get basic workflow data
+        # 获取基本工作流数据
         cursor.execute("SELECT * FROM workflows WHERE filename = ?", (workflow_id,))
         workflow_row = cursor.fetchone()
         
@@ -350,17 +350,17 @@ class EnhancedAPI:
             'analyzed_at': workflow_row[14]
         }
         
-        # Add statistics if requested
+        # 如果请求，添加统计信息
         if include_stats:
             stats = self.community.get_workflow_stats(workflow_id)
             workflow_data['stats'] = stats.__dict__ if stats else None
         
-        # Add ratings if requested
+        # 如果请求，添加评分
         if include_ratings:
             ratings = self.community.get_workflow_ratings(workflow_id, 5)
             workflow_data['ratings'] = [rating.__dict__ for rating in ratings]
         
-        # Add related workflows if requested
+        # 如果请求，添加相关工作流
         if include_related:
             related = self._get_related_workflows(workflow_id)
             workflow_data['related_workflows'] = related
@@ -369,13 +369,13 @@ class EnhancedAPI:
         return workflow_data
     
     def _get_recommendations(self, request: WorkflowRecommendationRequest) -> List[Dict]:
-        """Get personalized workflow recommendations"""
-        # Implementation for recommendation algorithm
-        # This would use collaborative filtering, content-based filtering, etc.
+        """获取个性化工作流推荐"""
+        # 推荐算法的实现
+        # 这将使用协同过滤、基于内容的过滤等
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Simple recommendation based on user interests
+        # 基于用户兴趣的简单推荐
         recommendations = []
         for interest in request.user_interests:
             cursor.execute("""
@@ -396,27 +396,27 @@ class EnhancedAPI:
         return recommendations[:request.limit]
     
     def _get_trending_workflows(self, limit: int) -> List[Dict]:
-        """Get trending workflows based on recent activity"""
+        """基于最近活动获取热门工作流"""
         return self.community.get_most_popular_workflows(limit)
     
     def _get_analytics_overview(self) -> Dict:
-        """Get analytics overview"""
+        """获取分析概览"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Total workflows
+        # 工作流总数
         cursor.execute("SELECT COUNT(*) FROM workflows")
         total_workflows = cursor.fetchone()[0]
         
-        # Active workflows
+        # 活跃工作流数
         cursor.execute("SELECT COUNT(*) FROM workflows WHERE active = 1")
         active_workflows = cursor.fetchone()[0]
         
-        # Categories
+        # 分类统计
         cursor.execute("SELECT category, COUNT(*) FROM workflows GROUP BY category")
         categories = dict(cursor.fetchall())
         
-        # Integrations
+        # 集成统计
         cursor.execute("SELECT COUNT(DISTINCT integrations) FROM workflows")
         unique_integrations = cursor.fetchone()[0]
         
@@ -431,25 +431,25 @@ class EnhancedAPI:
         }
     
     def _get_custom_analytics(self, request: AnalyticsRequest) -> Dict:
-        """Get custom analytics data"""
-        # Implementation for custom analytics
+        """获取自定义分析数据"""
+        # 自定义分析的实现
         return {
             'date_range': request.date_range,
             'metrics': request.metrics,
-            'data': {},  # Placeholder for actual analytics data
+            'data': {},  # 实际分析数据的占位符
             'timestamp': datetime.now().isoformat()
         }
     
     def _get_health_status(self) -> Dict:
-        """Get health status and performance metrics"""
+        """获取健康状态和性能指标"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Database health
+        # 数据库健康状态
         cursor.execute("SELECT COUNT(*) FROM workflows")
         total_workflows = cursor.fetchone()[0]
         
-        # Performance test
+        # 性能测试
         start_time = time.time()
         cursor.execute("SELECT COUNT(*) FROM workflows WHERE active = 1")
         active_count = cursor.fetchone()[0]
@@ -473,11 +473,11 @@ class EnhancedAPI:
         }
     
     def _get_related_workflows(self, workflow_id: str, limit: int = 5) -> List[Dict]:
-        """Get related workflows based on similar integrations or categories"""
+        """基于相似的集成或分类获取相关工作流"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Get current workflow details
+        # 获取当前工作流详情
         cursor.execute("SELECT integrations, category FROM workflows WHERE filename = ?", (workflow_id,))
         current_workflow = cursor.fetchone()
         
@@ -488,7 +488,7 @@ class EnhancedAPI:
         current_integrations = current_workflow[0] or ""
         current_category = current_workflow[1] or ""
         
-        # Find related workflows
+        # 查找工作流
         cursor.execute("""
             SELECT filename, name, description FROM workflows 
             WHERE filename != ? 
@@ -508,7 +508,7 @@ class EnhancedAPI:
         return related
     
     def run(self, host: str = "127.0.0.1", port: int = 8000, debug: bool = False):
-        """Run the enhanced API server"""
+        """运行增强API服务器"""
         uvicorn.run(
             self.app,
             host=host,
@@ -517,10 +517,10 @@ class EnhancedAPI:
         )
 
 if __name__ == "__main__":
-    # Initialize and run enhanced API
+    # 初始化并运行增强API
     api = EnhancedAPI()
-    print("🚀 Starting Enhanced N8N Workflows API...")
-    print("📊 Features: Advanced search, recommendations, analytics, community features")
-    print("🌐 API Documentation: http://127.0.0.1:8000/docs")
+    print("🚀 正在启动增强N8N工作流API...")
+    print("📊 功能：高级搜索、推荐、分析、社区功能")
+    print("🌐 API文档：http://127.0.0.1:8000/docs")
     
     api.run(debug=True)

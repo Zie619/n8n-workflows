@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Community Features Module for n8n Workflows Repository
-Implements rating, review, and social features
+N8N 工作流仓库社区功能模块
+实现评分、评论和社交功能
 """
 
 import sqlite3
@@ -13,10 +13,10 @@ from dataclasses import dataclass
 
 @dataclass
 class WorkflowRating:
-    """Workflow rating data structure"""
+    """工作流评分数据结构"""
     workflow_id: str
     user_id: str
-    rating: int  # 1-5 stars
+    rating: int  # 1-5 星
     review: Optional[str] = None
     helpful_votes: int = 0
     created_at: datetime = None
@@ -24,7 +24,7 @@ class WorkflowRating:
 
 @dataclass
 class WorkflowStats:
-    """Workflow statistics"""
+    """工作流统计数据"""
     workflow_id: str
     total_ratings: int
     average_rating: float
@@ -34,19 +34,19 @@ class WorkflowStats:
     last_updated: datetime
 
 class CommunityFeatures:
-    """Community features manager for workflow repository"""
+    """工作流仓库的社区功能管理器"""
     
     def __init__(self, db_path: str = "workflows.db"):
-        """Initialize community features with database connection"""
+        """使用数据库连接初始化社区功能"""
         self.db_path = db_path
         self.init_community_tables()
     
     def init_community_tables(self):
-        """Initialize community feature database tables"""
+        """初始化社区功能数据库表"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Workflow ratings and reviews
+        # 工作流评分和评论
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS workflow_ratings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +61,7 @@ class CommunityFeatures:
             )
         """)
         
-        # Workflow usage statistics
+        # 工作流使用统计
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS workflow_stats (
                 workflow_id TEXT PRIMARY KEY,
@@ -74,7 +74,7 @@ class CommunityFeatures:
             )
         """)
         
-        # User profiles
+        # 用户资料
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_profiles (
                 user_id TEXT PRIMARY KEY,
@@ -90,13 +90,13 @@ class CommunityFeatures:
             )
         """)
         
-        # Workflow collections (user favorites)
+        # 工作流集合（用户收藏）
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS workflow_collections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
                 collection_name TEXT NOT NULL,
-                workflow_ids TEXT, -- JSON array of workflow IDs
+                workflow_ids TEXT, -- 工作流 ID 的 JSON 数组
                 is_public BOOLEAN DEFAULT FALSE,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -104,13 +104,13 @@ class CommunityFeatures:
             )
         """)
         
-        # Workflow comments
+        # 工作流评论
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS workflow_comments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 workflow_id TEXT NOT NULL,
                 user_id TEXT NOT NULL,
-                parent_id INTEGER, -- For threaded comments
+                parent_id INTEGER, -- 用于线程评论
                 comment TEXT NOT NULL,
                 helpful_votes INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -122,35 +122,35 @@ class CommunityFeatures:
         conn.close()
     
     def add_rating(self, workflow_id: str, user_id: str, rating: int, review: str = None) -> bool:
-        """Add or update a workflow rating and review"""
+        """添加或更新工作流评分和评论"""
         if not (1 <= rating <= 5):
-            raise ValueError("Rating must be between 1 and 5")
+            raise ValueError("评分必须在 1 到 5 之间")
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         try:
-            # Insert or update rating
+            # 插入或更新评分
             cursor.execute("""
                 INSERT OR REPLACE INTO workflow_ratings 
                 (workflow_id, user_id, rating, review, updated_at)
                 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             """, (workflow_id, user_id, rating, review))
             
-            # Update workflow statistics
+            # 更新工作流统计
             self._update_workflow_stats(workflow_id)
             
             conn.commit()
             return True
             
         except Exception as e:
-            print(f"Error adding rating: {e}")
+            print(f"添加评分时出错：{e}")
             return False
         finally:
             conn.close()
     
     def get_workflow_ratings(self, workflow_id: str, limit: int = 10) -> List[WorkflowRating]:
-        """Get ratings and reviews for a workflow"""
+        """获取工作流的评分和评论"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -178,7 +178,7 @@ class CommunityFeatures:
         return ratings
     
     def get_workflow_stats(self, workflow_id: str) -> Optional[WorkflowStats]:
-        """Get comprehensive statistics for a workflow"""
+        """获取工作流的全面统计数据"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -205,7 +205,7 @@ class CommunityFeatures:
         return None
     
     def increment_view(self, workflow_id: str):
-        """Increment view count for a workflow"""
+        """增加工作流的浏览计数"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -224,7 +224,7 @@ class CommunityFeatures:
         conn.close()
     
     def increment_download(self, workflow_id: str):
-        """Increment download count for a workflow"""
+        """增加工作流的下载计数"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -243,7 +243,7 @@ class CommunityFeatures:
         conn.close()
     
     def get_top_rated_workflows(self, limit: int = 10) -> List[Dict]:
-        """Get top-rated workflows"""
+        """获取评分最高的工作流"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -270,7 +270,7 @@ class CommunityFeatures:
         return results
     
     def get_most_popular_workflows(self, limit: int = 10) -> List[Dict]:
-        """Get most popular workflows by views and downloads"""
+        """根据浏览量和下载量获取最受欢迎的工作流"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -297,7 +297,7 @@ class CommunityFeatures:
     
     def create_collection(self, user_id: str, collection_name: str, workflow_ids: List[str], 
                          is_public: bool = False, description: str = None) -> bool:
-        """Create a workflow collection"""
+        """创建工作流集合"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -312,13 +312,13 @@ class CommunityFeatures:
             return True
             
         except Exception as e:
-            print(f"Error creating collection: {e}")
+            print(f"创建集合时出错：{e}")
             return False
         finally:
             conn.close()
     
     def get_user_collections(self, user_id: str) -> List[Dict]:
-        """Get collections for a user"""
+        """获取用户的集合"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -344,7 +344,7 @@ class CommunityFeatures:
         return collections
     
     def _update_workflow_stats(self, workflow_id: str):
-        """Update workflow statistics after rating changes"""
+        """评分变更后更新工作流统计数据"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -367,18 +367,18 @@ class CommunityFeatures:
         conn.commit()
         conn.close()
 
-# Example usage and API endpoints
+# 示例用法和 API 端点
 def create_community_api_endpoints(app):
-    """Add community feature endpoints to FastAPI app"""
+    """向 FastAPI 应用添加社区功能端点"""
     community = CommunityFeatures()
     
     @app.post("/api/workflows/{workflow_id}/rate")
     async def rate_workflow(workflow_id: str, rating_data: dict):
-        """Rate a workflow"""
+        """为工作流评分"""
         try:
             success = community.add_rating(
                 workflow_id=workflow_id,
-                user_id=rating_data.get('user_id', 'anonymous'),
+                user_id=rating_data.get('user_id', 'anonymous'),  # 匿名用户
                 rating=rating_data['rating'],
                 review=rating_data.get('review')
             )
@@ -388,48 +388,48 @@ def create_community_api_endpoints(app):
     
     @app.get("/api/workflows/{workflow_id}/ratings")
     async def get_workflow_ratings(workflow_id: str, limit: int = 10):
-        """Get workflow ratings and reviews"""
+        """获取工作流评分和评论"""
         ratings = community.get_workflow_ratings(workflow_id, limit)
         return {"ratings": ratings}
     
     @app.get("/api/workflows/{workflow_id}/stats")
     async def get_workflow_stats(workflow_id: str):
-        """Get workflow statistics"""
+        """获取工作流统计数据"""
         stats = community.get_workflow_stats(workflow_id)
         return {"stats": stats}
     
     @app.get("/api/workflows/top-rated")
     async def get_top_rated_workflows(limit: int = 10):
-        """Get top-rated workflows"""
+        """获取评分最高的工作流"""
         workflows = community.get_top_rated_workflows(limit)
         return {"workflows": workflows}
     
     @app.get("/api/workflows/most-popular")
     async def get_most_popular_workflows(limit: int = 10):
-        """Get most popular workflows"""
+        """获取最受欢迎的工作流"""
         workflows = community.get_most_popular_workflows(limit)
         return {"workflows": workflows}
     
     @app.post("/api/workflows/{workflow_id}/view")
     async def track_workflow_view(workflow_id: str):
-        """Track workflow view"""
+        """记录工作流浏览"""
         community.increment_view(workflow_id)
         return {"success": True}
     
     @app.post("/api/workflows/{workflow_id}/download")
     async def track_workflow_download(workflow_id: str):
-        """Track workflow download"""
+        """记录工作流下载"""
         community.increment_download(workflow_id)
         return {"success": True}
 
 if __name__ == "__main__":
-    # Initialize community features
+    # 初始化社区功能
     community = CommunityFeatures()
-    print("✅ Community features initialized successfully!")
+    print("✅ 社区功能初始化成功！")
     
-    # Example: Add a rating
-    # community.add_rating("example-workflow.json", "user123", 5, "Great workflow!")
+    # 示例：添加评分
+    # community.add_rating("example-workflow.json", "user123", 5, "很棒的工作流！")
     
-    # Example: Get top-rated workflows
+    # 示例：获取评分最高的工作流
     top_workflows = community.get_top_rated_workflows(5)
-    print(f"📊 Top rated workflows: {len(top_workflows)}")
+    print(f"📊 评分最高的工作流数量：{len(top_workflows)}")

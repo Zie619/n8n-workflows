@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-AI Assistant for N8N Workflow Discovery
-Intelligent chat interface for finding and understanding workflows.
+N8N 工作流发现 AI 助手
+用于查找和理解工作流的智能聊天界面。
 """
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -35,21 +35,21 @@ class WorkflowAssistant:
         return conn
     
     def search_workflows_intelligent(self, query: str, limit: int = 5) -> List[Dict]:
-        """Intelligent workflow search based on natural language query."""
+        """基于自然语言查询的智能工作流搜索。"""
         conn = self.get_db_connection()
         
-        # Extract keywords and intent from query
+        # 从查询中提取关键词和意图
         keywords = self.extract_keywords(query)
         intent = self.detect_intent(query)
         
-        # Build search query
+        # 构建搜索查询
         search_terms = []
         for keyword in keywords:
             search_terms.append(f"name LIKE '%{keyword}%' OR description LIKE '%{keyword}%'")
         
         where_clause = " OR ".join(search_terms) if search_terms else "1=1"
         
-        # Add intent-based filtering
+        # 添加基于意图的过滤
         if intent == "automation":
             where_clause += " AND (trigger_type = 'Scheduled' OR trigger_type = 'Complex')"
         elif intent == "integration":
@@ -78,8 +78,8 @@ class WorkflowAssistant:
         return workflows
     
     def extract_keywords(self, query: str) -> List[str]:
-        """Extract relevant keywords from user query."""
-        # Common automation terms
+        """从用户查询中提取相关关键词。"""
+        # 常见的自动化术语
         automation_terms = {
             'email': ['email', 'gmail', 'mail'],
             'social': ['twitter', 'facebook', 'instagram', 'linkedin', 'social'],
@@ -98,7 +98,7 @@ class WorkflowAssistant:
                 if term in query_lower:
                     keywords.append(term)
         
-        # Extract specific service names
+        # 提取特定服务名称
         services = ['slack', 'telegram', 'openai', 'google', 'microsoft', 'shopify', 'airtable']
         for service in services:
             if service in query_lower:
@@ -107,7 +107,7 @@ class WorkflowAssistant:
         return list(set(keywords))
     
     def detect_intent(self, query: str) -> str:
-        """Detect user intent from query."""
+        """从查询中检测用户意图。"""
         query_lower = query.lower()
         
         if any(word in query_lower for word in ['automate', 'schedule', 'recurring', 'daily', 'weekly']):
@@ -122,11 +122,11 @@ class WorkflowAssistant:
             return "general"
     
     def generate_response(self, query: str, workflows: List[Dict]) -> str:
-        """Generate natural language response based on query and workflows."""
+        """基于查询和工作流生成自然语言响应。"""
         if not workflows:
-            return "I couldn't find any workflows matching your request. Try searching for specific services like 'Slack', 'OpenAI', or 'Email automation'."
+            return "我找不到符合您请求的工作流。尝试搜索特定服务，如 'Slack'、'OpenAI' 或 'Email automation'。"
         
-        # Analyze workflow patterns
+        # 分析工作流模式
         trigger_types = [w['trigger_type'] for w in workflows]
         integrations = []
         for w in workflows:
@@ -135,67 +135,67 @@ class WorkflowAssistant:
         common_integrations = list(set(integrations))[:3]
         most_common_trigger = max(set(trigger_types), key=trigger_types.count)
         
-        # Generate contextual response
+        # 生成上下文响应
         response_parts = []
         
         if len(workflows) == 1:
             workflow = workflows[0]
-            response_parts.append(f"I found a perfect match: **{workflow['name']}**")
-            response_parts.append(f"This is a {workflow['trigger_type'].lower()} workflow that {workflow['description'].lower()}")
+            response_parts.append(f"我找到了完美匹配：**{workflow['name']}**")
+            response_parts.append(f"这是一个 {workflow['trigger_type'].lower()} 工作流，{workflow['description'].lower()}")
         else:
-            response_parts.append(f"I found {len(workflows)} relevant workflows:")
+            response_parts.append(f"我找到了 {len(workflows)} 个相关工作流：")
             
             for i, workflow in enumerate(workflows[:3], 1):
                 response_parts.append(f"{i}. **{workflow['name']}** - {workflow['description']}")
         
         if common_integrations:
-            response_parts.append(f"\nThese workflows commonly use: {', '.join(common_integrations)}")
+            response_parts.append(f"\n这些工作流通常使用：{', '.join(common_integrations)}")
         
         if most_common_trigger != 'all':
-            response_parts.append(f"Most are {most_common_trigger.lower()} triggered workflows.")
+            response_parts.append(f"大多数是 {most_common_trigger.lower()} 触发的工作流。")
         
         return "\n".join(response_parts)
     
     def get_suggestions(self, query: str) -> List[str]:
-        """Generate helpful suggestions based on query."""
+        """基于查询生成有用的建议。"""
         suggestions = []
         
         if 'email' in query.lower():
             suggestions.extend([
-                "Email automation workflows",
-                "Gmail integration examples",
-                "Email notification systems"
+                "电子邮件自动化工作流",
+                "Gmail 集成示例",
+                "电子邮件通知系统"
             ])
         elif 'ai' in query.lower() or 'openai' in query.lower():
             suggestions.extend([
-                "AI-powered workflows",
-                "OpenAI integration examples",
-                "Chatbot automation"
+                "AI 驱动的工作流",
+                "OpenAI 集成示例",
+                "聊天机器人自动化"
             ])
         elif 'social' in query.lower():
             suggestions.extend([
-                "Social media automation",
-                "Twitter integration workflows",
-                "LinkedIn automation"
+                "社交媒体自动化",
+                "Twitter 集成工作流",
+                "LinkedIn 自动化"
             ])
         else:
             suggestions.extend([
-                "Popular automation patterns",
-                "Webhook-triggered workflows",
-                "Scheduled automation examples"
+                "流行的自动化模式",
+                "Webhook 触发的工作流",
+                "计划自动化示例"
             ])
         
         return suggestions[:3]
     
     def calculate_confidence(self, query: str, workflows: List[Dict]) -> float:
-        """Calculate confidence score for the response."""
+        """计算响应的置信度分数。"""
         if not workflows:
             return 0.0
         
-        # Base confidence on number of matches and relevance
+        # 基于匹配数量和相关性计算基础置信度
         base_confidence = min(len(workflows) / 5.0, 1.0)
         
-        # Boost confidence for exact matches
+        # 为精确匹配提升置信度
         query_lower = query.lower()
         exact_matches = 0
         for workflow in workflows:
@@ -215,18 +215,18 @@ ai_app = FastAPI(title="N8N AI Assistant", version="1.0.0")
 
 @ai_app.post("/chat", response_model=AIResponse)
 async def chat_with_assistant(message: ChatMessage):
-    """Chat with the AI assistant to discover workflows."""
+    """与 AI 助手聊天以发现工作流。"""
     try:
-        # Search for relevant workflows
+        # 搜索相关工作流
         workflows = assistant.search_workflows_intelligent(message.message, limit=5)
         
-        # Generate response
+        # 生成响应
         response_text = assistant.generate_response(message.message, workflows)
         
-        # Get suggestions
+        # 获取建议
         suggestions = assistant.get_suggestions(message.message)
         
-        # Calculate confidence
+        # 计算置信度
         confidence = assistant.calculate_confidence(message.message, workflows)
         
         return AIResponse(
@@ -237,11 +237,11 @@ async def chat_with_assistant(message: ChatMessage):
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Assistant error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"助手错误：{str(e)}")
 
 @ai_app.get("/chat/interface")
 async def chat_interface():
-    """Get the chat interface HTML."""
+    """获取聊天界面 HTML。"""
     html_content = """
     <!DOCTYPE html>
     <html lang="en">

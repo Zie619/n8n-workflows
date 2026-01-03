@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Update README.md with current workflow statistics
-Replaces hardcoded numbers with live data from the database.
+使用当前工作流统计信息更新 README.md
+将硬编码的数字替换为数据库中的实时数据。
 """
 
 import json
@@ -18,17 +18,17 @@ from workflow_db import WorkflowDatabase
 
 
 def get_current_stats():
-    """Get current workflow statistics from the database."""
+    """从数据库获取当前工作流统计信息。"""
     db_path = "database/workflows.db"
 
     if not os.path.exists(db_path):
-        print("Database not found. Run workflow indexing first.")
+        print("未找到数据库。请先运行工作流索引。")
         return None
 
     db = WorkflowDatabase(db_path)
     stats = db.get_stats()
 
-    # Get categories count
+    # 获取类别计数
     categories = db.get_service_categories()
 
     return {
@@ -45,10 +45,10 @@ def get_current_stats():
 
 
 def get_category_list(categories):
-    """Get formatted list of all categories (same logic as search index)."""
+    """获取所有类别的格式化列表（与搜索索引相同的逻辑）。"""
     formatted_categories = set()
 
-    # Map technical categories to display names
+    # 将技术类别映射到显示名称
     category_mapping = {
         'messaging': 'Communication & Messaging',
         'email': 'Communication & Messaging',
@@ -68,7 +68,7 @@ def get_category_list(categories):
         display_name = category_mapping.get(category_key, category_key.replace('_', ' ').title())
         formatted_categories.add(display_name)
 
-    # Add categories from the create_categories.py system
+    # 添加来自 create_categories.py 系统的类别
     additional_categories = [
         "Business Process Automation",
         "Web Scraping & Data Extraction",
@@ -86,11 +86,11 @@ def get_category_list(categories):
 
 
 def update_readme_stats(stats):
-    """Update README.md with current statistics."""
+    """使用当前统计信息更新 README.md。"""
     readme_path = "README.md"
 
     if not os.path.exists(readme_path):
-        print("README.md not found")
+        print("未找到 README.md")
         return False
 
     with open(readme_path, 'r', encoding='utf-8') as f:
@@ -119,7 +119,7 @@ def update_readme_stats(stats):
         (r'- \*\*Unique Integrations\*\*: [\d,]+ different',
          f'- **Unique Integrations**: {stats["unique_integrations"]:,} different'),
 
-        # Update complexity/trigger distribution
+        # 更新复杂度/触发器分布
         (r'- \*\*Complex\*\*: [\d,]+ workflows \([\d.]+%\)',
          f'- **Complex**: {stats["triggers"].get("Complex", 0):,} workflows ({(stats["triggers"].get("Complex", 0)/stats["total_workflows"]*100):.1f}%)'),
 
@@ -132,7 +132,7 @@ def update_readme_stats(stats):
         (r'- \*\*Scheduled\*\*: [\d,]+ workflows \([\d.]+%\)',
          f'- **Scheduled**: {stats["triggers"].get("Scheduled", 0):,} workflows ({(stats["triggers"].get("Scheduled", 0)/stats["total_workflows"]*100):.1f}%)'),
 
-        # Update total in current collection stats
+        # 更新当前集合统计信息中的总数
         (r'\*\*Total Workflows\*\*: [\d,]+ automation',
          f'**Total Workflows**: {stats["total_workflows"]:,} automation'),
 
@@ -145,22 +145,22 @@ def update_readme_stats(stats):
         (r'\*\*Unique Integrations\*\*: [\d,]+ different',
          f'**Unique Integrations**: {stats["unique_integrations"]:,} different'),
 
-        # Categories count
+        # 类别计数
         (r'Our system automatically categorizes workflows into [\d]+ service categories',
          f'Our system automatically categorizes workflows into {stats["categories_count"]} service categories'),
 
-        # Update any "2000+" references
+        # 更新任何 "2000+" 引用
         (r'2000\+', f'{stats["total_workflows"]:,}+'),
         (r'2,000\+', f'{stats["total_workflows"]:,}+'),
 
-        # Search across X workflows
+        # 搜索 X 个工作流
         (r'Search across [\d,]+ workflows', f'Search across {stats["total_workflows"]:,} workflows'),
 
-        # Instant search across X workflows
+        # 即时搜索 X 个工作流
         (r'Instant search across [\d,]+ workflows', f'Instant search across {stats["total_workflows"]:,} workflows'),
     ]
 
-    # Apply all replacements
+    # 应用所有替换
     updated_content = content
     replacements_made = 0
 
@@ -170,42 +170,42 @@ def update_readme_stats(stats):
         if updated_content != old_content:
             replacements_made += 1
 
-    # Write back to file
+    # 写回文件
     with open(readme_path, 'w', encoding='utf-8') as f:
         f.write(updated_content)
 
-    print(f"README.md updated with current statistics:")
-    print(f"  - Total workflows: {stats['total_workflows']:,}")
-    print(f"  - Active workflows: {stats['active_workflows']:,}")
-    print(f"  - Total nodes: {stats['total_nodes']:,}")
-    print(f"  - Unique integrations: {stats['unique_integrations']:,}")
-    print(f"  - Categories: {stats['categories_count']}")
-    print(f"  - Replacements made: {replacements_made}")
+    print(f"README.md 已使用当前统计信息更新：")
+    print(f"  - 工作流总数：{stats['total_workflows']:,}")
+    print(f"  - 活跃工作流：{stats['active_workflows']:,}")
+    print(f"  - 节点总数：{stats['total_nodes']:,}")
+    print(f"  - 唯一集成：{stats['unique_integrations']:,}")
+    print(f"  - 类别：{stats['categories_count']}")
+    print(f"  - 替换次数：{replacements_made}")
 
     return True
 
 
 def main():
-    """Main function to update README statistics."""
+    """更新 README 统计信息的主函数。"""
     try:
-        print("Getting current workflow statistics...")
+        print("正在获取当前工作流统计信息...")
         stats = get_current_stats()
 
         if not stats:
-            print("Failed to get statistics")
+            print("获取统计信息失败")
             sys.exit(1)
 
-        print("Updating README.md...")
+        print("正在更新 README.md...")
         success = update_readme_stats(stats)
 
         if success:
-            print("README.md successfully updated with latest statistics!")
+            print("README.md 已成功更新为最新统计信息！")
         else:
-            print("Failed to update README.md")
+            print("更新 README.md 失败")
             sys.exit(1)
 
     except Exception as e:
-        print(f"Error updating README stats: {e}")
+        print(f"更新 README 统计信息时出错：{e}")
         sys.exit(1)
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-User Management System for N8N Workflows
-Multi-user access control and authentication.
+N8N 工作流用户管理系统
+多用户访问控制和身份验证。
 """
 
 from fastapi import FastAPI, HTTPException, Depends, status
@@ -62,7 +62,7 @@ class UserManager:
         self.init_database()
     
     def init_database(self):
-        """Initialize user database."""
+        """初始化用户数据库。"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -109,7 +109,7 @@ class UserManager:
         self.create_default_admin()
     
     def create_default_admin(self):
-        """Create default admin user if none exists."""
+        """如果不存在则创建默认管理员用户。"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -137,11 +137,11 @@ class UserManager:
         conn.close()
     
     def hash_password(self, password: str) -> str:
-        """Hash password using SHA-256."""
+        """使用 SHA-256 对密码进行哈希处理。"""
         return hashlib.sha256(password.encode()).hexdigest()
     
     def verify_password(self, password: str, hashed: str) -> bool:
-        """Verify password against hash."""
+        """验证密码是否与哈希值匹配。"""
         return self.hash_password(password) == hashed
     
     def create_user(self, user_data: UserCreate) -> User:

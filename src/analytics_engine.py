@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Advanced Analytics Engine for N8N Workflows
-Provides insights, patterns, and usage analytics.
+N8N 工作流高级分析引擎
+提供洞察、模式和使用分析。
 """
 
 from fastapi import FastAPI, HTTPException, Query
@@ -31,17 +31,17 @@ class WorkflowAnalytics:
         return conn
     
     def get_workflow_analytics(self) -> Dict[str, Any]:
-        """Get comprehensive workflow analytics."""
+        """获取全面的工作流分析。"""
         conn = self.get_db_connection()
         
-        # Basic statistics
+        # 基本统计
         cursor = conn.execute("SELECT COUNT(*) as total FROM workflows")
         total_workflows = cursor.fetchone()['total']
         
         cursor = conn.execute("SELECT COUNT(*) as active FROM workflows WHERE active = 1")
         active_workflows = cursor.fetchone()['active']
         
-        # Trigger type distribution
+        # 触发器类型分布
         cursor = conn.execute("""
             SELECT trigger_type, COUNT(*) as count 
             FROM workflows 
@@ -50,7 +50,7 @@ class WorkflowAnalytics:
         """)
         trigger_distribution = {row['trigger_type']: row['count'] for row in cursor.fetchall()}
         
-        # Complexity distribution
+        # 复杂度分布
         cursor = conn.execute("""
             SELECT complexity, COUNT(*) as count 
             FROM workflows 
@@ -59,7 +59,7 @@ class WorkflowAnalytics:
         """)
         complexity_distribution = {row['complexity']: row['count'] for row in cursor.fetchall()}
         
-        # Node count statistics
+        # 节点数量统计
         cursor = conn.execute("""
             SELECT 
                 AVG(node_count) as avg_nodes,
@@ -70,7 +70,7 @@ class WorkflowAnalytics:
         """)
         node_stats = dict(cursor.fetchone())
         
-        # Integration analysis
+        # 集成分析
         cursor = conn.execute("SELECT integrations FROM workflows WHERE integrations IS NOT NULL")
         all_integrations = []
         for row in cursor.fetchall():
@@ -80,10 +80,10 @@ class WorkflowAnalytics:
         integration_counts = Counter(all_integrations)
         top_integrations = dict(integration_counts.most_common(10))
         
-        # Workflow patterns
+        # 工作流模式
         patterns = self.analyze_workflow_patterns(conn)
         
-        # Recommendations
+        # 建议
         recommendations = self.generate_recommendations(
             total_workflows, active_workflows, trigger_distribution, 
             complexity_distribution, top_integrations
@@ -111,8 +111,8 @@ class WorkflowAnalytics:
         }
     
     def analyze_workflow_patterns(self, conn) -> Dict[str, Any]:
-        """Analyze common workflow patterns and relationships."""
-        # Integration co-occurrence analysis
+        """分析常见的工作流模式和关系。"""
+        # 集成共现分析
         cursor = conn.execute("""
             SELECT name, integrations, trigger_type, complexity, node_count
             FROM workflows 
@@ -125,21 +125,21 @@ class WorkflowAnalytics:
         for row in cursor.fetchall():
             integrations = json.loads(row['integrations'] or '[]')
             
-            # Count service categories
+            # 统计服务类别
             for integration in integrations:
                 category = self.categorize_service(integration)
                 service_categories[category] += 1
             
-            # Find integration pairs
+            # 查找集成对
             for i in range(len(integrations)):
                 for j in range(i + 1, len(integrations)):
                     pair = tuple(sorted([integrations[i], integrations[j]]))
-                    integration_pairs[pair] += 1
+                integration_pairs[pair] += 1
         
-        # Most common integration pairs
+        # 最常见的集成对
         top_pairs = dict(Counter(integration_pairs).most_common(5))
         
-        # Workflow complexity patterns
+        # 工作流复杂度模式
         cursor = conn.execute("""
             SELECT 
                 trigger_type,
@@ -167,88 +167,88 @@ class WorkflowAnalytics:
         }
     
     def categorize_service(self, service: str) -> str:
-        """Categorize a service into a broader category."""
+        """将服务分类到更广泛的类别中。"""
         service_lower = service.lower()
         
         if any(word in service_lower for word in ['slack', 'telegram', 'discord', 'whatsapp']):
-            return "Communication"
+            return "通信"
         elif any(word in service_lower for word in ['openai', 'ai', 'chat', 'gpt']):
-            return "AI/ML"
+            return "人工智能/机器学习"
         elif any(word in service_lower for word in ['google', 'microsoft', 'office']):
-            return "Productivity"
+            return "生产力"
         elif any(word in service_lower for word in ['shopify', 'woocommerce', 'stripe']):
-            return "E-commerce"
+            return "电子商务"
         elif any(word in service_lower for word in ['airtable', 'notion', 'database']):
-            return "Data Management"
+            return "数据管理"
         elif any(word in service_lower for word in ['twitter', 'facebook', 'instagram']):
-            return "Social Media"
+            return "社交媒体"
         else:
-            return "Other"
+            return "其他"
     
     def generate_recommendations(self, total: int, active: int, triggers: Dict, 
                                complexity: Dict, integrations: Dict) -> List[str]:
-        """Generate actionable recommendations based on analytics."""
+        """基于分析生成可操作的建议。"""
         recommendations = []
         
-        # Activation rate recommendations
+        # 激活率建议
         activation_rate = (active / total) * 100 if total > 0 else 0
         if activation_rate < 20:
             recommendations.append(
-                f"Low activation rate ({activation_rate:.1f}%). Consider reviewing inactive workflows "
-                "and updating them for current use cases."
+                f"激活率较低 ({activation_rate:.1f}%)。考虑审查非活跃工作流 "
+                "并更新它们以适应当前用例。"
             )
         elif activation_rate > 80:
             recommendations.append(
-                f"High activation rate ({activation_rate:.1f}%)! Your workflows are well-maintained. "
-                "Consider documenting successful patterns for team sharing."
+                f"激活率较高 ({activation_rate:.1f}%)！您的工作流维护良好。 "
+                "考虑记录成功的模式以便团队共享。"
             )
         
-        # Trigger type recommendations
+        # 触发器类型建议
         webhook_count = triggers.get('Webhook', 0)
         scheduled_count = triggers.get('Scheduled', 0)
         
         if webhook_count > scheduled_count * 2:
             recommendations.append(
-                "You have many webhook-triggered workflows. Consider adding scheduled workflows "
-                "for data synchronization and maintenance tasks."
+                "您有许多 Webhook 触发的工作流。考虑添加计划工作流 "
+                "用于数据同步和维护任务。"
             )
         elif scheduled_count > webhook_count * 2:
             recommendations.append(
-                "You have many scheduled workflows. Consider adding webhook-triggered workflows "
-                "for real-time integrations and event-driven automation."
+                "您有许多计划工作流。考虑添加 Webhook 触发的工作流 "
+                "用于实时集成和事件驱动的自动化。"
             )
         
-        # Integration recommendations
+        # 集成建议
         if 'OpenAI' in integrations and integrations['OpenAI'] > 5:
             recommendations.append(
-                "You're using OpenAI extensively. Consider creating AI workflow templates "
-                "for common use cases like content generation and data analysis."
+                "您广泛使用 OpenAI。考虑创建 AI 工作流模板 "
+                "用于常见用例，如内容生成和数据分析。"
             )
         
         if 'Slack' in integrations and 'Telegram' in integrations:
             recommendations.append(
-                "You're using multiple communication platforms. Consider creating unified "
-                "notification workflows that can send to multiple channels."
+                "您使用多个通信平台。考虑创建统一 "
+                "通知工作流，可以发送到多个渠道。"
             )
         
-        # Complexity recommendations
+        # 复杂度建议
         high_complexity = complexity.get('high', 0)
         if high_complexity > total * 0.3:
             recommendations.append(
-                "You have many high-complexity workflows. Consider breaking them down into "
-                "smaller, reusable components for better maintainability."
+                "您有许多高复杂度的工作流。考虑将它们分解为 "
+                "更小的、可重用的组件以提高可维护性。"
             )
         
         return recommendations
     
     def get_trend_analysis(self, days: int = 30) -> Dict[str, Any]:
-        """Analyze trends over time (simulated for demo)."""
-        # In a real implementation, this would analyze historical data
+        """分析随时间变化的趋势（演示模拟）。"""
+        # 在实际实现中，这将分析历史数据
         return {
             "workflow_growth": {
                 "daily_average": 2.3,
                 "growth_rate": 15.2,
-                "trend": "increasing"
+                "trend": "增长中"
             },
             "popular_integrations": {
                 "trending_up": ["OpenAI", "Slack", "Google Sheets"],
@@ -258,15 +258,15 @@ class WorkflowAnalytics:
             "complexity_trends": {
                 "average_nodes": 12.5,
                 "complexity_increase": 8.3,
-                "automation_maturity": "intermediate"
+                "automation_maturity": "中级"
             }
         }
     
     def get_usage_insights(self) -> Dict[str, Any]:
-        """Get usage insights and patterns."""
+        """获取使用洞察和模式。"""
         conn = self.get_db_connection()
         
-        # Active vs inactive analysis
+        # 活跃与非活跃分析
         cursor = conn.execute("""
             SELECT 
                 trigger_type,
@@ -288,7 +288,7 @@ class WorkflowAnalytics:
                 "activation_rate": round(activation_rate, 2)
             })
         
-        # Most effective patterns
+        # 最有效的模式
         effective_patterns = sorted(usage_patterns, key=lambda x: x['activation_rate'], reverse=True)[:5]
         
         conn.close()
@@ -297,22 +297,22 @@ class WorkflowAnalytics:
             "usage_patterns": usage_patterns,
             "most_effective_patterns": effective_patterns,
             "insights": [
-                "Webhook-triggered workflows have higher activation rates",
-                "Medium complexity workflows are most commonly used",
-                "AI-powered workflows show increasing adoption",
-                "Communication integrations are most popular"
+                "Webhook 触发的工作流具有更高的激活率",
+                "中等复杂度的工作流最常用",
+                "AI 驱动的工作流显示出增加的采用率",
+                "通信集成最受欢迎"
             ]
         }
 
-# Initialize analytics engine
+# 初始化分析引擎
 analytics_engine = WorkflowAnalytics()
 
-# FastAPI app for Analytics
-analytics_app = FastAPI(title="N8N Analytics Engine", version="1.0.0")
+# 用于分析的 FastAPI 应用
+analytics_app = FastAPI(title="N8N 分析引擎", version="1.0.0")
 
 @analytics_app.get("/analytics/overview", response_model=AnalyticsResponse)
 async def get_analytics_overview():
-    """Get comprehensive analytics overview."""
+    """获取全面的分析概览。"""
     try:
         analytics_data = analytics_engine.get_workflow_analytics()
         trends = analytics_engine.get_trend_analysis()
@@ -326,34 +326,34 @@ async def get_analytics_overview():
             generated_at=analytics_data["generated_at"]
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analytics error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"分析错误：{str(e)}")
 
 @analytics_app.get("/analytics/trends")
 async def get_trend_analysis(days: int = Query(30, ge=1, le=365)):
-    """Get trend analysis for specified period."""
+    """获取指定期间的趋势分析。"""
     try:
         return analytics_engine.get_trend_analysis(days)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Trend analysis error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"趋势分析错误：{str(e)}")
 
 @analytics_app.get("/analytics/insights")
 async def get_usage_insights():
-    """Get usage insights and patterns."""
+    """获取使用洞察和模式。"""
     try:
         return analytics_engine.get_usage_insights()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Insights error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"洞察错误：{str(e)}")
 
 @analytics_app.get("/analytics/dashboard")
 async def get_analytics_dashboard():
-    """Get analytics dashboard HTML."""
+    """获取分析仪表板 HTML。"""
     html_content = """
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="zh-CN">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>N8N Analytics Dashboard</title>
+        <title>N8N 分析仪表板</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -438,27 +438,27 @@ async def get_analytics_dashboard():
     <body>
         <div class="dashboard">
             <div class="header">
-                <h1>📊 N8N Analytics Dashboard</h1>
-                <p>Comprehensive insights into your workflow ecosystem</p>
+                <h1>📊 N8N 分析仪表板</h1>
+                <p>全面洞察您的工作流生态系统</p>
             </div>
             
             <div class="stats-grid" id="statsGrid">
-                <div class="loading">Loading analytics...</div>
+                <div class="loading">正在加载分析...</div>
             </div>
             
             <div class="chart-container">
-                <div class="chart-title">Workflow Distribution</div>
+                <div class="chart-title">工作流分布</div>
                 <canvas id="triggerChart" width="400" height="200"></canvas>
             </div>
             
             <div class="chart-container">
-                <div class="chart-title">Integration Usage</div>
+                <div class="chart-title">集成使用情况</div>
                 <canvas id="integrationChart" width="400" height="200"></canvas>
             </div>
             
             <div class="recommendations" id="recommendations">
-                <div class="chart-title">Recommendations</div>
-                <div class="loading">Loading recommendations...</div>
+                <div class="chart-title">建议</div>
+                <div class="loading">正在加载建议...</div>
             </div>
         </div>
         
@@ -468,20 +468,20 @@ async def get_analytics_dashboard():
                     const response = await fetch('/analytics/overview');
                     const data = await response.json();
                     
-                    // Update stats
+                    // 更新统计
                     updateStats(data.overview);
                     
-                    // Create charts
+                    // 创建图表
                     createTriggerChart(data.patterns.distributions?.trigger_types || {});
                     createIntegrationChart(data.patterns.distributions?.top_integrations || {});
                     
-                    // Update recommendations
+                    // 更新建议
                     updateRecommendations(data.recommendations);
                     
                 } catch (error) {
-                    console.error('Error loading analytics:', error);
+                    console.error('加载分析时出错:', error);
                     document.getElementById('statsGrid').innerHTML = 
-                        '<div class="loading">Error loading analytics. Please try again.</div>';
+                        '<div class="loading">加载分析时出错。请重试。</div>';
                 }
             }
             
@@ -490,19 +490,19 @@ async def get_analytics_dashboard():
                 statsGrid.innerHTML = `
                     <div class="stat-card">
                         <div class="stat-number">${overview.total_workflows?.toLocaleString() || 0}</div>
-                        <div class="stat-label">Total Workflows</div>
+                        <div class="stat-label">工作流总数</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${overview.active_workflows?.toLocaleString() || 0}</div>
-                        <div class="stat-label">Active Workflows</div>
+                        <div class="stat-label">活跃工作流</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${overview.activation_rate || 0}%</div>
-                        <div class="stat-label">Activation Rate</div>
+                        <div class="stat-label">激活率</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number">${overview.unique_integrations || 0}</div>
-                        <div class="stat-label">Unique Integrations</div>
+                        <div class="stat-label">唯一集成</div>
                     </div>
                 `;
             }
@@ -545,7 +545,7 @@ async def get_analytics_dashboard():
                     data: {
                         labels: labels,
                         datasets: [{
-                            label: 'Usage Count',
+                            label: '使用次数',
                             data: data,
                             backgroundColor: '#667eea'
                         }]
@@ -565,17 +565,17 @@ async def get_analytics_dashboard():
                 const container = document.getElementById('recommendations');
                 if (recommendations && recommendations.length > 0) {
                     container.innerHTML = `
-                        <div class="chart-title">Recommendations</div>
+                        <div class="chart-title">建议</div>
                         ${recommendations.map(rec => `
                             <div class="recommendation">${rec}</div>
                         `).join('')}
                     `;
                 } else {
-                    container.innerHTML = '<div class="chart-title">Recommendations</div><div class="loading">No recommendations available</div>';
+                    container.innerHTML = '<div class="chart-title">建议</div><div class="loading">暂无可用建议</div>';
                 }
             }
             
-            // Load analytics on page load
+            // 页面加载时加载分析
             loadAnalytics();
         </script>
     </body>
