@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>⚡ N8N Workflow Documentation</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+  <!-- n8n Demo Web Component for interactive workflow canvas preview -->
+  <script type="module" src="https://n8n-io.github.io/n8n-demo-webcomponent/n8n-demo.js"></script>
   <style>
     /* Modern CSS Reset and Base */
     * {
@@ -527,6 +529,40 @@
       display: none !important;
     }
 
+    /* n8n Canvas Preview styling */
+    .canvas-container {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      overflow: hidden;
+      height: 500px;
+      position: relative;
+    }
+
+    .canvas-container n8n-demo {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .canvas-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+    }
+
+    .canvas-error {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--error);
+      text-align: center;
+      padding: 2rem;
+    }
+
     /* Mermaid diagram styling */
     .mermaid {
       background: var(--bg-secondary);
@@ -790,8 +826,21 @@
             <h4>Actions</h4>
             <div class="workflow-actions">
               <a id="downloadBtn" class="action-btn primary" href="#" download>📥 Download JSON</a>
+              <button id="viewCanvasBtn" class="action-btn">🎨 View Canvas</button>
               <button id="viewJsonBtn" class="action-btn">📄 View JSON</button>
               <button id="viewDiagramBtn" class="action-btn">📊 View Diagram</button>
+            </div>
+          </div>
+
+          <div class="workflow-detail hidden" id="canvasSection">
+            <div class="section-header">
+              <h4>n8n Canvas Preview</h4>
+              <div class="diagram-controls">
+                <span class="zoom-info">Interactive canvas - drag to pan, scroll to zoom</span>
+              </div>
+            </div>
+            <div id="canvasContainer" class="canvas-container">
+              <div id="canvasViewer" class="canvas-loading">Loading canvas preview...</div>
             </div>
           </div>
 
@@ -876,8 +925,12 @@
           modalStats: document.getElementById('modalStats'),
           modalIntegrations: document.getElementById('modalIntegrations'),
           downloadBtn: document.getElementById('downloadBtn'),
+          viewCanvasBtn: document.getElementById('viewCanvasBtn'),
           viewJsonBtn: document.getElementById('viewJsonBtn'),
           viewDiagramBtn: document.getElementById('viewDiagramBtn'),
+          canvasSection: document.getElementById('canvasSection'),
+          canvasContainer: document.getElementById('canvasContainer'),
+          canvasViewer: document.getElementById('canvasViewer'),
           jsonSection: document.getElementById('jsonSection'),
           jsonViewer: document.getElementById('jsonViewer'),
           diagramSection: document.getElementById('diagramSection'),
@@ -986,6 +1039,10 @@
           if (e.target === this.elements.workflowModal) {
             this.closeModal();
           }
+        });
+
+        this.elements.viewCanvasBtn.addEventListener('click', () => {
+          this.toggleCanvasView();
         });
 
         this.elements.viewJsonBtn.addEventListener('click', () => {
@@ -1423,6 +1480,7 @@
         this.elements.downloadBtn.download = workflow.filename;
 
         // Reset view states
+        this.elements.canvasSection.classList.add('hidden');
         this.elements.jsonSection.classList.add('hidden');
         this.elements.diagramSection.classList.add('hidden');
 
@@ -1440,12 +1498,61 @@
         this.isDragging = false;
 
         // Reset button states
+        this.elements.viewCanvasBtn.textContent = '🎨 View Canvas';
         this.elements.viewJsonBtn.textContent = '📄 View JSON';
         this.elements.viewDiagramBtn.textContent = '📊 View Diagram';
 
         // Reset copy button states
         this.resetCopyButton('copyJsonBtn');
         this.resetCopyButton('copyDiagramBtn');
+
+        // Clear canvas content
+        this.elements.canvasViewer.innerHTML = '<div class="canvas-loading">Loading canvas preview...</div>';
+      }
+
+      async toggleCanvasView() {
+        if (!this.currentWorkflow) return;
+
+        const isVisible = !this.elements.canvasSection.classList.contains('hidden');
+
+        if (isVisible) {
+          this.elements.canvasSection.classList.add('hidden');
+          this.elements.viewCanvasBtn.textContent = '🎨 View Canvas';
+        } else {
+          try {
+            this.elements.canvasViewer.innerHTML = '<div class="canvas-loading">Loading canvas preview...</div>';
+            this.elements.canvasSection.classList.remove('hidden');
+            this.elements.viewCanvasBtn.textContent = '🎨 Hide Canvas';
+
+            // Fetch the workflow JSON
+            const data = await this.apiCall(`/workflows/${this.currentWorkflow.filename}`);
+            const workflowJson = data.raw_json;
+
+            // Detect current theme
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+
+            // Create the n8n-demo web component
+            const n8nDemo = document.createElement('n8n-demo');
+            n8nDemo.setAttribute('workflow', JSON.stringify(workflowJson));
+            n8nDemo.setAttribute('theme', currentTheme);
+            n8nDemo.setAttribute('frame', 'false');
+
+            // Clear and add the component
+            this.elements.canvasViewer.innerHTML = '';
+            this.elements.canvasViewer.appendChild(n8nDemo);
+
+          } catch (error) {
+            this.elements.canvasViewer.innerHTML = `
+              <div class="canvas-error">
+                <div>
+                  <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚠️</div>
+                  <div>Error loading canvas preview</div>
+                  <div style="font-size: 0.875rem; margin-top: 0.5rem; opacity: 0.8;">${this.escapeHtml(error.message)}</div>
+                </div>
+              </div>
+            `;
+          }
+        }
       }
 
       async toggleJsonView() {
