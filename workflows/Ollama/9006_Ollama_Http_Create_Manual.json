@@ -1,0 +1,183 @@
+{
+  "name": "AI Blog Writer Pipeline (Ollama)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "topic",
+              "name": "topic",
+              "value": "How to Self-Host AI Models with Ollama",
+              "type": "string"
+            },
+            {
+              "id": "tone",
+              "name": "tone",
+              "value": "professional but conversational",
+              "type": "string"
+            },
+            {
+              "id": "word_count",
+              "name": "word_count",
+              "value": "1500",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-input",
+      "name": "Set Blog Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'You are a professional blog researcher. Research the topic: \"' + $json.topic + '\" and provide 5 key points with supporting evidence. Format as a numbered list with brief explanations. Be factual and cite real concepts.', stream: false, options: { temperature: 0.3, num_predict: 1000 } }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "research",
+      "name": "1. Research Topic (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'You are a blog outline creator. Based on this research:\\n\\n' + JSON.parse($json.data).response + '\\n\\nCreate a detailed blog outline for the topic: \"' + $('Set Blog Parameters').item.json.topic + '\"\\n\\nInclude: Title, H2 sections, key points under each, and a conclusion. Target ' + $('Set Blog Parameters').item.json.word_count + ' words.', stream: false, options: { temperature: 0.4, num_predict: 1000 } }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "outline",
+      "name": "2. Create Outline (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'You are a professional blog writer. Write a complete blog post following this outline:\\n\\n' + JSON.parse($json.data).response + '\\n\\nRequirements:\\n- Tone: ' + $('Set Blog Parameters').item.json.tone + '\\n- Target length: ' + $('Set Blog Parameters').item.json.word_count + ' words\\n- Use markdown formatting (## for headings)\\n- Include a compelling introduction and conclusion\\n- Add practical tips and examples\\n- Write for SEO (use keywords naturally)', stream: false, options: { temperature: 0.7, num_predict: 4000 } }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "draft",
+      "name": "3. Write Draft (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'You are a professional editor. Edit and improve this blog post for clarity, grammar, flow, and SEO. Fix any issues and make it publication-ready. Return the complete edited post in markdown.\\n\\nOriginal post:\\n\\n' + JSON.parse($json.data).response, stream: false, options: { temperature: 0.3, num_predict: 4000 } }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "edit",
+      "name": "4. Edit & Polish (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "final_post",
+              "name": "final_post",
+              "value": "={{ JSON.parse($json.data).response }}",
+              "type": "string"
+            },
+            {
+              "id": "topic",
+              "name": "topic",
+              "value": "={{ $('Set Blog Parameters').item.json.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "generated_at",
+              "name": "generated_at",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "output",
+      "name": "Final Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [{ "node": "Set Blog Parameters", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set Blog Parameters": {
+      "main": [
+        [{ "node": "1. Research Topic (Ollama)", "type": "main", "index": 0 }]
+      ]
+    },
+    "1. Research Topic (Ollama)": {
+      "main": [
+        [{ "node": "2. Create Outline (Ollama)", "type": "main", "index": 0 }]
+      ]
+    },
+    "2. Create Outline (Ollama)": {
+      "main": [
+        [{ "node": "3. Write Draft (Ollama)", "type": "main", "index": 0 }]
+      ]
+    },
+    "3. Write Draft (Ollama)": {
+      "main": [
+        [{ "node": "4. Edit & Polish (Ollama)", "type": "main", "index": 0 }]
+      ]
+    },
+    "4. Edit & Polish (Ollama)": {
+      "main": [
+        [{ "node": "Final Output", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    { "name": "AI" },
+    { "name": "Ollama" },
+    { "name": "Content" },
+    { "name": "Blog" }
+  ]
+}

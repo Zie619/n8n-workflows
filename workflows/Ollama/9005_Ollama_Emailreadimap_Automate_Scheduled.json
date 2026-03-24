@@ -1,0 +1,142 @@
+{
+  "name": "AI Email Auto-Responder (Ollama)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "id": "schedule",
+      "name": "Check Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 10,
+        "filters": {
+          "readStatus": "unread"
+        }
+      },
+      "id": "get-emails",
+      "name": "Get Unread Emails (IMAP)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "credentials": {
+        "imap": {
+          "id": "REPLACE_WITH_YOUR_IMAP_CREDENTIAL_ID",
+          "name": "Your IMAP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'Classify this email into one of these categories: URGENT, QUESTION, FEEDBACK, SPAM, OTHER.\\n\\nFrom: ' + $json.from + '\\nSubject: ' + $json.subject + '\\nBody: ' + ($json.text || '').substring(0, 1000) + '\\n\\nRespond with ONLY the category name, nothing else.', stream: false, options: { temperature: 0.1, num_predict: 20 } }) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "classify",
+      "name": "1. Classify Email (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ JSON.parse($json.data).response.trim() }}",
+              "rightValue": "SPAM",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "filter-spam",
+      "name": "Filter Spam",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'Write a professional, helpful email reply to this message. Be concise and friendly.\\n\\nFrom: ' + $('Get Unread Emails (IMAP)').item.json.from + '\\nSubject: ' + $('Get Unread Emails (IMAP)').item.json.subject + '\\nBody: ' + ($('Get Unread Emails (IMAP)').item.json.text || '').substring(0, 2000) + '\\n\\nWrite ONLY the reply body (no subject line, no greeting format instructions). Sign off as the team.', stream: false, options: { temperature: 0.5, num_predict: 1000 } }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "draft-reply",
+      "name": "2. Draft Reply (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "draft",
+              "name": "draft_reply",
+              "value": "={{ JSON.parse($json.data).response }}",
+              "type": "string"
+            },
+            {
+              "id": "original_from",
+              "name": "original_from",
+              "value": "={{ $('Get Unread Emails (IMAP)').item.json.from }}",
+              "type": "string"
+            },
+            {
+              "id": "original_subject",
+              "name": "original_subject",
+              "value": "={{ 'Re: ' + $('Get Unread Emails (IMAP)').item.json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "category",
+              "name": "category",
+              "value": "={{ JSON.parse($('1. Classify Email (Ollama)').item.json.data).response.trim() }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "prepare-output",
+      "name": "Prepare Draft for Review",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Check Every 5 Minutes": {
+      "main": [[{ "node": "Get Unread Emails (IMAP)", "type": "main", "index": 0 }]]
+    },
+    "Get Unread Emails (IMAP)": {
+      "main": [[{ "node": "1. Classify Email (Ollama)", "type": "main", "index": 0 }]]
+    },
+    "1. Classify Email (Ollama)": {
+      "main": [[{ "node": "Filter Spam", "type": "main", "index": 0 }]]
+    },
+    "Filter Spam": {
+      "main": [[{ "node": "2. Draft Reply (Ollama)", "type": "main", "index": 0 }]]
+    },
+    "2. Draft Reply (Ollama)": {
+      "main": [[{ "node": "Prepare Draft for Review", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "AI" }, { "name": "Ollama" }, { "name": "Email" }, { "name": "Automation" }]
+}

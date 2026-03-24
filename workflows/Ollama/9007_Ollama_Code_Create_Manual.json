@@ -1,0 +1,111 @@
+{
+  "name": "AI Social Media Content Generator (Ollama)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "topic",
+              "name": "topic",
+              "value": "Benefits of self-hosting AI models",
+              "type": "string"
+            },
+            {
+              "id": "brand_voice",
+              "name": "brand_voice",
+              "value": "Tech-savvy, slightly irreverent, helpful. We love open source and privacy.",
+              "type": "string"
+            },
+            {
+              "id": "target_audience",
+              "name": "target_audience",
+              "value": "developers, sysadmins, tech enthusiasts",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "config",
+      "name": "Content Parameters",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'Generate social media content for the topic: \"' + $json.topic + '\"\\n\\nBrand voice: ' + $json.brand_voice + '\\nTarget audience: ' + $json.target_audience + '\\n\\nReturn ONLY valid JSON with this structure:\\n{\\n  \"twitter\": \"Tweet (max 280 chars, include 2-3 relevant hashtags)\",\\n  \"linkedin\": \"LinkedIn post (3-4 paragraphs, professional tone, include hashtags)\",\\n  \"reddit_title\": \"Reddit post title (engaging, not clickbait)\",\\n  \"reddit_body\": \"Reddit post body (informative, genuine value, no hard sell)\",\\n  \"instagram_caption\": \"Instagram caption (engaging, with emoji, 5-10 hashtags at end)\"\\n}', stream: false, options: { temperature: 0.7, num_predict: 2000 } }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "generate",
+      "name": "Generate All Platform Content (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = JSON.parse($input.first().json.data).response;\n// Extract JSON from response\nconst match = response.match(/\\{[\\s\\S]*\\}/);\nif (match) {\n  const content = JSON.parse(match[0]);\n  return [{ json: { ...content, topic: $('Content Parameters').first().json.topic, generated_at: new Date().toISOString() } }];\n}\nthrow new Error('Failed to parse AI response as JSON');"
+      },
+      "id": "parse",
+      "name": "Parse Content JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'llama3:8b', prompt: 'Review this social media content for quality. Check for:\\n1. Grammar and spelling errors\\n2. Tone consistency with brand voice\\n3. Platform-appropriate formatting\\n4. Hashtag relevance\\n\\nContent:\\nTwitter: ' + $json.twitter + '\\nLinkedIn: ' + $json.linkedin + '\\nReddit: ' + $json.reddit_title + ' — ' + $json.reddit_body + '\\nInstagram: ' + $json.instagram_caption + '\\n\\nIf any issues found, return corrected versions as JSON (same structure). If all good, return the same content. Return ONLY JSON.', stream: false, options: { temperature: 0.2, num_predict: 2000 } }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "review",
+      "name": "Review & Polish (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = JSON.parse($input.first().json.data).response;\nconst match = response.match(/\\{[\\s\\S]*\\}/);\nconst original = $('Parse Content JSON').first().json;\nif (match) {\n  try {\n    const reviewed = JSON.parse(match[0]);\n    return [{ json: { ...original, ...reviewed, reviewed: true } }];\n  } catch(e) {}\n}\nreturn [{ json: { ...original, reviewed: false } }];"
+      },
+      "id": "final-parse",
+      "name": "Final Content Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Content Parameters", "type": "main", "index": 0 }]]
+    },
+    "Content Parameters": {
+      "main": [[{ "node": "Generate All Platform Content (Ollama)", "type": "main", "index": 0 }]]
+    },
+    "Generate All Platform Content (Ollama)": {
+      "main": [[{ "node": "Parse Content JSON", "type": "main", "index": 0 }]]
+    },
+    "Parse Content JSON": {
+      "main": [[{ "node": "Review & Polish (Ollama)", "type": "main", "index": 0 }]]
+    },
+    "Review & Polish (Ollama)": {
+      "main": [[{ "node": "Final Content Output", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "AI" }, { "name": "Ollama" }, { "name": "Social Media" }, { "name": "Content" }]
+}
