@@ -508,7 +508,287 @@ Before activating a workflow:
 
 ---
 
-## 13. Final rule
+## 13. Multi-channel message payload (Luxee Inbox)
+
+> This section extends section 3 for the Luxee Inbox domain (`domain:inbox`).
+> All inbound messages from SMS, WhatsApp, LinkedIn, and Outlook must be normalized
+> to this canonical structure before entering any downstream processing.
+
+---
+
+### 13.1 Message entity type
+
+When `entity_type` is `"message"`, the canonical payload must include the following groups
+in addition to the standard top-level fields defined in section 3.3:
+
+| Group | Purpose |
+|---|---|
+| `message` | Core message content, direction, and status |
+| `conversation` | Conversation thread context |
+| `contact` | Sender/recipient identity |
+| `channel` | Channel-specific metadata |
+| `ai` | AI processing results (populated by downstream workflows) |
+| `routing` | Routing decisions |
+| `meta` | Schema metadata |
+
+---
+
+### 13.2 Canonical message payload — reference template
+
+```json
+{
+  "trace_id": "uuid",
+  "workflow_name": "string",
+  "execution_timestamp": "2026-04-03T14:00:00Z",
+  "source_system": "twilio | whatsapp | outlook | linkedin | internal",
+  "source_event": "message.received | message.delivered | message.failed",
+  "entity_type": "message",
+  "entity_id": "source-system-message-id",
+  "client_id": "luxee-internal",
+  "domain": "inbox",
+  "status": "normalized",
+
+  "message": {
+    "direction": "inbound | outbound",
+    "body": "Message text content",
+    "subject": null,
+    "attachments": [],
+    "external_message_id": "twilio-sid or outlook-message-id",
+    "received_at": "2026-04-03T14:00:00Z",
+    "status": "received | sent | delivered | failed | read"
+  },
+
+  "conversation": {
+    "id": null,
+    "external_contact_id": "+33600000000 or email or linkedin-urn",
+    "channel": "sms | whatsapp | outlook | linkedin",
+    "channel_connection_id": "uuid-of-channel-connection",
+    "is_new": true,
+    "thread_id": null
+  },
+
+  "contact": {
+    "name": null,
+    "email": null,
+    "phone": null,
+    "company": null,
+    "external_identifier": "+33600000000 or email or linkedin-urn",
+    "known_contact_id": null
+  },
+
+  "channel": {
+    "type": "sms | whatsapp | outlook | linkedin",
+    "from": "+33600000000 or email or linkedin-urn",
+    "to": "+33600000001 or inbox-email",
+    "metadata": {}
+  },
+
+  "ai": {
+    "intent": null,
+    "summary": null,
+    "priority": null,
+    "score": null,
+    "next_action": null,
+    "labels": [],
+    "suggestion": null,
+    "qualification": {
+      "budget": null,
+      "authority": null,
+      "need": null,
+      "timeline": null
+    },
+    "processed_at": null
+  },
+
+  "routing": {
+    "path": "default",
+    "priority": "normal",
+    "requires_human_review": false,
+    "assigned_to": null
+  },
+
+  "meta": {
+    "raw_payload_available": true,
+    "schema_version": "1.0",
+    "notes": null
+  },
+
+  "raw_payload": {}
+}
+```
+
+---
+
+### 13.3 Channel-specific source field mappings
+
+#### Twilio SMS → Canonical
+
+| Source field (Twilio) | Canonical field |
+|---|---|
+| `Body` | `message.body` |
+| `MessageSid` | `message.external_message_id`, `entity_id` |
+| `From` | `channel.from`, `contact.external_identifier`, `conversation.external_contact_id` |
+| `To` | `channel.to`, `conversation.channel_connection_id` (resolved by lookup) |
+| `MessageStatus` | `message.status` |
+| *(full webhook body)* | `raw_payload` |
+
+`channel.type` = `"sms"`, `source_system` = `"twilio"`, `source_event` = `"message.received"`
+
+#### WhatsApp (via Twilio) → Canonical
+
+Same as SMS mapping, with:
+- `channel.type` = `"whatsapp"`, `source_system` = `"whatsapp"`
+- `channel.metadata.profile_name` from `ProfileName` field
+
+#### Outlook (Microsoft Graph) → Canonical
+
+| Source field (Graph API) | Canonical field |
+|---|---|
+| `bodyPreview` | `message.body` (full body in `message.body` via Graph call) |
+| `id` | `message.external_message_id`, `entity_id` |
+| `from.emailAddress.address` | `channel.from`, `contact.email`, `conversation.external_contact_id` |
+| `from.emailAddress.name` | `contact.name` |
+| `subject` | `message.subject` |
+| `receivedDateTime` | `message.received_at` |
+| `conversationId` | `conversation.thread_id` |
+| `hasAttachments` + `attachments[]` | `message.attachments` |
+| *(full Graph notification payload)* | `raw_payload` |
+
+`channel.type` = `"outlook"`, `source_system` = `"outlook"`, `source_event` = `"message.received"`
+
+#### LinkedIn DM → Canonical
+
+| Source field (LinkedIn/integration) | Canonical field |
+|---|---|
+| `message_text` | `message.body` |
+| `message_id` | `message.external_message_id`, `entity_id` |
+| `sender_urn` | `channel.from`, `contact.external_identifier`, `conversation.external_contact_id` |
+| `sender_name` | `contact.name` |
+| `conversation_urn` | `conversation.thread_id` |
+| *(full payload)* | `raw_payload` |
+
+`channel.type` = `"linkedin"`, `source_system` = `"linkedin"`
+
+> ⚠️ Risk flag: LinkedIn has no official DM API for automation. Integration depends on
+> unofficial tooling (Phantombuster, Clay, etc.) or LinkedIn Partner Program access.
+> Treat this channel as fragile. Always log `meta.notes` with integration method used.
+
+---
+
+### 13.4 `[BRIDGE]` Code node — Twilio SMS reference
+
+```js
+const input = $json;
+
+return [{
+  trace_id: input.MessageSid ?? crypto.randomUUID(),
+  workflow_name: "[Luxee] Inbox — Inbound SMS Handler",
+  execution_timestamp: new Date().toISOString(),
+  source_system: "twilio",
+  source_event: "message.received",
+  entity_type: "message",
+  entity_id: input.MessageSid ?? null,
+  client_id: "luxee-internal",
+  domain: "inbox",
+  status: "normalized",
+
+  message: {
+    direction: "inbound",
+    body: input.Body ?? null,
+    subject: null,
+    attachments: [],
+    external_message_id: input.MessageSid ?? null,
+    received_at: new Date().toISOString(),
+    status: "received"
+  },
+
+  conversation: {
+    id: null,
+    external_contact_id: input.From ?? null,
+    channel: "sms",
+    channel_connection_id: null, // resolved by [PROCESSING] lookup
+    is_new: null,                // determined by [IDEMPOTENCY] check
+    thread_id: null
+  },
+
+  contact: {
+    name: null,
+    email: null,
+    phone: input.From ?? null,
+    company: null,
+    external_identifier: input.From ?? null,
+    known_contact_id: null      // resolved by [PROCESSING] lookup
+  },
+
+  channel: {
+    type: "sms",
+    from: input.From ?? null,
+    to: input.To ?? null,
+    metadata: {
+      num_media: input.NumMedia ?? "0",
+      from_country: input.FromCountry ?? null,
+      from_city: input.FromCity ?? null
+    }
+  },
+
+  ai: {
+    intent: null,
+    summary: null,
+    priority: null,
+    score: null,
+    next_action: null,
+    labels: [],
+    suggestion: null,
+    qualification: { budget: null, authority: null, need: null, timeline: null },
+    processed_at: null
+  },
+
+  routing: {
+    path: "default",
+    priority: "normal",
+    requires_human_review: false,
+    assigned_to: null
+  },
+
+  meta: {
+    raw_payload_available: true,
+    schema_version: "1.0",
+    notes: null
+  },
+
+  raw_payload: input
+}];
+```
+
+---
+
+### 13.5 AI group update — by downstream AI workflow
+
+After the AI analysis workflow processes the message, it updates `conversations.ai_*` fields
+in Supabase directly. The canonical payload `ai` group is also updated in the workflow chain:
+
+```json
+"ai": {
+  "intent": "sales_interest",
+  "summary": "Contact is asking about pricing for the enterprise plan.",
+  "priority": "high",
+  "score": 7.5,
+  "next_action": "Send pricing deck and schedule a call",
+  "labels": ["enterprise", "pricing-inquiry"],
+  "suggestion": "Hi {{name}}, thanks for reaching out! I'd be happy to share...",
+  "qualification": {
+    "budget": "possible",
+    "authority": "unknown",
+    "need": "explicit",
+    "timeline": "near_term"
+  },
+  "processed_at": "2026-04-03T14:01:32Z"
+}
+```
+
+---
+
+## 14. Final rule
 
 If a generated or imported workflow does not clearly comply with these conventions, it must be renamed, restructured, documented, and secured before being considered production-ready.
 
