@@ -1,17 +1,20 @@
 {
   "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
-  "name": "[Luxee] Inbox \u2014 Inbound SMS Handler",
+  "name": "[Luxee] Inbox — Inbound SMS Handler",
   "nodes": [
     {
       "id": "sticky-001",
       "name": "Header",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [240, 60],
+      "position": [
+        240,
+        60
+      ],
       "parameters": {
-        "content": "## [Luxee] Inbox \u2014 Inbound SMS Handler\n\n**Client:** luxee-internal | **Domain:** inbox | **Version:** 1.0 | **Last update:** 2026-04-03\n\n**Description:** Receives inbound Twilio SMS, normalizes to canonical payload,\npersists message + conversation in Supabase, triggers async AI analysis.\nIdempotent \u2014 duplicate MessageSids are safely discarded.\n\n**Required env vars:**\n- `SUPABASE_URL` \u2014 Supabase project URL\n- `SUPABASE_SERVICE_KEY` \u2014 Service role key (write access)\n- `N8N_WEBHOOK_AI_ANALYZER` \u2014 AI Analyzer sub-workflow webhook URL\n- `SLACK_WEBHOOK_OPS` \u2014 Slack webhook for fatal error alerts\n\n**Tags:** `client:luxee-internal` `domain:inbox`",
-        "height": 240,
-        "width": 740,
+        "content": "## [Luxee] Inbox — Inbound SMS Handler\n\n**Client:** luxee-internal | **Domain:** inbox | **Version:** 1.1 | **Last update:** 2026-04-04\n\n**Description:** Reçoit les SMS Twilio entrants, normalise vers le canonical payload v1.1 (conforme §13.2), persiste en Supabase, déclenche l’analyse AI en async. Idémpotent sur MessageSid.\n\n**Error model (two-level):**\n- Niveau 1 (local) : échecs métier (validation, channel manquant) → [ERROR] Classify Error\n- Niveau 2 (global) : échecs techniques (DB down, timeout) → n8n Error Trigger workflow\n\n**DB dependencies:**\n- Trigger `update_conversation_last_message_at()` gère last_message_at et is_read automatiquement\n- Contrainte UNIQUE sur `contacts.phone` requise pour l’UPSERT idempotent du contact\n\n**Required env vars:** `SUPABASE_URL` `SUPABASE_SERVICE_KEY` `N8N_WEBHOOK_AI_ANALYZER` `SLACK_WEBHOOK_OPS`",
+        "height": 300,
+        "width": 780,
         "color": 5
       }
     },
@@ -20,7 +23,10 @@
       "name": "[TRIGGER] Receive Twilio SMS Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [560, 300],
+      "position": [
+        560,
+        380
+      ],
       "webhookId": "a1b2c3d4-e5f6-7890-abcd-111111111111",
       "parameters": {
         "httpMethod": "POST",
@@ -35,9 +41,12 @@
       "name": "[BRIDGE] Normalize SMS Payload",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [800, 300],
+      "position": [
+        800,
+        380
+      ],
       "parameters": {
-        "jsCode": "const input = $input.first().json;\n\nreturn [{\n  json: {\n    trace_id: input.MessageSid ?? null,\n    workflow_name: '[Luxee] Inbox \u2014 Inbound SMS Handler',\n    source_system: 'twilio',\n    entity_type: 'message',\n    message: {\n      direction: 'inbound',\n      body: input.Body ?? null,\n      external_message_id: input.MessageSid ?? null,\n      status: 'received',\n      subject: null,\n      media_url: input.MediaUrl0 ?? null,\n      num_media: parseInt(input.NumMedia ?? '0', 10)\n    },\n    conversation: {\n      channel_connection_id: null,\n      external_contact_id: input.From ?? null,\n      status: 'open',\n      is_new: false\n    },\n    contact: {\n      phone: input.From ?? null,\n      known_contact_id: null\n    },\n    channel: {\n      type: 'sms',\n      from: input.From ?? null,\n      to: input.To ?? null,\n      provider: 'twilio',\n      account_sid: input.AccountSid ?? null\n    },\n    ai: {\n      intent: null,\n      summary: null,\n      sentiment: null,\n      priority_score: null,\n      suggested_reply: null,\n      qualification_stage: null,\n      tags: []\n    },\n    routing: {\n      assigned_to: null,\n      team: null,\n      escalated: false\n    },\n    meta: {\n      from_country: input.FromCountry ?? null,\n      from_city: input.FromCity ?? null,\n      from_state: input.FromState ?? null,\n      num_segments: input.NumSegments ?? null,\n      sms_status: input.SmsStatus ?? null\n    },\n    raw_payload: input\n  }\n}];"
+        "jsCode": "const input = $input.first().json;\n\nreturn [{\n  json: {\n    trace_id: input.MessageSid ?? crypto.randomUUID(),\n    workflow_name: '[Luxee] Inbox — Inbound SMS Handler',\n    execution_timestamp: new Date().toISOString(),\n    source_system: 'twilio',\n    source_event: 'message.received',\n    entity_type: 'message',\n    entity_id: input.MessageSid ?? null,\n    client_id: 'luxee-internal',\n    domain: 'inbox',\n    status: 'normalized',\n    message: {\n      direction: 'inbound',\n      body: input.Body ?? null,\n      subject: null,\n      attachments: [],\n      external_message_id: input.MessageSid ?? null,\n      received_at: new Date().toISOString(),\n      status: 'received'\n    },\n    conversation: {\n      id: null,\n      external_contact_id: input.From ?? null,\n      channel: 'sms',\n      channel_connection_id: null,\n      is_new: null,\n      thread_id: null\n    },\n    contact: {\n      name: null,\n      email: null,\n      phone: input.From ?? null,\n      company: null,\n      external_identifier: input.From ?? null,\n      known_contact_id: null\n    },\n    channel: {\n      type: 'sms',\n      from: input.From ?? null,\n      to: input.To ?? null,\n      metadata: {\n        provider: 'twilio',\n        account_sid: input.AccountSid ?? null,\n        num_media: parseInt(input.NumMedia ?? '0', 10),\n        from_country: input.FromCountry ?? null,\n        from_city: input.FromCity ?? null,\n        from_state: input.FromState ?? null,\n        num_segments: parseInt(input.NumSegments ?? '1', 10),\n        sms_status: input.SmsStatus ?? null\n      }\n    },\n    ai: {\n      intent: null,\n      summary: null,\n      priority: null,\n      score: null,\n      next_action: null,\n      labels: [],\n      suggestion: null,\n      qualification: {\n        budget: null,\n        authority: null,\n        need: null,\n        timeline: null\n      },\n      processed_at: null\n    },\n    routing: {\n      path: 'default',\n      priority: 'normal',\n      requires_human_review: false,\n      assigned_to: null\n    },\n    meta: {\n      raw_payload_available: true,\n      schema_version: '1.0',\n      notes: null\n    },\n    raw_payload: input\n  }\n}];"
       }
     },
     {
@@ -45,7 +54,10 @@
       "name": "[VALIDATION] Check Required Fields",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1040, 300],
+      "position": [
+        1040,
+        380
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -88,13 +100,29 @@
       }
     },
     {
+      "id": "tag-validation-001",
+      "name": "[ROUTER] Tag Validation Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        560
+      ],
+      "parameters": {
+        "jsCode": "// Injecte le contexte d'erreur avant [ERROR] Classify Error\nreturn [{ json: { ...$input.first().json, _error_source: 'validation_failed' } }];"
+      }
+    },
+    {
       "id": "idempotency-001",
       "name": "[IDEMPOTENCY] Check Duplicate Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1280, 300],
+      "position": [
+        1280,
+        380
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: $env.SUPABASE_URL + '/rest/v1/messages',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n  },\n  qs: {\n    external_message_id: 'eq.' + data.trace_id,\n    select: 'id',\n    limit: '1'\n  },\n  json: true\n});\n\nreturn [{\n  json: {\n    ...data,\n    _idempotency: {\n      is_duplicate: Array.isArray(response) && response.length > 0,\n      existing_message_id: Array.isArray(response) && response.length > 0 ? response[0].id : null\n    }\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: $env.SUPABASE_URL + '/rest/v1/messages',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n  },\n  qs: {\n    external_message_id: 'eq.' + data.message.external_message_id,\n    select: 'id',\n    limit: '1'\n  },\n  json: true\n});\n\nreturn [{\n  json: {\n    ...data,\n    _idempotency: {\n      is_duplicate: Array.isArray(response) && response.length > 0,\n      existing_message_id: Array.isArray(response) && response.length > 0 ? response[0].id : null\n    }\n  }\n}];"
       }
     },
     {
@@ -102,7 +130,10 @@
       "name": "[IDEMPOTENCY] Is Duplicate?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1520, 300],
+      "position": [
+        1520,
+        380
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -128,12 +159,15 @@
     },
     {
       "id": "skip-log-001",
-      "name": "[LOGGING] Skip \u2014 Write Duplicate Log",
+      "name": "[LOGGING] Skip — Write Duplicate Log",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 520],
+      "position": [
+        1760,
+        560
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n\nawait this.helpers.httpRequest({\n  method: 'POST',\n  url: $env.SUPABASE_URL + '/rest/v1/events_log',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    event_type: 'message.duplicate_skipped',\n    actor_type: 'workflow',\n    actor_id: '[Luxee] Inbox \u2014 Inbound SMS Handler',\n    workflow_trace_id: data.trace_id,\n    status: 'skipped',\n    payload: {\n      source_system: data.source_system,\n      external_message_id: data.message.external_message_id,\n      existing_message_id: data._idempotency.existing_message_id\n    }\n  },\n  json: true\n});\n\nreturn [$input.first()];"
+        "jsCode": "const data = $input.first().json;\n\nawait this.helpers.httpRequest({\n  method: 'POST',\n  url: $env.SUPABASE_URL + '/rest/v1/events_log',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    event_type: 'message.duplicate_skipped',\n    actor_type: 'workflow',\n    actor_id: '[Luxee] Inbox — Inbound SMS Handler',\n    workflow_trace_id: data.trace_id,\n    status: 'skipped',\n    payload: {\n      source_system: data.source_system,\n      external_message_id: data.message.external_message_id,\n      existing_message_id: data._idempotency.existing_message_id\n    }\n  },\n  json: true\n});\n\nreturn [$input.first()];"
       }
     },
     {
@@ -141,7 +175,10 @@
       "name": "[PROCESSING] Resolve Channel Connection",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 300],
+      "position": [
+        1760,
+        380
+      ],
       "parameters": {
         "jsCode": "const data = $input.first().json;\nconst toPhone = data.channel.to;\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: $env.SUPABASE_URL + '/rest/v1/channel_connections',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n  },\n  qs: {\n    channel: 'eq.sms',\n    external_identifier: 'eq.' + toPhone,\n    is_active: 'eq.true',\n    select: 'id,label,config',\n    limit: '1'\n  },\n  json: true\n});\n\nconst found = Array.isArray(response) && response.length > 0;\n\nreturn [{\n  json: {\n    ...data,\n    conversation: {\n      ...data.conversation,\n      channel_connection_id: found ? response[0].id : null\n    },\n    _channel: {\n      found: found,\n      label: found ? response[0].label : null,\n      config: found ? response[0].config : null\n    }\n  }\n}];"
       }
@@ -151,7 +188,10 @@
       "name": "[PROCESSING] Channel Connection Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2000, 300],
+      "position": [
+        2000,
+        380
+      ],
       "parameters": {
         "conditions": {
           "options": {
@@ -176,13 +216,29 @@
       }
     },
     {
+      "id": "tag-channel-001",
+      "name": "[ROUTER] Tag Channel Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        560
+      ],
+      "parameters": {
+        "jsCode": "// Injecte le contexte d'erreur avant [ERROR] Classify Error\nreturn [{ json: { ...$input.first().json, _error_source: 'channel_not_configured' } }];"
+      }
+    },
+    {
       "id": "contact-001",
       "name": "[PROCESSING] Resolve or Create Contact",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2240, 300],
+      "position": [
+        2240,
+        380
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst phone = data.contact.phone;\n\n// 1. Try to find existing contact by phone\nconst existing = await this.helpers.httpRequest({\n  method: 'GET',\n  url: $env.SUPABASE_URL + '/rest/v1/contacts',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n  },\n  qs: {\n    phone: 'eq.' + phone,\n    select: 'id,full_name,company',\n    limit: '1'\n  },\n  json: true\n});\n\nlet contactId;\nlet isNewContact = false;\n\nif (Array.isArray(existing) && existing.length > 0) {\n  // Known contact\n  contactId = existing[0].id;\n} else {\n  // Create minimal contact \u2014 enrichment happens in AI workflow\n  const created = await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.SUPABASE_URL + '/rest/v1/contacts',\n    headers: {\n      'apikey': $env.SUPABASE_SERVICE_KEY,\n      'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=representation'\n    },\n    body: { phone: phone },\n    json: true\n  });\n  const result = Array.isArray(created) ? created[0] : created;\n  contactId = result.id;\n  isNewContact = true;\n}\n\nreturn [{\n  json: {\n    ...data,\n    contact: {\n      ...data.contact,\n      known_contact_id: contactId\n    },\n    _contact: {\n      id: contactId,\n      is_new: isNewContact\n    }\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nconst phone = data.contact.phone;\n\n// Etape 1 : chercher le contact existant par numero\nconst existing = await this.helpers.httpRequest({\n  method: 'GET',\n  url: $env.SUPABASE_URL + '/rest/v1/contacts',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n  },\n  qs: { phone: 'eq.' + phone, select: 'id,full_name,company', limit: '1' },\n  json: true\n});\n\nlet contactId;\nlet isNewContact = false;\n\nif (Array.isArray(existing) && existing.length > 0) {\n  // Contact connu\n  contactId = existing[0].id;\n} else {\n  // Etape 2 : upsert idempotent (ignore-duplicates gere les race conditions)\n  // Requiert une contrainte UNIQUE sur contacts.phone au niveau DB\n  let created;\n  try {\n    created = await this.helpers.httpRequest({\n      method: 'POST',\n      url: $env.SUPABASE_URL + '/rest/v1/contacts',\n      headers: {\n        'apikey': $env.SUPABASE_SERVICE_KEY,\n        'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n        'Content-Type': 'application/json',\n        'Prefer': 'resolution=ignore-duplicates,return=representation'\n      },\n      qs: { on_conflict: 'phone' },\n      body: { phone: phone },\n      json: true\n    });\n  } catch (e) {\n    created = null; // Erreur reseau ou serveur\n  }\n\n  if (Array.isArray(created) && created.length > 0) {\n    // Nouveau contact cree avec succes\n    contactId = created[0].id;\n    isNewContact = true;\n  } else {\n    // Conflit ignore (race condition) ou POST echoue : re-lecture\n    const refetch = await this.helpers.httpRequest({\n      method: 'GET',\n      url: $env.SUPABASE_URL + '/rest/v1/contacts',\n      headers: {\n        'apikey': $env.SUPABASE_SERVICE_KEY,\n        'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n      },\n      qs: { phone: 'eq.' + phone, select: 'id,full_name,company', limit: '1' },\n      json: true\n    });\n    if (!Array.isArray(refetch) || refetch.length === 0) {\n      throw new Error('contact_resolution_failed: impossible de trouver ou creer le contact pour phone=' + phone);\n    }\n    contactId = refetch[0].id;\n    isNewContact = false;\n  }\n}\n\nreturn [{\n  json: {\n    ...data,\n    contact: { ...data.contact, known_contact_id: contactId },\n    _contact: { id: contactId, is_new: isNewContact }\n  }\n}];"
       }
     },
     {
@@ -190,9 +246,12 @@
       "name": "[PROCESSING] Resolve or Create Conversation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2480, 300],
+      "position": [
+        2480,
+        380
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst channelConnectionId = data.conversation.channel_connection_id;\nconst contactId = data._contact.id;\nconst phone = data.contact.phone;\n\n// 1. Look for an existing open conversation\nconst existing = await this.helpers.httpRequest({\n  method: 'GET',\n  url: $env.SUPABASE_URL + '/rest/v1/conversations',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n  },\n  qs: {\n    channel_connection_id: 'eq.' + channelConnectionId,\n    contact_id: 'eq.' + contactId,\n    status: 'not.in.(resolved,archived,spam)',\n    select: 'id,status',\n    order: 'created_at.desc',\n    limit: '1'\n  },\n  json: true\n});\n\nlet conversationId;\nlet isNew = false;\n\nif (Array.isArray(existing) && existing.length > 0) {\n  conversationId = existing[0].id;\n} else {\n  // Create new conversation\n  const created = await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.SUPABASE_URL + '/rest/v1/conversations',\n    headers: {\n      'apikey': $env.SUPABASE_SERVICE_KEY,\n      'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=representation'\n    },\n    body: {\n      channel_connection_id: channelConnectionId,\n      contact_id: contactId,\n      external_contact_id: phone,\n      status: 'open',\n      is_read: false,\n      last_workflow_trace_id: data.trace_id\n    },\n    json: true\n  });\n  const result = Array.isArray(created) ? created[0] : created;\n  conversationId = result.id;\n  isNew = true;\n}\n\nreturn [{\n  json: {\n    ...data,\n    conversation: {\n      ...data.conversation,\n      id: conversationId,\n      is_new: isNew\n    },\n    _conversation: {\n      id: conversationId,\n      is_new: isNew\n    }\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nconst channelConnectionId = data.conversation.channel_connection_id;\nconst contactId = data._contact.id;\nconst phone = data.contact.phone;\n\n// Etape 1 : chercher une conversation ouverte existante\nconst existing = await this.helpers.httpRequest({\n  method: 'GET',\n  url: $env.SUPABASE_URL + '/rest/v1/conversations',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n  },\n  qs: {\n    channel_connection_id: 'eq.' + channelConnectionId,\n    contact_id: 'eq.' + contactId,\n    status: 'not.in.(resolved,archived,spam)',\n    select: 'id,status',\n    order: 'created_at.desc',\n    limit: '1'\n  },\n  json: true\n});\n\nlet conversationId;\nlet isNew = false;\n\nif (Array.isArray(existing) && existing.length > 0) {\n  // Reprendre la conversation existante\n  conversationId = existing[0].id;\n} else {\n  // Etape 2 : creer une nouvelle conversation\n  // Pas de contrainte UNIQUE sur (channel_connection_id, contact_id) par design :\n  // un contact peut avoir plusieurs conversations. Race condition: faible probabilite,\n  // geree par le pattern GET -> POST -> GET-si-vide ci-dessous.\n  let created;\n  try {\n    created = await this.helpers.httpRequest({\n      method: 'POST',\n      url: $env.SUPABASE_URL + '/rest/v1/conversations',\n      headers: {\n        'apikey': $env.SUPABASE_SERVICE_KEY,\n        'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n        'Content-Type': 'application/json',\n        'Prefer': 'return=representation'\n      },\n      body: {\n        channel_connection_id: channelConnectionId,\n        contact_id: contactId,\n        external_contact_id: phone,\n        status: 'open',\n        is_read: false,\n        last_workflow_trace_id: data.trace_id\n      },\n      json: true\n    });\n  } catch (e) {\n    // Echec DB : tentative de re-lecture (race condition possible)\n    created = null;\n  }\n\n  if (Array.isArray(created) && created.length > 0) {\n    conversationId = created[0].id;\n    isNew = true;\n  } else {\n    // Re-lecture apres echec ou reponse vide\n    const refetch = await this.helpers.httpRequest({\n      method: 'GET',\n      url: $env.SUPABASE_URL + '/rest/v1/conversations',\n      headers: {\n        'apikey': $env.SUPABASE_SERVICE_KEY,\n        'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY\n      },\n      qs: {\n        channel_connection_id: 'eq.' + channelConnectionId,\n        contact_id: 'eq.' + contactId,\n        status: 'not.in.(resolved,archived,spam)',\n        select: 'id,status',\n        order: 'created_at.desc',\n        limit: '1'\n      },\n      json: true\n    });\n    if (!Array.isArray(refetch) || refetch.length === 0) {\n      throw new Error('conversation_resolution_failed: impossible de trouver ou creer la conversation pour contact_id=' + contactId);\n    }\n    conversationId = refetch[0].id;\n    isNew = false;\n  }\n}\n\nreturn [{\n  json: {\n    ...data,\n    conversation: { ...data.conversation, id: conversationId, is_new: isNew },\n    _conversation: { id: conversationId, is_new: isNew }\n  }\n}];"
       }
     },
     {
@@ -200,9 +259,12 @@
       "name": "[OUTPUT] Insert Message to Supabase",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2720, 300],
+      "position": [
+        2720,
+        380
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n\nconst response = await this.helpers.httpRequest({\n  method: 'POST',\n  url: $env.SUPABASE_URL + '/rest/v1/messages',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=representation'\n  },\n  body: {\n    conversation_id: data.conversation.id,\n    channel_connection_id: data.conversation.channel_connection_id,\n    direction: 'inbound',\n    status: 'received',\n    body: data.message.body,\n    subject: null,\n    external_message_id: data.message.external_message_id,\n    source_system: 'twilio',\n    raw_payload: data.raw_payload,\n    workflow_trace_id: data.trace_id\n  },\n  json: true\n});\n\nconst result = Array.isArray(response) ? response[0] : response;\n\nreturn [{\n  json: {\n    ...data,\n    _inserted_message: {\n      id: result.id\n    }\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\n\nlet result;\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.SUPABASE_URL + '/rest/v1/messages',\n    headers: {\n      'apikey': $env.SUPABASE_SERVICE_KEY,\n      'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=representation'\n    },\n    body: {\n      conversation_id: data.conversation.id,\n      channel_connection_id: data.conversation.channel_connection_id,\n      direction: 'inbound',\n      status: 'received',\n      body: data.message.body,\n      subject: null,\n      external_message_id: data.message.external_message_id,\n      source_system: 'twilio',\n      raw_payload: data.raw_payload,\n      workflow_trace_id: data.trace_id\n    },\n    json: true\n  });\n  result = Array.isArray(response) ? response[0] : response;\n} catch (e) {\n  // Echec d'ecriture critique : rethrow avec contexte pour le global Error Trigger\n  const enriched = new Error('[OUTPUT] Insert Message: ' + e.message);\n  enriched.description = JSON.stringify({\n    error_type: 'db_write_failed',\n    trace_id: data.trace_id,\n    conversation_id: data.conversation.id,\n    external_message_id: data.message.external_message_id\n  });\n  throw enriched;\n}\n\nreturn [{\n  json: {\n    ...data,\n    _inserted_message: { id: result.id }\n  }\n}];"
       }
     },
     {
@@ -210,9 +272,12 @@
       "name": "[OUTPUT] Update Conversation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2960, 300],
+      "position": [
+        2960,
+        380
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n\nawait this.helpers.httpRequest({\n  method: 'PATCH',\n  url: $env.SUPABASE_URL + '/rest/v1/conversations?id=eq.' + data.conversation.id,\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    last_message_at: new Date().toISOString(),\n    is_read: false,\n    last_workflow_trace_id: data.trace_id,\n    contact_id: data._contact.id\n  },\n  json: true\n});\n\nreturn [$input.first()];"
+        "jsCode": "const data = $input.first().json;\n\n// Le trigger DB update_conversation_last_message_at() gere last_message_at et is_read.\n// Ce PATCH ne met a jour que la traçabilite metier de la conversation.\nawait this.helpers.httpRequest({\n  method: 'PATCH',\n  url: $env.SUPABASE_URL + '/rest/v1/conversations?id=eq.' + data.conversation.id,\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: { last_workflow_trace_id: data.trace_id },\n  json: true\n});\n\nreturn [$input.first()];"
       }
     },
     {
@@ -220,9 +285,12 @@
       "name": "[OUTPUT] Trigger AI Analysis Sub-Workflow",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3200, 300],
+      "position": [
+        3200,
+        380
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n\n// Fire-and-forget: do not block main pipeline on AI latency\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.N8N_WEBHOOK_AI_ANALYZER,\n    headers: {\n      'Content-Type': 'application/json'\n    },\n    body: {\n      conversation_id: data.conversation.id,\n      message_id: data._inserted_message.id,\n      trace_id: data.trace_id\n    },\n    json: true,\n    timeout: 3000\n  });\n} catch (e) {\n  // Intentionally swallowed \u2014 AI failure must not block inbound pipeline\n}\n\nreturn [$input.first()];"
+        "jsCode": "const data = $input.first().json;\n\nlet aiStatus = 'success';\nlet aiError = null;\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.N8N_WEBHOOK_AI_ANALYZER,\n    headers: { 'Content-Type': 'application/json' },\n    body: {\n      conversation_id: data.conversation.id,\n      message_id: data._inserted_message.id,\n      trace_id: data.trace_id\n    },\n    json: true,\n    timeout: 3000\n  });\n} catch (e) {\n  // Non-bloquant : l'echec AI ne bloque pas le pipeline inbound\n  aiStatus = 'failed';\n  aiError = e.message;\n}\n\n// REGLE : les actions non-bloquantes doivent toujours tracer leur resultat\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.SUPABASE_URL + '/rest/v1/events_log',\n    headers: {\n      'apikey': $env.SUPABASE_SERVICE_KEY,\n      'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n      'Content-Type': 'application/json',\n      'Prefer': 'return=minimal'\n    },\n    body: {\n      event_type: 'ai_trigger.' + aiStatus,\n      actor_type: 'workflow',\n      actor_id: '[Luxee] Inbox — Inbound SMS Handler',\n      conversation_id: data.conversation.id,\n      workflow_trace_id: data.trace_id,\n      status: aiStatus === 'success' ? 'success' : 'warning',\n      payload: { message_id: data._inserted_message.id, ai_trigger_error: aiError }\n    },\n    json: true\n  });\n} catch (logErr) {\n  // Echec de log accepte : le pipeline continue\n}\n\nreturn [{\n  json: {\n    ...data,\n    _ai_trigger: { status: aiStatus, error: aiError }\n  }\n}];"
       }
     },
     {
@@ -230,9 +298,12 @@
       "name": "[LOGGING] Write Execution Log",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3440, 300],
+      "position": [
+        3440,
+        380
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n\nawait this.helpers.httpRequest({\n  method: 'POST',\n  url: $env.SUPABASE_URL + '/rest/v1/events_log',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    event_type: 'message.received',\n    actor_type: 'workflow',\n    actor_id: '[Luxee] Inbox \u2014 Inbound SMS Handler',\n    conversation_id: data.conversation.id,\n    workflow_trace_id: data.trace_id,\n    status: 'success',\n    payload: {\n      source_system: data.source_system,\n      channel: 'sms',\n      from: data.channel.from,\n      message_id: data._inserted_message.id,\n      is_new_conversation: data._conversation.is_new,\n      is_new_contact: data._contact.is_new\n    }\n  },\n  json: true\n});\n\nreturn [$input.first()];"
+        "jsCode": "const data = $input.first().json;\n\nawait this.helpers.httpRequest({\n  method: 'POST',\n  url: $env.SUPABASE_URL + '/rest/v1/events_log',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    event_type: 'message.received',\n    actor_type: 'workflow',\n    actor_id: '[Luxee] Inbox — Inbound SMS Handler',\n    conversation_id: data.conversation.id,\n    workflow_trace_id: data.trace_id,\n    status: 'success',\n    payload: {\n      source_system: data.source_system,\n      channel: 'sms',\n      from: data.channel.from,\n      message_id: data._inserted_message.id,\n      is_new_conversation: data._conversation.is_new,\n      is_new_contact: data._contact.is_new,\n      ai_trigger_status: data._ai_trigger ? data._ai_trigger.status : 'unknown'\n    }\n  },\n  json: true\n});\n\nreturn [$input.first()];"
       }
     },
     {
@@ -240,9 +311,12 @@
       "name": "[ERROR] Classify Error",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1280, 560],
+      "position": [
+        1280,
+        700
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\n\nlet error_type = 'unknown';\nlet is_fatal = false;\nlet should_alert = false;\nlet description = 'An unknown error occurred in the SMS handler pipeline';\n\nif (data._channel && data._channel.found === false) {\n  // Came from PROCESSING Channel Connection Found? false path\n  error_type = 'channel_not_configured';\n  is_fatal = true;\n  should_alert = true;\n  description = 'No active SMS channel_connection found for To number: ' + (data.channel ? data.channel.to : 'unknown');\n} else if (!data._channel) {\n  // Came from VALIDATION false path \u2014 infer which field failed\n  const missing = [];\n  if (!data.message || !data.message.external_message_id) missing.push('external_message_id');\n  if (!data.message || !data.message.body) missing.push('message.body');\n  if (!data.channel || !data.channel.from || !/^\\+\\d{7,15}$/.test(data.channel.from)) missing.push('channel.from (must be E.164)');\n  error_type = 'validation_failed';\n  is_fatal = false;\n  should_alert = false;\n  description = 'Validation failed: ' + (missing.length ? missing.join(', ') : 'unknown field');\n}\n\nreturn [{\n  json: {\n    ...data,\n    _classified_error: {\n      error_type: error_type,\n      is_fatal: is_fatal,\n      should_alert: should_alert,\n      description: description,\n      timestamp: new Date().toISOString(),\n      trace_id: data.trace_id\n    }\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\n\n// _error_source est toujours injecte par les noeuds [ROUTER] Tag * Error\n// Il ne doit JAMAIS etre infere depuis l'etat du payload\nconst source = data._error_source ?? 'unknown';\n\nconst errorDefinitions = {\n  validation_failed: {\n    error_type: 'validation_failed',\n    is_fatal: false,\n    should_alert: false,\n    description: 'SMS entrant rejete : champs requis manquants ou invalides. ' +\n      'Champs verifies : message.external_message_id (MessageSid), message.body, ' +\n      'channel.from (format E.164). Voir raw_payload pour les valeurs source.'\n  },\n  channel_not_configured: {\n    error_type: 'channel_not_configured',\n    is_fatal: true,\n    should_alert: true,\n    description: 'Aucun channel_connection SMS actif trouve pour le numero To : ' +\n      (data.channel ? data.channel.to : 'inconnu') + '. ' +\n      'Verifier que channel_connections contient une entree active pour ce numero Twilio.'\n  }\n};\n\nconst classified = errorDefinitions[source] ?? {\n  error_type: 'unclassified',\n  is_fatal: false,\n  should_alert: false,\n  description: 'Source d erreur non reconnue : ' + source\n};\n\nreturn [{\n  json: {\n    ...data,\n    _classified_error: {\n      ...classified,\n      timestamp: new Date().toISOString(),\n      trace_id: data.trace_id\n    }\n  }\n}];"
       }
     },
     {
@@ -250,9 +324,12 @@
       "name": "[LOGGING] Write Error Log",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1520, 560],
+      "position": [
+        1520,
+        700
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst err = data._classified_error;\n\nawait this.helpers.httpRequest({\n  method: 'POST',\n  url: $env.SUPABASE_URL + '/rest/v1/events_log',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    event_type: 'workflow.error',\n    actor_type: 'workflow',\n    actor_id: '[Luxee] Inbox \u2014 Inbound SMS Handler',\n    workflow_trace_id: err.trace_id,\n    status: 'failure',\n    payload: {\n      error_type: err.error_type,\n      description: err.description,\n      is_fatal: err.is_fatal,\n      source_system: data.source_system,\n      channel_from: data.channel ? data.channel.from : null,\n      channel_to: data.channel ? data.channel.to : null\n    }\n  },\n  json: true\n});\n\nreturn [$input.first()];"
+        "jsCode": "const data = $input.first().json;\nconst err = data._classified_error;\n\nawait this.helpers.httpRequest({\n  method: 'POST',\n  url: $env.SUPABASE_URL + '/rest/v1/events_log',\n  headers: {\n    'apikey': $env.SUPABASE_SERVICE_KEY,\n    'Authorization': 'Bearer ' + $env.SUPABASE_SERVICE_KEY,\n    'Content-Type': 'application/json',\n    'Prefer': 'return=minimal'\n  },\n  body: {\n    event_type: 'workflow.error',\n    actor_type: 'workflow',\n    actor_id: '[Luxee] Inbox — Inbound SMS Handler',\n    workflow_trace_id: err.trace_id,\n    status: 'failure',\n    payload: {\n      error_type: err.error_type,\n      description: err.description,\n      is_fatal: err.is_fatal,\n      source_system: data.source_system,\n      channel_from: data.channel ? data.channel.from : null,\n      channel_to: data.channel ? data.channel.to : null\n    }\n  },\n  json: true\n});\n\nreturn [$input.first()];"
       }
     },
     {
@@ -260,9 +337,12 @@
       "name": "[NOTIFICATION] Alert on Fatal Failure",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 560],
+      "position": [
+        1760,
+        700
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst err = data._classified_error;\n\n// Only alert for fatal errors that need human action\nif (!err || !err.should_alert) {\n  return [$input.first()];\n}\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.SLACK_WEBHOOK_OPS,\n    headers: {\n      'Content-Type': 'application/json'\n    },\n    body: {\n      text: ':rotating_light: *[Luxee] Inbox \u2014 Fatal SMS Handler Error*',\n      blocks: [\n        {\n          type: 'header',\n          text: { type: 'plain_text', text: ':rotating_light: Luxee Inbox \u2014 Fatal Error' }\n        },\n        {\n          type: 'section',\n          fields: [\n            { type: 'mrkdwn', text: '*Error type:*\\n' + err.error_type },\n            { type: 'mrkdwn', text: '*Fatal:*\\n' + err.is_fatal },\n            { type: 'mrkdwn', text: '*Description:*\\n' + err.description },\n            { type: 'mrkdwn', text: '*Trace ID:*\\n`' + err.trace_id + '`' },\n            { type: 'mrkdwn', text: '*From:*\\n' + (data.channel ? data.channel.from : 'unknown') },\n            { type: 'mrkdwn', text: '*To:*\\n' + (data.channel ? data.channel.to : 'unknown') },\n            { type: 'mrkdwn', text: '*Time:*\\n' + err.timestamp }\n          ]\n        }\n      ]\n    },\n    json: true\n  });\n} catch (e) {\n  // Swallow \u2014 alert failure must not mask the original error\n}\n\nreturn [$input.first()];"
+        "jsCode": "const data = $input.first().json;\nconst err = data._classified_error;\n\n// Alerter uniquement pour les erreurs fatales necessitant une action humaine\nif (!err || !err.should_alert) {\n  return [$input.first()];\n}\n\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: $env.SLACK_WEBHOOK_OPS,\n    headers: { 'Content-Type': 'application/json' },\n    body: {\n      text: ':rotating_light: *[Luxee] Inbox — Erreur Fatale SMS*',\n      blocks: [\n        {\n          type: 'header',\n          text: { type: 'plain_text', text: ':rotating_light: Luxee Inbox — Fatal Error' }\n        },\n        {\n          type: 'section',\n          fields: [\n            { type: 'mrkdwn', text: '*Type :*\\n' + err.error_type },\n            { type: 'mrkdwn', text: '*Fatal :*\\n' + err.is_fatal },\n            { type: 'mrkdwn', text: '*Description :*\\n' + err.description },\n            { type: 'mrkdwn', text: '*Trace ID :*\\n`' + err.trace_id + '`' },\n            { type: 'mrkdwn', text: '*From :*\\n' + (data.channel ? data.channel.from : 'inconnu') },\n            { type: 'mrkdwn', text: '*To :*\\n' + (data.channel ? data.channel.to : 'inconnu') },\n            { type: 'mrkdwn', text: '*Time :*\\n' + err.timestamp }\n          ]\n        }\n      ]\n    },\n    json: true\n  });\n} catch (e) {\n  // Echec d'alerte acceptable : ne pas masquer l'erreur originale\n}\n\nreturn [$input.first()];"
       }
     }
   ],
@@ -270,107 +350,197 @@
     "[TRIGGER] Receive Twilio SMS Webhook": {
       "main": [
         [
-          { "node": "[BRIDGE] Normalize SMS Payload", "type": "main", "index": 0 }
+          {
+            "node": "[BRIDGE] Normalize SMS Payload",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[BRIDGE] Normalize SMS Payload": {
       "main": [
         [
-          { "node": "[VALIDATION] Check Required Fields", "type": "main", "index": 0 }
+          {
+            "node": "[VALIDATION] Check Required Fields",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[VALIDATION] Check Required Fields": {
       "main": [
         [
-          { "node": "[IDEMPOTENCY] Check Duplicate Message", "type": "main", "index": 0 }
+          {
+            "node": "[IDEMPOTENCY] Check Duplicate Message",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "[ERROR] Classify Error", "type": "main", "index": 0 }
+          {
+            "node": "[ROUTER] Tag Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[ROUTER] Tag Validation Error": {
+      "main": [
+        [
+          {
+            "node": "[ERROR] Classify Error",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[IDEMPOTENCY] Check Duplicate Message": {
       "main": [
         [
-          { "node": "[IDEMPOTENCY] Is Duplicate?", "type": "main", "index": 0 }
+          {
+            "node": "[IDEMPOTENCY] Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[IDEMPOTENCY] Is Duplicate?": {
       "main": [
         [
-          { "node": "[LOGGING] Skip \u2014 Write Duplicate Log", "type": "main", "index": 0 }
+          {
+            "node": "[LOGGING] Skip — Write Duplicate Log",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "[PROCESSING] Resolve Channel Connection", "type": "main", "index": 0 }
+          {
+            "node": "[PROCESSING] Resolve Channel Connection",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[PROCESSING] Resolve Channel Connection": {
       "main": [
         [
-          { "node": "[PROCESSING] Channel Connection Found?", "type": "main", "index": 0 }
+          {
+            "node": "[PROCESSING] Channel Connection Found?",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[PROCESSING] Channel Connection Found?": {
       "main": [
         [
-          { "node": "[PROCESSING] Resolve or Create Contact", "type": "main", "index": 0 }
+          {
+            "node": "[PROCESSING] Resolve or Create Contact",
+            "type": "main",
+            "index": 0
+          }
         ],
         [
-          { "node": "[ERROR] Classify Error", "type": "main", "index": 0 }
+          {
+            "node": "[ROUTER] Tag Channel Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[ROUTER] Tag Channel Error": {
+      "main": [
+        [
+          {
+            "node": "[ERROR] Classify Error",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[PROCESSING] Resolve or Create Contact": {
       "main": [
         [
-          { "node": "[PROCESSING] Resolve or Create Conversation", "type": "main", "index": 0 }
+          {
+            "node": "[PROCESSING] Resolve or Create Conversation",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[PROCESSING] Resolve or Create Conversation": {
       "main": [
         [
-          { "node": "[OUTPUT] Insert Message to Supabase", "type": "main", "index": 0 }
+          {
+            "node": "[OUTPUT] Insert Message to Supabase",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[OUTPUT] Insert Message to Supabase": {
       "main": [
         [
-          { "node": "[OUTPUT] Update Conversation", "type": "main", "index": 0 }
+          {
+            "node": "[OUTPUT] Update Conversation",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[OUTPUT] Update Conversation": {
       "main": [
         [
-          { "node": "[OUTPUT] Trigger AI Analysis Sub-Workflow", "type": "main", "index": 0 }
+          {
+            "node": "[OUTPUT] Trigger AI Analysis Sub-Workflow",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[OUTPUT] Trigger AI Analysis Sub-Workflow": {
       "main": [
         [
-          { "node": "[LOGGING] Write Execution Log", "type": "main", "index": 0 }
+          {
+            "node": "[LOGGING] Write Execution Log",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[ERROR] Classify Error": {
       "main": [
         [
-          { "node": "[LOGGING] Write Error Log", "type": "main", "index": 0 }
+          {
+            "node": "[LOGGING] Write Error Log",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "[LOGGING] Write Error Log": {
       "main": [
         [
-          { "node": "[NOTIFICATION] Alert on Fatal Failure", "type": "main", "index": 0 }
+          {
+            "node": "[NOTIFICATION] Alert on Fatal Failure",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     }
@@ -382,8 +552,12 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "tags": [
-    { "name": "client:luxee-internal" },
-    { "name": "domain:inbox" }
+    {
+      "name": "client:luxee-internal"
+    },
+    {
+      "name": "domain:inbox"
+    }
   ],
   "meta": {
     "templateCredsSetupCompleted": true,

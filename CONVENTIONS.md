@@ -405,18 +405,29 @@ Examples:
 
 ## 8. Code node rules
 
-Use Code nodes only when:
-- native nodes cannot express the logic clearly
-- transformation logic would otherwise become harder to maintain
-- the logic remains bounded to one dominant layer
+### When Code nodes are justified
 
-Avoid Code nodes for:
-- simple field mapping
-- basic IF/ELSE routing
-- trivial formatting
-- tasks already handled well by native nodes
+Use a Code node only when:
+- The logic requires **maintaining the full payload** while making an external API call (Supabase, etc.) and injecting results — native HTTP Request node cannot do this without a Merge node
+- The transformation is **conditionally multi-step** (GET → conditional POST → GET fallback) that cannot be expressed clearly with native nodes
+- The logic uses **derived computed fields** (dates, regex, array operations) that would require multiple native nodes to express
+- The logic is **bounded to one dominant layer** and cannot be split cleanly
 
-**Rule:** A Code node must never become a hidden black box for routing, business logic, output writing, and error handling all at once. If a Code node is non-obvious, document it with a Sticky Note.
+### When Code nodes are prohibited
+
+Do NOT use a Code node for:
+- Simple field renaming or static value assignment → use **Set (Edit Fields)** node
+- Basic HTTP calls where the payload does not need to be maintained downstream → use **HTTP Request** node
+- Simple field injection on routing paths (e.g. injecting `_error_source`) → use **Set** node or a minimal Code node with a clear comment
+- IF/ELSE routing based on a single condition → use **IF** node
+
+### Code node discipline rules
+
+- **One responsibility per node.** A Code node must never combine routing, business logic, output writing, and error handling.
+- **No silent failures.** Code nodes that call external APIs must either propagate errors (let n8n handle them) or explicitly catch and route them with context.
+- **Document non-obvious nodes.** Any Code node that is not self-evident must have a Sticky Note explaining its purpose.
+- **No magic transformations.** If a Code node's behavior cannot be understood in 30 seconds, refactor it.
+- **Prefer native nodes for terminal operations.** If a node is the last in a path and does not need to pass data forward, HTTP Request is preferred over Code node.
 
 ---
 
@@ -491,20 +502,38 @@ Minor edits do not require a version bump: label cleanup, Sticky Note wording, l
 
 Before activating a workflow:
 
-- [ ] Layered architecture is respected
-- [ ] All nodes follow `[LAYER] Verb Object`
-- [ ] Critical nodes have explicit error handling where relevant
-- [ ] Workflow-level Error Trigger is configured
-- [ ] Logging layer is present
+**Architecture**
+- [ ] Layered architecture is respected (§1)
+- [ ] All nodes follow `[LAYER] Verb Object` naming (§2)
+- [ ] No legacy `Function` node, no `Wait` node unless justified (§7)
+- [ ] Code nodes used only where justified (§8)
+
+**Payload**
+- [ ] `[BRIDGE]` outputs all required top-level fields: `trace_id`, `workflow_name`, `execution_timestamp`, `source_system`, `source_event`, `entity_type`, `entity_id`, `client_id`, `domain`, `status` (§3.3)
+- [ ] `meta.schema_version` is set
+- [ ] `raw_payload` is preserved
+
+**Error handling**
+- [ ] Global n8n Error Trigger workflow is configured and paired (§19)
+- [ ] All known business-logic error paths route through `[ROUTER] Tag * Error` → `[ERROR] Classify Error` (§19)
+- [ ] `[ERROR] Classify Error` reads `_error_source`, never infers from payload state (§19)
+- [ ] No silent catch blocks on critical nodes — errors either propagate or are explicitly logged (§17)
+- [ ] All non-blocking async sub-actions log their outcome (success or failure) to events_log (§17)
+
+**Logging & traceability**
+- [ ] `[LOGGING] Write Execution Log` is present on the success path
+- [ ] `[LOGGING] Write Error Log` is present on the error path
+- [ ] `trace_id` is preserved through the entire execution
+
+**Webhook workflows**
+- [ ] `responseMode` is explicitly set (`onReceived` for provider webhooks) (§15)
+- [ ] Webhook response behavior is documented in the Sticky Note (§15)
+
+**Documentation**
 - [ ] Tags `client:` and `domain:` are defined
-- [ ] Header Sticky Note is present
-- [ ] No legacy `Function` node
-- [ ] No fragile `Wait` node unless formally justified
+- [ ] Header Sticky Note is present with version, description, env vars, error model
+- [ ] Section Sticky Notes present for workflows > 10 nodes
 - [ ] Tested on at least one real or simulated payload
-- [ ] Traceability fields are preserved
-- [ ] Output actions are clearly identifiable
-- [ ] Retry policy is bounded and documented
-- [ ] Manual fallback exists for unrecoverable critical failures
 
 ---
 
@@ -675,88 +704,99 @@ Same as SMS mapping, with:
 
 ---
 
-### 13.4 `[BRIDGE]` Code node — Twilio SMS reference
+### 13.4 `[BRIDGE]` Code node — Twilio SMS reference implementation (v1.1)
+
+> Updated 2026-04-04 — fully aligned with §3.3 required top-level fields and §13.2 template.  
+> All metadata (provider, account_sid, geo) moved to `channel.metadata`.  
+> `ai` group aligned with §13.2 field names.
 
 ```js
-const input = $json;
+const input = $input.first().json;
 
 return [{
-  trace_id: input.MessageSid ?? crypto.randomUUID(),
-  workflow_name: "[Luxee] Inbox — Inbound SMS Handler",
-  execution_timestamp: new Date().toISOString(),
-  source_system: "twilio",
-  source_event: "message.received",
-  entity_type: "message",
-  entity_id: input.MessageSid ?? null,
-  client_id: "luxee-internal",
-  domain: "inbox",
-  status: "normalized",
+  json: {
+    trace_id: input.MessageSid ?? crypto.randomUUID(),
+    workflow_name: "[Luxee] Inbox — Inbound SMS Handler",
+    execution_timestamp: new Date().toISOString(),
+    source_system: "twilio",
+    source_event: "message.received",
+    entity_type: "message",
+    entity_id: input.MessageSid ?? null,
+    client_id: "luxee-internal",
+    domain: "inbox",
+    status: "normalized",
 
-  message: {
-    direction: "inbound",
-    body: input.Body ?? null,
-    subject: null,
-    attachments: [],
-    external_message_id: input.MessageSid ?? null,
-    received_at: new Date().toISOString(),
-    status: "received"
-  },
+    message: {
+      direction: "inbound",
+      body: input.Body ?? null,
+      subject: null,
+      attachments: [],
+      external_message_id: input.MessageSid ?? null,
+      received_at: new Date().toISOString(),
+      status: "received"
+    },
 
-  conversation: {
-    id: null,
-    external_contact_id: input.From ?? null,
-    channel: "sms",
-    channel_connection_id: null, // resolved by [PROCESSING] lookup
-    is_new: null,                // determined by [IDEMPOTENCY] check
-    thread_id: null
-  },
+    conversation: {
+      id: null,
+      external_contact_id: input.From ?? null,
+      channel: "sms",
+      channel_connection_id: null,  // resolved by [PROCESSING] Resolve Channel Connection
+      is_new: null,                  // determined by [PROCESSING] Resolve or Create Conversation
+      thread_id: null
+    },
 
-  contact: {
-    name: null,
-    email: null,
-    phone: input.From ?? null,
-    company: null,
-    external_identifier: input.From ?? null,
-    known_contact_id: null      // resolved by [PROCESSING] lookup
-  },
+    contact: {
+      name: null,
+      email: null,
+      phone: input.From ?? null,
+      company: null,
+      external_identifier: input.From ?? null,
+      known_contact_id: null         // resolved by [PROCESSING] Resolve or Create Contact
+    },
 
-  channel: {
-    type: "sms",
-    from: input.From ?? null,
-    to: input.To ?? null,
-    metadata: {
-      num_media: input.NumMedia ?? "0",
-      from_country: input.FromCountry ?? null,
-      from_city: input.FromCity ?? null
-    }
-  },
+    channel: {
+      type: "sms",
+      from: input.From ?? null,
+      to: input.To ?? null,
+      metadata: {
+        provider: "twilio",
+        account_sid: input.AccountSid ?? null,
+        num_media: parseInt(input.NumMedia ?? "0", 10),
+        from_country: input.FromCountry ?? null,
+        from_city: input.FromCity ?? null,
+        from_state: input.FromState ?? null,
+        num_segments: parseInt(input.NumSegments ?? "1", 10),
+        sms_status: input.SmsStatus ?? null
+      }
+    },
 
-  ai: {
-    intent: null,
-    summary: null,
-    priority: null,
-    score: null,
-    next_action: null,
-    labels: [],
-    suggestion: null,
-    qualification: { budget: null, authority: null, need: null, timeline: null },
-    processed_at: null
-  },
+    ai: {
+      intent: null,
+      summary: null,
+      priority: null,
+      score: null,
+      next_action: null,
+      labels: [],
+      suggestion: null,
+      qualification: { budget: null, authority: null, need: null, timeline: null },
+      processed_at: null
+    },
 
-  routing: {
-    path: "default",
-    priority: "normal",
-    requires_human_review: false,
-    assigned_to: null
-  },
+    routing: {
+      path: "default",
+      priority: "normal",
+      requires_human_review: false,
+      assigned_to: null
+    },
 
-  meta: {
-    raw_payload_available: true,
-    schema_version: "1.0",
-    notes: null
-  },
+    meta: {
+      raw_payload_available: true,
+      schema_version: "1.0",
+      notes: null
+    },
 
-  raw_payload: input
+    raw_payload: input
+  }
 }];
 ```
 
@@ -788,7 +828,261 @@ in Supabase directly. The canonical payload `ai` group is also updated in the wo
 
 ---
 
-## 14. Final rule
+## 15. Webhook response policy (production)
+
+Any workflow triggered by an external provider webhook (Twilio, WhatsApp, Stripe, Calendly, Microsoft Graph…) must comply with these rules.
+
+### 15.1 Response timing
+
+**Rule:** The HTTP response to the provider **must be sent before any business processing begins.**
+
+- Use `responseMode: "onReceived"` on the Webhook trigger node — n8n sends the response immediately upon receiving the request, before executing any downstream node.
+- Never use `responseMode: "lastNode"` for provider webhooks. It delays the response until the full workflow completes, causing provider timeouts and retries.
+
+### 15.2 Response payload
+
+| Provider | Expected response | n8n setting |
+|---|---|---|
+| Twilio SMS/WhatsApp | HTTP 200, empty body or `<Response/>` | `responseData: "noData"` |
+| Microsoft Graph (Outlook) | HTTP 202 (validation: 200 + token) | `responseData: "noData"` |
+| Calendly | HTTP 200, any body | `responseData: "noData"` |
+| Generic webhook | HTTP 200, any body | `responseData: "noData"` |
+
+### 15.3 Documentation requirement
+
+The webhook response behavior **must be documented** in the Header Sticky Note:
+
+```
+Webhook response: HTTP 200 sent immediately (responseMode: onReceived).
+Twilio will not retry. Full processing is async.
+```
+
+### 15.4 Provider retry risk
+
+If the provider does not receive the expected response within its timeout window, it will retry the request — causing **duplicate processing**. This is why:
+1. `responseMode: "onReceived"` is mandatory for Twilio (15s timeout).
+2. An `[IDEMPOTENCY]` layer is mandatory on all provider webhook workflows.
+
+---
+
+## 16. Code node discipline (enforced)
+
+> This section enforces and replaces §8 for all new workflows.
+
+### 16.1 Use native nodes first
+
+Before writing a Code node, verify that the following native nodes cannot solve the problem:
+
+| Need | Native node |
+|---|---|
+| Assign/rename fields | **Set (Edit Fields)** |
+| HTTP call (terminal or data-replaceable) | **HTTP Request** |
+| Conditional routing | **IF** or **Switch** |
+| Merging two paths | **Merge** |
+| Looping over items | **Split in Batches** |
+| Calling another workflow | **Execute Workflow** |
+
+### 16.2 Justified Code node uses
+
+A Code node is the correct choice when:
+
+1. **Payload propagation + API call**: The node must make an external API call AND maintain the full payload for downstream nodes. HTTP Request node cannot do this without a complex Merge setup.
+2. **Conditional multi-step API logic**: The node implements a GET → conditional POST → GET-fallback pattern (e.g. resolve-or-create entity).
+3. **Complex derived computation**: Arrays, date math, regex extraction, multi-field transformation that would require 5+ native nodes.
+4. **Structured error enrichment and rethrow**: Adding execution context to an error before rethrowing for the global Error Trigger.
+
+### 16.3 Prohibited Code node patterns
+
+- ❌ Simple field injection: use Set node
+- ❌ Single-purpose HTTP call with no downstream payload need: use HTTP Request
+- ❌ Routing via `if(x) return A; else return B;`: use IF node + downstream branching
+- ❌ Swallowing exceptions silently with an empty `catch(e) {}` block
+- ❌ Mixing routing, business logic, output write, and logging in one Code node
+
+---
+
+## 17. Async non-blocking action failure policy
+
+Any action that is intentionally non-blocking (fire-and-forget) must comply with this policy.
+
+### 17.1 Definition
+
+A non-blocking action is one where:
+- Its failure must NOT stop the main pipeline
+- It is executed after the critical path (message stored, conversation updated)
+- Examples: AI analysis trigger, enrichment webhook, analytics ping, secondary notification
+
+### 17.2 Required pattern
+
+```js
+let actionStatus = 'success';
+let actionError = null;
+
+try {
+  await this.helpers.httpRequest({ ... });
+} catch (e) {
+  // Non-blocking: capture but do not rethrow
+  actionStatus = 'failed';
+  actionError = e.message;
+}
+
+// MANDATORY: always log the outcome — failures are never silently discarded
+try {
+  await this.helpers.httpRequest({
+    // POST to events_log
+    body: {
+      event_type: 'action_name.' + actionStatus,
+      status: actionStatus === 'success' ? 'success' : 'warning',
+      payload: { action_error: actionError }
+    }
+  });
+} catch (logErr) {
+  // Log failure accepted — pipeline continues
+}
+
+// Propagate status on the payload for downstream observability
+return [{ json: { ...$input.first().json, _action_status: actionStatus } }];
+```
+
+### 17.3 Rules
+
+- **Failures must always be logged** — minimum: `event_type`, `status: 'warning'`, `trace_id`, error message.
+- **The main execution log must include the sub-action status** — e.g. `ai_trigger_status: 'failed'` in the final `[LOGGING] Write Execution Log` payload.
+- **The try/catch on the log write is acceptable** — if logging itself fails, the pipeline must not break.
+- **Never use a completely empty catch block** on non-blocking actions. Always capture the error message at minimum.
+
+---
+
+## 18. Resolve-or-create pattern and race condition policy
+
+Any node that looks up an entity and optionally creates it must comply with these rules.
+
+### 18.1 Preferred pattern: database-level idempotency
+
+**For entities with a natural unique key** (phone, email, external ID):
+
+1. Use a DB-level `UNIQUE` constraint on the key column
+2. In the workflow, use Supabase's upsert with `?on_conflict=column` + `Prefer: resolution=ignore-duplicates,return=representation`
+3. If the response is empty (conflict was ignored), re-fetch the existing row
+
+```js
+// Upsert pattern (requires UNIQUE constraint at DB level)
+const created = await this.helpers.httpRequest({
+  method: 'POST',
+  url: SUPABASE_URL + '/rest/v1/table',
+  headers: { 'Prefer': 'resolution=ignore-duplicates,return=representation' },
+  qs: { on_conflict: 'phone' },
+  body: { phone: value },
+  json: true
+});
+
+if (Array.isArray(created) && created.length > 0) {
+  // Successfully created
+  return created[0].id;
+} else {
+  // Conflict ignored — re-fetch the existing row
+  const existing = await this.helpers.httpRequest({ /* GET by phone */ });
+  return existing[0].id;
+}
+```
+
+### 18.2 Fallback pattern: GET → POST → GET
+
+**For entities without a unique constraint** (by design), or when the DB schema cannot be changed:
+
+```
+GET entity → if found: use it
+             if not found: POST entity
+               → if POST succeeds: use new entity
+               → if POST fails or returns empty: GET again (race condition fallback)
+               → if second GET fails: throw error with context
+```
+
+This pattern handles the window between GET returning 0 results and a concurrent POST creating the entity.
+
+### 18.3 Responsibility boundary
+
+| Layer | Responsibility |
+|---|---|
+| **Database** | Define UNIQUE constraints where applicable. Enforce data integrity. |
+| **Workflow** | Implement the upsert or fallback pattern. Never assume GET returning 0 = safe to create. |
+
+### 18.4 When race conditions are acceptable
+
+For entities like conversations (intentionally no unique constraint — a contact can have multiple conversations), document the design decision in a code comment and implement the GET → POST → GET fallback to minimize, but not eliminate, rare duplicate creation.
+
+---
+
+## 19. Error architecture — two-level model
+
+Luxee workflows use a strict two-level error model. Confusing the two levels leads to uncaught failures and untraced errors.
+
+### 19.1 Level 1 — Business logic errors (local ERROR path)
+
+**Definition:** Known, predictable, domain-specific invalid states.
+
+**Examples:**
+- Validation failed (missing field, wrong format)
+- Channel connection not configured for a given number
+- Required entity not found (contact type mismatch, etc.)
+
+**How it works:**
+1. An IF node or routing node detects the error condition
+2. A `[ROUTER] Tag * Error` node injects `_error_source: 'error_type_name'` onto the payload
+3. The payload flows to `[ERROR] Classify Error`
+4. `[ERROR] Classify Error` reads `_error_source` and maps it to `{error_type, is_fatal, should_alert, description}`
+5. `[LOGGING] Write Error Log` persists the classified error
+6. `[NOTIFICATION] Alert on Fatal Failure` sends a Slack alert only when `should_alert: true`
+
+**Rule: `[ERROR] Classify Error` must ONLY use `_error_source` to classify.** It must never inspect payload state (e.g. `if data._channel.found === false`) to infer the error type. That inference logic belongs in the routing node, not in the classifier.
+
+### 19.2 Level 2 — Technical failures (global Error Trigger)
+
+**Definition:** Unexpected infrastructure failures that prevent normal execution.
+
+**Examples:**
+- Database unavailable (5xx from Supabase)
+- Network timeout on HTTP call
+- Malformed API response crashing a Code node
+
+**How it works:**
+1. The failing node throws an exception (either naturally or via an explicit `throw`)
+2. n8n catches the unhandled exception at the workflow level
+3. The paired global **Error Trigger** workflow fires and receives the error context
+4. The Error Trigger workflow logs, alerts, and optionally queues for retry
+
+**Rule:** Critical write nodes (e.g. `[OUTPUT] Insert Message to Supabase`) must rethrow with enriched context:
+
+```js
+} catch (e) {
+  const enriched = new Error('[OUTPUT] Insert Message: ' + e.message);
+  enriched.description = JSON.stringify({
+    error_type: 'db_write_failed',
+    trace_id: data.trace_id,
+    conversation_id: data.conversation.id
+  });
+  throw enriched;
+}
+```
+
+### 19.3 Mandatory pairing rule
+
+> Every production webhook workflow **must** be paired with a global n8n Error Trigger workflow.  
+> Document the Error Trigger workflow name in the Header Sticky Note.
+
+### 19.4 Decision table
+
+| Situation | Level | Node to use |
+|---|---|---|
+| Invalid payload field | 1 | `[ROUTER] Tag Validation Error` → `[ERROR] Classify Error` |
+| Missing configuration (channel not found) | 1 | `[ROUTER] Tag Channel Error` → `[ERROR] Classify Error` |
+| Supabase write failure (5xx) | 2 | Rethrow with context → global Error Trigger |
+| Network timeout on non-critical call | Handled inline | Catch, log to events_log, continue |
+| AI trigger failure | Handled inline | Catch, log as warning, continue (§17) |
+
+---
+
+## 20. Final rule
 
 If a generated or imported workflow does not clearly comply with these conventions, it must be renamed, restructured, documented, and secured before being considered production-ready.
 
