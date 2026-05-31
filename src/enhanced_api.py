@@ -4,6 +4,7 @@ Enhanced API Module for n8n Workflows Repository
 Advanced features, analytics, and performance optimizations
 """
 
+import logging
 import sqlite3
 import time
 from datetime import datetime
@@ -16,6 +17,8 @@ import uvicorn
 
 # Import community features
 from community_features import CommunityFeatures, create_community_api_endpoints
+
+logger = logging.getLogger(__name__)
 
 
 class WorkflowSearchRequest(BaseModel):
@@ -50,6 +53,26 @@ class AnalyticsRequest(BaseModel):
 class EnhancedAPI:
     """Enhanced API with advanced features"""
 
+    # Allow-list mapping of user-supplied sort keys to safe SQL column
+    # expressions. ORDER BY identifiers cannot be parameter-bound, so any
+    # sort key not present here falls back to the default ("name"). This is
+    # the primary defense against SQL injection via the sort_by parameter.
+    SORT_COLUMNS = {
+        "name": "w.name",
+        "created": "w.created_at",
+        "created_at": "w.created_at",
+        "updated": "w.updated_at",
+        "updated_at": "w.updated_at",
+        "trigger_type": "w.trigger_type",
+        "complexity": "w.complexity",
+        "node_count": "w.node_count",
+        "category": "w.category",
+        "filename": "w.filename",
+        "rating": "ws.average_rating",
+        "average_rating": "ws.average_rating",
+        "total_ratings": "ws.total_ratings",
+    }
+
     def __init__(self, db_path: str = "workflows.db"):
         """Initialize enhanced API"""
         self.db_path = db_path
@@ -64,12 +87,16 @@ class EnhancedAPI:
 
     def _setup_middleware(self):
         """Setup middleware for performance and security"""
-        # CORS middleware
+        # CORS middleware.
+        # This is a public, unauthenticated read API. Wildcard origins must
+        # not be combined with allow_credentials=True: that combination is
+        # rejected by browsers and would expose credentialed cross-origin
+        # requests if any auth were added. Keep credentials disabled.
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "OPTIONS"],
             allow_headers=["*"],
         )
 
@@ -121,8 +148,11 @@ class EnhancedAPI:
                     "timestamp": datetime.now().isoformat(),
                 }
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         @self.app.post("/api/v2/workflows/search")
         async def advanced_workflow_search(request: WorkflowSearchRequest):
@@ -141,8 +171,11 @@ class EnhancedAPI:
                     "timestamp": datetime.now().isoformat(),
                 }
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         @self.app.get("/api/v2/workflows/{workflow_id}")
         async def get_workflow_enhanced(
@@ -162,8 +195,15 @@ class EnhancedAPI:
 
                 return workflow_data
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except HTTPException:
+                # Preserve intentional HTTP responses (e.g. 404) instead of
+                # masking them as a generic 500.
+                raise
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         # Recommendation endpoints
         @self.app.post("/api/v2/recommendations")
@@ -177,8 +217,11 @@ class EnhancedAPI:
                     "timestamp": datetime.now().isoformat(),
                 }
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         @self.app.get("/api/v2/recommendations/trending")
         async def get_trending_workflows(limit: int = Query(10, le=50)):
@@ -191,8 +234,11 @@ class EnhancedAPI:
                     "timestamp": datetime.now().isoformat(),
                 }
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         # Analytics endpoints
         @self.app.get("/api/v2/analytics/overview")
@@ -202,8 +248,11 @@ class EnhancedAPI:
                 overview = self._get_analytics_overview()
                 return overview
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         @self.app.post("/api/v2/analytics/custom")
         async def get_custom_analytics(request: AnalyticsRequest):
@@ -212,8 +261,11 @@ class EnhancedAPI:
                 analytics = self._get_custom_analytics(request)
                 return analytics
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         # Performance monitoring
         @self.app.get("/api/v2/health")
@@ -223,8 +275,11 @@ class EnhancedAPI:
                 health_data = self._get_health_status()
                 return health_data
 
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+            except Exception:
+                logger.exception("Unhandled error in enhanced API request")
+                raise HTTPException(
+                    status_code=500, detail="Internal server error"
+                )
 
         # Add community endpoints
         create_community_api_endpoints(self.app)
@@ -274,10 +329,18 @@ class EnhancedAPI:
         if conditions:
             query_parts.append("WHERE " + " AND ".join(conditions))
 
-        # Add sorting
-        sort_by = kwargs.get("sort_by", "name")
-        sort_order = kwargs.get("sort_order", "asc").upper()
-        query_parts.append(f"ORDER BY {sort_by} {sort_order}")
+        # Add sorting.
+        # ORDER BY identifiers cannot be bound as query parameters, so the
+        # sort column and direction must be validated against strict
+        # allow-lists to prevent SQL injection. Never interpolate raw,
+        # attacker-controlled values into the query string here.
+        sort_column = self.SORT_COLUMNS.get(
+            kwargs.get("sort_by", "name"), self.SORT_COLUMNS["name"]
+        )
+        sort_order = (
+            "ASC" if str(kwargs.get("sort_order", "asc")).upper() == "ASC" else "DESC"
+        )
+        query_parts.append(f"ORDER BY {sort_column} {sort_order}")
 
         # Add pagination
         query_parts.append("LIMIT ? OFFSET ?")
