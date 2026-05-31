@@ -313,6 +313,7 @@ async def get_workflow_detail(filename: str, request: Request):
         if not validate_filename(filename):
             print(f"Security: Blocked path traversal attempt for filename: {filename}")
             raise HTTPException(status_code=400, detail="Invalid filename format")
+        filename = os.path.basename(filename)  # Strip any path components
 
         # Security: Rate limiting
         client_ip = request.client.host if request.client else "unknown"
@@ -375,6 +376,7 @@ async def download_workflow(filename: str, request: Request):
         if not validate_filename(filename):
             print(f"Security: Blocked path traversal attempt for filename: {filename}")
             raise HTTPException(status_code=400, detail="Invalid filename format")
+        filename = os.path.basename(filename)  # Strip any path components
 
         # Security: Rate limiting
         client_ip = request.client.host if request.client else "unknown"
@@ -440,6 +442,7 @@ async def get_workflow_diagram(filename: str, request: Request):
         if not validate_filename(filename):
             print(f"Security: Blocked path traversal attempt for filename: {filename}")
             raise HTTPException(status_code=400, detail="Invalid filename format")
+        filename = os.path.basename(filename)  # Strip any path components
 
         # Security: Rate limiting
         client_ip = request.client.host if request.client else "unknown"
