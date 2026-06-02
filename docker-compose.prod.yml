@@ -1,0 +1,66 @@
+services:
+  workflows-docs:
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=warning
+      - ENABLE_METRICS=true
+      - MAX_WORKERS=4
+    volumes:
+      - workflows-db:/app/database
+      - workflows-logs:/app/logs
+      - ./workflows:/app/workflows:ro  # Read-only workflow files
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.workflows-docs.rule=Host(`workflows.yourdomain.com`)"
+      - "traefik.http.routers.workflows-docs.tls=true"
+      - "traefik.http.routers.workflows-docs.tls.certresolver=myresolver"
+      - "traefik.http.services.workflows-docs.loadbalancer.server.port=8000"
+      - "traefik.http.middlewares.workflows-docs-auth.basicauth.users=admin:$$2y$$10$$..."  # Generate with htpasswd
+
+  # Production reverse proxy
+  reverse-proxy:
+    restart: always
+      - "traefik.http.middlewares.workflows-docs-auth.basicauth.users=admin:$$2y$$12$$eImiTXuWVxfM37uY4JANjQ=="
+      # Example hash for password 'examplepassword'. Generate your own with: htpasswd -nbB <user> <password>
+      # See: https://doc.traefik.io/traefik/middlewares/http/basicauth/
+    volumes:
+      - ./traefik/config:/etc/traefik/dynamic:ro
+      - ./ssl:/ssl:ro
+    environment:
+      - TRAEFIK_LOG_LEVEL=INFO
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  # Optional: Monitoring stack
+  monitoring:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - workflows-network
+    profiles:
+      - monitoring
+
+volumes:
+  prometheus-data:

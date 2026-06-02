@@ -1,0 +1,135 @@
+# Default values for workflows-docs.
+# This is a YAML-formatted file.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/sahiixx/n8n-workflows-1
+  pullPolicy: Always
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit-rps: "100"
+  hosts:
+    - host: workflows.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: workflows-docs-tls
+      hosts:
+        - workflows.example.com
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Persistence configuration
+persistence:
+  database:
+    enabled: true
+    size: 1Gi
+    storageClass: "standard"
+    accessMode: ReadWriteOnce
+  logs:
+    enabled: true
+    size: 2Gi
+    storageClass: "standard"
+    accessMode: ReadWriteOnce
+
+# Environment configuration
+env:
+  ENVIRONMENT: production
+  LOG_LEVEL: info
+  ENABLE_METRICS: "true"
+  MAX_WORKERS: "4"
+
+# Health checks
+healthChecks:
+  livenessProbe:
+    httpGet:
+      path: /api/stats
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /api/stats
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    path: /metrics
+    labels: {}
+
+# Network policies
+networkPolicy:
+  enabled: false
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

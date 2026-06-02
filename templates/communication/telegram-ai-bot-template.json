@@ -1,0 +1,220 @@
+{
+  "name": "Telegram AI Bot Template",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "message_text",
+              "value": "={{ $json.message.text }}"
+            },
+            {
+              "name": "user_id",
+              "value": "={{ $json.message.from.id }}"
+            },
+            {
+              "name": "username",
+              "value": "={{ $json.message.from.username || $json.message.from.first_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "preprocess-message",
+      "name": "Preprocess Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "system_prompt",
+              "value": "You are a helpful AI assistant. Provide clear, concise, and accurate responses to user questions."
+            },
+            {
+              "name": "temperature",
+              "value": "0.7"
+            },
+            {
+              "name": "max_tokens",
+              "value": "500"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bot-settings",
+      "name": "Bot Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('preprocess-message').item.json.user_id }}",
+        "action": "typing"
+      },
+      "id": "send-typing",
+      "name": "Send Typing Action",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_BOT_TOKEN",
+          "name": "Telegram Bot API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-3.5-turbo",
+        "messages": {
+          "messageValues": [
+            {
+              "content": "={{ $('bot-settings').item.json.system_prompt }}",
+              "role": "system"
+            },
+            {
+              "content": "={{ $('preprocess-message').item.json.message_text }}",
+              "role": "user"
+            }
+          ]
+        },
+        "options": {
+          "temperature": "={{ $('bot-settings').item.json.temperature }}",
+          "maxTokens": "={{ $('bot-settings').item.json.max_tokens }}"
+        }
+      },
+      "id": "openai-chat",
+      "name": "OpenAI Chat",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_API_KEY",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('preprocess-message').item.json.user_id }}",
+        "text": "={{ $('openai-chat').item.json.choices[0].message.content }}"
+      },
+      "id": "send-response",
+      "name": "Send Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_BOT_TOKEN",
+          "name": "Telegram Bot API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Preprocess Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preprocess Message": {
+      "main": [
+        [
+          {
+            "node": "Bot Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot Settings": {
+      "main": [
+        [
+          {
+            "node": "Send Typing Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Typing Action": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat": {
+      "main": [
+        [
+          {
+            "node": "Send Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-27T00:00:00.000Z",
+  "versionId": "1"
+}

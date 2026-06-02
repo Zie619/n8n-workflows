@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N8N Workflows - Mobile Interface</title>
+    <style>
+        /* Mobile-First CSS Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8fafc;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 100%;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .search-toggle {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        /* Search Bar */
+        .search-container {
+            background: white;
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: none;
+        }
+
+        .search-container.active {
+            display: block;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: #667eea;
+        }
+
+        /* Filters */
+        .filters {
+            background: white;
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-chip {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .filter-chip.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        /* Main Content */
+        .main-content {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        /* Workflow Cards */
+        .workflow-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .workflow-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .workflow-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .workflow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .workflow-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a202c;
+            margin-bottom: 0.25rem;
+        }
+
+        .workflow-meta {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .meta-tag {
+            background: #e2e8f0;
+            color: #4a5568;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .workflow-description {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .workflow-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .rating {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .stars {
+            color: #fbbf24;
+        }
+
+        .rating-text {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .workflow-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .action-btn:hover {
+            background: #5a67d8;
+        }
+
+        .action-btn.secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .action-btn.secondary:hover {
+            background: #cbd5e0;
+        }
+
+        /* Loading States */
+        .loading {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: none;
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-around;
+            padding: 0.5rem 0;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.5rem;
+            text-decoration: none;
+            color: #6b7280;
+            transition: color 0.3s;
+        }
+
+        .nav-item.active {
+            color: #667eea;
+        }
+
+        .nav-icon {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-label {
+            font-size: 0.75rem;
+        }
+
+        /* Tablet Styles */
+        @media (min-width: 768px) {
+            .workflow-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .main-content {
+                padding: 2rem;
+            }
+        }
+
+        /* Desktop Styles */
+        @media (min-width: 1024px) {
+            .workflow-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .header-content {
+                max-width: 1200px;
+            }
+            
+            .main-content {
+                max-width: 1200px;
+                padding: 2rem;
+            }
+            
+            .bottom-nav {
+                display: none;
+            }
+        }
+
+        /* Dark Mode Support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #1a202c;
+                color: #e2e8f0;
+            }
+            
+            .workflow-card {
+                background: #2d3748;
+                color: #e2e8f0;
+            }
+            
+            .search-container {
+                background: #2d3748;
+                border-bottom-color: #4a5568;
+            }
+            
+            .filters {
+                background: #2d3748;
+                border-bottom-color: #4a5568;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">🚀 N8N Workflows</div>
+            <button class="search-toggle" onclick="toggleSearch()">🔍</button>
+        </div>
+    </header>
+
+    <!-- Search Container -->
+    <div class="search-container" id="searchContainer">
+        <input type="text" class="search-input" placeholder="Search workflows..." id="searchInput">
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <div class="filter-chips">
+            <div class="filter-chip active" data-filter="all">All</div>
+            <div class="filter-chip" data-filter="communication">Communication</div>
+            <div class="filter-chip" data-filter="data-processing">Data Processing</div>
+            <div class="filter-chip" data-filter="automation">Automation</div>
+            <div class="filter-chip" data-filter="ai">AI</div>
+            <div class="filter-chip" data-filter="ecommerce">E-commerce</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="workflow-grid" id="workflowGrid">
+            <!-- Workflows will be loaded here -->
+        </div>
+        
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+        </div>
+        
+        <div class="empty-state" id="emptyState">
+            <h3>No workflows found</h3>
+            <p>Try adjusting your search or filters</p>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active">
+            <div class="nav-icon">🏠</div>
+            <div class="nav-label">Home</div>
+        </a>
+        <a href="#" class="nav-item">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">Analytics</div>
+        </a>
+        <a href="#" class="nav-item">
+            <div class="nav-icon">⭐</div>
+            <div class="nav-label">Favorites</div>
+        </a>
+        <a href="#" class="nav-item">
+            <div class="nav-icon">👤</div>
+            <div class="nav-label">Profile</div>
+        </a>
+    </nav>
+
+    <script>
+        // Mobile Interface JavaScript
+        class MobileWorkflowInterface {
+            constructor() {
+                this.workflows = [];
+                this.filteredWorkflows = [];
+                this.currentFilter = 'all';
+                this.searchTerm = '';
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.loadWorkflows();
+            }
+
+            setupEventListeners() {
+                // Search functionality
+                const searchInput = document.getElementById('searchInput');
+                searchInput.addEventListener('input', (e) => {
+                    this.searchTerm = e.target.value.toLowerCase();
+                    this.filterWorkflows();
+                });
+
+                // Filter chips
+                document.querySelectorAll('.filter-chip').forEach(chip => {
+                    chip.addEventListener('click', (e) => {
+                        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentFilter = e.target.dataset.filter;
+                        this.filterWorkflows();
+                    });
+                });
+
+                // Pull to refresh
+                let startY = 0;
+                document.addEventListener('touchstart', (e) => {
+                    startY = e.touches[0].clientY;
+                });
+
+                document.addEventListener('touchmove', (e) => {
+                    const currentY = e.touches[0].clientY;
+                    if (currentY - startY > 100 && window.scrollY === 0) {
+                        this.loadWorkflows();
+                    }
+                });
+            }
+
+            async loadWorkflows() {
+                this.showLoading(true);
+                
+                try {
+                    const response = await fetch('/api/v2/workflows?limit=20');
+                    const data = await response.json();
+                    this.workflows = data.workflows || [];
+                    this.filterWorkflows();
+                } catch (error) {
+                    console.error('Error loading workflows:', error);
+                    this.showError('Failed to load workflows');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            filterWorkflows() {
+                this.filteredWorkflows = this.workflows.filter(workflow => {
+                    const matchesSearch = !this.searchTerm || 
+                        workflow.name.toLowerCase().includes(this.searchTerm) ||
+                        workflow.description.toLowerCase().includes(this.searchTerm);
+                    
+                    const matchesFilter = this.currentFilter === 'all' ||
+                        workflow.category.toLowerCase().includes(this.currentFilter) ||
+                        workflow.integrations.toLowerCase().includes(this.currentFilter);
+                    
+                    return matchesSearch && matchesFilter;
+                });
+
+                this.renderWorkflows();
+            }
+
+            renderWorkflows() {
+                const grid = document.getElementById('workflowGrid');
+                const emptyState = document.getElementById('emptyState');
+                
+                if (this.filteredWorkflows.length === 0) {
+                    grid.style.display = 'none';
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                grid.style.display = 'grid';
+                emptyState.style.display = 'none';
+
+                grid.innerHTML = this.filteredWorkflows.map(workflow => `
+                    <div class="workflow-card" onclick="viewWorkflow('${workflow.filename}')">
+                        <div class="workflow-header">
+                            <div>
+                                <div class="workflow-title">${workflow.name}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="workflow-meta">
+                            <span class="meta-tag">${workflow.trigger_type}</span>
+                            <span class="meta-tag">${workflow.complexity}</span>
+                            <span class="meta-tag">${workflow.node_count} nodes</span>
+                        </div>
+                        
+                        <div class="workflow-description">
+                            ${workflow.description || 'No description available'}
+                        </div>
+                        
+                        <div class="workflow-footer">
+                            <div class="rating">
+                                <div class="stars">${this.generateStars(workflow.average_rating || 0)}</div>
+                                <span class="rating-text">(${workflow.total_ratings || 0})</span>
+                            </div>
+                            
+                            <div class="workflow-actions">
+                                <button class="action-btn secondary" onclick="event.stopPropagation(); downloadWorkflow('${workflow.filename}')">
+                                    📥
+                                </button>
+                                <button class="action-btn" onclick="event.stopPropagation(); viewWorkflow('${workflow.filename}')">
+                                    View
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            generateStars(rating) {
+                const fullStars = Math.floor(rating);
+                const hasHalfStar = rating % 1 >= 0.5;
+                const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+                
+                return '★'.repeat(fullStars) + 
+                       (hasHalfStar ? '☆' : '') + 
+                       '☆'.repeat(emptyStars);
+            }
+
+            showLoading(show) {
+                document.getElementById('loadingIndicator').style.display = show ? 'flex' : 'none';
+            }
+
+            showError(message) {
+                // Simple error display - could be enhanced with toast notifications
+                alert(message);
+            }
+        }
+
+        // Global functions
+        function toggleSearch() {
+            const searchContainer = document.getElementById('searchContainer');
+            searchContainer.classList.toggle('active');
+            
+            if (searchContainer.classList.contains('active')) {
+                document.getElementById('searchInput').focus();
+            }
+        }
+
+        function viewWorkflow(filename) {
+            window.location.href = `/workflow/${filename}`;
+        }
+
+        function downloadWorkflow(filename) {
+            window.open(`/api/workflows/${filename}/download`, '_blank');
+        }
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', () => {
+            new MobileWorkflowInterface();
+        });
+
+        // Service Worker for offline functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>

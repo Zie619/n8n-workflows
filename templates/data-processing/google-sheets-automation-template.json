@@ -1,0 +1,244 @@
+{
+  "name": "Google Sheets Data Processing Template",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sheet1",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "options": {
+          "range": "A:Z"
+        }
+      },
+      "id": "get-sheet-data",
+      "name": "Get Sheet Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "check-data-exists",
+      "name": "Check Data Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Data processing and transformation logic\nconst data = $input.all();\nconst processedData = [];\n\nfor (const item of data) {\n  const row = item.json;\n  \n  // Example: Clean and transform data\n  const processedRow = {\n    id: row[0] || '',\n    name: row[1] ? row[1].toString().trim() : '',\n    email: row[2] ? row[2].toString().toLowerCase() : '',\n    status: row[3] || 'pending',\n    created_at: new Date().toISOString(),\n    processed: true\n  };\n  \n  // Add validation\n  if (processedRow.email && processedRow.name) {\n    processedData.push(processedRow);\n  }\n}\n\nreturn processedData.map(item => ({ json: item }));"
+      },
+      "id": "process-data",
+      "name": "Process Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Processed",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "status": "={{ $json.status }}",
+            "created_at": "={{ $json.created_at }}",
+            "processed": "={{ $json.processed }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "useAppend": true
+        }
+      },
+      "id": "write-processed-data",
+      "name": "Write Processed Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        900,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "summary",
+              "value": "Data processing completed successfully"
+            },
+            {
+              "name": "processed_count",
+              "value": "={{ $('process-data').item.json.length }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-summary",
+      "name": "Create Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.3,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "message": "Data processing completed. Processed {{ $('create-summary').item.json.processed_count }} records at {{ $('create-summary').item.json.timestamp }}"
+      },
+      "id": "log-completion",
+      "name": "Log Completion",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "message": "No data found in the source sheet. Please check the data source."
+      },
+      "id": "handle-no-data",
+      "name": "Handle No Data",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        680,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Get Sheet Data": {
+      "main": [
+        [
+          {
+            "node": "Check Data Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Data Exists": {
+      "main": [
+        [
+          {
+            "node": "Process Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle No Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Data": {
+      "main": [
+        [
+          {
+            "node": "Write Processed Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Processed Data": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Summary": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-01-27T00:00:00.000Z",
+  "versionId": "1"
+}

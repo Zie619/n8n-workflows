@@ -1,0 +1,295 @@
+{
+  "name": "ComfyUI Image Generation Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-image",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "generate-image"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract prompt from webhook body or use default\nconst input = $input.first().json;\nconst prompt = input.body?.prompt || input.prompt || 'a beautiful sunset over mountains, highly detailed, 4k';\nconst negativePrompt = input.body?.negative_prompt || input.negative_prompt || 'blurry, low quality, distorted';\nconst seed = input.body?.seed || input.seed || Math.floor(Math.random() * 1000000000);\nconst steps = input.body?.steps || input.steps || 20;\nconst cfg = input.body?.cfg || input.cfg || 7;\nconst width = input.body?.width || input.width || 512;\nconst height = input.body?.height || input.height || 512;\n\n// ComfyUI API workflow format\n// This is a basic txt2img workflow - customize as needed\nconst comfyWorkflow = {\n  &quot;3&quot;: {\n    &quot;inputs&quot;: {\n      &quot;seed&quot;: seed,\n      &quot;steps&quot;: steps,\n      &quot;cfg&quot;: cfg,\n      &quot;sampler_name&quot;: &quot;euler&quot;,\n      &quot;scheduler&quot;: &quot;normal&quot;,\n      &quot;denoise&quot;: 1,\n      &quot;model&quot;: [&quot;4&quot;, 0],\n      &quot;positive&quot;: [&quot;6&quot;, 0],\n      &quot;negative&quot;: [&quot;7&quot;, 0],\n      &quot;latent_image&quot;: [&quot;5&quot;, 0]\n    },\n    &quot;class_type&quot;: &quot;KSampler&quot;,\n    &quot;_meta&quot;: { &quot;title&quot;: &quot;KSampler&quot; }\n  },\n  &quot;4&quot;: {\n    &quot;inputs&quot;: {\n      &quot;ckpt_name&quot;: &quot;v1-5-pruned-emaonly.safetensors&quot;\n    },\n    &quot;class_type&quot;: &quot;CheckpointLoaderSimple&quot;,\n    &quot;_meta&quot;: { &quot;title&quot;: &quot;Load Checkpoint&quot; }\n  },\n  &quot;5&quot;: {\n    &quot;inputs&quot;: {\n      &quot;width&quot;: width,\n      &quot;height&quot;: height,\n      &quot;batch_size&quot;: 1\n    },\n    &quot;class_type&quot;: &quot;EmptyLatentImage&quot;,\n    &quot;_meta&quot;: { &quot;title&quot;: &quot;Empty Latent Image&quot; }\n  },\n  &quot;6&quot;: {\n    &quot;inputs&quot;: {\n      &quot;text&quot;: prompt,\n      &quot;clip&quot;: [&quot;4&quot;, 1]\n    },\n    &quot;class_type&quot;: &quot;CLIPTextEncode&quot;,\n    &quot;_meta&quot;: { &quot;title&quot;: &quot;CLIP Text Encode (Positive)&quot; }\n  },\n  &quot;7&quot;: {\n    &quot;inputs&quot;: {\n      &quot;text&quot;: negativePrompt,\n      &quot;clip&quot;: [&quot;4&quot;, 1]\n    },\n    &quot;class_type&quot;: &quot;CLIPTextEncode&quot;,\n    &quot;_meta&quot;: { &quot;title&quot;: &quot;CLIP Text Encode (Negative)&quot; }\n  },\n  &quot;8&quot;: {\n    &quot;inputs&quot;: {\n      &quot;samples&quot;: [&quot;3&quot;, 0],\n      &quot;vae&quot;: [&quot;4&quot;, 2]\n    },\n    &quot;class_type&quot;: &quot;VAEDecode&quot;,\n    &quot;_meta&quot;: { &quot;title&quot;: &quot;VAE Decode&quot; }\n  },\n  &quot;9&quot;: {\n    &quot;inputs&quot;: {\n      &quot;filename_prefix&quot;: &quot;n8n_generated&quot;,\n      &quot;images&quot;: [&quot;8&quot;, 0]\n    },\n    &quot;class_type&quot;: &quot;SaveImage&quot;,\n    &quot;_meta&quot;: { &quot;title&quot;: &quot;Save Image&quot; }\n  }\n};\n\nreturn {\n  json: {\n    prompt: comfyWorkflow,\n    original_prompt: prompt,\n    negative_prompt: negativePrompt,\n    seed: seed,\n    steps: steps,\n    cfg: cfg,\n    width: width,\n    height: height\n  }\n};"
+      },
+      "id": "prepare-workflow",
+      "name": "Prepare ComfyUI Workflow",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://comfyui:8188/prompt",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: $json.prompt }) }}",
+        "options": {}
+      },
+      "id": "submit-to-comfyui",
+      "name": "Submit to ComfyUI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst promptId = response.prompt_id;\n\nif (!promptId) {\n  throw new Error('No prompt_id received from ComfyUI');\n}\n\nreturn {\n  json: {\n    prompt_id: promptId,\n    status: 'queued',\n    check_count: 0,\n    max_checks: 60,\n    ...$input.first().json\n  }\n};"
+      },
+      "id": "extract-prompt-id",
+      "name": "Extract Prompt ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-node",
+      "name": "Wait 2 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1130, 300],
+      "webhookId": "wait-resume"
+    },
+    {
+      "parameters": {
+        "url": "=http://comfyui:8188/history/{{ $json.prompt_id }}",
+        "options": {}
+      },
+      "id": "check-history",
+      "name": "Check Generation Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst promptId = $('Extract Prompt ID').first().json.prompt_id;\nconst historyData = input;\n\n// Check if our prompt_id exists in history and has outputs\nconst promptHistory = historyData[promptId];\n\nif (promptHistory && promptHistory.outputs) {\n  // Find the SaveImage node output (node 9 in our workflow)\n  const outputs = promptHistory.outputs;\n  let images = [];\n  \n  for (const nodeId in outputs) {\n    if (outputs[nodeId].images) {\n      images = images.concat(outputs[nodeId].images);\n    }\n  }\n  \n  if (images.length > 0) {\n    return {\n      json: {\n        status: 'completed',\n        prompt_id: promptId,\n        images: images,\n        image_urls: images.map(img => \n          `http://comfyui:8188/view?filename=${img.filename}&subfolder=${img.subfolder || ''}&type=${img.type || 'output'}`\n        ),\n        original_prompt: $('Extract Prompt ID').first().json.original_prompt,\n        generation_params: {\n          seed: $('Extract Prompt ID').first().json.seed,\n          steps: $('Extract Prompt ID').first().json.steps,\n          cfg: $('Extract Prompt ID').first().json.cfg\n        }\n      }\n    };\n  }\n}\n\n// Not ready yet - increment check count\nconst checkCount = ($('Extract Prompt ID').first().json.check_count || 0) + 1;\nconst maxChecks = $('Extract Prompt ID').first().json.max_checks || 60;\n\nif (checkCount >= maxChecks) {\n  throw new Error(`Generation timed out after ${maxChecks} checks`);\n}\n\nreturn {\n  json: {\n    status: 'pending',\n    prompt_id: promptId,\n    check_count: checkCount,\n    max_checks: maxChecks,\n    original_prompt: $('Extract Prompt ID').first().json.original_prompt,\n    seed: $('Extract Prompt ID').first().json.seed,\n    steps: $('Extract Prompt ID').first().json.steps,\n    cfg: $('Extract Prompt ID').first().json.cfg\n  }\n};"
+      },
+      "id": "check-completion",
+      "name": "Check if Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1570, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-complete",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-complete",
+      "name": "Generation Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1790, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-success",
+      "name": "Respond with Image",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2050, 200]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-retry",
+      "name": "Wait and Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2050, 400],
+      "webhookId": "wait-retry-resume"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Generation failed', details: $json }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond with Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2270, 500]
+    },
+    {
+      "parameters": {},
+      "id": "no-op",
+      "name": "No Operation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2270, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare ComfyUI Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare ComfyUI Workflow": {
+      "main": [
+        [
+          {
+            "node": "Submit to ComfyUI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit to ComfyUI": {
+      "main": [
+        [
+          {
+            "node": "Extract Prompt ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Prompt ID": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Check Generation Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Generation Status": {
+      "main": [
+        [
+          {
+            "node": "Check if Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Complete": {
+      "main": [
+        [
+          {
+            "node": "Generation Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generation Complete?": {
+      "main": [
+        [
+          {
+            "node": "Respond with Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait and Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait and Retry": {
+      "main": [
+        [
+          {
+            "node": "Check Generation Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ai-stack-comfyui-workflow"
+  },
+  "pinData": {},
+  "versionId": "1",
+  "triggerCount": 0,
+  "tags": [
+    {
+      "name": "ComfyUI",
+      "id": "1"
+    },
+    {
+      "name": "Image Generation",
+      "id": "2"
+    },
+    {
+      "name": "AI Stack",
+      "id": "3"
+    }
+  ]
+}

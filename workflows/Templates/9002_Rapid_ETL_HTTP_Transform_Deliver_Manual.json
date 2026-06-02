@@ -1,0 +1,68 @@
+{
+  "name": "Rapid ETL: HTTP -> Transform -> Deliver",
+  "nodes": [
+    {
+      "id": "mtr-0001",
+      "name": "Notas & Testes",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-160, 80],
+      "parameters": {
+        "color": 7,
+        "width": 760,
+        "height": 360,
+        "content": "## Template: ETL Rápido (HTTP \u2192 Transform \u2192 Entregar)\n\n- Objetivo: Ingerir dados de uma API, transformar e enviar em lote.\n- Teste rápido: execute manualmente no Editor.\n- Fonte demo: jsonplaceholder.typicode.com/posts.\n- Entrega demo: httpbin.org/post (eco).\n- Produção: substitua 'Upsert Endpoint' pelo seu DB/API (Sheets, Postgres, etc.)."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "mtr-0002",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [200, 280],
+      "parameters": {},
+      "typeVersion": 1
+    },
+    {
+      "id": "mtr-0003",
+      "name": "Fetch Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 280],
+      "parameters": {
+        "url": "https://jsonplaceholder.typicode.com/posts",
+        "method": "GET",
+        "options": {}
+      },
+      "typeVersion": 4.2
+    },
+    {
+      "id": "mtr-0004",
+      "name": "Transform",
+      "type": "n8n-nodes-base.function",
+      "position": [720, 280],
+      "parameters": {
+        "functionCode": "// Keep top 10 posts and map fields\nconst data = Array.isArray(items[0].json) ? items[0].json : [];\nreturn data.slice(0, 10).map(post => ({ json: { id: post.id, title: post.title, userId: post.userId } }));"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "mtr-0005",
+      "name": "Upsert Endpoint",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [980, 280],
+      "parameters": {
+        "url": "https://httpbin.org/post",
+        "method": "POST",
+        "specifyBody": "json",
+        "sendBody": true,
+        "jsonBody": "={{ $json }}",
+        "options": {"retryOnFail": true, "maxRetries": 2}
+      },
+      "typeVersion": 4.2
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {"main": [[{"node": "Fetch Data", "type": "main", "index": 0}]]},
+    "Fetch Data": {"main": [[{"node": "Transform", "type": "main", "index": 0}]]},
+    "Transform": {"main": [[{"node": "Upsert Endpoint", "type": "main", "index": 0}]]}
+  }
+}

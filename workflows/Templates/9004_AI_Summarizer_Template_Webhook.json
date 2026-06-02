@@ -1,0 +1,76 @@
+{
+  "name": "AI Summarizer (LLM-ready)",
+  "nodes": [
+    {
+      "id": "ai-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [200, 300],
+      "webhookId": "d3e4f5a6-b7c8-9d0e-1f2a-bc3456789004",
+      "parameters": {"path": "template/ai-summarizer", "httpMethod": "POST", "responseMode": "responseNode", "options": {}},
+      "typeVersion": 2
+    },
+    {
+      "id": "ai-0002",
+      "name": "Notas & Testes",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-140, 80],
+      "parameters": {
+        "color": 7,
+        "width": 760,
+        "height": 380,
+        "content": "## Template: Resumidor com LLM (pronto para escalar)\n\n- Objetivo: Receber texto e gerar resumo com LLM ou fallback local.\n- Teste rápido:\n```bash\ncurl -X POST http://<SEU_N8N>/webhook/template/ai-summarizer \\\n -H 'Content-Type: application/json' \\\n -d '{\\\"text\\\":\\\"Escreva um parágrafo longo aqui...\\\"}'\n```\n- Produção: habilite o nó OpenAI e configure credenciais.\n- Fallback: 'Local Summarize' funciona sem credenciais."
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "ai-0003",
+      "name": "Prepare Text",
+      "type": "n8n-nodes-base.set",
+      "position": [460, 300],
+      "parameters": {
+        "options": {},
+        "assignments": {"assignments": [
+          {"id": "txt", "name": "text", "type": "string", "value": "={{ $json.body?.text || 'Digite seu texto aqui para resumir.' }}"}
+        ]}
+      },
+      "typeVersion": 3.4
+    },
+    {
+      "id": "ai-0004",
+      "name": "OpenAI (opcional)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [720, 220],
+      "parameters": {
+        "modelId": {"__rl": true, "mode": "list", "value": "gpt-4o-mini", "cachedResultName": "GPT-4O-MINI"},
+        "options": {},
+        "messages": {"values": [{"content": "Resuma de forma objetiva o seguinte texto:\n\n{{ $json.text }}"}]}
+      },
+      "typeVersion": 1.5,
+      "disabled": true
+    },
+    {
+      "id": "ai-0005",
+      "name": "Local Summarize",
+      "type": "n8n-nodes-base.function",
+      "position": [720, 380],
+      "parameters": {
+        "functionCode": "// Fallback simples: truncar e manter frases principais\nconst t = ($json.text || '').trim();\nif (!t) return [{ json: { summary: '' } }];\nconst max = 240;\nconst summary = t.length <= max ? t : t.slice(0, max) + '...';\nreturn [{ json: { summary } }];"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "ai-0006",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [980, 380],
+      "parameters": {"respondWith": "json", "responseBody": "={{ $json }}", "options": {}},
+      "typeVersion": 1.1
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Prepare Text", "type": "main", "index": 0}]]},
+    "Prepare Text": {"main": [[{"node": "Local Summarize", "type": "main", "index": 0}]]},
+    "Local Summarize": {"main": [[{"node": "Respond", "type": "main", "index": 0}]]}
+  }
+}

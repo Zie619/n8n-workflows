@@ -1,7 +1,56 @@
 services:
-  doc:
+  # N8N Workflows Documentation Service
+  workflows-docs:
     image: workflows-doc:latest
     build:
       context: .
+      dockerfile: Dockerfile
+    container_name: n8n-workflows-docs
     ports:
       - "8000:8000"
+    volumes:
+      - workflows-db:/app/database
+      - workflows-logs:/app/logs
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    networks:
+      - workflows-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.workflows-docs.rule=Host(`localhost`)"
+      - "traefik.http.services.workflows-docs.loadbalancer.server.port=8000"
+
+  # Optional: Traefik reverse proxy for production
+  reverse-proxy:
+    image: traefik:v2.10
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=admin@example.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - workflows-network
+    profiles:
+      - production
+
+networks:
+  workflows-network:
+    driver: bridge
+
+volumes:
+  workflows-db:
+  workflows-logs:
