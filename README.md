@@ -53,7 +53,7 @@ ai-bom scan ./workflows/
 
 One command finds every AI Agent node, LLM integration, MCP client, hardcoded credential, and dangerous tool combination — then gives you a risk score and a compliance-ready report.
 
-**EU AI Act deadline: August 2025.** You need an AI inventory.
+**EU AI Act compliance is now required.** You need an AI inventory.
 
 <a href="https://github.com/Trusera/ai-bom"><strong>Get AI-BOM (free & open source) &rarr;</strong></a>
 
