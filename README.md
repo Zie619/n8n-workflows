@@ -242,6 +242,10 @@ n8n-workflows/
 
 ---
 
+## Related AI workflow directories
+
+- [OpenRuna n8n workflows hub](https://www.openruna.com/hubs/n8n-workflows) — Graph directory of n8n workflows linked to agents, prompts, and automation tools.
+
 ## Contributing
 
 We love contributions! Here's how you can help:
