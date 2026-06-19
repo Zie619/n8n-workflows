@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/zie619-n8n-workflows-badge.png)](https://mseep.ai/app/zie619-n8n-workflows)
+
 # n8n Workflow Collection
 
 <div align="center">
