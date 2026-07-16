@@ -6,9 +6,16 @@ Addresses Issues #115 and #129.
 """
 
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 import re
+
+# Add the parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+
+from workflow_db import WorkflowDatabase
+from generate_search_index import get_category_list
 
 
 def update_html_timestamp(html_file: str):
@@ -48,8 +55,33 @@ def update_html_timestamp(html_file: str):
     return True
 
 
+def compute_current_stats(db_path: str = "database/workflows.db"):
+    """Recompute workflow statistics from the SQLite database (source of truth).
+
+    Returns None if the database doesn't exist yet, so callers can fall back
+    or ask the user to index first, instead of silently keeping stale numbers.
+    """
+    if not Path(db_path).exists():
+        return None
+
+    db = WorkflowDatabase(db_path)
+    stats = db.get_stats()
+    categories = db.get_service_categories()
+
+    return {
+        "total_workflows": stats["total"],
+        "active_workflows": stats["active"],
+        "inactive_workflows": stats["inactive"],
+        "total_nodes": stats["total_nodes"],
+        "unique_integrations": stats["unique_integrations"],
+        "categories": len(get_category_list(categories)),
+        "triggers": stats["triggers"],
+        "complexity": stats["complexity"],
+    }
+
+
 def update_api_timestamp(api_dir: str):
-    """Update timestamp in API JSON files."""
+    """Update API JSON files with freshly recomputed statistics."""
     api_path = Path(api_dir)
 
     if not api_path.exists():
@@ -69,18 +101,26 @@ def update_api_timestamp(api_dir: str):
 
     print(f"✅ Created metadata file: {metadata_file}")
 
-    # Update stats.json if it exists
+    # Recompute stats.json from the actual workflows/ directory instead of
+    # just re-stamping whatever numbers happen to already be in the file.
     stats_file = api_path / "stats.json"
-    if stats_file.exists():
-        with open(stats_file, "r", encoding="utf-8") as f:
-            stats = json.load(f)
+    fresh_stats = compute_current_stats()
 
-        stats["last_updated"] = datetime.now().isoformat()
+    if fresh_stats is not None:
+        fresh_stats["last_updated"] = datetime.now().isoformat()
 
         with open(stats_file, "w", encoding="utf-8") as f:
-            json.dump(stats, f, indent=2)
+            json.dump(fresh_stats, f, indent=2)
 
-        print(f"✅ Updated stats file: {stats_file}")
+        print(
+            f"✅ Recomputed stats file: {stats_file} "
+            f"({fresh_stats['total_workflows']} workflows)"
+        )
+    elif stats_file.exists():
+        print(
+            f"⚠️  database/workflows.db not found — leaving {stats_file} unchanged."
+        )
+        print("   Run 'python workflow_db.py --index --force' to rebuild it first.")
 
     return True
 
