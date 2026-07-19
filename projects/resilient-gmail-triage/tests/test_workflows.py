@@ -44,10 +44,12 @@ def run_code_node(
     json_value: dict | None = None,
     items: list[dict] | None = None,
     gate: dict | None = None,
+    env: dict | None = None,
 ) -> Any:
     harness = r"""
 const fs = require('fs');
 const payload = JSON.parse(fs.readFileSync(0, 'utf8'));
+global.$env = payload.env || {};
 const inputItems = (payload.items || []).map(json => ({json}));
 const $input = {all: () => inputItems};
 const $ = () => ({item: {json: payload.gate || {}}});
@@ -62,6 +64,7 @@ process.stdout.write(JSON.stringify(result));
         "jsonValue": json_value or {},
         "items": items or [],
         "gate": gate or {},
+        "env": env or {},
     }
     result = subprocess.run(
         ["node", "-e", harness],
@@ -183,8 +186,13 @@ def test_prompt_injection_sends_exactly_one_minimized_admin_alert():
     assert "sender" not in builder_text
     assert "subject" not in builder_text
     assert "body" not in builder_text
-    built = run_code_node(builder, items=[eligible])
+    built = run_code_node(
+        builder,
+        items=[eligible],
+        env={"DISCORD_ROLE_ADMIN": "1527913267719307284"},
+    )
     content = built[0]["json"]["_admin_alert"]
+    assert content.startswith("<@&1527913267719307284>")
     assert "thread-technical-id" in content
     assert "prompt" in content.lower()
 

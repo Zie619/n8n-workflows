@@ -384,7 +384,9 @@ return $input.all().map(x=>{
   const j=x.json;
   const reference=String(j.gmail_thread_id||j.gmail_message_id||'unknown').slice(0,96);
   const quarantinedAt=String(j.processed_at||j.updated_at||new Date().toISOString()).slice(0,40);
-  return {json:{...j,_admin_alert:'🛡️ **Prompt-injection email quarantined**\nReference: `'+reference+'`\nQuarantined at: '+quarantinedAt+'\nNo personal email fields included.'}};
+  const adminRole=String($env.DISCORD_ROLE_ADMIN||'').replace(/\D/g,'').slice(0,24);
+  const mention=adminRole?'<@&'+adminRole+'>\n':'';
+  return {json:{...j,_admin_alert:mention+'🛡️ **Prompt-injection email quarantined**\nReference: `'+reference+'`\nQuarantined at: '+quarantinedAt+'\nNo personal email fields included.'}};
 });
 """
 
