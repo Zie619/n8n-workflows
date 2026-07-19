@@ -1,0 +1,1496 @@
+{
+  "name": "02 - Gmail Triage - Act and Notify",
+  "nodes": [
+    {
+      "id": "act-schedule",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -120
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "* * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "act-manual",
+      "name": "Manual Act",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        120
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "act-tick-draft",
+      "name": "Tick Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        -420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "act-load-draft",
+      "name": "Load Draft State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        -420
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "act-tick-discord",
+      "name": "Tick Discord",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        -140
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "act-load-discord",
+      "name": "Load Discord State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        -140
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "act-tick-escalation",
+      "name": "Tick Escalation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        140
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "act-load-escalation",
+      "name": "Load Escalation State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        140
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "act-tick-finalize",
+      "name": "Tick Finalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "act-load-finalize",
+      "name": "Load Finalize State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        420
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "act-select-draft",
+      "name": "Select Draft Work",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst allowed=['CLASSIFIED','RETRY'];\nreturn $input.all().filter(x => {\n  const j=x.json; return allowed.includes(j.status) && !j.draft_created && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;\n}).slice(0,20).map(x => {\n  const j=x.json; const safePl='Dzień dobry,\\n\\ndziękujemy za wiadomość. Potwierdzamy jej otrzymanie i przekazanie do weryfikacji. Odpowiedzialna osoba odpowie po sprawdzeniu szczegółów.\\n\\nZ poważaniem';\n  const safeEn='Hello,\\n\\nthank you for your message. We confirm receipt and have forwarded it for review. The responsible person will reply after verifying the details.\\n\\nKind regards';\n  const highRisk=j.urgency==='critical'||['COMPLAINT_ESCALATION','TECHNICAL_INCIDENT','LEGAL_PRIVACY'].includes(j.category)||Number(j.confidence||0)<0.75;\n  let body=highRisk?'':String(j.draft_body||'');\n  body=body.replace(/https?:\\/\\/\\S+/gi,'[link removed]').replace(/<@!?&?\\d+>|@everyone|@here/gi,'').replace(/```[\\s\\S]*?```/g,'').slice(0,3000).trim();\n  if(!body) body=j.lang==='en'?safeEn:safePl;\n  body+='\\n\\n[triage-id:'+j.gmail_message_id+']';\n  return {json:{...j,draft_subject:'Re: '+String(j.subject||'').slice(0,180),safe_draft_body:body}};\n});\n"
+      }
+    },
+    {
+      "id": "act-create-draft",
+      "name": "Create Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        -420
+      ],
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "subject": "={{$json.draft_subject}}",
+        "emailType": "text",
+        "message": "={{$json.safe_draft_body}}",
+        "options": {
+          "threadId": "={{$json.gmail_thread_id}}",
+          "sendTo": "={{$json.sender_reply_address}}"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "__CREDENTIAL_GMAIL_ID__",
+          "name": "Gmail - Contact Mailbox"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-mark-draft",
+      "name": "Mark DRAFT_CREATED",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -420
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "gmail_message_id": "={{ $('Select Draft Work').item.json.gmail_message_id }}",
+            "status": "DRAFT_CREATED",
+            "draft_created": true,
+            "last_error": "",
+            "updated_at": "={{new Date().toISOString()}}"
+          },
+          "matchingColumns": [
+            "gmail_message_id"
+          ],
+          "schema": [
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_created",
+              "displayName": "draft_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discord_notified",
+              "displayName": "discord_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_retry_at",
+              "displayName": "next_retry_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sender_reply_address",
+              "displayName": "sender_reply_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "gmail_message_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Select Draft Work').item.json.gmail_message_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "act-select-discord",
+      "name": "Select Discord Work",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -140
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nreturn $input.all().filter(x => {\n  const j=x.json; return !!j.draft_created && !j.discord_notified && j.status === 'DRAFT_CREATED' && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;\n}).slice(0,20);\n"
+      }
+    },
+    {
+      "id": "act-build-discord",
+      "name": "Build Discord",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -140
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst roleMap={\n OFFER_INQUIRY:$env.DISCORD_ROLE_SALES, EXISTING_CLIENT:$env.DISCORD_ROLE_CLIENT_SUCCESS,\n COMPLAINT_ESCALATION:$env.DISCORD_ROLE_CRISIS, BILLING:$env.DISCORD_ROLE_FINANCE,\n TECHNICAL_INCIDENT:$env.DISCORD_ROLE_CRISIS, LEGAL_PRIVACY:$env.DISCORD_ROLE_LEGAL_PRIVACY,\n PARTNERSHIP_RECRUITMENT:$env.DISCORD_ROLE_ADMIN, OTHER:$env.DISCORD_ROLE_ADMIN\n};\nreturn $input.all().map(x=>{\n const j=x.json; const owner=roleMap[j.category]||$env.DISCORD_ROLE_ADMIN;\n const backup=j.urgency==='critical'?$env.DISCORD_ROLE_CRISIS_BACKUP:'';\n const mentions=[owner,backup].filter(Boolean).map(id=>'<@&'+id+'>').join(' ');\n const icon={normal:'🟢',high:'🟠',critical:'🔴'}[j.urgency]||'🟢';\n const content=icon+' **'+j.category+'** • urgency: '+j.urgency+'\\nOwner: '+mentions+'\\nGmail thread ID: `'+String(j.gmail_thread_id||'').slice(0,40)+'`';\n return {json:{...j,_discord_content:content,_after_discord_status:j.urgency==='critical'?'NEEDS_ESCALATION':'NOTIFIED'}};\n});\n"
+      }
+    },
+    {
+      "id": "act-discord",
+      "name": "Discord Alert",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -140
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_TRIAGE_ID__",
+          "name": "Discord - Mail Triage"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-mark-notified",
+      "name": "Mark NOTIFIED",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        -140
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "gmail_message_id": "={{ $('Build Discord').item.json.gmail_message_id }}",
+            "status": "={{ $('Build Discord').item.json._after_discord_status }}",
+            "discord_notified": true,
+            "last_error": "",
+            "updated_at": "={{new Date().toISOString()}}"
+          },
+          "matchingColumns": [
+            "gmail_message_id"
+          ],
+          "schema": [
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_created",
+              "displayName": "draft_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discord_notified",
+              "displayName": "discord_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_retry_at",
+              "displayName": "next_retry_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sender_reply_address",
+              "displayName": "sender_reply_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "gmail_message_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Build Discord').item.json.gmail_message_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "act-select-escalation",
+      "name": "Select Critical Escalation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        140
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nreturn $input.all().filter(x=>x.json.status==='NEEDS_ESCALATION' && x.json.discord_notified).slice(0,10).map(x=>({json:{...x.json,_alert_subject:'[CRITICAL] Mail triage: '+x.json.category,_alert_body:'Critical triage item requires review.\\nCategory: '+x.json.category+'\\nGmail message ID: '+x.json.gmail_message_id+'\\nNo email body or personal data is included in this alert.'}}));\n"
+      }
+    },
+    {
+      "id": "act-send-escalation",
+      "name": "Discord Critical Escalation",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        880,
+        140
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{ '🔴 **Critical escalation**\\n' + $json._alert_body }}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_TRIAGE_ID__",
+          "name": "Discord - Mail Triage"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-mark-escalated",
+      "name": "Mark ESCALATED",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        140
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "gmail_message_id": "={{ $('Select Critical Escalation').item.json.gmail_message_id }}",
+            "status": "ESCALATED",
+            "updated_at": "={{new Date().toISOString()}}"
+          },
+          "matchingColumns": [
+            "gmail_message_id"
+          ],
+          "schema": [
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_created",
+              "displayName": "draft_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discord_notified",
+              "displayName": "discord_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_retry_at",
+              "displayName": "next_retry_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sender_reply_address",
+              "displayName": "sender_reply_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "gmail_message_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Select Critical Escalation').item.json.gmail_message_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "act-select-finalize",
+      "name": "Select Finalize Work",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst L={processed:'__LABEL_AUTO_PROCESSED__',processing:'__LABEL_AUTO_PROCESSING__',urgent:'__LABEL_AUTO_URGENT__',manual:'__LABEL_AUTO_MANUAL_REVIEW__',quarantine:'__LABEL_AUTO_QUARANTINED__',spam:'__LABEL_AUTO_SPAM__'};\nreturn $input.all().filter(x=>{\n const j=x.json;\n return ['NOTIFIED','ESCALATED','QUARANTINED'].includes(j.status) || (['CLASSIFIED','RETRY'].includes(j.status)&&['SPAM','PROMPT_INJECTION'].includes(j.category));\n}).slice(0,30).map(x=>{\n const j=x.json; const ids=[]; let final='PROCESSED';\n if(j.category==='PROMPT_INJECTION'||j.status==='QUARANTINED'){ids.push(L.quarantine);final='QUARANTINED';}\n else {ids.push(L.processed); if(j.category==='SPAM')ids.push(L.spam); if(j.urgency==='critical')ids.push(L.urgent); if(Number(j.confidence||0)<0.75)ids.push(L.manual);}\n return {json:{...j,_label_ids:ids,_final_status:final}};\n});\n"
+      }
+    },
+    {
+      "id": "act-add-labels",
+      "name": "Apply AUTO Labels",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        420
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "addLabels",
+        "messageId": "={{$json.gmail_message_id}}",
+        "labelIds": "={{$json._label_ids}}"
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "__CREDENTIAL_GMAIL_ID__",
+          "name": "Gmail - Contact Mailbox"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-remove-processing",
+      "name": "Remove PROCESSING Label",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        420
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "removeLabels",
+        "messageId": "={{ $('Select Finalize Work').item.json.gmail_message_id }}",
+        "labelIds": [
+          "__LABEL_AUTO_PROCESSING__"
+        ]
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "__CREDENTIAL_GMAIL_ID__",
+          "name": "Gmail - Contact Mailbox"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-mark-final",
+      "name": "Save Final Status",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        420
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "gmail_message_id": "={{ $('Select Finalize Work').item.json.gmail_message_id }}",
+            "status": "={{ $('Select Finalize Work').item.json._final_status }}",
+            "processed_at": "={{ $('Select Finalize Work').item.json._final_status==='PROCESSED'?new Date().toISOString():null }}",
+            "last_error": "",
+            "updated_at": "={{new Date().toISOString()}}"
+          },
+          "matchingColumns": [
+            "gmail_message_id"
+          ],
+          "schema": [
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_created",
+              "displayName": "draft_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discord_notified",
+              "displayName": "discord_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_retry_at",
+              "displayName": "next_retry_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sender_reply_address",
+              "displayName": "sender_reply_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "gmail_message_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Select Finalize Work').item.json.gmail_message_id }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Tick Draft",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Discord",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Escalation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Act": {
+      "main": [
+        [
+          {
+            "node": "Tick Draft",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Discord",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Escalation",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Finalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tick Draft": {
+      "main": [
+        [
+          {
+            "node": "Load Draft State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tick Discord": {
+      "main": [
+        [
+          {
+            "node": "Load Discord State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tick Escalation": {
+      "main": [
+        [
+          {
+            "node": "Load Escalation State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tick Finalize": {
+      "main": [
+        [
+          {
+            "node": "Load Finalize State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Draft State": {
+      "main": [
+        [
+          {
+            "node": "Select Draft Work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Draft Work": {
+      "main": [
+        [
+          {
+            "node": "Create Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Draft": {
+      "main": [
+        [
+          {
+            "node": "Mark DRAFT_CREATED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Discord State": {
+      "main": [
+        [
+          {
+            "node": "Select Discord Work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Discord Work": {
+      "main": [
+        [
+          {
+            "node": "Build Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Discord": {
+      "main": [
+        [
+          {
+            "node": "Discord Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Alert": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Escalation State": {
+      "main": [
+        [
+          {
+            "node": "Select Critical Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Critical Escalation": {
+      "main": [
+        [
+          {
+            "node": "Discord Critical Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Critical Escalation": {
+      "main": [
+        [
+          {
+            "node": "Mark ESCALATED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Finalize State": {
+      "main": [
+        [
+          {
+            "node": "Select Finalize Work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Finalize Work": {
+      "main": [
+        [
+          {
+            "node": "Apply AUTO Labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply AUTO Labels": {
+      "main": [
+        [
+          {
+            "node": "Remove PROCESSING Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove PROCESSING Label": {
+      "main": [
+        [
+          {
+            "node": "Save Final Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "timezone": "Europe/Warsaw",
+    "errorWorkflow": "__ERROR_WORKFLOW_ID__"
+  },
+  "active": false,
+  "pinData": {}
+}

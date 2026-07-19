@@ -1,0 +1,190 @@
+{
+  "name": "04 - Gmail Triage - Global Error Handler",
+  "nodes": [
+    {
+      "id": "err-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "err-sanitize",
+      "name": "Sanitize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst e=$json||{};const wf=String((e.workflow&&e.workflow.name)||'unknown workflow').slice(0,100);const node=String((e.execution&&e.execution.lastNodeExecuted)||'unknown node').slice(0,100);\nlet msg=String((e.execution&&e.execution.error&&e.execution.error.message)||'workflow error');\nmsg=msg.split('\\n')[0].replace(/https?:\\/\\/\\S+/g,'[url]').replace(/(?:api[_-]?key|token|secret|password)\\s*[:=]\\s*\\S+/gi,'[secret]').replace(/[A-Za-z0-9_-]{32,}/g,'[token]').slice(0,240);\nconst severity=/critical|auth|credential|permission/i.test(msg)?'critical':/timeout|429|retry|rate/i.test(msg)?'warning':'error';\nconst event_id='evt_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);\nreturn [{json:{event_id,severity,component:node,event_type:'workflow_error',message:wf+' / '+node+': '+msg,created_at:new Date().toISOString(),_discord_content:'🔴 **Workflow error**\\nWorkflow: '+wf+'\\nNode: '+node+'\\nError: '+msg}}];\n"
+      }
+    },
+    {
+      "id": "err-log",
+      "name": "Log Event",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        450,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "system_events"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{$json.event_id}}",
+            "severity": "={{$json.severity}}",
+            "component": "={{$json.component}}",
+            "event_type": "={{$json.event_type}}",
+            "message": "={{$json.message}}",
+            "created_at": "={{$json.created_at}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "severity",
+              "displayName": "severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "component",
+              "displayName": "component",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "event_type",
+              "displayName": "event_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resolved_at",
+              "displayName": "resolved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "err-discord",
+      "name": "Discord Error",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        680,
+        0
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{ $('Sanitize').item.json._discord_content }}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_ERROR_ID__",
+          "name": "Discord - Automation Alerts"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Sanitize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitize": {
+      "main": [
+        [
+          {
+            "node": "Log Event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Discord Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "timezone": "Europe/Warsaw"
+  },
+  "active": false,
+  "pinData": {}
+}

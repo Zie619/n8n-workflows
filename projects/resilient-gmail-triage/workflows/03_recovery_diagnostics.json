@@ -1,0 +1,1097 @@
+{
+  "name": "03 - Gmail Triage - Recovery and Diagnostics",
+  "nodes": [
+    {
+      "id": "rec-five",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rec-fifteen",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/15 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rec-daily",
+      "name": "Daily Health Report",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15 8 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rec-tick",
+      "name": "Recovery Tick",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        -420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "rec-load",
+      "name": "Load Recovery State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        -420
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rec-analyze",
+      "name": "Analyze Recovery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst now=Date.now(), backoff=[60000,300000,900000,1800000,3600000];\nconst terminal=['PROCESSED','QUARANTINED'];\nconst out=[];\nfor(const x of $input.all()){\n const j=x.json;if(!j.gmail_message_id||terminal.includes(j.status))continue;\n const updated=j.updated_at?new Date(j.updated_at).getTime():0;\n const attempts=Number(j.attempts||0);\n if(attempts>=5){out.push({json:{...j,_new_status:'QUARANTINED',_attempts:attempts,_next_retry:null,_error:'maximum retry attempts reached'}});continue;}\n if(['PROCESSING','FETCHING','RECEIVED'].includes(j.status)&&now-updated>600000){\n   const n=attempts+1;out.push({json:{...j,_new_status:'RETRY',_attempts:n,_next_retry:new Date(now+backoff[Math.min(n-1,4)]).toISOString(),_error:'recovered stale '+j.status}});\n }\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "rec-remove-processing",
+      "name": "Remove Stale PROCESSING Label",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        -420
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "removeLabels",
+        "messageId": "={{$json.gmail_message_id}}",
+        "labelIds": [
+          "__LABEL_AUTO_PROCESSING__"
+        ]
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "__CREDENTIAL_GMAIL_ID__",
+          "name": "Gmail - Contact Mailbox"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "rec-update",
+      "name": "Update Recovery State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -420
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "gmail_message_id": "={{ $('Analyze Recovery').item.json.gmail_message_id }}",
+            "status": "={{ $('Analyze Recovery').item.json._new_status }}",
+            "attempts": "={{ $('Analyze Recovery').item.json._attempts }}",
+            "next_retry_at": "={{ $('Analyze Recovery').item.json._next_retry }}",
+            "last_error": "={{ $('Analyze Recovery').item.json._error }}",
+            "updated_at": "={{new Date().toISOString()}}"
+          },
+          "matchingColumns": [
+            "gmail_message_id"
+          ],
+          "schema": [
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_created",
+              "displayName": "draft_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discord_notified",
+              "displayName": "discord_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_retry_at",
+              "displayName": "next_retry_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sender_reply_address",
+              "displayName": "sender_reply_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "gmail_message_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Analyze Recovery').item.json.gmail_message_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rec-scan",
+      "name": "Gmail Safety Scan",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        220,
+        -160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "filters": {
+          "q": "newer_than:1d in:inbox is:unread -label:AUTO/PROCESSED -label:AUTO/PROCESSING",
+          "readStatus": "unread",
+          "includeSpamTrash": false
+        },
+        "options": {
+          "maxResults": 50
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "__CREDENTIAL_GMAIL_ID__",
+          "name": "Gmail - Contact Mailbox"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "rec-scan-tick",
+      "name": "Safety State Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{count:$input.all().length}}];"
+      }
+    },
+    {
+      "id": "rec-scan-state",
+      "name": "Load Safety State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -160
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rec-missing",
+      "name": "Find Missing Gmail Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst mails=$('Gmail Safety Scan').all().map(x=>x.json);\nconst known=new Set($input.all().map(x=>x.json.gmail_message_id).filter(Boolean));\nreturn mails.filter(m=>m.id&&!known.has(m.id)).map(m=>({json:{gmail_message_id:m.id,gmail_thread_id:m.threadId||'',status:'RECEIVED',attempts:0,created_at:new Date().toISOString(),updated_at:new Date().toISOString()}}));\n"
+      }
+    },
+    {
+      "id": "rec-insert",
+      "name": "Insert RECEIVED",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        -160
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "gmail_message_id": "={{$json.gmail_message_id}}",
+            "gmail_thread_id": "={{$json.gmail_thread_id}}",
+            "status": "RECEIVED",
+            "attempts": 0,
+            "created_at": "={{$json.created_at}}",
+            "updated_at": "={{$json.updated_at}}"
+          },
+          "matchingColumns": [
+            "gmail_message_id"
+          ],
+          "schema": [
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_created",
+              "displayName": "draft_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discord_notified",
+              "displayName": "discord_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_retry_at",
+              "displayName": "next_retry_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sender_reply_address",
+              "displayName": "sender_reply_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "gmail_message_id",
+              "condition": "eq",
+              "keyValue": "={{$json.gmail_message_id}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rec-diag-tick",
+      "name": "Diagnostics Tick",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "rec-diag-load",
+      "name": "Load Diagnostic State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rec-health",
+      "name": "Compute Queue Health",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst rows=$input.all().map(x=>x.json);const now=Date.now();\nconst pending=rows.filter(x=>!['PROCESSED','QUARANTINED'].includes(x.status)).length;\nconst stale=rows.filter(x=>x.updated_at&&!['PROCESSED','QUARANTINED'].includes(x.status)&&now-new Date(x.updated_at).getTime()>600000).length;\nconst quarantined=rows.filter(x=>x.status==='QUARANTINED').length;\nconst status=stale>0||pending>20||quarantined>5?'CRITICAL':pending>0||quarantined>0?'DEGRADED':'HEALTHY';\nconst healthState=$getWorkflowStaticData('global');\nhealthState.queueFailures=status==='HEALTHY'?0:Number(healthState.queueFailures||0)+1;\nreturn [{json:{component:'queue',status,consecutive_failures:healthState.queueFailures,circuit_state:'CLOSED',last_success_at:status==='HEALTHY'?new Date().toISOString():null,last_failure_at:status==='HEALTHY'?null:new Date().toISOString(),last_error:status==='HEALTHY'?'':'pending='+pending+', stale='+stale+', quarantined='+quarantined,updated_at:new Date().toISOString()}}];\n"
+      }
+    },
+    {
+      "id": "rec-health-save",
+      "name": "Write Queue Health",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "mode": "name",
+          "value": "system_health"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "component": "={{$json.component}}",
+            "status": "={{$json.status}}",
+            "consecutive_failures": "={{$json.consecutive_failures}}",
+            "circuit_state": "={{$json.circuit_state}}",
+            "last_success_at": "={{$json.last_success_at}}",
+            "last_failure_at": "={{$json.last_failure_at}}",
+            "last_error": "={{$json.last_error}}",
+            "updated_at": "={{$json.updated_at}}"
+          },
+          "matchingColumns": [
+            "component"
+          ],
+          "schema": [
+            {
+              "id": "component",
+              "displayName": "component",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "consecutive_failures",
+              "displayName": "consecutive_failures",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "circuit_state",
+              "displayName": "circuit_state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_success_at",
+              "displayName": "last_success_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_failure_at",
+              "displayName": "last_failure_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "component",
+              "condition": "eq",
+              "keyValue": "={{$json.component}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "rec-report-tick",
+      "name": "Report Tick",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "rec-report-load",
+      "name": "Load System Health",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "system_health"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "rec-report",
+      "name": "Build Daily Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows=$input.all().map(x=>x.json);const now=Date.now();const icons={HEALTHY:'🟢',DEGRADED:'🟠',CRITICAL:'🔴',UNKNOWN:'⚪'};const lines=rows.map(x=>{const updated=x.updated_at?new Date(x.updated_at).getTime():0;const effective=!updated||now-updated>1800000?'UNKNOWN':x.status;return (icons[effective]||'⚪')+' '+x.component+': '+effective+(effective==='UNKNOWN'?' (stale telemetry)':'');});return [{json:{content:'📊 **Daily n8n mail-triage health**\\n'+lines.join('\\n')+'\\nNo message bodies or personal data included.'}}];"
+      }
+    },
+    {
+      "id": "rec-report-discord",
+      "name": "Send Daily Report",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        880,
+        400
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json.content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_ERROR_ID__",
+          "name": "Discord - Automation Alerts"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Recovery Tick",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gmail Safety Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recovery Tick": {
+      "main": [
+        [
+          {
+            "node": "Load Recovery State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Recovery State": {
+      "main": [
+        [
+          {
+            "node": "Analyze Recovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Recovery": {
+      "main": [
+        [
+          {
+            "node": "Remove Stale PROCESSING Label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Stale PROCESSING Label": {
+      "main": [
+        [
+          {
+            "node": "Update Recovery State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Safety Scan": {
+      "main": [
+        [
+          {
+            "node": "Safety State Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safety State Query": {
+      "main": [
+        [
+          {
+            "node": "Load Safety State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Safety State": {
+      "main": [
+        [
+          {
+            "node": "Find Missing Gmail Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Missing Gmail Items": {
+      "main": [
+        [
+          {
+            "node": "Insert RECEIVED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Diagnostics Tick",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Diagnostics Tick": {
+      "main": [
+        [
+          {
+            "node": "Load Diagnostic State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Diagnostic State": {
+      "main": [
+        [
+          {
+            "node": "Compute Queue Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Queue Health": {
+      "main": [
+        [
+          {
+            "node": "Write Queue Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Health Report": {
+      "main": [
+        [
+          {
+            "node": "Report Tick",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Tick": {
+      "main": [
+        [
+          {
+            "node": "Load System Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load System Health": {
+      "main": [
+        [
+          {
+            "node": "Build Daily Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Daily Report": {
+      "main": [
+        [
+          {
+            "node": "Send Daily Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "timezone": "Europe/Warsaw",
+    "errorWorkflow": "__ERROR_WORKFLOW_ID__"
+  },
+  "active": false,
+  "pinData": {}
+}
