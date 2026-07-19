@@ -99,3 +99,25 @@ The deployer:
 - `system_events`
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/UI_ACCEPTANCE_PL.md`](docs/UI_ACCEPTANCE_PL.md).
+
+## Controlled stress testing
+
+The fixture generator creates 110 deterministic messages across 11 balanced scenario groups. Every message has a unique multilingual body and a unique, category-blind subject such as `[STRESS-...-001] Blue notebook by the window`; category, case type, urgency and scenario details never appear in the subject.
+
+```bash
+python3 -c "from pathlib import Path; from src.generate_stress_fixtures import write_fixture_set; write_fixture_set('stress-run-id', Path('stress/runs/stress-run-id'))"
+python3 -m pytest tests/test_stress_fixtures.py tests/test_stress_sender.py tests/test_stress_audit.py -q
+```
+
+The sender persists Gmail message IDs after every confirmed send and never retries an ambiguous failure automatically. Use a bounded sequence range to enforce checkpoints:
+
+```bash
+python3 -u src/send_stress_batch.py \
+  --fixtures stress/runs/stress-run-id/fixtures.json \
+  --recipient test-mailbox@example.invalid \
+  --start 1 --stop 30 \
+  --state stress/runs/stress-run-id/send_state.json \
+  --interval-seconds 180
+```
+
+Runtime manifests, message bodies, audit output and Gmail IDs under `stress/runs/` are intentionally ignored by Git. The pure audit comparator uses `discord_notified` as the durable security-alert checkpoint for `PROMPT_INJECTION`; exact Gmail labels and Discord message presentation are verified separately from Gmail execution output or the UI.

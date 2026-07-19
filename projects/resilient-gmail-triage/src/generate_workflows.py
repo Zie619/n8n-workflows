@@ -181,8 +181,16 @@ return out;
 
 NORMALIZE_JS = r"""
 function header(headers, name) {
-  const h = (headers || []).find(x => String(x.name || '').toLowerCase() === name.toLowerCase());
-  return h ? String(h.value || '') : '';
+  if (Array.isArray(headers)) {
+    const h = headers.find(x => String(x.name || '').toLowerCase() === name.toLowerCase());
+    return h ? String(h.value || '') : '';
+  }
+  if (headers && typeof headers === 'object') {
+    const value = headers[name.toLowerCase()] ?? headers[name] ?? '';
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object') return String(value.text || value.value || '');
+  }
+  return '';
 }
 function decode(data) {
   if (!data) return '';
@@ -216,15 +224,19 @@ function injection(text) {
     || /(?:show|print|reveal|send|exfiltrate|read)[\s\S]{0,100}(?:\.env|secret\S*|token\S*|password\S*|api[ _-]?key\S*)/iu.test(value);
 }
 const m = $json;
-const headers = (m.payload && m.payload.headers) || [];
-const from = header(headers,'From') || m.From || '';
-const reply = header(headers,'Reply-To') || from;
-const subject = header(headers,'Subject') || m.Subject || '(no subject)';
+const headers = (m.payload && m.payload.headers) || m.headers || {};
+const fromObject = m.from && typeof m.from === 'object' ? m.from : {};
+const replyObject = m.replyTo && typeof m.replyTo === 'object' ? m.replyTo : {};
+const fromValue = typeof fromObject.value === 'string' ? fromObject.value : '';
+const replyValue = typeof replyObject.value === 'string' ? replyObject.value : '';
+const from = fromObject.text || fromValue || m.From || header(headers,'From') || '';
+const reply = replyObject.text || replyValue || header(headers,'Reply-To') || from;
+const subject = m.subject || m.Subject || header(headers,'Subject') || '(no subject)';
 const auth = header(headers,'Authentication-Results').toLowerCase();
 const domain = ((from.match(/@([^\s>]+)/) || [,''])[1] || '').toLowerCase();
 const bodies = [];
 if (m.payload) collect(m.payload,bodies);
-let body = redactAndMinimize(bodies.join('\n') || m.snippet || '');
+let body = redactAndMinimize(m.text || bodies.join('\n') || m.snippet || '');
 const [rule_urgency, rule_reason] = urgency(subject + '\n' + body);
 const gmail_spam = (m.labelIds || []).includes('SPAM');
 const prompt_injection = injection(subject + '\n' + body);
@@ -457,7 +469,7 @@ def build_main():
         dt_get("main-state","Load State",(660,0),"messages"), code("main-gate","Gate",(880,0),GATE_JS),
         dt_write("main-processing","Mark PROCESSING",(1100,0),"messages","upsert",msg_values_processing,"gmail_message_id", alwaysOutputData=True),
         gmail("main-label-processing","Add PROCESSING Label",(1320,0),{"resource":"message","operation":"addLabels","messageId":"={{ $('Gate').item.json.gmail_message_id }}","labelIds":[LABELS["AUTO/PROCESSING"]]},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
-        gmail("main-full","Fetch Full",(1540,0),{"resource":"message","operation":"get","messageId":"={{ $('Gate').item.json.gmail_message_id }}","options":{"format":"full"}},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
+        gmail("main-full","Fetch Full",(1540,0),{"resource":"message","operation":"get","messageId":"={{ $('Gate').item.json.gmail_message_id }}","simple":False,"options":{"downloadAttachments":False}},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
         code("main-normalize","Normalize and Guard",(1760,0),NORMALIZE_JS), if_node("main-skip","Safety Shortcut",(1980,0),"={{$json._skip_ai}}"),
         code("main-local","Local Safety Result",(2200,-140),LOCAL_RESULT_JS),
         node("main-gemini","Gemini Structured Classify","n8n-nodes-base.httpRequest",4.2,(2200,140),{"method":"POST","url":"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent","authentication":"predefinedCredentialType","nodeCredentialType":"googlePalmApi","sendBody":True,"contentType":"raw","rawContentType":"application/json","body":"={{ JSON.stringify($json.gemini_payload) }}","options":{"timeout":20000}},creds={"googlePalmApi":GEMINI},retryOnFail=True,maxTries=3,waitBetweenTries=2000,onError="continueRegularOutput"),
