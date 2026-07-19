@@ -208,7 +208,12 @@ function urgency(text) {
   return ['normal','no deterministic urgency keyword'];
 }
 function injection(text) {
-  return /(ignore (all|any|the) (previous|prior) instructions|system\s*:|developer\s*:|admin override|dan mode|bypass restrictions|reveal (the )?(prompt|secret)|output exactly)/i.test(text || '');
+  const value=String(text||'');
+  return /(ignore (all|any|the) (previous|prior) instructions|forget (all|the)?\s*(previous|prior) instructions|system\s*:|developer\s*:|admin override|dan mode|bypass restrictions|reveal (the )?(prompt|secret)|output exactly)/i.test(value)
+    || /(?:zapomnij|zignoruj|pomiń)\s+(?:(?:wszystk\S*|poprzedni\S*|wcześniejsz\S*)\s+)?(?:instrukcj\S*|poleceni\S*)/iu.test(value)
+    || /(?:забудь|игнорируй|ігноруй)\s+(?:(?:все|усі)\s+)?(?:(?:предыдущ\S*|попередн\S*)\s+)?(?:инструкц\S*|інструкц\S*)/iu.test(value)
+    || /(?:pokaż|wyświetl|ujawnij|wyślij|wyslij|prześlij|przeslij|sprzedaj|odczytaj)[\s\S]{0,100}(?:\.env|sekret\S*|token\S*|hasł\S*|klucz\S*)/iu.test(value)
+    || /(?:show|print|reveal|send|exfiltrate|read)[\s\S]{0,100}(?:\.env|secret\S*|token\S*|password\S*|api[ _-]?key\S*)/iu.test(value);
 }
 const m = $json;
 const headers = (m.payload && m.payload.headers) || [];
@@ -307,7 +312,7 @@ return $input.all().filter(x => {
 
 SELECT_DISCORD_JS = r"""
 return $input.all().filter(x => {
-  const j=x.json; return !!j.draft_created && !j.discord_notified && j.status === 'DRAFT_CREATED' && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;
+  const j=x.json; return !!j.draft_created && !j.discord_notified && ['DRAFT_CREATED','CLASSIFIED','RETRY'].includes(j.status) && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;
 }).slice(0,20);
 """
 
@@ -336,7 +341,7 @@ SELECT_FINALIZE_JS = r"""
 const L={processed:'""" + LABELS["AUTO/PROCESSED"] + r"""',processing:'""" + LABELS["AUTO/PROCESSING"] + r"""',urgent:'""" + LABELS["AUTO/URGENT"] + r"""',manual:'""" + LABELS["AUTO/MANUAL_REVIEW"] + r"""',quarantine:'""" + LABELS["AUTO/QUARANTINED"] + r"""',spam:'""" + LABELS["AUTO/SPAM"] + r"""'};
 return $input.all().filter(x=>{
  const j=x.json;
- return ['NOTIFIED','ESCALATED','QUARANTINED'].includes(j.status) || (['CLASSIFIED','RETRY'].includes(j.status)&&['SPAM','PROMPT_INJECTION'].includes(j.category));
+ return ['NOTIFIED','ESCALATED'].includes(j.status) || (j.status==='QUARANTINED'&&!j.processed_at) || (['CLASSIFIED','RETRY'].includes(j.status)&&['SPAM','PROMPT_INJECTION'].includes(j.category));
 }).slice(0,30).map(x=>{
  const j=x.json; const ids=[]; let final='PROCESSED';
  if(j.category==='PROMPT_INJECTION'||j.status==='QUARANTINED'){ids.push(L.quarantine);final='QUARANTINED';}
@@ -475,9 +480,10 @@ def build_act():
         discord("act-send-escalation","Discord Critical Escalation",(880,140),"={{ '🔴 **Critical escalation**\\n' + $json._alert_body }}",DISCORD_TRIAGE,retryOnFail=True,maxTries=3,waitBetweenTries=2000),
         dt_write("act-mark-escalated","Mark ESCALATED",(1100,140),"messages","update",{"gmail_message_id":"={{ $('Select Critical Escalation').item.json.gmail_message_id }}","status":"ESCALATED","updated_at":"={{new Date().toISOString()}}"},"gmail_message_id"),
         code("act-select-finalize","Select Finalize Work",(660,420),SELECT_FINALIZE_JS),
-        gmail("act-add-labels","Apply AUTO Labels",(880,420),{"resource":"message","operation":"addLabels","messageId":"={{$json.gmail_message_id}}","labelIds":"={{$json._label_ids}}"},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
-        gmail("act-remove-processing","Remove PROCESSING Label",(1100,420),{"resource":"message","operation":"removeLabels","messageId":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","labelIds":[LABELS["AUTO/PROCESSING"]]},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
-        dt_write("act-mark-final","Save Final Status",(1320,420),"messages","update",{"gmail_message_id":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","status":"={{ $('Select Finalize Work').item.json._final_status }}","processed_at":"={{ $('Select Finalize Work').item.json._final_status==='PROCESSED'?new Date().toISOString():null }}","last_error":"","updated_at":"={{new Date().toISOString()}}"},"gmail_message_id"),
+        gmail("act-remove-managed","Remove Existing AUTO Labels",(880,420),{"resource":"message","operation":"removeLabels","messageId":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","labelIds":[LABELS["AUTO/PROCESSED"],LABELS["AUTO/URGENT"],LABELS["AUTO/MANUAL_REVIEW"],LABELS["AUTO/QUARANTINED"],LABELS["AUTO/SPAM"]]},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
+        gmail("act-add-labels","Apply AUTO Labels",(1100,420),{"resource":"message","operation":"addLabels","messageId":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","labelIds":"={{ $('Select Finalize Work').item.json._label_ids }}"},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
+        gmail("act-remove-processing","Remove PROCESSING Label",(1320,420),{"resource":"message","operation":"removeLabels","messageId":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","labelIds":[LABELS["AUTO/PROCESSING"]]},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
+        dt_write("act-mark-final","Save Final Status",(1540,420),"messages","update",{"gmail_message_id":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","status":"={{ $('Select Finalize Work').item.json._final_status }}","processed_at":"={{new Date().toISOString()}}","last_error":"","updated_at":"={{new Date().toISOString()}}"},"gmail_message_id"),
     ]
     filter_overrides = {
         "Mark DRAFT_CREATED": "={{ $('Select Draft Work').item.json.gmail_message_id }}",
@@ -492,7 +498,7 @@ def build_act():
     for trigger in ["Every Minute","Manual Act"]:
         for suffix in ["Draft","Discord","Escalation","Finalize"]:edges.append((trigger,0,"Tick "+suffix))
     for suffix in ["Draft","Discord","Escalation","Finalize"]:edges.append(("Tick "+suffix,0,"Load "+suffix+" State"))
-    edges += [("Load Draft State",0,"Select Draft Work"),("Select Draft Work",0,"Create Draft"),("Create Draft",0,"Mark DRAFT_CREATED"),("Load Discord State",0,"Select Discord Work"),("Select Discord Work",0,"Build Discord"),("Build Discord",0,"Discord Alert"),("Discord Alert",0,"Mark NOTIFIED"),("Load Escalation State",0,"Select Critical Escalation"),("Select Critical Escalation",0,"Discord Critical Escalation"),("Discord Critical Escalation",0,"Mark ESCALATED"),("Load Finalize State",0,"Select Finalize Work"),("Select Finalize Work",0,"Apply AUTO Labels"),("Apply AUTO Labels",0,"Remove PROCESSING Label"),("Remove PROCESSING Label",0,"Save Final Status")]
+    edges += [("Load Draft State",0,"Select Draft Work"),("Select Draft Work",0,"Create Draft"),("Create Draft",0,"Mark DRAFT_CREATED"),("Load Discord State",0,"Select Discord Work"),("Select Discord Work",0,"Build Discord"),("Build Discord",0,"Discord Alert"),("Discord Alert",0,"Mark NOTIFIED"),("Load Escalation State",0,"Select Critical Escalation"),("Select Critical Escalation",0,"Discord Critical Escalation"),("Discord Critical Escalation",0,"Mark ESCALATED"),("Load Finalize State",0,"Select Finalize Work"),("Select Finalize Work",0,"Remove Existing AUTO Labels"),("Remove Existing AUTO Labels",0,"Apply AUTO Labels"),("Apply AUTO Labels",0,"Remove PROCESSING Label"),("Remove PROCESSING Label",0,"Save Final Status")]
     return {"name":"02 - Gmail Triage - Act and Notify","nodes":nodes,"connections":connect(edges),"settings":{"saveExecutionProgress":True,"saveManualExecutions":True,"timezone":"Europe/Warsaw","errorWorkflow":"__ERROR_WORKFLOW_ID__"}}
 
 

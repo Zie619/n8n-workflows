@@ -441,7 +441,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nreturn $input.all().filter(x => {\n  const j=x.json; return !!j.draft_created && !j.discord_notified && j.status === 'DRAFT_CREATED' && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;\n}).slice(0,20);\n"
+        "jsCode": "\nreturn $input.all().filter(x => {\n  const j=x.json; return !!j.draft_created && !j.discord_notified && ['DRAFT_CREATED','CLASSIFIED','RETRY'].includes(j.status) && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;\n}).slice(0,20);\n"
       }
     },
     {
@@ -963,12 +963,12 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nconst L={processed:'__LABEL_AUTO_PROCESSED__',processing:'__LABEL_AUTO_PROCESSING__',urgent:'__LABEL_AUTO_URGENT__',manual:'__LABEL_AUTO_MANUAL_REVIEW__',quarantine:'__LABEL_AUTO_QUARANTINED__',spam:'__LABEL_AUTO_SPAM__'};\nreturn $input.all().filter(x=>{\n const j=x.json;\n return ['NOTIFIED','ESCALATED','QUARANTINED'].includes(j.status) || (['CLASSIFIED','RETRY'].includes(j.status)&&['SPAM','PROMPT_INJECTION'].includes(j.category));\n}).slice(0,30).map(x=>{\n const j=x.json; const ids=[]; let final='PROCESSED';\n if(j.category==='PROMPT_INJECTION'||j.status==='QUARANTINED'){ids.push(L.quarantine);final='QUARANTINED';}\n else {ids.push(L.processed); if(j.category==='SPAM')ids.push(L.spam); if(j.urgency==='critical')ids.push(L.urgent); if(Number(j.confidence||0)<0.75)ids.push(L.manual);}\n return {json:{...j,_label_ids:ids,_final_status:final}};\n});\n"
+        "jsCode": "\nconst L={processed:'__LABEL_AUTO_PROCESSED__',processing:'__LABEL_AUTO_PROCESSING__',urgent:'__LABEL_AUTO_URGENT__',manual:'__LABEL_AUTO_MANUAL_REVIEW__',quarantine:'__LABEL_AUTO_QUARANTINED__',spam:'__LABEL_AUTO_SPAM__'};\nreturn $input.all().filter(x=>{\n const j=x.json;\n return ['NOTIFIED','ESCALATED'].includes(j.status) || (j.status==='QUARANTINED'&&!j.processed_at) || (['CLASSIFIED','RETRY'].includes(j.status)&&['SPAM','PROMPT_INJECTION'].includes(j.category));\n}).slice(0,30).map(x=>{\n const j=x.json; const ids=[]; let final='PROCESSED';\n if(j.category==='PROMPT_INJECTION'||j.status==='QUARANTINED'){ids.push(L.quarantine);final='QUARANTINED';}\n else {ids.push(L.processed); if(j.category==='SPAM')ids.push(L.spam); if(j.urgency==='critical')ids.push(L.urgent); if(Number(j.confidence||0)<0.75)ids.push(L.manual);}\n return {json:{...j,_label_ids:ids,_final_status:final}};\n});\n"
       }
     },
     {
-      "id": "act-add-labels",
-      "name": "Apply AUTO Labels",
+      "id": "act-remove-managed",
+      "name": "Remove Existing AUTO Labels",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
@@ -977,9 +977,40 @@
       ],
       "parameters": {
         "resource": "message",
+        "operation": "removeLabels",
+        "messageId": "={{ $('Select Finalize Work').item.json.gmail_message_id }}",
+        "labelIds": [
+          "__LABEL_AUTO_PROCESSED__",
+          "__LABEL_AUTO_URGENT__",
+          "__LABEL_AUTO_MANUAL_REVIEW__",
+          "__LABEL_AUTO_QUARANTINED__",
+          "__LABEL_AUTO_SPAM__"
+        ]
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "__CREDENTIAL_GMAIL_ID__",
+          "name": "Gmail - Contact Mailbox"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-add-labels",
+      "name": "Apply AUTO Labels",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        420
+      ],
+      "parameters": {
+        "resource": "message",
         "operation": "addLabels",
-        "messageId": "={{$json.gmail_message_id}}",
-        "labelIds": "={{$json._label_ids}}"
+        "messageId": "={{ $('Select Finalize Work').item.json.gmail_message_id }}",
+        "labelIds": "={{ $('Select Finalize Work').item.json._label_ids }}"
       },
       "credentials": {
         "gmailOAuth2": {
@@ -997,7 +1028,7 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
       "position": [
-        1100,
+        1320,
         420
       ],
       "parameters": {
@@ -1024,7 +1055,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1320,
+        1540,
         420
       ],
       "parameters": {
@@ -1040,7 +1071,7 @@
           "value": {
             "gmail_message_id": "={{ $('Select Finalize Work').item.json.gmail_message_id }}",
             "status": "={{ $('Select Finalize Work').item.json._final_status }}",
-            "processed_at": "={{ $('Select Finalize Work').item.json._final_status==='PROCESSED'?new Date().toISOString():null }}",
+            "processed_at": "={{new Date().toISOString()}}",
             "last_error": "",
             "updated_at": "={{new Date().toISOString()}}"
           },
@@ -1452,6 +1483,17 @@
       ]
     },
     "Select Finalize Work": {
+      "main": [
+        [
+          {
+            "node": "Remove Existing AUTO Labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Existing AUTO Labels": {
       "main": [
         [
           {

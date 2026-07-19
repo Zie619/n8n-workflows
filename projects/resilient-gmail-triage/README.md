@@ -29,8 +29,10 @@ This deliberate eventual-consistency design prevents a Discord retry from recrea
 
 - Gmail message ID is the idempotency key.
 - `draft_created` and `discord_notified` are durable side-effect checkpoints.
-- Prompt injection is handled by deterministic code and never creates a draft.
-- Low-confidence/high-risk mail uses a fixed safe draft template.
+- Prompt injection is handled by deterministic multilingual code (English, Polish, Russian, Ukrainian), never creates a draft, and never enters normal Discord routing.
+- Requests to reveal `.env`, secrets, tokens, passwords, or API keys are quarantined before Gemini.
+- Finalization reconciles managed labels before applying the result, so a corrected decision cannot leave conflicting `SPAM`, `URGENT`, `PROCESSED`, or `QUARANTINED` labels.
+- Durable side-effect checkpoints take precedence over a stale textual status during concurrent minute ticks.
 - Discord receives category, urgency, owner role and Gmail thread ID only—never the message body or sender address.
 - Credential values and webhook URLs never enter Git.
 - Gemini authenticates through the n8n credential, never `?key=` in a URL.
