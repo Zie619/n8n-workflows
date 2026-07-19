@@ -163,6 +163,37 @@ def test_finalizer_reconciles_managed_labels_before_applying_result():
     assert "==='PROCESSED'" not in processed_at
 
 
+def test_prompt_injection_sends_exactly_one_minimized_admin_alert():
+    act = load_workflows()["02_act_notify.json"]
+    selector = node_by_name(act, "Select Security Alerts")["parameters"]["jsCode"]
+    eligible = {
+        "gmail_message_id": "security-1",
+        "gmail_thread_id": "thread-technical-id",
+        "status": "QUARANTINED",
+        "category": "PROMPT_INJECTION",
+        "processed_at": "2026-07-19T10:00:00Z",
+        "discord_notified": False,
+    }
+    assert len(run_code_node(selector, items=[eligible])) == 1
+    assert run_code_node(selector, items=[{**eligible, "discord_notified": True}]) == []
+    assert run_code_node(selector, items=[{**eligible, "category": "SPAM"}]) == []
+
+    builder = node_by_name(act, "Build Security Alert")["parameters"]["jsCode"]
+    builder_text = builder.lower()
+    assert "sender" not in builder_text
+    assert "subject" not in builder_text
+    assert "body" not in builder_text
+    built = run_code_node(builder, items=[eligible])
+    content = built[0]["json"]["_admin_alert"]
+    assert "thread-technical-id" in content
+    assert "prompt" in content.lower()
+
+    discord = node_by_name(act, "Discord Security Alert")
+    assert discord["credentials"]["discordWebhookApi"]["name"] == "Discord - Automation Alerts"
+    mark = node_by_name(act, "Mark Security Alerted")
+    assert mark["parameters"]["columns"]["value"]["discord_notified"] is True
+
+
 def test_queue_health_tracks_a_real_consecutive_failure_counter():
     recovery = load_workflows()["03_recovery_diagnostics.json"]
     code_text = node_by_name(recovery, "Compute Queue Health")["parameters"]["jsCode"]

@@ -173,6 +173,41 @@
       "alwaysOutputData": true
     },
     {
+      "id": "act-tick-security",
+      "name": "Tick Security",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        700
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
+      }
+    },
+    {
+      "id": "act-load-security",
+      "name": "Load Security State",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        700
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
       "id": "act-select-draft",
       "name": "Select Draft Work",
       "type": "n8n-nodes-base.code",
@@ -1262,6 +1297,275 @@
           ]
         }
       }
+    },
+    {
+      "id": "act-select-security",
+      "name": "Select Security Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        700
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nreturn $input.all().filter(x=>{\n  const j=x.json;\n  return j.status==='QUARANTINED' && j.category==='PROMPT_INJECTION' && !!j.processed_at && !j.discord_notified;\n}).slice(0,20);\n"
+      }
+    },
+    {
+      "id": "act-build-security",
+      "name": "Build Security Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        700
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nreturn $input.all().map(x=>{\n  const j=x.json;\n  const reference=String(j.gmail_thread_id||j.gmail_message_id||'unknown').slice(0,96);\n  const quarantinedAt=String(j.processed_at||j.updated_at||new Date().toISOString()).slice(0,40);\n  return {json:{...j,_admin_alert:'🛡️ **Prompt-injection email quarantined**\\nReference: `'+reference+'`\\nQuarantined at: '+quarantinedAt+'\\nNo personal email fields included.'}};\n});\n"
+      }
+    },
+    {
+      "id": "act-discord-security",
+      "name": "Discord Security Alert",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        700
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._admin_alert}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_ERROR_ID__",
+          "name": "Discord - Automation Alerts"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-mark-security",
+      "name": "Mark Security Alerted",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        700
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "dataTableId": {
+          "mode": "name",
+          "value": "message_processing_state"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "gmail_message_id": "={{ $('Build Security Alert').item.json.gmail_message_id }}",
+            "status": "QUARANTINED",
+            "discord_notified": true,
+            "last_error": "",
+            "updated_at": "={{new Date().toISOString()}}"
+          },
+          "matchingColumns": [
+            "gmail_message_id"
+          ],
+          "schema": [
+            {
+              "id": "gmail_message_id",
+              "displayName": "gmail_message_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "urgency",
+              "displayName": "urgency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confidence",
+              "displayName": "confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_created",
+              "displayName": "draft_created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "discord_notified",
+              "displayName": "discord_notified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "attempts",
+              "displayName": "attempts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_retry_at",
+              "displayName": "next_retry_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_error",
+              "displayName": "last_error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "date",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sender_reply_address",
+              "displayName": "sender_reply_address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lang",
+              "displayName": "lang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "gmail_message_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Build Security Alert').item.json.gmail_message_id }}"
+            }
+          ]
+        }
+      }
     }
   ],
   "connections": {
@@ -1285,6 +1589,11 @@
           },
           {
             "node": "Tick Finalize",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Security",
             "type": "main",
             "index": 0
           }
@@ -1311,6 +1620,11 @@
           },
           {
             "node": "Tick Finalize",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tick Security",
             "type": "main",
             "index": 0
           }
@@ -1355,6 +1669,17 @@
         [
           {
             "node": "Load Finalize State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tick Security": {
+      "main": [
+        [
+          {
+            "node": "Load Security State",
             "type": "main",
             "index": 0
           }
@@ -1520,6 +1845,50 @@
         [
           {
             "node": "Save Final Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Security State": {
+      "main": [
+        [
+          {
+            "node": "Select Security Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Security Alerts": {
+      "main": [
+        [
+          {
+            "node": "Build Security Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Security Alert": {
+      "main": [
+        [
+          {
+            "node": "Discord Security Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Security Alert": {
+      "main": [
+        [
+          {
+            "node": "Mark Security Alerted",
             "type": "main",
             "index": 0
           }

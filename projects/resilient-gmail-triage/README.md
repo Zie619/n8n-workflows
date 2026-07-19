@@ -29,7 +29,7 @@ This deliberate eventual-consistency design prevents a Discord retry from recrea
 
 - Gmail message ID is the idempotency key.
 - `draft_created` and `discord_notified` are durable side-effect checkpoints.
-- Prompt injection is handled by deterministic multilingual code (English, Polish, Russian, Ukrainian), never creates a draft, and never enters normal Discord routing.
+- Prompt injection is handled by deterministic multilingual code (English, Polish, Russian, Ukrainian), never creates a draft, and never enters normal Discord routing. After quarantine, exactly one metadata-only security alert (technical reference and timestamp; no sender, subject, or content) is sent through `Discord - Automation Alerts`.
 - Requests to reveal `.env`, secrets, tokens, passwords, or API keys are quarantined before Gemini.
 - Finalization reconciles managed labels before applying the result, so a corrected decision cannot leave conflicting `SPAM`, `URGENT`, `PROCESSED`, or `QUARANTINED` labels.
 - Durable side-effect checkpoints take precedence over a stale textual status during concurrent minute ticks.

@@ -372,6 +372,22 @@ const known=new Set($input.all().map(x=>x.json.gmail_message_id).filter(Boolean)
 return mails.filter(m=>m.id&&!known.has(m.id)).map(m=>({json:{gmail_message_id:m.id,gmail_thread_id:m.threadId||'',status:'RECEIVED',attempts:0,created_at:new Date().toISOString(),updated_at:new Date().toISOString()}}));
 """
 
+SELECT_SECURITY_ALERT_JS = r"""
+return $input.all().filter(x=>{
+  const j=x.json;
+  return j.status==='QUARANTINED' && j.category==='PROMPT_INJECTION' && !!j.processed_at && !j.discord_notified;
+}).slice(0,20);
+"""
+
+BUILD_SECURITY_ALERT_JS = r"""
+return $input.all().map(x=>{
+  const j=x.json;
+  const reference=String(j.gmail_thread_id||j.gmail_message_id||'unknown').slice(0,96);
+  const quarantinedAt=String(j.processed_at||j.updated_at||new Date().toISOString()).slice(0,40);
+  return {json:{...j,_admin_alert:'🛡️ **Prompt-injection email quarantined**\nReference: `'+reference+'`\nQuarantined at: '+quarantinedAt+'\nNo personal email fields included.'}};
+});
+"""
+
 QUEUE_HEALTH_JS = r"""
 const rows=$input.all().map(x=>x.json);const now=Date.now();
 const pending=rows.filter(x=>!['PROCESSED','QUARANTINED'].includes(x.status)).length;
@@ -465,8 +481,8 @@ def build_act():
         schedule("act-schedule","Every Minute",(0,-120),"* * * * *"),
         node("act-manual", "Manual Act", "n8n-nodes-base.manualTrigger", 1, (0,120), {}),
     ]
-    # Four independent checkpoint workers. New side effects advance on subsequent ticks.
-    for suffix,y in [("Draft",-420),("Discord",-140),("Escalation",140),("Finalize",420)]:
+    # Five independent checkpoint workers. New side effects advance on subsequent ticks.
+    for suffix,y in [("Draft",-420),("Discord",-140),("Escalation",140),("Finalize",420),("Security",700)]:
         nodes.append(code("act-tick-"+suffix.lower(),"Tick "+suffix,(220,y),"return [{json:{tick:new Date().toISOString()}}];"))
         nodes.append(dt_get("act-load-"+suffix.lower(),"Load "+suffix+" State",(440,y),"messages"))
     nodes += [
@@ -484,21 +500,26 @@ def build_act():
         gmail("act-add-labels","Apply AUTO Labels",(1100,420),{"resource":"message","operation":"addLabels","messageId":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","labelIds":"={{ $('Select Finalize Work').item.json._label_ids }}"},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
         gmail("act-remove-processing","Remove PROCESSING Label",(1320,420),{"resource":"message","operation":"removeLabels","messageId":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","labelIds":[LABELS["AUTO/PROCESSING"]]},retryOnFail=True,maxTries=3,waitBetweenTries=2000),
         dt_write("act-mark-final","Save Final Status",(1540,420),"messages","update",{"gmail_message_id":"={{ $('Select Finalize Work').item.json.gmail_message_id }}","status":"={{ $('Select Finalize Work').item.json._final_status }}","processed_at":"={{new Date().toISOString()}}","last_error":"","updated_at":"={{new Date().toISOString()}}"},"gmail_message_id"),
+        code("act-select-security","Select Security Alerts",(660,700),SELECT_SECURITY_ALERT_JS),
+        code("act-build-security","Build Security Alert",(880,700),BUILD_SECURITY_ALERT_JS),
+        discord("act-discord-security","Discord Security Alert",(1100,700),"={{$json._admin_alert}}",DISCORD_ERROR,retryOnFail=True,maxTries=3,waitBetweenTries=2000),
+        dt_write("act-mark-security","Mark Security Alerted",(1320,700),"messages","update",{"gmail_message_id":"={{ $('Build Security Alert').item.json.gmail_message_id }}","status":"QUARANTINED","discord_notified":True,"last_error":"","updated_at":"={{new Date().toISOString()}}"},"gmail_message_id"),
     ]
     filter_overrides = {
         "Mark DRAFT_CREATED": "={{ $('Select Draft Work').item.json.gmail_message_id }}",
         "Mark NOTIFIED": "={{ $('Build Discord').item.json.gmail_message_id }}",
         "Mark ESCALATED": "={{ $('Select Critical Escalation').item.json.gmail_message_id }}",
         "Save Final Status": "={{ $('Select Finalize Work').item.json.gmail_message_id }}",
+        "Mark Security Alerted": "={{ $('Build Security Alert').item.json.gmail_message_id }}",
     }
     for n in nodes:
         if n["name"] in filter_overrides:
             n["parameters"]["filters"]["conditions"][0]["keyValue"] = filter_overrides[n["name"]]
     edges=[]
     for trigger in ["Every Minute","Manual Act"]:
-        for suffix in ["Draft","Discord","Escalation","Finalize"]:edges.append((trigger,0,"Tick "+suffix))
-    for suffix in ["Draft","Discord","Escalation","Finalize"]:edges.append(("Tick "+suffix,0,"Load "+suffix+" State"))
-    edges += [("Load Draft State",0,"Select Draft Work"),("Select Draft Work",0,"Create Draft"),("Create Draft",0,"Mark DRAFT_CREATED"),("Load Discord State",0,"Select Discord Work"),("Select Discord Work",0,"Build Discord"),("Build Discord",0,"Discord Alert"),("Discord Alert",0,"Mark NOTIFIED"),("Load Escalation State",0,"Select Critical Escalation"),("Select Critical Escalation",0,"Discord Critical Escalation"),("Discord Critical Escalation",0,"Mark ESCALATED"),("Load Finalize State",0,"Select Finalize Work"),("Select Finalize Work",0,"Remove Existing AUTO Labels"),("Remove Existing AUTO Labels",0,"Apply AUTO Labels"),("Apply AUTO Labels",0,"Remove PROCESSING Label"),("Remove PROCESSING Label",0,"Save Final Status")]
+        for suffix in ["Draft","Discord","Escalation","Finalize","Security"]:edges.append((trigger,0,"Tick "+suffix))
+    for suffix in ["Draft","Discord","Escalation","Finalize","Security"]:edges.append(("Tick "+suffix,0,"Load "+suffix+" State"))
+    edges += [("Load Draft State",0,"Select Draft Work"),("Select Draft Work",0,"Create Draft"),("Create Draft",0,"Mark DRAFT_CREATED"),("Load Discord State",0,"Select Discord Work"),("Select Discord Work",0,"Build Discord"),("Build Discord",0,"Discord Alert"),("Discord Alert",0,"Mark NOTIFIED"),("Load Escalation State",0,"Select Critical Escalation"),("Select Critical Escalation",0,"Discord Critical Escalation"),("Discord Critical Escalation",0,"Mark ESCALATED"),("Load Finalize State",0,"Select Finalize Work"),("Select Finalize Work",0,"Remove Existing AUTO Labels"),("Remove Existing AUTO Labels",0,"Apply AUTO Labels"),("Apply AUTO Labels",0,"Remove PROCESSING Label"),("Remove PROCESSING Label",0,"Save Final Status"),("Load Security State",0,"Select Security Alerts"),("Select Security Alerts",0,"Build Security Alert"),("Build Security Alert",0,"Discord Security Alert"),("Discord Security Alert",0,"Mark Security Alerted")]
     return {"name":"02 - Gmail Triage - Act and Notify","nodes":nodes,"connections":connect(edges),"settings":{"saveExecutionProgress":True,"saveManualExecutions":True,"timezone":"Europe/Warsaw","errorWorkflow":"__ERROR_WORKFLOW_ID__"}}
 
 
