@@ -107,7 +107,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nconst now=Date.now(), backoff=[60000,300000,900000,1800000,3600000];\nconst terminal=['PROCESSED','QUARANTINED'];\nconst out=[];\nfor(const x of $input.all()){\n const j=x.json;if(!j.gmail_message_id||terminal.includes(j.status))continue;\n const updated=j.updated_at?new Date(j.updated_at).getTime():0;\n const attempts=Number(j.attempts||0);\n if(attempts>=5){out.push({json:{...j,_new_status:'QUARANTINED',_attempts:attempts,_next_retry:null,_error:'maximum retry attempts reached'}});continue;}\n if(['PROCESSING','FETCHING','RECEIVED'].includes(j.status)&&now-updated>600000){\n   const n=attempts+1;out.push({json:{...j,_new_status:'RETRY',_attempts:n,_next_retry:new Date(now+backoff[Math.min(n-1,4)]).toISOString(),_error:'recovered stale '+j.status}});\n }\n}\nreturn out;\n"
+        "jsCode": "\nconst now=Date.now(), backoff=[60000,300000,900000,1800000,3600000];\nconst terminal=['PROCESSED','QUARANTINED'];\nconst out=[];\nfor(const x of $input.all()){\n const j=x.json;if(!j.gmail_message_id||terminal.includes(j.status))continue;\n const recoverable=['PROCESSING','FETCHING','RECEIVED','RETRY_CLASSIFICATION'];\n if(!recoverable.includes(j.status))continue;\n const updated=j.updated_at?new Date(j.updated_at).getTime():0;\n const attempts=Number(j.attempts||0);\n if(attempts>=5){out.push({json:{...j,_new_status:'QUARANTINED',_attempts:attempts,_next_retry:null,_error:'maximum classification retry attempts reached'}});continue;}\n if(['PROCESSING','FETCHING','RECEIVED'].includes(j.status)&&now-updated>600000){\n   const n=attempts+1;out.push({json:{...j,_new_status:'RETRY_CLASSIFICATION',_attempts:n,_next_retry:new Date(now+backoff[Math.min(n-1,4)]).toISOString(),_error:'recovered stale '+j.status}});\n }\n}\nreturn out;\n"
       }
     },
     {
@@ -365,8 +365,8 @@
         "resource": "message",
         "operation": "getAll",
         "filters": {
-          "q": "newer_than:1d in:inbox is:unread -label:AUTO/PROCESSED -label:AUTO/PROCESSING",
-          "readStatus": "unread",
+          "q": "newer_than:1d in:inbox -label:AUTO/Przetworzone -label:AUTO/Przetwarzanie -label:AUTO/Kwarantanna",
+          "readStatus": "both",
           "includeSpamTrash": false
         },
         "options": {
@@ -693,7 +693,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nconst rows=$input.all().map(x=>x.json);const now=Date.now();\nconst pending=rows.filter(x=>!['PROCESSED','QUARANTINED'].includes(x.status)).length;\nconst stale=rows.filter(x=>x.updated_at&&!['PROCESSED','QUARANTINED'].includes(x.status)&&now-new Date(x.updated_at).getTime()>600000).length;\nconst quarantined=rows.filter(x=>x.status==='QUARANTINED').length;\nconst status=stale>0||pending>20||quarantined>5?'CRITICAL':pending>0||quarantined>0?'DEGRADED':'HEALTHY';\nconst healthState=$getWorkflowStaticData('global');\nhealthState.queueFailures=status==='HEALTHY'?0:Number(healthState.queueFailures||0)+1;\nreturn [{json:{component:'queue',status,consecutive_failures:healthState.queueFailures,circuit_state:'CLOSED',last_success_at:status==='HEALTHY'?new Date().toISOString():null,last_failure_at:status==='HEALTHY'?null:new Date().toISOString(),last_error:status==='HEALTHY'?'':'pending='+pending+', stale='+stale+', quarantined='+quarantined,updated_at:new Date().toISOString()}}];\n"
+        "jsCode": "\nconst rows=$input.all().map(x=>x.json);const now=Date.now();\nconst pending=rows.filter(x=>!['PROCESSED','QUARANTINED'].includes(x.status)).length;\nconst stale=rows.filter(x=>x.updated_at&&!['PROCESSED','QUARANTINED'].includes(x.status)&&now-new Date(x.updated_at).getTime()>600000).length;\nconst failedQuarantine=rows.filter(x=>x.status==='QUARANTINED'&&x.category!=='PROMPT_INJECTION'&&/maximum|failure|error|retry/i.test(String(x.last_error||''))).length;\nconst status=stale>0||pending>20||failedQuarantine>0?'CRITICAL':pending>0?'DEGRADED':'HEALTHY';\nconst healthState=$getWorkflowStaticData('global');\nhealthState.queueFailures=status==='CRITICAL'?Number(healthState.queueFailures||0)+1:0;\nreturn [{json:{component:'queue',status,consecutive_failures:healthState.queueFailures,circuit_state:'CLOSED',last_success_at:status!=='CRITICAL'?new Date().toISOString():null,last_failure_at:status==='CRITICAL'?new Date().toISOString():null,last_error:status==='HEALTHY'?'':'oczekujące='+pending+', przestarzałe='+stale+', kwarantanna_błędów='+failedQuarantine,updated_at:new Date().toISOString()}}];\n"
       }
     },
     {
@@ -860,7 +860,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const rows=$input.all().map(x=>x.json);const now=Date.now();const icons={HEALTHY:'🟢',DEGRADED:'🟠',CRITICAL:'🔴',UNKNOWN:'⚪'};const lines=rows.map(x=>{const updated=x.updated_at?new Date(x.updated_at).getTime():0;const effective=!updated||now-updated>1800000?'UNKNOWN':x.status;return (icons[effective]||'⚪')+' '+x.component+': '+effective+(effective==='UNKNOWN'?' (stale telemetry)':'');});return [{json:{content:'📊 **Daily n8n mail-triage health**\\n'+lines.join('\\n')+'\\nNo message bodies or personal data included.'}}];"
+        "jsCode": "const rows=$input.all().map(x=>x.json);const now=Date.now();const icons={HEALTHY:'🟢',DEGRADED:'🟠',CRITICAL:'🔴',UNKNOWN:'⚪'};const statusPL={HEALTHY:'ZDROWY',DEGRADED:'OGRANICZONY',CRITICAL:'KRYTYCZNY',UNKNOWN:'NIEZNANY'};const lines=rows.map(x=>{const updated=x.updated_at?new Date(x.updated_at).getTime():0;const effective=!updated||now-updated>1800000?'UNKNOWN':x.status;return (icons[effective]||'⚪')+' '+x.component+': '+(statusPL[effective]||effective)+(effective==='UNKNOWN'?' (nieaktualna telemetria)':'');});return [{json:{content:'📊 **Dzienny raport kondycji triage poczty n8n**\\n'+lines.join('\\n')+'\\nRaport nie zawiera treści wiadomości ani danych osobowych.'}}];"
       }
     },
     {
@@ -882,8 +882,8 @@
       },
       "credentials": {
         "discordWebhookApi": {
-          "id": "__CREDENTIAL_DISCORD_ERROR_ID__",
-          "name": "Discord - Automation Alerts"
+          "id": "__CREDENTIAL_DISCORD_OTHER_ID__",
+          "name": "Discord - Inne"
         }
       },
       "retryOnFail": true,

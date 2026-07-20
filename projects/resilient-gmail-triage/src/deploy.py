@@ -18,8 +18,14 @@ WORKFLOW_DIR = ROOT / "workflows"
 CREDENTIAL_SPECS = {
     ("Gmail - Contact Mailbox", "gmailOAuth2"): "__CREDENTIAL_GMAIL_ID__",
     ("Gemini - Mail Triage", "googlePalmApi"): "__CREDENTIAL_GEMINI_ID__",
-    ("Discord - Mail Triage", "discordWebhookApi"): "__CREDENTIAL_DISCORD_TRIAGE_ID__",
-    ("Discord - Automation Alerts", "discordWebhookApi"): "__CREDENTIAL_DISCORD_ERROR_ID__",
+    ("Discord - Sprzedaż", "discordWebhookApi"): "__CREDENTIAL_DISCORD_SALES_ID__",
+    ("Discord - Obsługa klienta", "discordWebhookApi"): "__CREDENTIAL_DISCORD_CLIENT_SUCCESS_ID__",
+    ("Discord - Incydenty i eskalacje", "discordWebhookApi"): "__CREDENTIAL_DISCORD_CRISIS_ID__",
+    ("Discord - Finanse", "discordWebhookApi"): "__CREDENTIAL_DISCORD_FINANCE_ID__",
+    ("Discord - Prawo i prywatność", "discordWebhookApi"): "__CREDENTIAL_DISCORD_LEGAL_PRIVACY_ID__",
+    ("Discord - Administracja", "discordWebhookApi"): "__CREDENTIAL_DISCORD_ADMINISTRATION_ID__",
+    ("Discord - Inne", "discordWebhookApi"): "__CREDENTIAL_DISCORD_OTHER_ID__",
+
 }
 
 LABEL_SPECS = {
@@ -29,6 +35,15 @@ LABEL_SPECS = {
     "AUTO/MANUAL_REVIEW": "__LABEL_AUTO_MANUAL_REVIEW__",
     "AUTO/QUARANTINED": "__LABEL_AUTO_QUARANTINED__",
     "AUTO/SPAM": "__LABEL_AUTO_SPAM__",
+    "Kategoria/Zapytanie ofertowe": "__LABEL_CATEGORY_OFFER_INQUIRY__",
+    "Kategoria/Obecny klient": "__LABEL_CATEGORY_EXISTING_CLIENT__",
+    "Kategoria/Reklamacja i eskalacja": "__LABEL_CATEGORY_COMPLAINT_ESCALATION__",
+    "Kategoria/Rozliczenia": "__LABEL_CATEGORY_BILLING__",
+    "Kategoria/Incydent techniczny": "__LABEL_CATEGORY_TECHNICAL_INCIDENT__",
+    "Kategoria/Prawo i prywatność": "__LABEL_CATEGORY_LEGAL_PRIVACY__",
+    "Kategoria/Współpraca i rekrutacja": "__LABEL_CATEGORY_PARTNERSHIP_RECRUITMENT__",
+    "Kategoria/Inne": "__LABEL_CATEGORY_OTHER__",
+    "Kategoria/Niechciane": "__LABEL_CATEGORY_SPAM__",
 }
 
 EXPECTED_TABLES = {

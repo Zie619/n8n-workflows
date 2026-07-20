@@ -103,41 +103,6 @@
       "alwaysOutputData": true
     },
     {
-      "id": "act-tick-escalation",
-      "name": "Tick Escalation",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        220,
-        140
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "return [{json:{tick:new Date().toISOString()}}];"
-      }
-    },
-    {
-      "id": "act-load-escalation",
-      "name": "Load Escalation State",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        440,
-        140
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "get",
-        "dataTableId": {
-          "mode": "name",
-          "value": "message_processing_state"
-        },
-        "returnAll": true,
-        "options": {}
-      },
-      "alwaysOutputData": true
-    },
-    {
       "id": "act-tick-finalize",
       "name": "Tick Finalize",
       "type": "n8n-nodes-base.code",
@@ -218,7 +183,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nconst allowed=['CLASSIFIED','RETRY'];\nreturn $input.all().filter(x => {\n  const j=x.json; return allowed.includes(j.status) && !j.draft_created && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;\n}).slice(0,20).map(x => {\n  const j=x.json; const safePl='Dzień dobry,\\n\\ndziękujemy za wiadomość. Potwierdzamy jej otrzymanie i przekazanie do weryfikacji. Odpowiedzialna osoba odpowie po sprawdzeniu szczegółów.\\n\\nZ poważaniem';\n  const safeEn='Hello,\\n\\nthank you for your message. We confirm receipt and have forwarded it for review. The responsible person will reply after verifying the details.\\n\\nKind regards';\n  const highRisk=j.urgency==='critical'||['COMPLAINT_ESCALATION','TECHNICAL_INCIDENT','LEGAL_PRIVACY'].includes(j.category)||Number(j.confidence||0)<0.75;\n  let body=highRisk?'':String(j.draft_body||'');\n  body=body.replace(/https?:\\/\\/\\S+/gi,'[link removed]').replace(/<@!?&?\\d+>|@everyone|@here/gi,'').replace(/```[\\s\\S]*?```/g,'').slice(0,3000).trim();\n  if(!body) body=j.lang==='en'?safeEn:safePl;\n  body+='\\n\\n[triage-id:'+j.gmail_message_id+']';\n  return {json:{...j,draft_subject:'Re: '+String(j.subject||'').slice(0,180),safe_draft_body:body}};\n});\n"
+        "jsCode": "\nconst allowed=['CLASSIFIED'];\nreturn $input.all().filter(x => {\n  const j=x.json; return allowed.includes(j.status) && !j.draft_created && !['SPAM','PROMPT_INJECTION'].includes(j.category);\n}).slice(0,20).map(x => {\n  const j=x.json; const safePl='Dzień dobry,\\n\\ndziękujemy za wiadomość. Potwierdzamy jej otrzymanie i przekazanie do weryfikacji. Odpowiedzialna osoba odpowie po sprawdzeniu szczegółów.\\n\\nZ poważaniem';\n  let body=String(j.draft_body||'');\n  body=body.replace(/https?:\\/\\/\\S+/gi,'[link removed]').replace(/<@!?&?\\d+>|@everyone|@here/gi,'').replace(/```[\\s\\S]*?```/g,'').slice(0,3000).trim();\n  if(!body) body=safePl;\n  body+='\\n\\n[triage-id:'+j.gmail_message_id+']';\n  return {json:{...j,draft_subject:'Re: '+String(j.subject||'').slice(0,180),safe_draft_body:body}};\n});\n"
       }
     },
     {
@@ -274,6 +239,7 @@
             "gmail_message_id": "={{ $('Select Draft Work').item.json.gmail_message_id }}",
             "status": "DRAFT_CREATED",
             "draft_created": true,
+            "draft_body": "={{ $('Select Draft Work').item.json.safe_draft_body }}",
             "last_error": "",
             "updated_at": "={{new Date().toISOString()}}"
           },
@@ -476,7 +442,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nreturn $input.all().filter(x => {\n  const j=x.json; return !!j.draft_created && !j.discord_notified && ['DRAFT_CREATED','CLASSIFIED','RETRY'].includes(j.status) && !['SPAM','PROMPT_INJECTION'].includes(j.category) && Number(j.attempts||0)<5;\n}).slice(0,20);\n"
+        "jsCode": "\nreturn $input.all().filter(x => {\n  const j=x.json; return !!j.draft_created && !j.discord_notified && ['DRAFT_CREATED','CLASSIFIED'].includes(j.status) && !['SPAM','PROMPT_INJECTION'].includes(j.category);\n}).slice(0,20);\n"
       }
     },
     {
@@ -490,35 +456,8 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nconst roleMap={\n OFFER_INQUIRY:$env.DISCORD_ROLE_SALES, EXISTING_CLIENT:$env.DISCORD_ROLE_CLIENT_SUCCESS,\n COMPLAINT_ESCALATION:$env.DISCORD_ROLE_CRISIS, BILLING:$env.DISCORD_ROLE_FINANCE,\n TECHNICAL_INCIDENT:$env.DISCORD_ROLE_CRISIS, LEGAL_PRIVACY:$env.DISCORD_ROLE_LEGAL_PRIVACY,\n PARTNERSHIP_RECRUITMENT:$env.DISCORD_ROLE_ADMIN, OTHER:$env.DISCORD_ROLE_ADMIN\n};\nreturn $input.all().map(x=>{\n const j=x.json; const owner=roleMap[j.category]||$env.DISCORD_ROLE_ADMIN;\n const backup=j.urgency==='critical'?$env.DISCORD_ROLE_CRISIS_BACKUP:'';\n const mentions=[owner,backup].filter(Boolean).map(id=>'<@&'+id+'>').join(' ');\n const icon={normal:'🟢',high:'🟠',critical:'🔴'}[j.urgency]||'🟢';\n const content=icon+' **'+j.category+'** • urgency: '+j.urgency+'\\nOwner: '+mentions+'\\nGmail thread ID: `'+String(j.gmail_thread_id||'').slice(0,40)+'`';\n return {json:{...j,_discord_content:content,_after_discord_status:j.urgency==='critical'?'NEEDS_ESCALATION':'NOTIFIED'}};\n});\n"
+        "jsCode": "\nconst roleMap={\n OFFER_INQUIRY:$env.DISCORD_ROLE_SALES, EXISTING_CLIENT:$env.DISCORD_ROLE_CLIENT_SUCCESS,\n COMPLAINT_ESCALATION:$env.DISCORD_ROLE_CRISIS, BILLING:$env.DISCORD_ROLE_FINANCE,\n TECHNICAL_INCIDENT:$env.DISCORD_ROLE_CRISIS, LEGAL_PRIVACY:$env.DISCORD_ROLE_LEGAL_PRIVACY,\n PARTNERSHIP_RECRUITMENT:$env.DISCORD_ROLE_ADMIN, OTHER:$env.DISCORD_ROLE_ADMIN\n};\nconst routeMap={\n OFFER_INQUIRY:'sales', EXISTING_CLIENT:'client_success',\n COMPLAINT_ESCALATION:'crisis', BILLING:'finance',\n TECHNICAL_INCIDENT:'crisis', LEGAL_PRIVACY:'legal_privacy',\n PARTNERSHIP_RECRUITMENT:'administration', OTHER:'other'\n};\nconst catPL={\n OFFER_INQUIRY:'Zapytanie ofertowe', EXISTING_CLIENT:'Klient istniejący',\n COMPLAINT_ESCALATION:'Eskalacja reklamacji', BILLING:'Rozliczenia',\n TECHNICAL_INCIDENT:'Incydent techniczny', LEGAL_PRIVACY:'Kwestie prawne i prywatność',\n PARTNERSHIP_RECRUITMENT:'Współpraca i rekrutacja', OTHER:'Inne'\n};\nconst urgPL={normal:'zwykła',high:'wysoka',critical:'krytyczna'};\nreturn $input.all().map(x=>{\n const j=x.json; const owner=roleMap[j.category]||$env.DISCORD_ROLE_ADMIN;\n const crisis=j.urgency==='critical'?$env.DISCORD_ROLE_CRISIS:'';\n const backup=j.urgency==='critical'?$env.DISCORD_ROLE_CRISIS_BACKUP:'';\n const mentions=[...new Set([crisis,owner,backup].filter(Boolean))].map(id=>'<@&'+id+'>').join(' ');\n const icon={normal:'🟢',high:'🟠',critical:'🔴'}[j.urgency]||'🟢';\n const threadId=encodeURIComponent(String(j.gmail_thread_id||j.gmail_message_id||''));\n const gmailUrl='https://mail.google.com/mail/u/0/#all/'+threadId;\n const clean=(v,max)=>String(v||'').replace(/https?:\\/\\/\\S+/gi,'[link removed]').replace(/<@!?&?\\d+>|@everyone|@here/gi,'').replace(/```[\\s\\S]*?```/g,'').replace(/\\r/g,'').trim().slice(0,max);\n const summaryRaw=clean(j.summary,420);\n const summaryParts=summaryRaw.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];\n const summary=summaryParts.slice(0,3).join(' ').replace(/\\s+/g,' ').trim()||'Brak krótkiego podsumowania — otwórz wiadomość w Gmail.';\n const draft=clean(j.draft_body,900)||'Draft wymaga ręcznego przygotowania.';\n const quote=v=>String(v).split('\\n').map(line=>'> '+line).join('\\n');\n const content=icon+' **'+(catPL[j.category]||j.category)+'** • priorytet: '+(urgPL[j.urgency]||j.urgency)+'\\nWłaściciel: '+mentions+'\\n\\n**Podsumowanie**\\n'+quote(summary)+'\\n\\n**Propozycja odpowiedzi**\\n'+quote(draft)+'\\n\\n📨 [Otwórz wiadomość w Gmail]('+gmailUrl+')';\n return {json:{...j,_discord_content:content,_discord_route:routeMap[j.category]||'administration',_after_discord_status:'NOTIFIED'}};\n});\n"
       }
-    },
-    {
-      "id": "act-discord",
-      "name": "Discord Alert",
-      "type": "n8n-nodes-base.discord",
-      "typeVersion": 2,
-      "position": [
-        1100,
-        -140
-      ],
-      "parameters": {
-        "authentication": "webhook",
-        "operation": "sendLegacy",
-        "content": "={{$json._discord_content}}",
-        "options": {
-          "wait": true
-        }
-      },
-      "credentials": {
-        "discordWebhookApi": {
-          "id": "__CREDENTIAL_DISCORD_TRIAGE_ID__",
-          "name": "Discord - Mail Triage"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
     },
     {
       "id": "act-mark-notified",
@@ -526,7 +465,7 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1320,
+        1540,
         -140
       ],
       "parameters": {
@@ -735,259 +674,6 @@
       }
     },
     {
-      "id": "act-select-escalation",
-      "name": "Select Critical Escalation",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        660,
-        140
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "\nreturn $input.all().filter(x=>x.json.status==='NEEDS_ESCALATION' && x.json.discord_notified).slice(0,10).map(x=>({json:{...x.json,_alert_subject:'[CRITICAL] Mail triage: '+x.json.category,_alert_body:'Critical triage item requires review.\\nCategory: '+x.json.category+'\\nGmail message ID: '+x.json.gmail_message_id+'\\nNo email body or personal data is included in this alert.'}}));\n"
-      }
-    },
-    {
-      "id": "act-send-escalation",
-      "name": "Discord Critical Escalation",
-      "type": "n8n-nodes-base.discord",
-      "typeVersion": 2,
-      "position": [
-        880,
-        140
-      ],
-      "parameters": {
-        "authentication": "webhook",
-        "operation": "sendLegacy",
-        "content": "={{ '🔴 **Critical escalation**\\n' + $json._alert_body }}",
-        "options": {
-          "wait": true
-        }
-      },
-      "credentials": {
-        "discordWebhookApi": {
-          "id": "__CREDENTIAL_DISCORD_TRIAGE_ID__",
-          "name": "Discord - Mail Triage"
-        }
-      },
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
-    },
-    {
-      "id": "act-mark-escalated",
-      "name": "Mark ESCALATED",
-      "type": "n8n-nodes-base.dataTable",
-      "typeVersion": 1.1,
-      "position": [
-        1100,
-        140
-      ],
-      "parameters": {
-        "resource": "row",
-        "operation": "update",
-        "dataTableId": {
-          "mode": "name",
-          "value": "message_processing_state"
-        },
-        "options": {},
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "gmail_message_id": "={{ $('Select Critical Escalation').item.json.gmail_message_id }}",
-            "status": "ESCALATED",
-            "updated_at": "={{new Date().toISOString()}}"
-          },
-          "matchingColumns": [
-            "gmail_message_id"
-          ],
-          "schema": [
-            {
-              "id": "gmail_message_id",
-              "displayName": "gmail_message_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "gmail_thread_id",
-              "displayName": "gmail_thread_id",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "category",
-              "displayName": "category",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "urgency",
-              "displayName": "urgency",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "confidence",
-              "displayName": "confidence",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "draft_created",
-              "displayName": "draft_created",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "discord_notified",
-              "displayName": "discord_notified",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "boolean",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "attempts",
-              "displayName": "attempts",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "number",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "next_retry_at",
-              "displayName": "next_retry_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "date",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "last_error",
-              "displayName": "last_error",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "date",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "updated_at",
-              "displayName": "updated_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "date",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "processed_at",
-              "displayName": "processed_at",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "date",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "sender_reply_address",
-              "displayName": "sender_reply_address",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "subject",
-              "displayName": "subject",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "lang",
-              "displayName": "lang",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "draft_body",
-              "displayName": "draft_body",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "summary",
-              "displayName": "summary",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ]
-        },
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "gmail_message_id",
-              "condition": "eq",
-              "keyValue": "={{ $('Select Critical Escalation').item.json.gmail_message_id }}"
-            }
-          ]
-        }
-      }
-    },
-    {
       "id": "act-select-finalize",
       "name": "Select Finalize Work",
       "type": "n8n-nodes-base.code",
@@ -998,7 +684,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nconst L={processed:'__LABEL_AUTO_PROCESSED__',processing:'__LABEL_AUTO_PROCESSING__',urgent:'__LABEL_AUTO_URGENT__',manual:'__LABEL_AUTO_MANUAL_REVIEW__',quarantine:'__LABEL_AUTO_QUARANTINED__',spam:'__LABEL_AUTO_SPAM__'};\nreturn $input.all().filter(x=>{\n const j=x.json;\n return ['NOTIFIED','ESCALATED'].includes(j.status) || (j.status==='QUARANTINED'&&!j.processed_at) || (['CLASSIFIED','RETRY'].includes(j.status)&&['SPAM','PROMPT_INJECTION'].includes(j.category));\n}).slice(0,30).map(x=>{\n const j=x.json; const ids=[]; let final='PROCESSED';\n if(j.category==='PROMPT_INJECTION'||j.status==='QUARANTINED'){ids.push(L.quarantine);final='QUARANTINED';}\n else {ids.push(L.processed); if(j.category==='SPAM')ids.push(L.spam); if(j.urgency==='critical')ids.push(L.urgent); if(Number(j.confidence||0)<0.75)ids.push(L.manual);}\n return {json:{...j,_label_ids:ids,_final_status:final}};\n});\n"
+        "jsCode": "\nconst L={processed:'__LABEL_AUTO_PROCESSED__',processing:'__LABEL_AUTO_PROCESSING__',urgent:'__LABEL_AUTO_URGENT__',manual:'__LABEL_AUTO_MANUAL_REVIEW__',quarantine:'__LABEL_AUTO_QUARANTINED__',spam:'__LABEL_AUTO_SPAM__'};\nconst C={OFFER_INQUIRY:'__LABEL_CATEGORY_OFFER_INQUIRY__',EXISTING_CLIENT:'__LABEL_CATEGORY_EXISTING_CLIENT__',COMPLAINT_ESCALATION:'__LABEL_CATEGORY_COMPLAINT_ESCALATION__',BILLING:'__LABEL_CATEGORY_BILLING__',TECHNICAL_INCIDENT:'__LABEL_CATEGORY_TECHNICAL_INCIDENT__',LEGAL_PRIVACY:'__LABEL_CATEGORY_LEGAL_PRIVACY__',PARTNERSHIP_RECRUITMENT:'__LABEL_CATEGORY_PARTNERSHIP_RECRUITMENT__',OTHER:'__LABEL_CATEGORY_OTHER__',SPAM:'__LABEL_CATEGORY_SPAM__'};\nreturn $input.all().filter(x=>{\n const j=x.json;\n return ['NOTIFIED','ESCALATED'].includes(j.status) || (j.status==='QUARANTINED'&&!j.processed_at) || (j.status==='CLASSIFIED'&&['SPAM','PROMPT_INJECTION'].includes(j.category));\n}).slice(0,30).map(x=>{\n const j=x.json; const ids=[]; let final='PROCESSED';\n if(j.category==='PROMPT_INJECTION'||j.status==='QUARANTINED'){ids.push(L.quarantine);final='QUARANTINED';}\n else {ids.push(L.processed); if(C[j.category])ids.push(C[j.category]); if(j.category==='SPAM')ids.push(L.spam); if(j.urgency==='critical')ids.push(L.urgent); if(Number(j.confidence||0)<0.75)ids.push(L.manual);}\n return {json:{...j,_label_ids:ids,_final_status:final}};\n});\n"
       }
     },
     {
@@ -1019,7 +705,16 @@
           "__LABEL_AUTO_URGENT__",
           "__LABEL_AUTO_MANUAL_REVIEW__",
           "__LABEL_AUTO_QUARANTINED__",
-          "__LABEL_AUTO_SPAM__"
+          "__LABEL_AUTO_SPAM__",
+          "__LABEL_CATEGORY_OFFER_INQUIRY__",
+          "__LABEL_CATEGORY_EXISTING_CLIENT__",
+          "__LABEL_CATEGORY_COMPLAINT_ESCALATION__",
+          "__LABEL_CATEGORY_BILLING__",
+          "__LABEL_CATEGORY_TECHNICAL_INCIDENT__",
+          "__LABEL_CATEGORY_LEGAL_PRIVACY__",
+          "__LABEL_CATEGORY_PARTNERSHIP_RECRUITMENT__",
+          "__LABEL_CATEGORY_OTHER__",
+          "__LABEL_CATEGORY_SPAM__"
         ]
       },
       "credentials": {
@@ -1323,7 +1018,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "\nreturn $input.all().map(x=>{\n  const j=x.json;\n  const reference=String(j.gmail_thread_id||j.gmail_message_id||'unknown').slice(0,96);\n  const quarantinedAt=String(j.processed_at||j.updated_at||new Date().toISOString()).slice(0,40);\n  const adminRole=String($env.DISCORD_ROLE_ADMIN||'').replace(/\\D/g,'').slice(0,24);\n  const mention=adminRole?'<@&'+adminRole+'>\\n':'';\n  return {json:{...j,_admin_alert:mention+'🛡️ **Prompt-injection email quarantined**\\nReference: `'+reference+'`\\nQuarantined at: '+quarantinedAt+'\\nNo personal email fields included.'}};\n});\n"
+        "jsCode": "\nreturn $input.all().map(x=>{\n  const j=x.json;\n  const quarantinedAt=String(j.processed_at||j.updated_at||new Date().toISOString()).slice(0,40);\n  const adminRole=String($env.DISCORD_ROLE_ADMIN||'').replace(/\\D/g,'').slice(0,24);\n  const mention=adminRole?'<@&'+adminRole+'>\\n':'';\n  const threadId=encodeURIComponent(String(j.gmail_thread_id||j.gmail_message_id||''));\n  const gmailUrl='https://mail.google.com/mail/u/0/#all/'+threadId;\n  return {json:{...j,_admin_alert:mention+'🛡️ **E-mail z próbą prompt-injection poddany kwarantannie**\\n📨 [Otwórz wiadomość w Gmail]('+gmailUrl+')\\nCzas kwarantanny: '+quarantinedAt+'\\nW alercie nie zawarto pól osobowych wiadomości.'}};\n});\n"
       }
     },
     {
@@ -1345,8 +1040,8 @@
       },
       "credentials": {
         "discordWebhookApi": {
-          "id": "__CREDENTIAL_DISCORD_ERROR_ID__",
-          "name": "Discord - Automation Alerts"
+          "id": "__CREDENTIAL_DISCORD_OTHER_ID__",
+          "name": "Discord - Inne"
         }
       },
       "retryOnFail": true,
@@ -1566,6 +1261,293 @@
           ]
         }
       }
+    },
+    {
+      "id": "act-route-sales",
+      "name": "Route Sales",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -440
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().filter(x=>x.json._discord_route==='sales');"
+      }
+    },
+    {
+      "id": "act-discord-sales",
+      "name": "Discord Sales",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -440
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_SALES_ID__",
+          "name": "Discord - Sprzedaż"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-route-client-success",
+      "name": "Route Client Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -330
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().filter(x=>x.json._discord_route==='client_success');"
+      }
+    },
+    {
+      "id": "act-discord-client-success",
+      "name": "Discord Client Success",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -330
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_CLIENT_SUCCESS_ID__",
+          "name": "Discord - Obsługa klienta"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-route-crisis",
+      "name": "Route Crisis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().filter(x=>x.json._discord_route==='crisis');"
+      }
+    },
+    {
+      "id": "act-discord-crisis",
+      "name": "Discord Crisis",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -220
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_CRISIS_ID__",
+          "name": "Discord - Incydenty i eskalacje"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-route-finance",
+      "name": "Route Finance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -110
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().filter(x=>x.json._discord_route==='finance');"
+      }
+    },
+    {
+      "id": "act-discord-finance",
+      "name": "Discord Finance",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -110
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_FINANCE_ID__",
+          "name": "Discord - Finanse"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-route-legal-privacy",
+      "name": "Route Legal Privacy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().filter(x=>x.json._discord_route==='legal_privacy');"
+      }
+    },
+    {
+      "id": "act-discord-legal-privacy",
+      "name": "Discord Legal Privacy",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_LEGAL_PRIVACY_ID__",
+          "name": "Discord - Prawo i prywatność"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-route-administration",
+      "name": "Route Administration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        110
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().filter(x=>x.json._discord_route==='administration');"
+      }
+    },
+    {
+      "id": "act-discord-administration",
+      "name": "Discord Administration",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        110
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_ADMINISTRATION_ID__",
+          "name": "Discord - Administracja"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "act-route-other",
+      "name": "Route Other",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all().filter(x=>x.json._discord_route==='other');"
+      }
+    },
+    {
+      "id": "act-discord-other",
+      "name": "Discord Other",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        220
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "sendLegacy",
+        "content": "={{$json._discord_content}}",
+        "options": {
+          "wait": true
+        }
+      },
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "__CREDENTIAL_DISCORD_OTHER_ID__",
+          "name": "Discord - Inne"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     }
   ],
   "connections": {
@@ -1579,11 +1561,6 @@
           },
           {
             "node": "Tick Discord",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Tick Escalation",
             "type": "main",
             "index": 0
           },
@@ -1610,11 +1587,6 @@
           },
           {
             "node": "Tick Discord",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Tick Escalation",
             "type": "main",
             "index": 0
           },
@@ -1647,17 +1619,6 @@
         [
           {
             "node": "Load Discord State",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Tick Escalation": {
-      "main": [
-        [
-          {
-            "node": "Load Escalation State",
             "type": "main",
             "index": 0
           }
@@ -1735,61 +1696,6 @@
         [
           {
             "node": "Build Discord",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Discord": {
-      "main": [
-        [
-          {
-            "node": "Discord Alert",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Discord Alert": {
-      "main": [
-        [
-          {
-            "node": "Mark NOTIFIED",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Load Escalation State": {
-      "main": [
-        [
-          {
-            "node": "Select Critical Escalation",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Select Critical Escalation": {
-      "main": [
-        [
-          {
-            "node": "Discord Critical Escalation",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Discord Critical Escalation": {
-      "main": [
-        [
-          {
-            "node": "Mark ESCALATED",
             "type": "main",
             "index": 0
           }
@@ -1889,6 +1795,201 @@
         [
           {
             "node": "Mark Security Alerted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Discord": {
+      "main": [
+        [
+          {
+            "node": "Route Sales",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route Client Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route Crisis",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route Finance",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route Legal Privacy",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route Administration",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route Other",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Sales": {
+      "main": [
+        [
+          {
+            "node": "Discord Sales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Sales": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Client Success": {
+      "main": [
+        [
+          {
+            "node": "Discord Client Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Client Success": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Crisis": {
+      "main": [
+        [
+          {
+            "node": "Discord Crisis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Crisis": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Finance": {
+      "main": [
+        [
+          {
+            "node": "Discord Finance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Finance": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Legal Privacy": {
+      "main": [
+        [
+          {
+            "node": "Discord Legal Privacy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Legal Privacy": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Administration": {
+      "main": [
+        [
+          {
+            "node": "Discord Administration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Administration": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Other": {
+      "main": [
+        [
+          {
+            "node": "Discord Other",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Other": {
+      "main": [
+        [
+          {
+            "node": "Mark NOTIFIED",
             "type": "main",
             "index": 0
           }
