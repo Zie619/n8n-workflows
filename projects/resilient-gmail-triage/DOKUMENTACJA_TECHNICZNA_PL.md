@@ -62,7 +62,7 @@ System **nie wysyła odpowiedzi do nadawcy automatycznie**. Tworzy draft przezna
 | Workflow 05 | nieaktywny, 4 node'y |
 | `message_processing_state` | 10 rekordów: 9 `PROCESSED`, 1 `QUARANTINED` |
 | `system_health` | 9 komponentów |
-| Test suite | `78 passed` |
+| Test suite | `59 passed` |
 
 ---
 
@@ -936,7 +936,7 @@ Po testach aktywuj w kolejności:
 Zweryfikowany wynik:
 
 ```text
-78 passed in 2.39s
+59 passed in 2.12s
 ```
 
 Testy obejmują m.in.:
@@ -946,10 +946,8 @@ Testy obejmują m.in.:
 - expected credentials i Data Tables;
 - placeholdery etykiet;
 - logikę state machine;
-- stress fixture generator i sender;
-- audit stress run;
 - controlled failure i manual launcher;
-- język polski materiałów demo.
+- testy narzędzia mail_tester.
 
 ### Minimalny test UI jednego maila
 
@@ -1006,9 +1004,7 @@ Należy backupować:
 - lokalny, niecommitowany label map;
 - konfigurację environment variables ról Discord.
 
-### Tunel Lapatron
-
-UI n8n jest dostępne na Lapatronie przez tunel SSH pod:
+UI n8n jest dostępne lokalnie pod:
 
 ```text
 http://127.0.0.1:5678
@@ -1016,9 +1012,9 @@ http://127.0.0.1:5678
 
 Brak odpowiedzi pod tym adresem nie musi oznaczać awarii n8n. Najpierw sprawdź:
 
-1. health n8n na hoście;
-2. listener `127.0.0.1:5678` na Lapatronie;
-3. proces/tunel SSH.
+1. health n8n (`GET /healthz`);
+2. czy proces n8n działa;
+3. czy port jest poprawnie wystawiony.
 
 ---
 
@@ -1095,20 +1091,13 @@ resilient-gmail-triage/
 ├── src/
 │   ├── generate_workflows.py
 │   ├── deploy.py
-│   ├── state_machine.py
-│   ├── generate_stress_fixtures.py
-│   ├── send_stress_batch.py
-│   ├── collect_stress_audit.py
-│   └── audit_stress_run.py
+│   └── state_machine.py
 ├── tests/
 │   ├── test_workflows.py
 │   ├── test_state_machine.py
 │   ├── test_deploy.py
 │   ├── test_controlled_failure.py
-│   ├── test_stress_fixtures.py
-│   ├── test_stress_sender.py
-│   ├── test_stress_audit.py
-│   └── test_demo_language.py
+│   └── test_mail_tester.py
 └── docs/
     ├── ARCHITECTURE.md
     ├── UI_ACCEPTANCE_PL.md
