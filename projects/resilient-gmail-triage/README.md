@@ -136,7 +136,5 @@ Open `http://127.0.0.1:8040`. See [`tools/mail_tester/README.md`](tools/mail_tes
 - [`DOKUMENTACJA_REKRUTACYJNA_PL.md`](DOKUMENTACJA_REKRUTACYJNA_PL.md) — short submission document
 - [`DOKUMENTACJA_TECHNICZNA_PL.md`](DOKUMENTACJA_TECHNICZNA_PL.md) — detailed technical appendix
 - [`docs/UI_ACCEPTANCE_PL.md`](docs/UI_ACCEPTANCE_PL.md) — acceptance procedure
-- [`ODPOWIEDZI_NA_CASEY_PL.md`](ODPOWIEDZI_NA_CASEY_PL.md) — client communication cases
-- [`WYZWANIA_I_DECYZJE_PL.md`](WYZWANIA_I_DECYZJE_PL.md) — challenges, trade-offs and next steps
 
 This project is developed in a fork of the MIT-licensed [`Zie619/n8n-workflows`](https://github.com/Zie619/n8n-workflows) collection. Existing workflows were used as pattern references only; the five workflows in this directory were generated for this solution.

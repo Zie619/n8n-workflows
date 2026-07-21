@@ -138,4 +138,4 @@ Do testów przygotowałem lokalną stronę `Test Mail Console`. Użytkownik moż
 
 Na działającej instancji przetworzono dziesięć syntetycznych wiadomości pokrywających wszystkie kolejki: dziewięć zakończyło się `PROCESSED`, a próba prompt injection została `QUARANTINED`. Powstało osiem draftów biznesowych i dziewięć notyfikacji Discord, wliczając alert bezpieczeństwa. Kontrolowany błąd utworzył wpis w `system_events` oraz alert techniczny. Pełny suite repozytorium zakończył się wynikiem **59 passed**.
 
-Materiały szczegółowe: pełna dokumentacja techniczna, eksporty pięciu workflow, odpowiedzi na siedem sytuacji projektowych oraz instrukcja UI acceptance znajdują się w repozytorium projektu.
+Materiały szczegółowe: pełna dokumentacja techniczna, eksporty pięciu workflow oraz instrukcja UI acceptance znajdują się w repozytorium projektu.
